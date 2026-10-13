@@ -1,0 +1,392 @@
+# ============================================================================================
+#  POLÍTICA DE AUTONOMÍA DEL ASISTENTE
+#  Qué hace por su cuenta y qué te pregunta antes.
+# ============================================================================================
+#
+#  CÓMO FUNCIONA
+#   - El asistente actúa SOLO, sin preguntar, salvo que lo que va a hacer encaje en alguna de las
+#     secciones CRÍTICAS de este archivo. En ese caso deja la acción preparada y espera tu confirmación.
+#   - Además hay un BLOQUEO DURO en el código (borrar el sistema, formatear discos, leer claves,
+#     descargar y ejecutar scripts de internet...). Eso no se puede desbloquear desde aquí ni diciendo que sí.
+#   - Solo LEER algo (cat, ls, grep...) nunca es crítico, aunque sea una ruta crítica.
+#   - Se relee solo al guardar el archivo: NO hace falta reiniciar. Si te equivocas al escribir, el registro
+#     del asistente (journalctl --user -u lina) te avisa de qué línea es y usa los valores de fábrica
+#     de la sección que falte.
+#   - Este archivo lo protege el código: el asistente NO puede modificarlo por voz. Lo que se pregunta y lo
+#     que no lo decides tú, a mano.
+#
+#  FORMATO de las líneas dentro de cada sección crítica  (una regla por línea; # para comentarios):
+#     motivo TEXTO                      lo que se te dice al pedir confirmación
+#     programa NOMBRE                   cualquier uso de ese programa (admite *, por ejemplo  mkfs.*)
+#     subcomando PROGRAMA PAL1 PAL2     ese programa con alguna de esas palabras (btrfs balance)
+#     bandera PROGRAMA OPC1 OPC2        ese programa con alguna de esas opciones (pacman -U)
+#     ruta PATRON                       si el comando modifica algo en esa ruta. Admite *; sin * incluye
+#                                       todo lo que haya dentro. ~ es tu carpeta personal.
+#     servicio UNIDAD                   systemctl start/stop/restart/enable/disable... de ese servicio
+#     paquete PATRON                    instalar o quitar ese paquete con pacman, paru o yay
+#     ejecutar_desde RUTA               ejecutar un programa o script que esté en esa ruta
+#
+#  CÓMO AJUSTARLO
+#   - ¿Quieres que te pregunte MENOS por algo? Borra la línea (o la sección entera).
+#   - ¿Quieres que te pregunte MÁS? Añade líneas, o cambia  autonomia  a  prudente  (abajo).
+#   - Si dejas una sección sin ninguna línea, esa categoría queda sin vigilar.
+# ============================================================================================
+
+
+# --------------------------------------------------------------------------------------------
+#  MODO
+#    alta      actúa solo en todo lo que no sea crítico (lo que has pedido)
+#    prudente  como antes: pide confirmación para casi todo lo que cambie algo. Útil si algún día quieres
+#              apretar las tuercas sin tocar nada más.
+# --------------------------------------------------------------------------------------------
+[modo]
+autonomia alta
+
+
+# --------------------------------------------------------------------------------------------
+#  LÍMITES
+#    borrados_masivos   a la papelera se pueden mandar hasta este número de archivos de golpe. Más de eso, o
+#                       cualquier comodín (*), se considera borrado masivo y pide confirmación.
+# --------------------------------------------------------------------------------------------
+[limites]
+borrados_masivos 10
+
+
+# --------------------------------------------------------------------------------------------
+#  CONTENIDO DE FUERA  (buscar en internet, descargar cosas...)
+#    no   El asistente puede buscar en internet, probar lo que encuentre y, si no funciona, probar otra cosa, todo
+#         por su cuenta y SIN pedirte confirmación. Lo crítico de más abajo SÍ la sigue pidiendo. (Lo que has pedido.)
+#    si   Después de leer algo de internet o de un archivo descargado, los cambios «libres» de esa misma petición
+#         piden confirmación, por si una web trajera instrucciones escondidas para la IA.
+#  Con «no» sigues protegido por: las secciones críticas de abajo, los bloqueos duros del código, las snapshots
+#  automáticas y el diario con «deshaz lo último». Lo que NO te protege: una web maliciosa podría hacer que la IA
+#  cambie por su cuenta cosas no críticas (siempre anotadas y casi siempre reversibles).
+# --------------------------------------------------------------------------------------------
+[contenido_de_fuera]
+frenar_cambios no
+
+
+# ============================================================================================
+#  SECCIONES CRÍTICAS (piden confirmación)
+# ============================================================================================
+
+# 1) Particiones, formatear o tocar otros discos (otros sistemas y discos).
+#    Copiar archivos a otro disco es normal y no entra aquí: lo que vigila es tocar los discos en sí.
+[discos_y_particiones]
+motivo toca discos o particiones (también los de otros sistemas)
+ruta /dev/nvme*
+ruta /dev/sd*
+ruta /dev/vd*
+ruta /dev/hd*
+ruta /dev/mmcblk*
+ruta /dev/disk/*
+ruta /dev/mapper/*
+ruta /dev/md*
+programa mount
+programa umount
+programa fsck
+programa fsck.*
+programa e2fsck
+programa ntfsfix
+programa ntfsresize
+programa resize2fs
+programa tune2fs
+programa losetup
+programa swapon
+programa swapoff
+subcomando btrfs balance check device rescue resize defragment scrub
+
+
+# 2) Arranque: gestor de arranque (Limine, GRUB, systemd-boot...), fstab, parámetros del kernel, initramfs.
+#    Los paquetes de esta sección se vigilan al instalarlos o quitarlos (una actualización normal, pacman -Syu,
+#    no entra: ya crea su propia snapshot).
+[arranque]
+motivo toca el arranque del sistema, el kernel o los controladores base
+ruta /boot
+ruta /efi
+ruta /etc/fstab
+ruta /etc/crypttab
+ruta /etc/default/limine
+ruta /etc/limine*
+ruta /etc/default/grub
+ruta /etc/kernel
+ruta /etc/mkinitcpio.conf
+ruta /etc/mkinitcpio.d
+ruta /etc/modprobe.d
+ruta /etc/modules-load.d
+ruta /etc/sysctl.conf
+ruta /etc/sysctl.d
+ruta /usr/lib/modules
+ruta /sys/module
+ruta /proc/sys
+programa mkinitcpio
+programa limine-*
+programa efibootmgr
+programa bootctl
+programa grub-*
+programa update-grub
+programa sbctl
+programa dracut
+programa kernel-install
+programa depmod
+programa modprobe
+programa insmod
+programa rmmod
+bandera sysctl -w --write -p --load --system
+paquete linux
+paquete linux-*
+paquete limine*
+paquete mkinitcpio*
+paquete systemd
+paquete systemd-*
+paquete glibc
+paquete pacman
+paquete filesystem
+paquete base
+paquete btrfs-progs
+paquete nvidia*
+paquete lib32-nvidia*
+
+
+# 3) Usuarios, contraseñas, permisos de administrador, claves y credenciales.
+[cuentas_y_credenciales]
+motivo toca usuarios, contraseñas, permisos de administrador o claves
+ruta /etc/passwd
+ruta /etc/shadow
+ruta /etc/group
+ruta /etc/gshadow
+ruta /etc/sudoers
+ruta /etc/sudoers.d
+ruta /etc/pam.d
+ruta /etc/security
+ruta /etc/polkit-1
+ruta /usr/share/polkit-1
+ruta ~/.ssh
+ruta ~/.gnupg
+ruta ~/.password-store
+ruta ~/.local/share/kwalletd
+programa passwd
+programa chpasswd
+programa chage
+programa gpasswd
+programa groupadd
+programa groupdel
+programa groupmod
+programa useradd
+programa userdel
+programa usermod
+programa visudo
+programa ssh-keygen
+programa ssh-add
+programa gpg
+programa gpg2
+programa kwallet-query
+programa secret-tool
+programa keyctl
+
+
+# 4) Red expuesta: cortafuegos, SSH, abrir puertos.
+[red_expuesta]
+motivo cambia el cortafuegos, SSH o algo que expone tu PC a la red
+programa ufw
+programa iptables
+programa ip6tables
+programa iptables-restore
+programa nft
+programa firewall-cmd
+servicio sshd
+servicio ssh
+servicio nftables
+servicio ufw
+servicio firewalld
+servicio iptables
+servicio ip6tables
+servicio avahi-daemon
+servicio smb
+servicio smbd
+servicio nmb
+servicio nfs-server
+servicio nginx
+servicio httpd
+servicio apache2
+ruta /etc/ssh
+ruta /etc/nftables.conf
+ruta /etc/ufw
+ruta /etc/firewalld
+ruta /etc/iptables
+ruta /etc/hosts
+ruta /etc/resolv.conf
+ruta /etc/NetworkManager
+ruta /etc/systemd/network
+ruta /etc/systemd/resolved.conf
+ruta /etc/systemd/resolved.conf.d
+ruta /etc/samba
+ruta /etc/exports
+ruta /etc/nginx
+ruta /etc/httpd
+ruta /etc/apache2
+bandera nc -l --listen
+bandera ncat -l --listen
+
+
+# 5) Borrar sin pasar por la papelera, o borrados masivos.
+#    Los borrados normales de tus archivos ya van a la papelera y no entran aquí. Aquí entra borrar de verdad
+#    (rm, shred...) salvo en las zonas desechables de abajo, y mandar muchos archivos de golpe a la papelera
+#    (ver [limites]).
+[borrado]
+motivo borra de forma definitiva, o muchos archivos de golpe
+programa rm
+programa unlink
+programa shred
+programa wipe
+programa srm
+programa truncate
+programa dd
+
+
+# 6) Ejecutar scripts bajados de internet, o software de fuera de las fuentes de confianza.
+#    Va directo: repositorios oficiales de pacman y Flathub. Pide confirmación: el AUR (paru, yay), pip, npm,
+#    cargo..., paquetes sueltos (pacman -U), añadir repositorios y ejecutar lo que haya en Descargas.
+[software_de_fuera]
+motivo instala o ejecuta software de fuera de las fuentes de confianza
+programa paru
+programa yay
+programa pikaur
+programa aurman
+programa makepkg
+programa pacman-key
+programa pip
+programa pip3
+programa pipx
+programa uv
+programa npm
+programa npx
+programa pnpm
+programa yarn
+programa cargo
+programa go
+programa gem
+programa composer
+programa *.AppImage
+programa *.run
+bandera pacman -U --upgrade
+subcomando flatpak remote-add remote-modify remote-delete
+ruta /etc/pacman.conf
+ruta /etc/pacman.d
+ruta /usr/local/bin
+ruta /usr/local/sbin
+ruta /opt
+ejecutar_desde ~/Descargas
+ejecutar_desde ~/Downloads
+
+
+# 7) Cualquier cosa que cueste dinero.
+#    Desde la terminal solo se pueden vigilar servicios de pago en la nube. Las compras en una web las evita
+#    la regla de la IA de no comprar nada, y el gasto del propio asistente tiene su sección aparte.
+[dinero]
+motivo puede costar dinero
+programa aws
+programa gcloud
+programa az
+programa doctl
+programa hcloud
+programa linode-cli
+programa terraform
+programa pulumi
+programa stripe
+
+
+# 8) Subir el límite de gasto del asistente (se estrena al llegar el control de gasto; solo con tu voz).
+[gasto_del_asistente]
+motivo cambia el límite de gasto del asistente
+
+
+# 9) Apagar, reiniciar o cerrar sesión (tira todo lo que tengas abierto).
+#    Sección extra, no incluida en la lista básica. Si no la quieres, borra la sección entera.
+[sesion]
+motivo apaga, reinicia o cierra tu sesión, o reinicia el escritorio (perderías lo que tengas abierto)
+programa reboot
+programa poweroff
+programa shutdown
+programa halt
+programa kexec
+subcomando systemctl reboot poweroff halt kexec suspend hibernate hybrid-sleep suspend-then-hibernate soft-reboot
+subcomando loginctl terminate-user terminate-session kill-user kill-session poweroff reboot suspend hibernate
+servicio sddm
+servicio display-manager
+servicio systemd-logind
+servicio plasma-kwin_wayland
+servicio plasma-kwin_x11
+servicio plasma-workspace
+servicio plasma-plasmashell
+programa kwin_wayland
+programa kwin_x11
+
+
+# 10) Crear servicios o tareas automáticas del sistema (formas de dejar algo ejecutándose para siempre).
+#     Sección extra, no incluida en la lista básica. Si no la quieres, borra la sección entera.
+[persistencia]
+motivo crea servicios o tareas automáticas, o cambia lo que se carga siempre al iniciar sesión o al abrir cualquier juego
+ruta /etc/systemd/system
+ruta /usr/lib/systemd/system
+ruta /etc/cron*
+ruta /var/spool/cron
+ruta /etc/profile
+ruta /etc/profile.d
+ruta /etc/environment
+ruta /etc/xdg/autostart
+ruta ~/.config/autostart
+ruta ~/.config/systemd/user
+ruta ~/.bashrc
+ruta ~/.bash_profile
+ruta ~/.bash_login
+ruta ~/.profile
+ruta ~/.zshrc
+ruta ~/.zshenv
+ruta ~/.zprofile
+ruta ~/.config/fish
+ruta ~/.config/environment.d
+ruta ~/.config/plasma-workspace/env
+ruta ~/.local/share/vulkan
+ruta ~/.config/vulkan
+ruta /etc/vulkan
+ruta /usr/share/vulkan
+ruta /etc/ld.so.preload
+ruta /etc/ld.so.conf.d
+ruta /etc/udev/rules.d
+ruta /usr/lib/udev/rules.d
+programa crontab
+programa at
+programa batch
+
+
+# 11) Modificar archivos que pertenecen a programas instalados (/usr/bin, /usr/lib, /usr/share...).
+#     Evita que el asistente «arregle» un programa editando /usr/bin con sed o creando enlaces ahí.
+#     Esos archivos son de pacman: un parche a mano se pierde o rompe cosas al actualizar. Instalar con pacman NO entra aquí.
+#     Si no la quieres, borra la sección entera.
+[archivos_de_paquetes]
+motivo modifica archivos de programas instalados (/usr, /bin...): un parche a mano se pierde o rompe al actualizar
+ruta /usr/bin
+ruta /usr/sbin
+ruta /usr/lib
+ruta /usr/lib64
+ruta /usr/libexec
+ruta /usr/share
+ruta /usr/include
+ruta /bin
+ruta /sbin
+ruta /lib
+ruta /lib64
+
+
+# ============================================================================================
+#  ZONAS DESECHABLES
+#  Aquí SÍ puede borrar de verdad (rm) sin preguntar: son cachés y temporales que se regeneran.
+#  Si en una de estas rutas hay cosas tuyas, bórrala de la lista.
+# ============================================================================================
+[zonas_desechables]
+ruta /tmp
+ruta /var/tmp
+ruta /dev/shm
+ruta ~/.cache
+ruta /var/cache

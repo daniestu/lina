@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lina-asistente"
+version = "0.1.0.dev0"
+description = "Lina: asistente de voz en español para el escritorio Linux"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Natural Language :: Spanish",
+    "Topic :: Desktop Environment",
+]
+dependencies = [
+    "numpy",
+    "sounddevice",
+    "faster-whisper",
+    "requests",
+    "pillow",
+    "python-docx",
+    "python-pptx",
+    "openpyxl",
+    "piper-tts",
+    "evdev; sys_platform == 'linux'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "pre-commit"]
+
+[project.scripts]
+lina = "lina.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+lina = ["datos/*", "escritorio/interfaz.sh"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 160
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82", "F401", "F811", "F841"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["F401", "F841", "F811", "F821"]

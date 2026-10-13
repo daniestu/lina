@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Datos del usuario y secretos: NUNCA al repositorio
+*.key
+*.env
+*.onnx
+*.onnx.json
+acciones.log
+*.log
+*.nuevo
+*.tmp
+.rastros-local
+
+# Editores y sistema
+.idea/
+.vscode/
+*.swp
+.DS_Store

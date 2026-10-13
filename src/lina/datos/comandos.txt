@@ -1,0 +1,351 @@
+# ============================================================================================
+#  ÓRDENES POR VOZ DEL ASISTENTE
+#  Todas las palabras y frases con las que el asistente reacciona a lo que dices, en un solo sitio.
+# ============================================================================================
+#
+#  CÓMO EDITARLO
+#   - Una palabra o frase por línea, bajo la sección que toque. Las líneas con # son comentarios.
+#   - No importan mayúsculas, tildes ni signos de puntuación: "Piénsalo" y "piensalo" son lo mismo.
+#   - Se relee solo cuando guardas el archivo: NO hace falta reiniciar el asistente.
+#   - Si te equivocas (una sección mal escrita, una frase demasiado corta...), el registro del
+#     asistente (journalctl --user -u lina) te avisa de qué línea es.
+#   - Si borras una sección entera, se usan los valores de fábrica. Si la dejas vacía, esa función
+#     queda desactivada (ver [profundo_automatico] para apagar las palabras automáticas).
+#   - Las frases muy cortas se ignoran (mínimo 4 letras en casi todas las secciones), porque
+#     saltarían sin querer.
+#   - Este archivo lo protege el código: el asistente NO puede modificarlo por voz. Las palabras de
+#     "sí" y "no" deciden si se ejecuta algo en tu PC, así que solo las cambias tú, a mano.
+# ============================================================================================
+
+
+# --------------------------------------------------------------------------------------------
+#  EMPEZAR UNA CONVERSACIÓN NUEVA
+#  Borra lo que el asistente recuerda de la conversación (y cancela lo que esté pendiente de
+#  confirmar). La frase tiene que EMPEZAR así: "Nueva conversación, ..." sí; "Oye, nueva
+#  conversación" no. Las dos primeras de la lista se le dan a Whisper como pista para que las oiga bien.
+# --------------------------------------------------------------------------------------------
+[reiniciar_conversacion]
+nueva conversación
+olvida lo anterior
+olvida todo
+empieza de nuevo
+empezamos de nuevo
+empecemos de nuevo
+borra la conversación
+
+
+# --------------------------------------------------------------------------------------------
+#  CANCELAR LO QUE ESTÁ HACIENDO
+#  Si el asistente está pensando o trabajando y pulsas el atajo, te escucha mientras sigue. Si lo que dices es SOLO
+#  una de estas frases (con un "ya" o un "por favor" detrás vale), lo deja: "Para", "Cancela eso", "Déjalo, por favor".
+#  Si dices otra cosa, abandona lo anterior y atiende lo nuevo. Frases como "para qué sirve esto" NO cancelan.
+# --------------------------------------------------------------------------------------------
+[cancelar]
+para
+para ya
+para eso
+pare
+detente
+detén eso
+stop
+alto
+cancela
+cancela eso
+cancélalo
+cancela todo
+déjalo
+déjalo estar
+olvídalo
+olvida eso
+basta
+ya vale
+da igual
+no importa
+no hagas nada
+no sigas
+no continúes
+
+
+# --------------------------------------------------------------------------------------------
+#  PETICIONES ABIERTAS  (activan el modo "a fondo" aunque no lo pidas)
+#  Cuando le pides que te lo deje todo listo para algo, antes de hacerlo hay que decidir CÓMO, y el modelo rápido tiende a
+#  quedarse con la primera herramienta que ve sin comprobar si sirve. Estas frases lo mandan al modelo con más razonamiento.
+#  Si te parece que salta de más, borra la frase; si falta alguna, añádela. Se busca en cualquier parte de lo que dices.
+# --------------------------------------------------------------------------------------------
+[profundo_peticiones_abiertas]
+configúramelo todo
+configúrmelo todo
+configurármelo todo
+déjamelo configurado
+déjamelo todo configurado
+prepáramelo todo
+quiero poder
+
+
+# --------------------------------------------------------------------------------------------
+#  VENTANAS SENSIBLES  (su captura de pantalla NUNCA se envía a Gemini)
+#  Si el título o la clase de la ventana activa contiene alguna de estas palabras (sin importar mayúsculas ni tildes), la captura no
+#  viaja con tu pregunta ni se puede pedir después. Es una red de seguridad que NO depende de lo que decida la IA.
+#  Añade las tuyas (el nombre de tu banco, de tu gestor de contraseñas…). Si salta de más, borra la palabra.
+#  Aparte: puedes decir «modo privado» (o «no mires mi pantalla») y no se envía ninguna captura hasta que lo quites.
+# --------------------------------------------------------------------------------------------
+[ventanas_sensibles]
+banco
+bank
+bbva
+santander
+caixabank
+caixa
+paypal
+revolut
+bizum
+facturación
+billing
+factura
+tarjeta
+tarjetas
+iban
+contraseña
+contraseñas
+password
+passwords
+keepass
+keepassxc
+bitwarden
+1password
+lastpass
+kwallet
+cartera
+wallet
+pago
+pagos
+payment
+checkout
+hacienda
+agencia tributaria
+sede electrónica
+clave de api
+api key
+api keys
+token
+secreto
+secret
+navegación privada
+private browsing
+incógnito
+incognito
+
+
+# --------------------------------------------------------------------------------------------
+#  MODO "A FONDO"  (más razonamiento y modelo más potente; tarda más)
+#  Hay cuatro formas de activarlo, una sección para cada una.
+# --------------------------------------------------------------------------------------------
+
+# 1) Frases que lo activan estén donde estén dentro de lo que dices.
+[profundo_frases]
+piensa bien
+piénsalo bien
+piénsalo mejor
+piénsalo despacio
+piénsalo a fondo
+piensa a fondo
+piensa con calma
+razona bien
+razónalo bien
+razona paso a paso
+analiza bien
+analízalo bien
+analízalo a fondo
+analiza a fondo
+investígalo a fondo
+investiga a fondo
+revísalo bien
+revisa bien
+mira bien
+comprueba bien
+compruébalo bien
+verifica bien
+verifícalo bien
+tómate tu tiempo
+tómate el tiempo
+tómate tiempo
+con calma
+con tranquilidad
+sin prisa
+con cuidado
+paso a paso
+paso por paso
+en profundidad
+a fondo
+a conciencia
+dale una vuelta
+dale vueltas
+razonamiento profundo
+modo razonamiento
+modo profundo
+todo tu razonamiento
+mejor modelo
+modelo potente
+modelo más potente
+modelo bueno
+
+# 2) Órdenes que no se confunden con otra cosa: valen en cualquier parte de la frase.
+[profundo_ordenes_en_cualquier_sitio]
+piénsalo
+pensalo
+razónalo
+analízalo
+investígalo
+reflexiónalo
+medítalo
+estudíalo
+examínalo
+profundiza
+esfuérzate
+asegúrate
+detenidamente
+detalladamente
+
+# 3) Verbos sueltos que también significan "piensa más", pero que aparecen en frases normales
+#    ("¿qué piensa Lydia de mí?"). Solo cuentan si están al PRINCIPIO de la frase (dentro de las
+#    4 primeras palabras) y sin una palabra de pregunta delante (la lista de justo debajo).
+[profundo_verbos_al_principio]
+piensa
+pensa
+razona
+analiza
+investiga
+reflexiona
+medita
+estudia
+examina
+evalúa
+
+# Si uno de los verbos de arriba va justo después de estas palabras, NO se cuenta como orden.
+# (Ejemplo: "¿qué piensa..." o "¿cómo analiza...")
+[profundo_verbos_no_si_va_despues_de]
+qué
+quién
+quiénes
+cómo
+cuándo
+dónde
+no
+se
+lo
+la
+le
+porque
+
+# 4) Palabras automáticas: activan el modo a fondo SIN que lo pidas, porque suelen ser tareas pesadas.
+#    Nunca se aplican mientras juegas. Para apagar esta función, deja la sección vacía.
+[profundo_automatico]
+diagnostica
+diagnóstico
+diagnostícame
+arregla
+arréglame
+soluciona
+soluciónalo
+depura
+optimiza
+optimízame
+automatiza
+automatízame
+script
+backup
+copia de seguridad
+
+
+# --------------------------------------------------------------------------------------------
+#  BORRADO DEFINITIVO
+#  Normalmente, cuando pides borrar algo de tu carpeta personal o del disco de datos protegido, el asistente lo
+#  mueve a la PAPELERA (se puede recuperar). Solo si en tu frase aparece alguna de estas, borra de verdad.
+#  Aun así te pedirá confirmación, y el disco de datos protegido sigue así (ver PROTEGER_DATOS en herramientas.py).
+# --------------------------------------------------------------------------------------------
+[borrar_definitivo]
+definitivamente
+de forma definitiva
+de forma permanente
+definitiva
+definitivo
+permanente
+permanentemente
+irrecuperable
+para siempre
+sin papelera
+sin pasar por la papelera
+
+
+# --------------------------------------------------------------------------------------------
+#  CONFIRMAR O CANCELAR UNA ACCIÓN
+#  Cuando el asistente deja algo pendiente ("¿lo instalo?"), tu SIGUIENTE frase decide:
+#   - Si es corta (8 palabras o menos), no tiene ninguna palabra de [confirmar_no] y cumple una de
+#     las dos listas de "sí": se ejecuta.
+#   - En cualquier otro caso se cancela. Ante la duda, se cancela.
+#  CUIDADO al tocar estas listas: son las que autorizan a ejecutar cosas en tu PC. No pongas
+#  palabras muy comunes (como "que", "es" o "y"): confirmarías sin querer.
+# --------------------------------------------------------------------------------------------
+
+# "Sí" cuando va al PRINCIPIO de la frase: "Sí, hazlo", "Vale", "Adelante".
+[confirmar_si_al_principio]
+sí
+vale
+ok
+okey
+okay
+dale
+adelante
+venga
+claro
+perfecto
+genial
+correcto
+confirmo
+confirmado
+procede
+hazlo
+hazla
+hazlos
+
+# "Sí" en cualquier parte de la frase: órdenes claras como "instálalo" o "por favor, ejecútalo".
+[confirmar_si_en_cualquier_sitio]
+instálalo
+instálala
+instálalos
+instálamelo
+ejecútalo
+ejecútamelo
+bórralo
+elimínalo
+créamelo
+créalo
+ábrelo
+actualízalo
+actualízamelo
+desinstálalo
+arréglalo
+configúralo
+ponlo
+actívalo
+desactívalo
+hazlo
+hazla
+hazlos
+
+# "No": si aparece cualquiera de estas en la frase, se cancela aunque también haya un "sí".
+[confirmar_no]
+no
+nunca
+cancela
+cancelar
+cancélalo
+espera
+para
+detente
+jamás
+tampoco
+nada
+mejor
+ni
+pero

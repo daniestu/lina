@@ -1,0 +1,3 @@
+# Paquetes del AUR en los que confías: el asistente los instala SIN preguntar.
+# Se rellena solo cuando confirmas la instalación de uno (te lo dice al hacerlo). Borra una línea para que vuelva a preguntar.
+# El asistente no puede modificar este archivo por voz. Un paquete por línea; # para comentarios.

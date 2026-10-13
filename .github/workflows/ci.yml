@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Dependencias del sistema
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+      - name: Instalar
+        run: pip install -e ".[dev]"
+      - name: Ruff
+        run: ruff check .
+      - name: Rastros y secretos
+        run: python scripts/comprobar_rastros.py
+      - name: Pruebas
+        run: pytest

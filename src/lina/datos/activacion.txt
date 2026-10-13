@@ -1,0 +1,22 @@
+# Manos libres: decir «Oye Lina, …» y que te atienda sin pulsar nada.
+# Este archivo se relee solo cuando lo cambias (no hace falta reiniciar). Una línea por ajuste: nombre = valor
+# El nombre también se cambia hablando: «a partir de ahora te llamas Jarvis».
+
+activo = si              # si / no: para apagar todo el manos libres (el atajo sigue funcionando siempre)
+nombre = lina           # cómo te llamo. Cámbialo por el que quieras: «oye <nombre>»
+alias =                  # otros nombres que también valen, separados por comas (por ejemplo: lina ia, atlante)
+prefijos = oye, escucha, hey, ey, eh, hola, oiga, atiende, despierta, ok, vale, oie
+sin_prefijo = si         # si: basta con «Lina, …» al principio de la frase. no: exige «oye / escucha / hey…» delante
+seguimiento = 8          # segundos tras contestarte en los que puedes seguir hablando SIN repetir el nombre (0 = nunca)
+espera_orden = 6         # segundos que espera tu orden si solo dices «Oye Lina» y callas
+en_juegos = no           # no: mientras hay un juego en primer plano no escucha (usa el atajo). si: escucha también jugando
+sensibilidad = 0.012     # volumen mínimo para considerar que hablas. Mídelo con:  lina manos-libres nivel
+eco = auto               # auto: cancela el eco solo (no oigo lo que suena por los altavoces). no: apagado. Por voz: «desactiva el eco»
+registro_ruido = no      # no: de lo que oigo y no va para mí NO se apunta nada en el registro. si: se apunta (solo para depurar)
+parecido = 0.78          # lo parecido que tiene que sonar el nombre (0-1). Más bajo = acepta más variantes (y más falsos avisos)
+indicador = si           # si / no: resplandor en los bordes de la pantalla mientras te escucha (azul), piensa (ámbar) o habla (verde). Prueba: lina indicador probar
+indicador_color = azul   # color al escucharte: azul, rojo, verde, morado, naranja, amarillo, rosa, cian, blanco o #rrggbb
+indicador_grosor = 40    # píxeles que entra el resplandor desde el borde
+indicador_intensidad = 1.0  # lo fuerte que brilla: 0.1 casi invisible … 1 normal … 2 muy fuerte
+indicador_juegos = no    # si: también se dibuja con un juego en primer plano
+indicador_instalar = si  # si: si faltan paquetes para dibujarlo, los instala solo con pacman (repositorios oficiales)

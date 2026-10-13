@@ -1,0 +1,13 @@
+# Vocabulario para ayudar a Whisper a entender nombres propios (programas, juegos, lugares, personas...).
+# Un término por línea. Las líneas que empiezan por # se ignoran. Máximo 60 términos.
+# Puedes editarlo cuando quieras: no hace falta reiniciar a Lina.
+# Lina también lo ampliará sola cuando le enseñes una palabra que oye mal.
+NVIDIA
+Steam
+Proton
+Discord
+Firefox
+Plasma
+Wayland
+PipeWire
+Flatpak

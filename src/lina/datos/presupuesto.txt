@@ -1,0 +1,47 @@
+# ============================================================================================
+#  PRESUPUESTO DE GEMINI  (lo lee presupuesto.py; se vuelve a leer solo cuando lo guardas)
+#  Esta es TU lista: las actualizaciones NO la pisan. La IA no puede editarla (solo tú).
+#
+#  Cómo funciona:
+#   - Lo rápido va con la clave GRATUITA (~/.config/lina/gemini.key).
+#   - Lo «a fondo» va con la de PAGO (~/.config/lina/gemini_pago.key); si una falla, se prueba con la otra.
+#   - Al llegar al tope del mes, la de pago deja de usarse sola. Para seguir, dilo tú:
+#       «sigue con el de pago hasta 15 euros»   (solo vale ese mes)
+#   - Esto es una ESTIMACIÓN (tokens x precios de abajo). El tope DURO de verdad es el prepago de Google: carga solo lo que
+#     quieras gastar y deja la recarga automática APAGADA. Lo oficial está en AI Studio > Dashboard > Usage.
+# ============================================================================================
+
+# Lo máximo que gastas al mes con la clave de pago, en euros.
+tope_mensual_eur = 10
+
+# Cuántos euros vale 1 dólar (los precios de Google están en dólares). Cámbialo cuando quieras. Está puesto un poco ALTO a propósito:
+# si el dólar vale menos, la cuenta sale algo más alta que la real, y te quedas del lado seguro.
+eur_por_usd = 0.92
+
+# Te aviso (por voz y con una notificación) al llegar a estos porcentajes del tope. Al 100 % la clave de pago deja de usarse.
+avisos_porcentaje = 50, 80, 100
+
+# Precios en dólares por millón de tokens:  modelo = entrada, salida [, entrada en caché]
+# La salida INCLUYE el razonamiento. Si pones  modelo@AAAA-MM-DD  el precio vale desde esa fecha (así se anota una subida anunciada).
+# Si Google devuelve un modelo que no está aquí, se cuenta el precio MÁS CARO de la tabla y se avisa en el registro.
+# Fuente: https://ai.google.dev/gemini-api/docs/pricing  (revísalo de vez en cuando: cambia a menudo)
+[precios]
+gemini-3.8-flash = 0.75, 3.75, 0.075
+gemini-3.8-flash@2027-01-01 = 1.50, 7.50, 0.15
+gemini-3.7-flash = 0.75, 3.75, 0.075
+gemini-3.7-flash@2027-01-01 = 1.50, 7.50, 0.15
+gemini-3.6-flash = 0.75, 3.75, 0.075
+gemini-3.6-flash@2027-01-01 = 1.50, 7.50, 0.15
+gemini-3.5-flash = 1.50, 9.00, 0.15
+gemini-3.5-flash-lite = 0.30, 2.50, 0.03
+gemini-3.1-flash-lite = 0.25, 1.50, 0.025
+gemini-3-flash-preview = 0.50, 3.00, 0.05
+gemini-3.1-pro-preview = 2.00, 12.00, 0.20
+gemini-2.5-flash = 0.30, 2.50, 0.03
+gemini-2.5-pro = 1.25, 10.00, 0.125
+
+# Los alias «-latest» apuntan a un modelo que Google cambia. Normalmente Google dice cuál ha contestado de verdad y se usa SU precio;
+# esto solo vale si no lo dice. Ajusta si sabes a qué apuntan hoy.
+gemini-flash-latest = 0.75, 3.75, 0.075
+gemini-flash-latest@2027-01-01 = 1.50, 7.50, 0.15
+gemini-flash-lite-latest = 0.30, 2.50, 0.03
