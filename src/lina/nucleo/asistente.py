@@ -3386,8 +3386,10 @@ class Asistente:
         texto = limpiar_para_voz(texto)
         texto = numeros_a_palabras(texto)
         try:
-            subprocess.run([sys.executable, "-m", "piper", "-m", VOZ, "--data-dir", str(RUT.asegurar(RUT.VOCES)),
-                            "-f", str(AUDIO_RESPUESTA), "--", texto],
+            orden = [sys.executable, "-m", "piper", "-m", VOC.modelo(VOZ), "--data-dir", str(RUT.asegurar(RUT.VOCES))]
+            if VOC.locutor(VOZ) is not None:
+                orden += ["-s", str(VOC.locutor(VOZ))]
+            subprocess.run(orden + ["-f", str(AUDIO_RESPUESTA), "--", texto],
                            cwd=RUT.asegurar(RUT.VOCES), check=True, capture_output=True)
             self.reproductor = subprocess.Popen(["paplay", str(AUDIO_RESPUESTA)])
             self.reproductor.wait()

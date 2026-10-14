@@ -12,6 +12,7 @@ AYUDA = f"""Lina {__version__}: asistente de voz para el escritorio Linux.
 
   lina                       arranca a Lina (lo normal es que lo haga sola el servicio de usuario)
   lina pulsar                equivale a pulsar el atajo (hablar / terminar de hablar / callarla). Ponlo en el atajo de teclado
+  lina voz [NOMBRE]          lista las voces o elige una (la descarga si hace falta)
   lina clave NOMBRE          guarda una clave (por ejemplo de un servidor MCP) sin que se vea ni se dicte
   lina manos-libres ORDEN    probar "frase" · eco · nivel   (ajustes del manos libres)
   lina indicador probar      enseña el resplandor de escucha
@@ -56,6 +57,9 @@ def main(argv=None):
     if orden == "clave":
         from lina.nucleo import claves
         return claves.principal(resto)
+    if orden == "voz":
+        from lina.voz import voces
+        return voces.principal(resto)
     if orden == "manos-libres":
         return _modulo("lina.voz.manos_libres", resto)
     if orden == "indicador":

@@ -1,13 +1,20 @@
 # Créditos y licencias de terceros
 
-## Voz por defecto
+## Voces
 
-Lina usa por defecto la voz **es_ES-mls_10246-low** del repositorio [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices),
-para el motor de voz [Piper](https://github.com/rhasspy/piper).
+Lina usa el motor de voz [Piper](https://github.com/rhasspy/piper) y las voces del repositorio
+[rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices). Las voces no se distribuyen con este repositorio: Lina descarga
+la que se elige a `~/.local/share/lina/voces/` la primera vez que la necesita.
 
-- Entrenada con el conjunto de datos **OpenSLR 94** (Multilingual LibriSpeech en español), con licencia
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Atribución: *Multilingual LibriSpeech, Pratap et al., OpenSLR 94*.
-- La voz no se distribuye con este repositorio: Lina la descarga a `~/.local/share/lina/voces/` la primera vez que arranca.
-- Se cambia con el archivo `~/.config/lina/voz.txt` (una línea con el nombre de la voz).
+| Voz | Origen |
+|---|---|
+| `es_MX-claude-high` (por defecto) | [es/es_MX/claude](https://huggingface.co/rhasspy/piper-voices/tree/main/es/es_MX/claude) |
+| `es_ES-davefx-medium` | [es/es_ES/davefx](https://huggingface.co/rhasspy/piper-voices/tree/main/es/es_ES/davefx) |
+| `es_ES-sharvard-medium-1`, `-2` | [es/es_ES/sharvard](https://huggingface.co/rhasspy/piper-voices/tree/main/es/es_ES/sharvard) |
 
-Si publicas una versión que incluya la voz, mantén esta atribución.
+- **Sharvard**: entrenada con el corpus Sharvard (Universidad de Edimburgo, [DataShare](https://datashare.ed.ac.uk/handle/10283/574)),
+  con licencia [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). Es un modelo de dos hablantes (los dos hablantes de Lina).
+- Cada voz tiene su ficha (`MODEL_CARD`) en la carpeta indicada, con su conjunto de datos y licencia.
+
+Cómo elegir voz: `lina voz` lista las que hay y `lina voz NOMBRE` cambia de voz.
+Si publicas una versión que incluya alguna voz, mantén estas atribuciones.

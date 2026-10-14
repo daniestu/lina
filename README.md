@@ -24,7 +24,7 @@ cd lina
 ```
 
 Después, crea un atajo de teclado global (por ejemplo `Meta+Espacio`) que ejecute `lina pulsar`, y guarda tu clave de Gemini cuando
-Lina te la pida. Todo lo configurable está en `~/.config/lina/`.
+Lina te la pida. Todo lo configurable está en `~/.config/lina/`. Para cambiar de voz: `lina voz`.
 
 ## Documentación
 

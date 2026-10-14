@@ -1,31 +1,60 @@
-"""Voces de Lina: cuál se usa por defecto, dónde se guardan y cómo se descargan la primera vez.
+"""Voces de Lina: cuáles hay, cuál se usa, dónde se guardan y cómo se descargan la primera vez.
 
 Las voces son modelos de Piper (https://github.com/rhasspy/piper). No viajan dentro del repositorio: Lina descarga la que necesita
 a ~/.local/share/lina/voces/ y, si no hay internet, usa cualquier otra que ya tenga.
 
-La voz que se usa se elige con el archivo ~/.config/lina/voz.txt (una línea con el nombre, por ejemplo es_ES-mls_10246-low).
+La voz que se usa se elige con `lina voz NOMBRE` o escribiendo su nombre en ~/.config/lina/voz.txt (una línea).
+El catálogo está organizado por idioma para poder añadir otros más adelante.
 """
 import os
+import sys
 import urllib.request
 from pathlib import Path
 
 from lina.nucleo import rutas as RUT
 
-VOZ_POR_DEFECTO = "es_ES-mls_10246-low"
+IDIOMA = "es"
 
 # Revisión fija del repositorio de voces, para que la descarga sea siempre el mismo archivo.
 REVISION = "9df7583dc899c8f5ecaaebf1120a9fd1911e8009"
 BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/" + REVISION
 
-# nombre -> carpeta dentro del repositorio de voces
+# idioma -> nombre de la voz -> {modelo de Piper, carpeta en el repositorio de voces, hablante (si el modelo tiene varios), descripción}
 CATALOGO = {
-    "es_ES-mls_10246-low": "es/es_ES/mls_10246/low",
-    "es_ES-mls_9972-low": "es/es_ES/mls_9972/low",
-    "es_ES-davefx-medium": "es/es_ES/davefx/medium",
-    "es_ES-carlfm-x_low": "es/es_ES/carlfm/x_low",
+    "es": {
+        "es_MX-claude-high": {"modelo": "es_MX-claude-high", "carpeta": "es/es_MX/claude/high", "locutor": None,
+                              "descripcion": "Claude · México · calidad alta (por defecto)"},
+        "es_ES-davefx-medium": {"modelo": "es_ES-davefx-medium", "carpeta": "es/es_ES/davefx/medium", "locutor": None,
+                                "descripcion": "Dave · España · calidad media"},
+        "es_ES-sharvard-medium-1": {"modelo": "es_ES-sharvard-medium", "carpeta": "es/es_ES/sharvard/medium", "locutor": 0,
+                                    "descripcion": "Sharvard, hablante 1 · España · calidad media"},
+        "es_ES-sharvard-medium-2": {"modelo": "es_ES-sharvard-medium", "carpeta": "es/es_ES/sharvard/medium", "locutor": 1,
+                                    "descripcion": "Sharvard, hablante 2 · España · calidad media"},
+    },
 }
+VOZ_POR_DEFECTO = "es_MX-claude-high"
 TIEMPO = 60
 TROZO = 1 << 20
+
+
+def entrada(nombre):
+    """La ficha del catálogo de esa voz, o None si no es una voz del catálogo."""
+    for voces in CATALOGO.values():
+        if nombre in voces:
+            return voces[nombre]
+    return None
+
+
+def modelo(nombre):
+    """Nombre del modelo de Piper (los archivos .onnx). Una voz que no esté en el catálogo se toma como nombre de modelo ya instalado."""
+    ficha = entrada(nombre)
+    return ficha["modelo"] if ficha else nombre
+
+
+def locutor(nombre):
+    """Número de hablante para los modelos con varios, o None."""
+    ficha = entrada(nombre)
+    return ficha["locutor"] if ficha else None
 
 
 def voz_elegida(carpeta_config=None):
@@ -41,9 +70,16 @@ def voz_elegida(carpeta_config=None):
     return VOZ_POR_DEFECTO
 
 
+def fijar(nombre, carpeta_config=None):
+    """Guarda la voz elegida en voz.txt."""
+    base = Path(carpeta_config or RUT.CONFIG)
+    base.mkdir(parents=True, exist_ok=True)
+    (base / "voz.txt").write_text(nombre + "\n", encoding="utf-8")
+
+
 def archivos(nombre, carpeta=None):
     base = Path(carpeta or RUT.VOCES)
-    return base / f"{nombre}.onnx", base / f"{nombre}.onnx.json"
+    return base / f"{modelo(nombre)}.onnx", base / f"{modelo(nombre)}.onnx.json"
 
 
 def instalada(nombre, carpeta=None):
@@ -72,19 +108,19 @@ def asegurar(nombre, carpeta=None, log=print, abrir=_abrir):
     """Deja la voz lista. True si está disponible (ya estaba o se ha descargado), False si no ha podido."""
     if instalada(nombre, carpeta):
         return True
-    sitio = CATALOGO.get(nombre)
-    if sitio is None:
-        log(f"Voz: «{nombre}» no está en el catálogo y no la tengo instalada.")
+    ficha = entrada(nombre)
+    if ficha is None:
+        log(f"Voz: «{nombre}» no está en el catálogo y no la tengo instalada. Mira las disponibles con:  lina voz")
         return False
     base = Path(carpeta or RUT.VOCES)
     try:
         base.mkdir(parents=True, exist_ok=True)
         log(f"Voz: descargando {nombre} (la primera vez; unos 60 MB)…")
         for destino in reversed(archivos(nombre, base)):               # primero el pequeño (.json), luego el modelo
-            _descargar(f"{BASE}/{sitio}/{destino.name}", destino, abrir)
+            _descargar(f"{BASE}/{ficha['carpeta']}/{destino.name}", destino, abrir)
     except (OSError, ValueError) as e:
         log(f"Voz: no he podido descargar {nombre} ({e}).")
-        for p in base.glob(f"{nombre}.*.parcial"):
+        for p in base.glob(f"{ficha['modelo']}.*.parcial"):
             p.unlink(missing_ok=True)
         return False
     log(f"Voz: {nombre} lista.")
@@ -92,7 +128,7 @@ def asegurar(nombre, carpeta=None, log=print, abrir=_abrir):
 
 
 def disponibles(carpeta=None):
-    """Nombres de las voces que hay instaladas."""
+    """Nombres de los modelos que hay instalados."""
     base = Path(carpeta or RUT.VOCES)
     return sorted(p.name[:-5] for p in base.glob("*.onnx") if (base / (p.name + ".json")).is_file()) if base.is_dir() else []
 
@@ -107,3 +143,30 @@ def preparar(log=print, carpeta=None, carpeta_config=None, abrir=_abrir):
         log(f"Voz: uso {otras[0]} mientras tanto.")
         return otras[0]
     return None
+
+
+def principal(argv, carpeta=None, carpeta_config=None, abrir=_abrir, salida=print):
+    """lina voz            lista las voces y marca la que se usa
+    lina voz NOMBRE     elige esa voz (la descarga ahora si hace falta)"""
+    actual = voz_elegida(carpeta_config)
+    if not argv:
+        salida("Voces disponibles (la marcada con * es la que se usa; «instalada» = ya descargada):")
+        for nombre, ficha in CATALOGO[IDIOMA].items():
+            marca = "*" if nombre == actual else " "
+            estado = "instalada" if instalada(nombre, carpeta) else "se descarga al elegirla"
+            salida(f" {marca} {nombre:26} {ficha['descripcion']}  [{estado}]")
+        salida("\nElige una con:  lina voz NOMBRE   (después reinicia a Lina: systemctl --user restart lina)")
+        return 0
+    nombre = argv[0]
+    if nombre not in CATALOGO[IDIOMA]:
+        salida(f"No conozco la voz «{nombre}». Mira las que hay con:  lina voz")
+        return 2
+    if not asegurar(nombre, carpeta, salida, abrir):
+        return 1
+    fijar(nombre, carpeta_config)
+    salida(f"Voz elegida: {nombre}. Reinicia a Lina para oírla:  systemctl --user restart lina")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(principal(sys.argv[1:]))
