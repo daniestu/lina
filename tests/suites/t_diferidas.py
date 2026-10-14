@@ -1,4 +1,5 @@
-import sys, time
+import sys, time, os, tempfile
+os.environ["HOME"] = tempfile.mkdtemp()          # no ensuciar las recetas del usuario
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 for m in ("sounddevice", "faster_whisper"):

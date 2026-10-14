@@ -4054,6 +4054,20 @@ DECLARACIONES = [
      "description": ("Dice cuánto se ha gastado este mes con la clave de pago de Gemini, cuál es el tope y si se ha llegado a él. Úsala cuando el usuario "
                      "pregunte cuánto lleva gastado o cómo va el presupuesto. Solo consulta: no puede cambiar nada."),
      "parameters": {"type": "object", "properties": {}}},
+    {"name": "mis_ajustes",
+     "description": ("Tu propia documentación y tus propios ajustes. accion=ayuda: te da tus comandos, TODOS tus ajustes con su valor actual, las voces "
+                     "y los manuales (con «tema» lees un manual entero). accion=cambiar: cambia un ajuste («ajuste» = seccion.clave, «valor»). "
+                     "accion=elegir_voz: pasa a hablar con otra voz (se nota ya). accion=probar_voz: dice un texto con esa voz sin cambiarla, para que "
+                     "el usuario las compare (puedes llamarla varias veces seguidas). Úsala SIEMPRE que pregunten por cómo eres, qué puedes hacer o cómo "
+                     "se configura algo tuyo (voz, velocidad, resplandor, perfil, nombre, manos libres…) o pidan cambiarlo: consulta antes de decir que no puedes."),
+     "parameters": {"type": "object",
+                    "properties": {"accion": {"type": "string", "enum": ["ayuda", "cambiar", "elegir_voz", "probar_voz"]},
+                                   "tema": {"type": "string", "description": "ayuda: nombre de un manual para leerlo entero (opcional)."},
+                                   "ajuste": {"type": "string", "description": "cambiar: seccion.clave, p. ej. voz.velocidad."},
+                                   "valor": {"type": "string", "description": "cambiar: el valor nuevo (dentro de los límites que da la ayuda)."},
+                                   "voz": {"type": "string", "description": "elegir_voz / probar_voz: nombre exacto de la voz."},
+                                   "texto": {"type": "string", "description": "probar_voz: qué decir (una frase corta)."}},
+                    "required": ["accion"]}},
     {"name": "empezar_de_cero",
      "description": ("Olvida la conversación actual y empieza una nueva, sin recordar nada de lo anterior. Úsala cuando el usuario quiera empezar de "
                      "cero, olvidar lo hablado o dar por cerrado todo lo anterior (con las palabras que sean). NO la uses por un simple cambio de "

@@ -26,6 +26,7 @@ GRUPOS = {
     "web": ["leer_web"],
     "organizacion": ["notas", "recordatorios"],
     "mcp": ["mcp_servidores"],
+    "yo": ["mis_ajustes"],
     "interfaz": ["interfaz", "ventanas", "guardar_receta_interfaz"],
 }
 # Los grupos nuevos (fase C) se registran con registrar_grupo().
@@ -38,6 +39,7 @@ DESCRIPCION = {
     "web": "leer una página web o un enlace y resumirla",
     "organizacion": "notas del usuario (crear, buscar, leer) y recordatorios que suenan por voz",
     "interfaz": "ver y manejar los botones, campos y controles de una ventana (accesibilidad y teclado) para manejar programas por su interfaz",
+    "yo": "cómo eres y cómo se configura algo tuyo: tu documentación, tus comandos y tus ajustes (voz, velocidad, resplandor, perfil, nombre); probar y cambiar tu voz",
     "mcp": "gestionar servidores MCP (herramientas externas): ver, añadir, quitar, aprobar, y darle a Claude Desktop o Codex las herramientas de este asistente",
 }
 
@@ -57,6 +59,7 @@ _PALABRAS = {
     "organizacion": r"\b(notas?|apunta|apuntame|anota|anotame|apuntes?|recuerdame|recuerda que|recordatorios?|recordarme|avisame|alarma|temporizador|cuenta atras|lista de la compra|"
                     r"que (tengo|me queda) (pendiente|apuntado)|despiertame|dentro de (\d+|un|una|media|unos) (minutos?|horas?|dias?)|en (\d+|un|una|media) (minutos?|horas?))",
     "mcp": r"\b(mcp|servidores? de herramientas|model context|conect\w*\s+(a|al|con)\s+(un |el |mi |tu )?(navegador|github|calendario|correo|gmail|base de datos)|navegador real|navegador de verdad)",
+    "yo": r"\b(tu voz|tus voces|voces|velocidad|resplandor|tus ajustes|tu configuracion|configurate|tus comandos|que puedes hacer|que sabes hacer|como eres|como te (cambio|configuro|uso|ajusto)|tu nombre|te llamas|tu perfil|tu autonomia|manos libres|documentacion tuya|tu documentacion)",
     "interfaz": r"\b(boton(es)?|pulsa(r)?|haz clic|clic en|click|dale a|aprieta|casilla|marca(r)? (la|el)|desmarca(r)?|desplegable|pestana|que (hay|ves|aparece|botones)|controles de|elementos de la ventana|instalador|acepta(r)? (el|la|los)|siguiente|barra de (ruta|rutor|rutas|direcciones|direccion|busqueda|herramientas|menu|estado)|(escribe|teclea|pon|introduce|rellena)\w* .{0,40}\\b(en|dentro de) (la|el|este|esta|ese|esa) (barra|campo|caja|cuadro|casilla|buscador|ventana|formulario)|cuadro de (texto|dialogo|busqueda)|campo de (texto|busqueda)|menu (archivo|editar|ver|herramientas|ajustes)|senala(r)? (el|la|los|las)|archivos ocultos|vista en (columnas|iconos|detalles|lista)|(muestra|oculta|activa|desactiva|cambia|abre|cierra) .{0,40}\b(en|de) (dolphin|kate|okular|gwenview|ark|konsole)|(dolphin|kate|okular|gwenview)\b.{0,40}\b(muestra|oculta|activa|desactiva|vista|panel|pestana))\b",
     "memoria": r"\b(gast|presupuesto|euros|tope|diario|has cambiado|has hecho|te oi mal|queria decir|me refiero|aprendido|recetas|olvida como|alias)",
 }
@@ -352,6 +355,12 @@ REGLAS = {
         "AL RESPONDER: una o dos frases cortas con el resultado real («Hecho: ahora se ven los archivos ocultos»). No cuentes los pasos ni leas listas de controles. "
         "Si no has podido: qué ha pasado y qué puede hacer él, en una frase. No te disculpes ni repitas lo que ya dijiste."
     ),
+    "yo": (
+        "[YO] Tienes tu propia documentación y tus ajustes en mis_ajustes: ante cualquier duda sobre cómo eres o cómo se configura algo tuyo, empieza por "
+        "accion=ayuda (una sola llamada trae comandos, ajustes con valor y voces) y no busques en internet. Razona qué quiere el usuario y hazlo tú: "
+        "cambiar un ajuste, elegir_voz, o probar_voz con un texto corto para que compare (varias seguidas si pide ejemplos). No inventes datos que la ayuda no da "
+        "(por ejemplo si una voz es de hombre o de mujer: ponle ejemplos y que decida él). No puedes tocar claves ni gasto; los cambios que dan más permisos "
+        "solo con el atajo, y si te rechaza un cambio, cuéntaselo tal cual. Contesta corto: lo que has hecho o lo que necesitas de él."),
     "memoria": (
         "[MEMORIA] ver_diario lista lo que has cambiado (qué, cuándo, si se puede deshacer). alias_de_voz: si el usuario te corrige cómo entendiste una palabra, "
         "«oido» es la palabra mal oída TAL COMO salió en lo que dijo y «significa» lo que quería decir; cuéntale en una frase qué apuntaste. Solo apuntas lo "

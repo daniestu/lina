@@ -47,22 +47,32 @@ for c in ("lina config poner autonomia.perfil autonomo", "lina config perfil aut
 for c in ("lina config", "lina config ver voz.velocidad", "lina config comprobar", "lina voz", "lina pulsar"):
     ok(H.clasificar(c)[0] != "bloqueado", "permitido (solo mira): " + c)
 
-# órdenes por voz: el origen (atajo o «Oye Lina») decide si se puede subir permisos o gasto; todo sin llamar a la IA
-from lina.nucleo import asistente as A, presupuesto as PRES
-def asistente(libre, dichas):
-    a = A.Asistente.__new__(A.Asistente); a.origen_voz_libre = libre; a.decir = dichas.append; return a
-dichas = []
+# Lina se consulta y se configura sola con la herramienta mis_ajustes; el origen (atajo o «Oye Lina») y lo leído de fuera limitan lo sensible
+from lina.nucleo import asistente as A, grupos as G
+from lina.voz import voces as VOC
+def asistente(libre, sucio=False):
+    a = A.Asistente.__new__(A.Asistente); a.origen_voz_libre = libre; a.ejecutor = MagicMock(); a.ejecutor.contaminado = "web" if sucio else None; return a
+ok(any(d["name"] == "mis_ajustes" for d in H.DECLARACIONES) and "mis_ajustes" in G.GRUPOS["yo"], "mis_ajustes existe y está en el grupo «yo»")
+ok("yo" in G.elegir("¿qué voces femeninas tienes?") and "yo" in G.elegir("ponme un ejemplo de tu voz"), "preguntar por las voces carga el grupo")
+t = asistente(True)._mis_ajustes({"accion": "ayuda"})
+ok("lina voz" in t and "voz.velocidad" in t and "es_MX-claude-high" in t, "ayuda: comandos, ajustes con valor y voces")
 aj.establecer("autonomia", "perfil", "equilibrado")
-asistente(True, dichas)._atender("pasa al perfil prudente", 0)
+asistente(True)._mis_ajustes({"accion": "cambiar", "ajuste": "autonomia.perfil", "valor": "prudente"})
 ok(aj.get("autonomia", "perfil") == "prudente", "por «Oye Lina» se puede apretar el perfil")
-asistente(True, dichas)._atender("pasa al perfil autónomo", 0)
-ok(aj.get("autonomia", "perfil") == "prudente" and "atajo" in dichas[-1], "por «Oye Lina» no se puede aflojar el perfil")
-asistente(False, dichas)._atender("pasa al perfil autónomo", 0)
-ok(aj.get("autonomia", "perfil") == "autonomo", "con el atajo sí")
-asistente(True, dichas)._atender("habla más rápido", 0)
-ok(aj.get("voz", "velocidad") > 1.0, "la velocidad se cambia también por «Oye Lina»")
-PRES.hay_clave_de_pago = lambda: True
-PRES.estado = lambda: {"tope_eur": 10.0}
-asistente(True, dichas)._atender("sube el tope de gasto a 50 euros", 0)
-ok("atajo" in dichas[-1], "por «Oye Lina» no se sube el tope de gasto")
+r = asistente(True)._mis_ajustes({"accion": "cambiar", "ajuste": "autonomia.perfil", "valor": "autonomo"})
+ok(aj.get("autonomia", "perfil") == "prudente" and "atajo" in r, "por «Oye Lina» no se puede aflojar el perfil")
+asistente(False, sucio=True)._mis_ajustes({"accion": "cambiar", "ajuste": "autonomia.perfil", "valor": "autonomo"})
+ok(aj.get("autonomia", "perfil") == "prudente", "tras leer contenido de fuera tampoco")
+asistente(False)._mis_ajustes({"accion": "cambiar", "ajuste": "autonomia.perfil", "valor": "autonomo"})
+ok(aj.get("autonomia", "perfil") == "autonomo", "con el atajo y sin contenido de fuera, sí")
+asistente(False)._mis_ajustes({"accion": "cambiar", "ajuste": "gasto.tope_mensual_eur", "valor": "999"})
+ok(aj.get("gasto", "tope_mensual_eur") == 10, "el tope de gasto no lo toca la IA ni con el atajo")
+a = asistente(False); dichas = []
+a._hablar = lambda texto, voz=None: dichas.append((voz, texto))
+VOC.asegurar = lambda nombre, *x, **k: True
+a._mis_ajustes({"accion": "probar_voz", "voz": "es_ES-davefx-medium", "texto": "hola"})
+ok(dichas == [("es_ES-davefx-medium", "hola")] and VOC.voz_elegida() != "es_ES-davefx-medium", "probar_voz habla con esa voz sin cambiarla")
+a._mis_ajustes({"accion": "elegir_voz", "voz": "es_ES-davefx-medium"})
+ok(VOC.voz_elegida() == "es_ES-davefx-medium", "elegir_voz la cambia al instante")
+ok("No conozco" in a._mis_ajustes({"accion": "elegir_voz", "voz": "inventada"}), "voz que no existe: lo dice")
 print("fallos", f); sys.exit(1 if f else 0)

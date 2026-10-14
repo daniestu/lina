@@ -29,7 +29,7 @@ from urllib.parse import urlparse
 
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import claves as CL
-from lina.nucleo import ordenes_ajustes as OA
+from lina.nucleo import autoconocimiento as AUTO
 from lina.nucleo import rutas as RUT
 from lina.voz import voces as VOC
 
@@ -193,8 +193,8 @@ AUDIO_RESPUESTA = RUT.temporal("respuesta.wav")
 
 INSTRUCCIONES = (
     "Eres un asistente por voz para un PC con Linux de escritorio, que se usa para jugar, programar y otras tareas del día a día. "
-    "Sobre ti misma: tus ajustes (voz, velocidad, perfil de autonomía, claves, tope de gasto) se cambian con el comando «lina config» y «lina voz» en una "
-    "terminal; nunca los cambias tú ni busques cómo hacerlo en internet. "
+    "Sobre ti misma: tienes tu propia documentación y tus ajustes en la herramienta mis_ajustes (grupo «yo»); si preguntan cómo eres o cómo se configura algo tuyo, "
+    "consúltala y actúa tú, en lugar de buscar en internet. "
     "Recibes una captura de su pantalla, el título de la ventana activa y su pregunta. Adapta tu papel a lo que esté haciendo: si es un videojuego, eres "
     "un experto en ese juego (el contexto detectado y el título te dicen cuál); si es una terminal, un editor o el propio sistema, un experto en Linux y "
     "programación; en otro caso, un asistente general. Si la pregunta no tiene relación con la pantalla, respóndela igualmente sin forzar el contexto. "
@@ -1661,11 +1661,6 @@ class Asistente:
             H.anotar(f"[bloqueado] petición de destrucción total: «{pregunta[:120]}»")
             self.decir(H.AVISO_DESTRUCCION_TOTAL)
             return
-        orden_aj = OA.entender(pregunta)
-        if orden_aj:                                            # «habla más rápido», «pasa al perfil prudente»…: lo hace el código, sin IA; lo que da más permisos solo con el atajo
-            log(f"Ajuste por voz: {orden_aj[:4]} ({'manos libres' if self.origen_voz_libre else 'atajo'})")
-            self.decir(OA.aplicar(orden_aj, voz_libre=self.origen_voz_libre))
-            return
         orden_ml = ML.entender_orden(pregunta) if ML else None
         if orden_ml:                                            # «activa el manos libres», «te llamas Jarvis»…: lo hace el código, sin IA
             self.decir(self._gestionar_manos_libres(orden_ml))
@@ -2298,6 +2293,8 @@ class Asistente:
             return self.ejecutor.abrir_app(args.get("nombre", ""))
         if nombre == "ver_gasto":
             return PRES.resumen()
+        if nombre == "mis_ajustes":
+            return self._mis_ajustes(args)
         if nombre == "empezar_de_cero":
             self.historial.clear()
             self.ejecutor.cancelar()
@@ -2324,6 +2321,30 @@ class Asistente:
             log(f"Deshacer cambio (id={args.get('id')!r}): " + " | ".join(resultado.splitlines()[:2])[:300])
             return resultado
         return f"Herramienta desconocida: {nombre}"
+
+    def _mis_ajustes(self, args):
+        """Lina consulta su documentación y sus ajustes, y los cambia (con las protecciones de autoconocimiento.py)."""
+        accion = str(args.get("accion") or "ayuda")
+        if accion == "ayuda":
+            return AUTO.ayuda(args.get("tema"))
+        if accion == "cambiar":
+            hecho, texto = AUTO.cambiar(args.get("ajuste"), args.get("valor"), voz_libre=self.origen_voz_libre,
+                                        contaminado=bool(self.ejecutor.contaminado))
+            log(f"Ajuste cambiado por la IA: {args.get('ajuste')!r} -> {args.get('valor')!r}: {'hecho' if hecho else texto[:120]}")
+            return texto
+        if accion in ("elegir_voz", "probar_voz"):
+            nombre = str(args.get("voz") or "")
+            if nombre not in VOC.CATALOGO[VOC.IDIOMA]:
+                return f"No conozco la voz «{nombre}». Las que hay: {', '.join(VOC.CATALOGO[VOC.IDIOMA])}."
+            if not VOC.asegurar(nombre, log=log):
+                return f"No he podido descargar la voz {nombre}: mira el registro."
+            if accion == "elegir_voz":
+                VOC.fijar(nombre)
+                log(f"Voz cambiada por la IA: {nombre}")
+                return f"Hecho: ahora hablo con {nombre}. Se nota ya desde tu siguiente frase; esta respuesta aún sale con la voz de antes."
+            self._hablar(str(args.get("texto") or "Hola, así suena mi voz."), voz=nombre)
+            return f"Dicho con la voz {nombre}. Si vas a probar varias, hazlo una a una en esta misma respuesta y no repitas el texto en tu contestación."
+        return "Acción desconocida: usa ayuda, cambiar, elegir_voz o probar_voz."
 
     def resumen_de_lo_hecho(self):
         """Lo que ya se ha ejecutado (o queda pendiente) en esta petición, contado por el código a partir de lo que de verdad
@@ -3408,13 +3429,14 @@ class Asistente:
         self.estado = "hablando"
         self._hablar(texto)
 
-    def _hablar(self, texto):
+    def _hablar(self, texto, voz=None):
         texto = limpiar_para_voz(texto)
         texto = numeros_a_palabras(texto)
+        voz = voz or VOC.voz_elegida() or VOZ                  # la elegida ahora mismo: cambiarla se nota al instante, sin reiniciar
         try:
-            orden = [sys.executable, "-m", "piper", "-m", VOC.modelo(VOZ), "--data-dir", str(RUT.asegurar(RUT.VOCES))]
-            if VOC.locutor(VOZ) is not None:
-                orden += ["-s", str(VOC.locutor(VOZ))]
+            orden = [sys.executable, "-m", "piper", "-m", VOC.modelo(voz), "--data-dir", str(RUT.asegurar(RUT.VOCES))]
+            if VOC.locutor(voz) is not None:
+                orden += ["-s", str(VOC.locutor(voz))]
             velocidad = AJ.actuales(log=lambda m: None).get("voz", "velocidad")
             if abs(velocidad - 1.0) > 0.01:
                 orden += ["--length-scale", f"{1.0 / velocidad:.3f}"]          # Piper: más de 1 = más lento; aquí la velocidad es la inversa
