@@ -216,10 +216,6 @@ INSTRUCCION_LOCAL = (
 )
 
 
-# Las reglas de acciones están en grupos.py: el núcleo va siempre y las de cada grupo solo si se carga.
-INSTRUCCIONES_ACCIONES = G.REGLAS_NUCLEO + " " + G.reglas(G.GRUPOS)
-
-
 # ======================= UTILIDADES =======================
 def _plano_simple(texto):
     t = unicodedata.normalize("NFD", str(texto or "").strip().lower())

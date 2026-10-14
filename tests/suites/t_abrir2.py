@@ -11,7 +11,9 @@ ap("htop", "Htop", "htop", "Terminal=true\n")
 ap("org.fp.App", "Flatty", "/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=flatty org.fp.App @@u %U @@")
 C.DIRS_APPS = lambda: [d]; C._cache_apps["firma"] = None
 e = H.Ejecutor.__new__(H.Ejecutor)
+e.nueva_tarea()                       # contadores de la tarea (el tope de comandos los usa)
 lanzados = []
+e.lanzar = lambda c: (lanzados.append(c) or "Lanzado.")          # los lanzadores del sistema se abren directamente
 e.herramienta = lambda a: (lanzados.append(a["comando"]) or "Lanzado.")
 f = 0
 def ok(c, m):
@@ -24,7 +26,7 @@ n = len(lanzados); r = e.abrir_app("k"); ok(len(lanzados) == n, r[:80])
 r = e.abrir_app("Flatty"); ok(lanzados[-1] == "flatpak run org.fp.App", lanzados[-1])
 n = len(lanzados); r = e.abrir_app("htop"); ok("terminal" in r and len(lanzados) == n, r)
 r = e.abrir_app("org.kde.konsole"); ok("Konsole" in r and lanzados[-1] == "konsole", r)
-e.herramienta = lambda a: "BLOQUEADO: no"
+e.lanzar = lambda c: "BLOQUEADO: no"
 r = e.abrir_app("kate"); ok(r.startswith("Intenté abrir") and "BLOQUEADO" in r, r)
 r = e.abrir_app(""); ok("Falta" in r, r)
 print("fallos", f)

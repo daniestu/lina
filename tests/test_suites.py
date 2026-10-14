@@ -18,10 +18,8 @@ SRC = AQUI.parent / "src"
 
 # suite -> por qué puede fallar según el entorno
 DEPENDEN_DEL_ENTORNO = {
-    "t_abrir.py": "necesita Visual Studio Code instalado para uno de los casos",
-    "t_abrir2.py": "prueba antigua pendiente de actualizar (Ejecutor.n_comandos)",
     "t_err.py": "necesita la librería del sistema PortAudio",
-    "t_mov.py": "dos casos de movimiento de ventanas conocidos, pendientes",
+    "t_mov.py": "mover el puntero de esquina a esquina con un ratón muy acelerado: dos casos simulados todavía no convergen (mejora pendiente)",
 }
 
 

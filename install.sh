@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instalador de Lina (versión inicial: Arch Linux y derivados; el resto de distribuciones llegan en la Fase 5).
+# Instalador de Lina (versión inicial: Arch Linux y derivados; el resto de distribuciones llegan en la Fase 3).
 #   ./install.sh             instala o actualiza
 #   ./install.sh --simular   dice qué haría, sin tocar nada
 #   ./install.sh --quitar    desinstala el servicio y el comando (no borra tus ajustes ni tus datos)

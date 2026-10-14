@@ -131,7 +131,6 @@ def notificar(titulo, cuerpo=""):
 
 
 # ======================= CLASIFICAR COMANDOS =======================
-_SEPARADORES = re.compile(r"\|\||&&|;|\||\n")
 _HOME = str(Path.home())
 
 _OBJETIVOS_PELIGROSOS = {"/", "/*", "/home", "/home/*", "/boot", "/boot/*", "/etc", "/etc/*", "/usr", "/usr/*",
@@ -2860,14 +2859,6 @@ class Ejecutor:
         return "\n\n".join(partes)
 
     # --- Ejecución ---
-    def paquetes_oficiales(self, paquetes):
-        """¿Existen todos esos paquetes en los repositorios oficiales? (se pregunta a pacman)"""
-        try:
-            r = subprocess.run(["pacman", "-Si", *paquetes], capture_output=True, timeout=20)
-            return r.returncode == 0
-        except (OSError, subprocess.SubprocessError):
-            return False
-
     @staticmethod
     def _canonico_instalar(comando):
         paquetes = analizar_instalacion(comando)

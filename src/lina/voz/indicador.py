@@ -142,7 +142,6 @@ _SONDA = (
     "print(json.dumps(r))\n"
 )
 _MARCA = RUT.DATOS / "indicador_instalacion"
-REINTENTO_HORAS = 24
 
 
 def sondear(python, ejecutar=subprocess.run):

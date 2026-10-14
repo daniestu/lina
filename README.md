@@ -24,10 +24,23 @@ cd lina
 ```
 
 Después, crea un atajo de teclado global (por ejemplo `Meta+Espacio`) que ejecute `lina pulsar`, y guarda tu clave de Gemini cuando
-Lina te la pida. Todo lo configurable está en `~/.config/lina/`. Para cambiar de voz: `lina voz`.
+Lina te la pida. 
+## Ajustes
+
+Todo está en un único archivo, `~/.config/lina/config.toml`, y se cambia con `lina config` (se aplica sin reiniciar):
+
+```sh
+lina config                          # ver todos los ajustes
+lina config poner asistente.nombre Jarvis
+lina config perfil prudente          # autonomo (por defecto), equilibrado o prudente
+lina voz                             # elegir otra voz
+```
+
+Cada ajuste está explicado en [docs/configuracion.md](docs/configuracion.md).
 
 ## Documentación
 
+- [Configuración](docs/configuracion.md)
 - [Arquitectura](docs/arquitectura.md)
 - [Seguridad y confirmaciones](docs/seguridad.md)
 - [Hoja de ruta](docs/hoja-de-ruta.md)
