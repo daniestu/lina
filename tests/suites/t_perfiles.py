@@ -46,4 +46,23 @@ for c in ("lina config poner autonomia.perfil autonomo", "lina config perfil aut
     ok(H.clasificar(c)[0] == "bloqueado", "bloqueado para la IA: " + c)
 for c in ("lina config", "lina config ver voz.velocidad", "lina config comprobar", "lina voz", "lina pulsar"):
     ok(H.clasificar(c)[0] != "bloqueado", "permitido (solo mira): " + c)
+
+# órdenes por voz: el origen (atajo o «Oye Lina») decide si se puede subir permisos o gasto; todo sin llamar a la IA
+from lina.nucleo import asistente as A, presupuesto as PRES
+def asistente(libre, dichas):
+    a = A.Asistente.__new__(A.Asistente); a.origen_voz_libre = libre; a.decir = dichas.append; return a
+dichas = []
+aj.establecer("autonomia", "perfil", "equilibrado")
+asistente(True, dichas)._atender("pasa al perfil prudente", 0)
+ok(aj.get("autonomia", "perfil") == "prudente", "por «Oye Lina» se puede apretar el perfil")
+asistente(True, dichas)._atender("pasa al perfil autónomo", 0)
+ok(aj.get("autonomia", "perfil") == "prudente" and "atajo" in dichas[-1], "por «Oye Lina» no se puede aflojar el perfil")
+asistente(False, dichas)._atender("pasa al perfil autónomo", 0)
+ok(aj.get("autonomia", "perfil") == "autonomo", "con el atajo sí")
+asistente(True, dichas)._atender("habla más rápido", 0)
+ok(aj.get("voz", "velocidad") > 1.0, "la velocidad se cambia también por «Oye Lina»")
+PRES.hay_clave_de_pago = lambda: True
+PRES.estado = lambda: {"tope_eur": 10.0}
+asistente(True, dichas)._atender("sube el tope de gasto a 50 euros", 0)
+ok("atajo" in dichas[-1], "por «Oye Lina» no se sube el tope de gasto")
 print("fallos", f); sys.exit(1 if f else 0)

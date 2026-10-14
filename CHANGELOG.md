@@ -17,6 +17,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - Perfiles de autonomía (`autonomo`, `equilibrado`, `prudente`) e interruptores por categoría. Discos, arranque, cuentas, dinero y gasto se confirman siempre.
 - Velocidad de la voz ajustable (`voz.velocidad`).
 - Claves en el llavero del sistema (`lina clave gemini|pago|NOMBRE`), con respaldo en un archivo 600; la clave de pago exige un tope mensual; ninguna clave sale en el registro.
+- Ajustes por voz («habla más rápido», «quita el resplandor», «pasa al perfil prudente»): los entiende el código, no la IA; subir permisos o gasto solo con el atajo, no con «Oye Lina».
 
 ### Eliminado
 - `scripts/probar_gemini.py` (diagnóstico antiguo, atado al archivo de clave de antes) y código sin uso.

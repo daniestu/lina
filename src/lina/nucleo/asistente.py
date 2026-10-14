@@ -29,6 +29,7 @@ from urllib.parse import urlparse
 
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import claves as CL
+from lina.nucleo import ordenes_ajustes as OA
 from lina.nucleo import rutas as RUT
 from lina.voz import voces as VOC
 
@@ -74,7 +75,7 @@ except ImportError:                   # actualización a medias: sin presupuesto
         def notificar(self, texto): pass
         def estado(self): return {"tope_eur": 0.0}
         def resumen(self): return "Falta presupuesto.py: no hay control de gasto y no uso la clave de pago."
-        def subir_tope(self, euros): return "Falta presupuesto.py: no puedo cambiar el tope."
+        def subir_tope(self, euros, voz_libre=False): return "Falta presupuesto.py: no puedo cambiar el tope."
         def entender_tope(self, texto): return None
     PRES = _SinPresupuesto()
     print("Aviso: falta presupuesto.py; arranco sin la clave de pago", flush=True)
@@ -1651,12 +1652,17 @@ class Asistente:
     def _atender(self, pregunta, inicio):
         euros = PRES.entender_tope(pregunta)
         if euros is not None:                                   # solo TÚ cambias el tope de gasto: lo hace el código ante una frase tuya, nunca la IA
-            self.decir(PRES.subir_tope(euros))
+            self.decir(PRES.subir_tope(euros, voz_libre=self.origen_voz_libre))
             return
         if H.destruccion_total(pregunta):                         # formatear el ordenador, borrar el sistema…: ni se ofrece ni se prepara
             log("Petición de destrucción total (formatear/borrar el sistema): bloqueada sin llamar a la IA")
             H.anotar(f"[bloqueado] petición de destrucción total: «{pregunta[:120]}»")
             self.decir(H.AVISO_DESTRUCCION_TOTAL)
+            return
+        orden_aj = OA.entender(pregunta)
+        if orden_aj:                                            # «habla más rápido», «pasa al perfil prudente»…: lo hace el código, sin IA; lo que da más permisos solo con el atajo
+            log(f"Ajuste por voz: {orden_aj[:4]} ({'manos libres' if self.origen_voz_libre else 'atajo'})")
+            self.decir(OA.aplicar(orden_aj, voz_libre=self.origen_voz_libre))
             return
         orden_ml = ML.entender_orden(pregunta) if ML else None
         if orden_ml:                                            # «activa el manos libres», «te llamas Jarvis»…: lo hace el código, sin IA

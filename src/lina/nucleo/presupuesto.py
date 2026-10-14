@@ -310,10 +310,14 @@ def resumen():
     return texto + " Es una estimación mía con la tabla de precios; lo oficial está en AI Studio, en Dashboard > Usage."
 
 
-def subir_tope(euros):
-    """Cambia el tope de ESTE mes (solo lo llama el código ante una frase tuya, nunca la IA). Devuelve lo que se te dice."""
+def subir_tope(euros, voz_libre=False):
+    """Cambia el tope de ESTE mes (solo lo llama el código ante una frase tuya, nunca la IA). Devuelve lo que se te dice.
+    Con voz_libre=True (la orden llegó por «Oye Lina») solo se deja bajarlo: subirlo exige el atajo."""
     if not hay_clave_de_pago():
         return "No hay clave de pago configurada (añádela con:  lina clave pago): no hay ningún gasto que topar."
+    if voz_libre and euros > estado()["tope_eur"]:
+        return ("Subir el tope de gasto solo lo hago si pulsas el atajo y me lo dices tú. "
+                "Con «Oye Lina» no, por si lo dijera otra voz.")
     if not (1 <= euros <= TOPE_MAXIMO_POR_VOZ):
         return (f"Por seguridad solo cambio el tope por voz entre 1 y {TOPE_MAXIMO_POR_VOZ} euros. Si quieres otra cifra, edita {ARCHIVO.name}.")
     with _lock:

@@ -14,6 +14,20 @@ lina config comprobar                    # revisar el archivo
 
 Las listas que se editan a mano siguen aparte: `politica.txt` (reglas de lo crítico), `comandos.txt`, `vocabulario.txt`, `paquetes_confiables.txt` y los precios en `presupuesto.txt`.
 
+## Cambiar ajustes hablando
+
+Lo más habitual se puede pedir con la voz. Lo entiende el código de Lina, no la IA, así que la IA no puede cambiarse a sí misma los ajustes.
+
+| Dices | Pasa |
+|---|---|
+| «Habla más rápido» / «más despacio» / «velocidad normal» | Cambia `voz.velocidad` |
+| «Quita el resplandor» / «pon el resplandor» / «resplandor verde» / «más grueso» / «más suave» | Cambia `interfaz.indicador*` |
+| «Pasa al perfil prudente» / «¿qué perfil tienes?» | Cambia o dice el perfil |
+| «Sube el tope de gasto a 20 euros» / «¿cuál es el tope de gasto?» | Cambia (solo este mes) o dice el tope |
+
+Lo que **aprieta** (perfil más prudente, tope más bajo) se pide de cualquier forma. Lo que da **más permisos o más gasto** (perfil más permisivo, tope más alto)
+solo se hace si pulsas el atajo y lo dices tú; con «Oye Lina» Lina se niega, por si lo dijera otra voz (un vídeo, otra persona).
+
 ## Perfiles de autonomía
 
 | Perfil | Qué hace |
