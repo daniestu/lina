@@ -14,6 +14,7 @@ puedes leer tú (permisos 600) dentro de ~/.config/lina. Nunca se escriben en pa
 import getpass
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -28,6 +29,7 @@ ARCHIVO_MCP = "mcp_claves.env"
 TIEMPO_LLAVERO = 8                      # segundos: si el llavero está bloqueado y pide desbloquearse, no se espera eternamente
 
 _cache = {}
+BUSCAR = shutil.which                    # dónde está un programa (se cambia en las pruebas)
 
 
 def normalizar(nombre):
@@ -70,8 +72,8 @@ def llavero_borrar(nombre, ejecutar=subprocess.run):
 
 
 def llavero_disponible(ejecutar=subprocess.run):
-    cod, _ = _secret_tool(["--version"], ejecutar=ejecutar)
-    return cod == 0
+    """¿Está instalado secret-tool? (No admite --version, así que se mira si existe; que el llavero funcione de verdad se comprueba al guardar, leyendo de vuelta.)"""
+    return bool(BUSCAR("secret-tool"))
 
 
 # ----------------------------------------------------------------------------------------------------------------------

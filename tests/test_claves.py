@@ -22,6 +22,7 @@ def mundo(tmp_path, monkeypatch):
     A._instancia.update(ajustes=None, ruta=None)
     from lina.nucleo import claves as C
     C._cache.clear()
+    C.BUSCAR = lambda programa: "/usr/bin/" + programa
 
     class Llavero:
         def __init__(self):
@@ -31,8 +32,8 @@ def mundo(tmp_path, monkeypatch):
             if self.roto:
                 raise FileNotFoundError("secret-tool")
             a = orden[1:]
-            if a[0] == "--version":
-                return subprocess.CompletedProcess(orden, 0, "0.21\n", "")
+            if a[0] == "--version":                                   # el secret-tool de verdad no la admite
+                return subprocess.CompletedProcess(orden, 2, "", "Usage: secret-tool...")
             nombre = a[a.index("nombre") + 1] if "nombre" in a else None
             if a[0] == "store":
                 self.datos[nombre] = input
@@ -163,3 +164,16 @@ def test_lina_clave_lista_sin_enseñar_valores(mundo):
     assert C.principal([], salida=salida.append, ejecutar=ll) == 0
     assert any("gemini" in l and "llavero" in l for l in salida) and not any("clave-gratis-123456" in l for l in salida)
     assert C.principal(["borrar", "gemini"], salida=salida.append, ejecutar=ll) == 0 and C.donde_esta("gemini", ll) == ""
+
+
+def test_sin_secret_tool_instalado_se_dice(mundo):
+    C, ll, R = mundo
+    C.BUSCAR = lambda programa: None
+    assert not C.llavero_disponible(ll)
+    salida = []
+    C.principal([], salida=salida.append, ejecutar=ll)
+    assert any("no encontrado" in l for l in salida)
+    C.BUSCAR = lambda programa: "/usr/bin/" + programa
+    salida.clear()
+    C.principal([], salida=salida.append, ejecutar=ll)
+    assert any("disponible" in l and "no" not in l.split("disponible")[0][-3:] for l in salida)
