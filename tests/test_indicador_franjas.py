@@ -1,13 +1,10 @@
 from lina.voz import indicador as IND
 
 
-def test_franjas_no_se_solapan_en_las_esquinas():
+def test_franjas_del_largo_completo():
     w, h, g = 1920, 1080, 40
-    arriba = IND.medidas_de("arriba", w, h, g)
-    izq = IND.medidas_de("izquierda", w, h, g)
-    assert arriba == (1920, 40)
-    assert izq == (40, 1000)
-    assert izq[1] + 2 * arriba[1] == h
+    assert IND.medidas_de("arriba", w, h, g) == (1920, 40)
+    assert IND.medidas_de("derecha", w, h, g) == (40, 1080)
 
 
 def test_grosor_limitado_por_la_pantalla():

@@ -90,11 +90,9 @@ LADOS = ("arriba", "abajo", "izquierda", "derecha")
 
 
 def medidas_de(lado, ancho, alto, grosor):
-    """Tamaño (ancho, alto) de la franja de un lado en un monitor de ancho×alto. Las de los lados dejan libres las esquinas."""
+    """Tamaño (ancho, alto) de la franja de un lado en un monitor de ancho×alto. Todas son del largo completo: en las esquinas se mezclan."""
     e = max(1, min(grosor, ancho // 2, alto // 2))
-    if lado in ("arriba", "abajo"):
-        return ancho, e
-    return e, max(1, alto - 2 * e)
+    return (ancho, e) if lado in ("arriba", "abajo") else (e, alto)
 
 
 def anclas_de(lado):
@@ -472,12 +470,6 @@ def servir(entrada=None, salida=None):
         v.connect("map-event", lambda w, e: sin_ratón(w) or False)
         return v
 
-    def margenes(v, lado, e):
-        """Las franjas de los lados no pisan las de arriba y abajo en las esquinas (si no, ahí el color se sumaría dos veces)."""
-        if capa and lado in ("izquierda", "derecha"):
-            capa.set_margin(v, capa.Edge.TOP, e)
-            capa.set_margin(v, capa.Edge.BOTTOM, e)
-
     def montar():
         pantalla = Gdk.Display.get_default()
         vistos = set()
@@ -490,7 +482,6 @@ def servir(entrada=None, salida=None):
             vistos.add(clave)
             for lado in LADOS:
                 v = crear(m, lado)
-                margenes(v, lado, estado["grosor"])
                 estado["ventanas"].append(v)
 
     def ajustar_tamano():
@@ -501,7 +492,6 @@ def servir(entrada=None, salida=None):
         for v in estado["ventanas"]:
             ancho, alto = (-1, e) if v.lado_lina in ("arriba", "abajo") else (e, -1)
             v.set_size_request(ancho, alto)
-            margenes(v, v.lado_lina, e)
 
     def refrescar():
         visible = estado["modo"] != "off"
