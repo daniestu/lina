@@ -67,3 +67,12 @@ def test_tope_por_voz_libre_no_sube_pero_si_baja(monkeypatch):
     monkeypatch.setattr(P, "estado", lambda: {"tope_eur": 10.0})
     assert "atajo" in P.subir_tope(50, voz_libre=True)
 
+
+
+def test_preguntas_sobre_cambiar_la_voz_se_contestan_en_local(aj):
+    for frase in ("¿Cómo puedo cambiar tu voz?", "qué voces tienes", "cámbiate la voz", "cómo se cambia la voz"):
+        assert OA.entender(frase) == ("ayuda", "voz"), frase
+    r = OA.aplicar(OA.entender("¿Cómo puedo cambiar tu voz?"), aj)
+    assert "lina voz" in r and "Claude" in r
+    assert OA.entender("cómo cambio la configuración") == ("ayuda", "ajustes")
+    assert OA.entender("cómo cambio la voz de este personaje en el juego de rol que estoy haciendo ahora mismo") is None

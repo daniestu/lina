@@ -29,6 +29,12 @@ def entender(texto):
     n = _normalizar(texto)
     if not n or len(n.split()) > 10:                          # son órdenes cortas: una petición larga que mencione «más rápido» es otra cosa
         return None
+    # --- preguntas sobre cómo se cambia algo de Lina: se contestan aquí, sin buscar en internet
+    if re.search(r"\b(como|donde|que)\b.*\b(cambio|cambiar|cambias|puedo cambiar|se cambia|configuro|configurar|elijo|elegir|pongo|poner)\b.*\b(voz|voces)\b", n) \
+            or re.search(r"\b(que|cuantas|cuales) voces\b", n) or re.search(r"\b(cambia|cambiate|cambiame)\b.*\b(tu|la|otra) voz|\bponte otra voz\b", n):
+        return ("ayuda", "voz")
+    if re.search(r"\b(como|donde)\b.*\b(cambio|cambiar|cambias|se cambia|configuro|configurar|ajusto|ajustar)\b.*\b(ajustes|configuracion|tu nombre|perfil)\b", n):
+        return ("ayuda", "ajustes")
     # --- velocidad de la voz
     if re.search(rf"\b{_VERBOS_HABLA}\b[^.]*\b(mas rapido|mas deprisa|mas aprisa|rapido|deprisa)\b", n) or re.search(r"\bsube la velocidad de (?:la )?voz\b", n):
         return ("mover", "voz", "velocidad", +0.15, "más rápido")
@@ -72,6 +78,13 @@ def entender(texto):
 def aplicar(orden, aj=None, voz_libre=False):
     """Hace el cambio y devuelve lo que Lina dice. voz_libre=True si la orden llegó por «Oye Lina» (y no con el atajo)."""
     aj = aj or AJ.actuales(log=lambda m: None)
+    if orden[0] == "ayuda":
+        if orden[1] == "voz":
+            from lina.voz import voces
+            nombres = ", ".join(v["descripcion"].split(" · ")[0] + " " + v["descripcion"].split(" · ")[1] for g in voces.CATALOGO.values() for v in g.values())
+            return (f"Tengo {sum(len(g) for g in voces.CATALOGO.values())} voces en español: {nombres}. Para cambiarla, en una terminal escribe lina voz, "
+                    "y después el nombre de la que quieras; luego reinicia a Lina. La velocidad sí te la cambio ahora: dime habla más rápido o más despacio.")
+        return ("Mis ajustes se cambian con el comando lina config en una terminal. Algunos puedes pedírmelos hablando: la velocidad, el resplandor, el perfil y el tope de gasto.")
     if orden[0] == "ver":
         if orden[1] == "perfil":
             return f"Voy con el perfil {aj.get('autonomia', 'perfil')}."
