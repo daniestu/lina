@@ -28,10 +28,15 @@ r2 = H.oficina_hoja({"accion": "crear", "nombre": "Gastos del mes", "filas": [["
 ok((casa/"Documentos"/"Gastos del mes (2).xlsx").exists(), "no sobrescribe")
 # recalcular con LibreOffice para comprobar la fórmula
 import subprocess
+import shutil
 out = casa/"calc"; out.mkdir()
-subprocess.run(["soffice","--headless","--convert-to","xlsx","--outdir",str(out),str(f)],capture_output=True,timeout=120)
-v = openpyxl.load_workbook(out/f.name, data_only=True)["Octubre"]
-ok(abs(v["B5"].value - (650+45.5+1234.56)) < 0.01, f"fórmula calculada por LibreOffice: {v['B5'].value}")
+HAY_SOFFICE = bool(shutil.which("soffice"))
+if HAY_SOFFICE:
+    subprocess.run(["soffice","--headless","--convert-to","xlsx","--outdir",str(out),str(f)],capture_output=True,timeout=120)
+    v = openpyxl.load_workbook(out/f.name, data_only=True)["Octubre"]
+    ok(abs(v["B5"].value - (650+45.5+1234.56)) < 0.01, f"fórmula calculada por LibreOffice: {v['B5'].value}")
+else:
+    print("OMITIDO  fórmula calculada por LibreOffice (no está instalado)")
 r = H.oficina_hoja({"accion": "leer", "nombre": "gastos mes"}); print(r)
 ok("Alquiler" in r, "leer por nombre aproximado")
 r = H.oficina_hoja({"accion": "anadir_filas", "nombre": "Gastos del mes.xlsx", "hoja": "octubre", "filas": [["Internet", "30"]]}); print(r)
@@ -70,9 +75,10 @@ r = H.oficina_presentacion({"accion": "cambiar", "nombre": "Viaje a Roma", "nume
 q = pptx.Presentation(p).slides[1]
 ok(q.shapes.title.text == "Imprescindibles" and [x.text for x in q.shapes[1].text_frame.paragraphs] == ["Uno", "Dos"], "cambiar diapositiva")
 ok("no hay la 9" in H.oficina_presentacion({"accion": "cambiar", "nombre": "Viaje a Roma", "numero": 9, "titulo": "x"}), "número fuera de rango")
-subprocess.run(["soffice","--headless","--convert-to","pdf","--outdir",str(out),str(p)],capture_output=True,timeout=120)
-ok((out/"Viaje a Roma.pdf").exists(), "LibreOffice abre y convierte el pptx")
-(Path(tempfile.gettempdir())/"roma.pdf").write_bytes((out/"Viaje a Roma.pdf").read_bytes())
+if HAY_SOFFICE:
+    subprocess.run(["soffice","--headless","--convert-to","pdf","--outdir",str(out),str(p)],capture_output=True,timeout=120)
+    ok((out/"Viaje a Roma.pdf").exists(), "LibreOffice abre y convierte el pptx")
+    (Path(tempfile.gettempdir())/"roma.pdf").write_bytes((out/"Viaje a Roma.pdf").read_bytes())
 
 # --- grupos
 nom = [d["name"] for d in G.herramientas(H.DECLARACIONES, ["archivos"])]
@@ -110,8 +116,9 @@ r = H.oficina_presentacion({"accion":"cambiar","nombre":"Viaje a Roma","numero":
 H.oficina_presentacion({"accion":"anadir","nombre":"Viaje a Roma","diapositivas":[{"titulo":"Nueva","puntos":["x"]}]})
 prs = pptx.Presentation(pp); ok(len(prs.slides)==6 and any(sh.name=="acento_asistente" for sh in prs.slides[5].shapes), "nueva con el tema")
 H.oficina_presentacion({"accion":"estilo","nombre":"Viaje a Roma","tema":"verde"})
-subprocess.run(["soffice","--headless","--convert-to","pdf","--outdir",str(out),str(pp)],capture_output=True,timeout=120)
-(Path(tempfile.gettempdir())/"tema.pdf").write_bytes((out/"Viaje a Roma.pdf").read_bytes())
+if HAY_SOFFICE:
+    subprocess.run(["soffice","--headless","--convert-to","pdf","--outdir",str(out),str(pp)],capture_output=True,timeout=120)
+    (Path(tempfile.gettempdir())/"tema.pdf").write_bytes((out/"Viaje a Roma.pdf").read_bytes())
 H.oficina_presentacion({"accion":"crear","nombre":"def","titulo":"Defecto","abrir":False,"diapositivas":[{"titulo":"A","puntos":["uno","dos"]}]})
 ok(pptx.Presentation(casa/"Documentos"/"def.pptx").core_properties.keywords=="lina-tema:oscuro", "defecto oscuro")
 ok("archivos" in G.elegir("añade al éxtel de gastos del mes el internet", [], []), "éxtel → archivos")
