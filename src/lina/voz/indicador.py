@@ -86,6 +86,29 @@ def interpretar(linea):
     return None
 
 
+LADOS = ("arriba", "abajo", "izquierda", "derecha")
+
+
+def medidas_de(lado, ancho, alto, grosor):
+    """Tamaño (ancho, alto) de la franja de un lado en un monitor de ancho×alto. Las de los lados dejan libres las esquinas."""
+    e = max(1, min(grosor, ancho // 2, alto // 2))
+    if lado in ("arriba", "abajo"):
+        return ancho, e
+    return e, max(1, alto - 2 * e)
+
+
+def anclas_de(lado):
+    """Bordes a los que se pega la franja, en el orden (arriba, abajo, izquierda, derecha). Pegada a tres: se estira a lo largo de ese lado."""
+    return {"arriba": (True, False, True, True), "abajo": (False, True, True, True),
+            "izquierda": (True, True, True, False), "derecha": (True, True, False, True)}[lado]
+
+
+def degradado_de(lado, ancho, alto):
+    """(x0, y0, x1, y1) del degradado: opaco en el borde de la pantalla y transparente hacia dentro."""
+    return {"arriba": (0, 0, 0, alto), "abajo": (0, alto, 0, 0),
+            "izquierda": (0, 0, ancho, 0), "derecha": (ancho, 0, 0, 0)}[lado]
+
+
 def estilo_de(modo, color_escucha):
     """(color_hex, alfa_máximo, velocidad_de_pulso) de cada modo. Velocidad 0 = fijo."""
     return {"escucha": (color_escucha, 0.36, 2.0), "seguimiento": (color_escucha, 0.16, 0.0),
@@ -385,17 +408,15 @@ def servir(entrada=None, salida=None):
         alfa = min(1.0, alfa * estado["intensidad"])
         r, g, b = hex_a_rgb(color)
         w, h = ventana.get_allocated_width(), ventana.get_allocated_height()
-        e = min(estado["grosor"], w // 2, h // 2)
+        x0, y0, x1, y1 = degradado_de(ventana.lado_lina, w, h)
+        grad = cairo.LinearGradient(x0, y0, x1, y1)
+        grad.add_color_stop_rgba(0.0, r, g, b, alfa)
+        grad.add_color_stop_rgba(0.25, r, g, b, alfa * 0.30)
+        grad.add_color_stop_rgba(1.0, r, g, b, 0.0)
         cr.set_operator(cairo.OPERATOR_OVER)
-        for (x0, y0, x1, y1, rx, ry, rw, rh) in ((0, 0, 0, e, 0, 0, w, e), (0, h, 0, h - e, 0, h - e, w, e),
-                                                  (0, 0, e, 0, 0, 0, e, h), (w, 0, w - e, 0, w - e, 0, e, h)):
-            grad = cairo.LinearGradient(x0, y0, x1, y1)
-            grad.add_color_stop_rgba(0.0, r, g, b, alfa)
-            grad.add_color_stop_rgba(0.25, r, g, b, alfa * 0.30)
-            grad.add_color_stop_rgba(1.0, r, g, b, 0.0)
-            cr.rectangle(rx, ry, rw, rh)
-            cr.set_source(grad)
-            cr.fill()
+        cr.rectangle(0, 0, w, h)
+        cr.set_source(grad)
+        cr.fill()
         return False
 
     def sin_ratón(widget, *_):
@@ -417,8 +438,10 @@ def servir(entrada=None, salida=None):
             except Exception:
                 pass
 
-    def crear(monitor):
+    def crear(monitor, lado):
+        """Una franja fina pegada a un borde del monitor. Si el compositor no dejara pasar el ratón, solo bloquearía la franja y no toda la pantalla."""
         v = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
+        v.lado_lina = lado
         v.set_title("lina-indicador")
         v.set_app_paintable(True)
         v.set_decorated(False)
@@ -432,12 +455,12 @@ def servir(entrada=None, salida=None):
         if visual is not None:
             v.set_visual(visual)
         geo = monitor.get_geometry()
-        v.set_default_size(geo.width, geo.height)
+        v.set_default_size(*medidas_de(lado, geo.width, geo.height, estado["grosor"]))
         if capa:
             capa.init_for_window(v)
             capa.set_layer(v, capa.Layer.OVERLAY)
-            for borde in (capa.Edge.TOP, capa.Edge.BOTTOM, capa.Edge.LEFT, capa.Edge.RIGHT):
-                capa.set_anchor(v, borde, True)
+            for borde, ancla in zip((capa.Edge.TOP, capa.Edge.BOTTOM, capa.Edge.LEFT, capa.Edge.RIGHT), anclas_de(lado)):
+                capa.set_anchor(v, borde, ancla)
             capa.set_exclusive_zone(v, -1)
             capa.set_keyboard_mode(v, capa.KeyboardMode.NONE)
             capa.set_namespace(v, "lina-indicador")
@@ -449,13 +472,40 @@ def servir(entrada=None, salida=None):
         v.connect("map-event", lambda w, e: sin_ratón(w) or False)
         return v
 
+    def margenes(v, lado, e):
+        """Las franjas de los lados no pisan las de arriba y abajo en las esquinas (si no, ahí el color se sumaría dos veces)."""
+        if capa and lado in ("izquierda", "derecha"):
+            capa.set_margin(v, capa.Edge.TOP, e)
+            capa.set_margin(v, capa.Edge.BOTTOM, e)
+
     def montar():
         pantalla = Gdk.Display.get_default()
+        vistos = set()
         for i in range(pantalla.get_n_monitors()):
-            estado["ventanas"].append(crear(pantalla.get_monitor(i)))
+            m = pantalla.get_monitor(i)
+            g = m.get_geometry()
+            clave = (g.x, g.y, g.width, g.height)
+            if clave in vistos:                              # pantallas duplicadas (espejo): una sola capa; la segunda la cierra el compositor
+                continue
+            vistos.add(clave)
+            for lado in LADOS:
+                v = crear(m, lado)
+                margenes(v, lado, estado["grosor"])
+                estado["ventanas"].append(v)
+
+    def ajustar_tamano():
+        e = estado["grosor"]
+        if estado.get("grosor_aplicado") == e:
+            return
+        estado["grosor_aplicado"] = e
+        for v in estado["ventanas"]:
+            ancho, alto = (-1, e) if v.lado_lina in ("arriba", "abajo") else (e, -1)
+            v.set_size_request(ancho, alto)
+            margenes(v, v.lado_lina, e)
 
     def refrescar():
         visible = estado["modo"] != "off"
+        ajustar_tamano()
         for v in estado["ventanas"]:
             if visible:
                 if not v.get_visible():
