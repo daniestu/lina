@@ -28,10 +28,10 @@ def test_respeta_variables_xdg(tmp_path, monkeypatch):
 
 
 def test_editable_copia_el_de_fabrica_una_sola_vez(rutas):
-    ruta = rutas.editable("activacion.txt")
-    assert ruta == rutas.CONFIG / "activacion.txt" and ruta.is_file()
+    ruta = rutas.editable("comandos.txt")
+    assert ruta == rutas.CONFIG / "comandos.txt" and ruta.is_file()
     ruta.write_text("# mío\n", encoding="utf-8")
-    assert rutas.editable("activacion.txt").read_text(encoding="utf-8") == "# mío\n"      # no se pisa lo del usuario
+    assert rutas.editable("comandos.txt").read_text(encoding="utf-8") == "# mío\n"      # no se pisa lo del usuario
 
 
 def test_editable_sin_archivo_de_fabrica_solo_devuelve_la_ruta(rutas):
@@ -47,5 +47,5 @@ def test_carpeta_usuario_lee_user_dirs(rutas, tmp_path):
 
 
 def test_datos_de_fabrica_completos(rutas):
-    for n in ("activacion.txt", "comandos.txt", "politica.txt", "presupuesto.txt", "vocabulario.txt", "paquetes_confiables.txt"):
+    for n in ("comandos.txt", "politica.txt", "presupuesto.txt", "vocabulario.txt", "paquetes_confiables.txt"):
         assert (rutas.DEFECTOS / n).is_file(), n

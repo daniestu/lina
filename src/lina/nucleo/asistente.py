@@ -27,6 +27,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
+from lina.nucleo import ajustes as AJ
 from lina.nucleo import rutas as RUT
 from lina.voz import voces as VOC
 
@@ -129,8 +130,8 @@ except ImportError:  # sin la librería evdev el asistente funciona igual, pero 
 
 # ======================= CONFIGURACIÓN =======================
 CLAVE_GEMINI = RUT.CONFIG / "gemini.key"
-CLAVE_PAGO = RUT.CONFIG / "gemini_pago.key"       # A5: la clave de pago (con tope de gasto: presupuesto.txt)
-VOZ = VOC.VOZ_POR_DEFECTO                  # voz de Piper; main() la sustituye por la elegida en ~/.config/lina/voz.txt (ver voz/voces.py)
+CLAVE_PAGO = RUT.CONFIG / "gemini_pago.key"       # A5: la clave de pago (con tope de gasto: config.toml, [gasto])
+VOZ = VOC.VOZ_POR_DEFECTO                  # voz de Piper; main() la sustituye por la elegida en config.toml ([voz]) (ver voz/voces.py)
 PROMPT_WHISPER_CARACTERES = 650              # tamaño máximo de la pista que se le da a Whisper (si se pasa, olvida el principio)
 MODELO_WHISPER = "small"                    # voz a texto, en la CPU
 MODELO_LOCAL = "qwen3-vl:8b-instruct"       # modelo de visión de Ollama
@@ -3411,6 +3412,9 @@ class Asistente:
             orden = [sys.executable, "-m", "piper", "-m", VOC.modelo(VOZ), "--data-dir", str(RUT.asegurar(RUT.VOCES))]
             if VOC.locutor(VOZ) is not None:
                 orden += ["-s", str(VOC.locutor(VOZ))]
+            velocidad = AJ.actuales(log=lambda m: None).get("voz", "velocidad")
+            if abs(velocidad - 1.0) > 0.01:
+                orden += ["--length-scale", f"{1.0 / velocidad:.3f}"]          # Piper: más de 1 = más lento; aquí la velocidad es la inversa
             subprocess.run(orden + ["-f", str(AUDIO_RESPUESTA), "--", texto],
                            cwd=RUT.asegurar(RUT.VOCES), check=True, capture_output=True)
             self.reproductor = subprocess.Popen(["paplay", str(AUDIO_RESPUESTA)])

@@ -3,7 +3,7 @@
 Las voces son modelos de Piper (https://github.com/rhasspy/piper). No viajan dentro del repositorio: Lina descarga la que necesita
 a ~/.local/share/lina/voces/ y, si no hay internet, usa cualquier otra que ya tenga.
 
-La voz que se usa se elige con `lina voz NOMBRE` o escribiendo su nombre en ~/.config/lina/voz.txt (una línea).
+La voz que se usa se elige con `lina voz NOMBRE` (se guarda en config.toml, sección [voz]).
 El catálogo está organizado por idioma para poder añadir otros más adelante.
 """
 import os
@@ -11,6 +11,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from lina.nucleo import ajustes as AJ
 from lina.nucleo import rutas as RUT
 
 IDIOMA = "es"
@@ -58,7 +59,9 @@ def locutor(nombre):
 
 
 def voz_elegida(carpeta_config=None):
-    """Nombre de la voz que el usuario ha puesto en voz.txt, o la de por defecto."""
+    """Nombre de la voz elegida en config.toml ([voz]) o, si se da una carpeta suelta (pruebas), en su voz.txt; si no hay, la de por defecto."""
+    if carpeta_config is None:
+        return AJ.actuales(log=lambda m: None).get("voz", "voz")
     ruta = Path(carpeta_config or RUT.CONFIG) / "voz.txt"
     try:
         for linea in ruta.read_text(encoding="utf-8").splitlines():
@@ -71,7 +74,10 @@ def voz_elegida(carpeta_config=None):
 
 
 def fijar(nombre, carpeta_config=None):
-    """Guarda la voz elegida en voz.txt."""
+    """Guarda la voz elegida (en config.toml, o en un voz.txt suelto si se da una carpeta)."""
+    if carpeta_config is None:
+        AJ.actuales(log=lambda m: None).establecer("voz", "voz", nombre)
+        return
     base = Path(carpeta_config or RUT.CONFIG)
     base.mkdir(parents=True, exist_ok=True)
     (base / "voz.txt").write_text(nombre + "\n", encoding="utf-8")

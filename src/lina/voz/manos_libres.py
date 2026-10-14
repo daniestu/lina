@@ -10,7 +10,7 @@ Cómo funciona (todo en tu ordenador):
 Seguridad: lo que pide confirmación (borrar, instalar, gastar…) NO se puede confirmar con la voz en manos libres: ahí hay que pulsar el atajo
 (así una voz de la tele o de otra persona no puede autorizar nada). Cancelar sí se puede por voz.
 
-Configuración: activacion.txt (nombre, variantes, tiempos, sensibilidad). Se relee sola al cambiarla; el nombre también se cambia por voz
+Configuración: config.toml, secciones [asistente] y [activacion] (nombre, variantes, tiempos, sensibilidad); ver ajustes.py. Se relee sola al cambiarla; el nombre también se cambia por voz
 («a partir de ahora te llamas Jarvis»).
 
 Pruebas sin micrófono:
@@ -30,9 +30,9 @@ import unicodedata
 from pathlib import Path
 
 import numpy as np
+from lina.nucleo import ajustes as AJ
 from lina.nucleo import rutas as RUT
 
-ARCHIVO = RUT.editable("activacion.txt")
 FRECUENCIA = 16000
 BLOQUE = 480                      # 30 ms por bloque de audio
 
@@ -68,13 +68,23 @@ _FUNCION = {"a", "de", "la", "el", "en", "y", "que", "los", "las", "un", "una", 
 # Configuración
 # ----------------------------------------------------------------------------------------------------------------------
 class Config:
-    def __init__(self, ruta=None):
-        self.ruta = Path(ruta) if ruta else ARCHIVO
+    """Los ajustes del manos libres y del indicador, con los nombres de siempre (nombre, activo, indicador_color…).
+    Sin ruta: se leen y se guardan en config.toml (ver ajustes.py). Con ruta: un archivo suelto «clave = valor» (para pruebas y uso antiguo)."""
+
+    def __init__(self, ruta=None, ajustes=None):
+        self.ruta = Path(ruta) if ruta else None
+        self.ajustes = None if ruta else (ajustes or AJ.actuales(log=lambda m: None))
         self.valores = dict(PREDETERMINADOS)
         self.mtime = None
         self.cargar()
 
     def cargar(self):
+        if self.ajustes is not None:
+            self.ajustes.cargar()
+            self.valores = dict(PREDETERMINADOS)
+            self.valores.update({k: v for k, v in self.ajustes.planas().items() if k in PREDETERMINADOS})
+            self.mtime = self.ajustes.marca
+            return
         self.valores = dict(PREDETERMINADOS)
         try:
             self.mtime = self.ruta.stat().st_mtime_ns
@@ -94,7 +104,7 @@ class Config:
 
     def recargar_si_cambio(self):
         try:
-            m = self.ruta.stat().st_mtime_ns
+            m = self.ajustes._marca() if self.ajustes is not None else self.ruta.stat().st_mtime_ns
         except OSError:
             m = None
         if m != self.mtime:
@@ -103,7 +113,16 @@ class Config:
         return False
 
     def guardar(self, clave, valor):
-        """Cambia una línea del archivo conservando los comentarios (y la crea si no existe)."""
+        """Cambia un ajuste conservando los comentarios del archivo (y lo crea si no existe)."""
+        if self.ajustes is not None:
+            seccion, k = AJ.PLANAS[clave]
+            try:
+                self.ajustes.establecer(seccion, k, valor)
+            except ValueError:
+                return
+            self.valores[clave] = AJ.a_texto_plano(self.ajustes.get(seccion, k))
+            self.mtime = self.ajustes.marca
+            return
         self.valores[clave] = str(valor)
         try:
             lineas = self.ruta.read_text(encoding="utf-8").splitlines()
@@ -504,7 +523,7 @@ class ManosLibres:
         import sounddevice as sd
         self._preparar_eco()
         self.log(f"Manos libres: listo. Di «Oye {self.cfg.nombre.capitalize()}» para hablarme sin pulsar nada"
-                 + ("" if self.cfg.si("activo") else " (ahora está DESACTIVADO en activacion.txt)"))
+                 + ("" if self.cfg.si("activo") else " (ahora está DESACTIVADO: lina config poner activacion.activo si)"))
         flujo = sd.InputStream(samplerate=FRECUENCIA, channels=1, dtype="float32", blocksize=BLOQUE,
                                callback=lambda datos, *_: self._meter(datos))
         with flujo:
@@ -719,7 +738,7 @@ def _nivel():
         return
     recomendado = max(0.006, round(min(habla * 0.25, max(suelo * 3, 0.008)), 4))
     print(f"Sensibilidad recomendada: {recomendado}")
-    print(f"Pon en activacion.txt:  sensibilidad = {recomendado}")
+    print(f"Ponlo con:  lina config poner activacion.sensibilidad {recomendado}")
 
 
 if __name__ == "__main__":

@@ -143,9 +143,9 @@ _SECRETOS = [r"\.config/lina", r"\.ssh\b", r"\.gnupg", r"/etc/shadow", r"/etc/gs
              r"cookies\.sqlite", r"login data", r"\.mozilla", r"\.pgpass", r"\.key\b"]
 _PROPIO = (r"(?:^|/)lina/(?:nucleo|voz|escritorio|modulos|mcp|datos)/|site-packages/lina|/src/lina/|\.config/lina|\.local/share/lina|\.local/state/lina|"
           r"lina\.service|systemd/user/lina|systemctl[^;|&\n]*\blina\b|mcp\.json|mcp_estado|"
-          r"\b(?:politica|comandos|activacion|presupuesto|paquetes_confiables|alias|vocabulario|disco_datos)\.txt|mcp_claves|"
+          r"\b(?:politica|comandos|activacion|presupuesto|paquetes_confiables|alias|vocabulario|disco_datos)\.txt|config\.toml|mcp_claves|"
           r"\b(?:asistente|herramientas|grupos|sistema|juegoconf|web|notas|recordatorios|oficina|organizacion|interfaz|interfaz_atspi|interfaz_vision|indicador|"
-          r"plataforma|manos_libres|comandos|politica|diario|presupuesto|recetas|juegos|rutas|claves)\.py|\.config/asistente|\.local/share/asistente")
+          r"plataforma|manos_libres|comandos|politica|diario|presupuesto|recetas|juegos|rutas|claves|ajustes)\.py|\.config/asistente|\.local/share/asistente")
 _SUDOERS = r"/etc/sudoers|\bvisudo\b|sudoers\.d"
 
 # Prefijos que envuelven a otro comando, con las opciones de cada uno que llevan un valor detrás

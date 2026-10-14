@@ -1,7 +1,7 @@
 """A5 · Presupuesto de Gemini: la clave gratuita y la de pago, lo gastado en el mes, el tope y los avisos.
 
 Aquí no se habla con Gemini: solo se lleva la cuenta y se decide QUÉ clave toca. Lo ajustable (tope, tipo de cambio, precios)
-está en presupuesto.txt. Lo gastado se guarda en ~/.local/share/lina/gasto.json (solo legible por ti, y la IA no puede tocarlo).
+está en config.toml ([gasto]; los precios, en presupuesto.txt). Lo gastado se guarda en ~/.local/share/lina/gasto.json (solo legible por ti, y la IA no puede tocarlo).
 
 Reglas:
   - Lo rápido va con la clave gratuita; lo «a fondo» va con la de pago; si una falla, se prueba con la otra.
@@ -17,6 +17,7 @@ import subprocess
 import threading
 import time
 
+from lina.nucleo import ajustes as AJ
 from lina.nucleo import comandos
 from lina.nucleo import rutas as RUT
 
@@ -98,12 +99,15 @@ def configuracion():
         marca = ARCHIVO.stat().st_mtime_ns
     except OSError:
         marca = None
+    aj = AJ.actuales(log=log)
+    marca = (marca, aj.marca)
     if _cache_conf["datos"] is not None and _cache_conf["marca"] == marca:
         return _cache_conf["datos"]
+    marca_txt = marca[0]
     datos = {"tope_eur": TOPE_EUR, "eur_por_usd": EUR_POR_USD, "avisos": AVISOS_PORCENTAJE,
              "precios": {m: list(v) for m, v in PRECIOS_DEFECTO.items()}}
     propios = {}
-    if marca is not None:
+    if marca_txt is not None:
         seccion = ""
         try:
             lineas = ARCHIVO.read_text(encoding="utf-8").splitlines()
@@ -138,6 +142,10 @@ def configuracion():
             except ValueError:
                 log(f"{ARCHIVO.name}: no entiendo «{k} = {v}»: uso el valor de fábrica")
         datos["precios"].update(propios)
+    # El tope, el cambio euro/dólar y los avisos viven en config.toml, sección [gasto] (presupuesto.txt solo guarda los precios)
+    datos["tope_eur"] = float(aj.get("gasto", "tope_mensual_eur"))
+    datos["eur_por_usd"] = float(aj.get("gasto", "eur_por_usd"))
+    datos["avisos"] = tuple(aj.get("gasto", "avisos_porcentaje"))
     _cache_conf["marca"], _cache_conf["datos"] = marca, datos
     return datos
 

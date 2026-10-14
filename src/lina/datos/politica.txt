@@ -26,6 +26,11 @@
 #     paquete PATRON                    instalar o quitar ese paquete con pacman, paru o yay
 #     ejecutar_desde RUTA               ejecutar un programa o script que esté en esa ruta
 #
+#  PERFIL Y ATAJOS
+#   - El perfil (autonomo, equilibrado o prudente) y los interruptores por categoría están en config.toml, sección [autonomia]
+#     (lina config perfil prudente). Se aplican ENCIMA de este archivo: pueden apretar el modo o aflojar categorías, pero
+#     discos, arranque, cuentas, dinero y gasto se confirman siempre.
+#
 #  CÓMO AJUSTARLO
 #   - ¿Quieres que te pregunte MENOS por algo? Borra la línea (o la sección entera).
 #   - ¿Quieres que te pregunte MÁS? Añade líneas, o cambia  autonomia  a  prudente  (abajo).

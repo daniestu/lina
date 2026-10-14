@@ -12,7 +12,7 @@ Funciona en dos mitades:
   · servir()  (proceso aparte, python3 del sistema con GTK3): dibuja. Si está «gtk-layer-shell» usa una capa por encima de todo (como un panel)
     que no coge el foco ni el ratón; si no, usa una ventana normal transparente (menos fiable en Wayland).
 
-Ajustes en activacion.txt:   indicador = si | no      indicador_color = azul | rojo | verde | morado | naranja | #rrggbb
+Ajustes en config.toml, sección [interfaz]:   indicador = true | false      indicador_color = azul | rojo | verde | morado | naranja | #rrggbb
                              indicador_grosor = 40 (píxeles)     indicador_intensidad = 1.0 (0.1 muy suave … 2 fuerte)     indicador_juegos = no (si: también se dibuja con un juego en primer plano)
                              indicador_instalar = si (no: no instala paquetes por su cuenta)
 Todo es automático: al arrancar comprueba que haya con qué dibujar y, si falta, instala los paquetes oficiales (indicador_instalar = no lo impide).

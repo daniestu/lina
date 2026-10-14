@@ -1,5 +1,5 @@
 # ============================================================================================
-#  PRESUPUESTO DE GEMINI  (lo lee presupuesto.py; se vuelve a leer solo cuando lo guardas)
+#  PRECIOS DE GEMINI  (lo lee presupuesto.py; se vuelve a leer solo cuando lo guardas)
 #  Esta es TU lista: las actualizaciones NO la pisan. La IA no puede editarla (solo tú).
 #
 #  Cómo funciona:
@@ -11,15 +11,8 @@
 #     quieras gastar y deja la recarga automática APAGADA. Lo oficial está en AI Studio > Dashboard > Usage.
 # ============================================================================================
 
-# Lo máximo que gastas al mes con la clave de pago, en euros.
-tope_mensual_eur = 10
-
-# Cuántos euros vale 1 dólar (los precios de Google están en dólares). Cámbialo cuando quieras. Está puesto un poco ALTO a propósito:
-# si el dólar vale menos, la cuenta sale algo más alta que la real, y te quedas del lado seguro.
-eur_por_usd = 0.92
-
-# Te aviso (por voz y con una notificación) al llegar a estos porcentajes del tope. Al 100 % la clave de pago deja de usarse.
-avisos_porcentaje = 50, 80, 100
+# El tope mensual, el cambio euro/dólar y los avisos de porcentaje ya no se escriben aquí: están en config.toml, sección [gasto]
+# (cámbialos con  lina config poner gasto.tope_mensual_eur 15). Este archivo solo guarda los precios.
 
 # Precios en dólares por millón de tokens:  modelo = entrada, salida [, entrada en caché]
 # La salida INCLUYE el razonamiento. Si pones  modelo@AAAA-MM-DD  el precio vale desde esa fecha (así se anota una subida anunciada).
