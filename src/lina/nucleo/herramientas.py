@@ -146,6 +146,8 @@ _PROPIO = (r"(?:^|/)lina/(?:nucleo|voz|escritorio|modulos|mcp|datos)/|site-packa
           r"\b(?:asistente|herramientas|grupos|sistema|juegoconf|web|notas|recordatorios|oficina|organizacion|interfaz|interfaz_atspi|interfaz_vision|indicador|"
           r"plataforma|manos_libres|comandos|politica|diario|presupuesto|recetas|juegos|rutas|claves|ajustes)\.py|\.config/asistente|\.local/share/asistente")
 _SUDOERS = r"/etc/sudoers|\bvisudo\b|sudoers\.d"
+# Órdenes de Lina que cambian sus propios permisos, gasto, voz o claves: las da el usuario en su terminal o con el atajo, nunca la IA
+_ORDEN_PROPIA = r"(?:^|[\s;&|(`/])(?:lina|python3?\s+-m\s+lina(?:\.__main__)?)\s+(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S)"
 
 # Prefijos que envuelven a otro comando, con las opciones de cada uno que llevan un valor detrás
 _PREFIJOS = {"sudo": {"-u", "-g", "-C", "-h", "-p", "-r", "-t", "-U", "-D", "-R"}, "doas": {"-u", "-C"},
@@ -251,6 +253,8 @@ def _bloqueado(comando, _profundidad=0):
         return "tocaría mi propio código o mi servicio"
     if re.search(_SUDOERS, bajo):
         return "tocaría los permisos de sudo"
+    if re.search(_ORDEN_PROPIA, bajo):
+        return "cambiaría mis propios ajustes de permisos, gasto o claves (eso lo haces tú, o con el atajo)"
 
     for seg in _segmentos(comando):
         t = _tokens(seg)

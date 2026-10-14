@@ -40,4 +40,10 @@ ok(not PO.datos()["frenar_contenido_de_fuera"] and nivel("touch /home/x/nuevo.tx
 ok(nivel("rm /home/x/algo.txt") == "autonomo", "politica.txt sin reglas de borrado: no pregunta")
 aj.establecer("autonomia", "borrado", "confirmar")
 ok(nivel("rm /home/x/algo.txt") == "critico", "borrado = confirmar recupera las reglas de fábrica")
+# la IA no puede cambiar sus propios permisos, gasto ni claves por el terminal
+for c in ("lina config poner autonomia.perfil autonomo", "lina config perfil autonomo", "lina config poner gasto.tope_mensual_eur 5000",
+          "python -m lina config poner autonomia.borrado libre", "cd ~ && lina config poner voz.velocidad 2", "lina clave GITHUB_TOKEN", "lina voz es_ES-davefx-medium"):
+    ok(H.clasificar(c)[0] == "bloqueado", "bloqueado para la IA: " + c)
+for c in ("lina config", "lina config ver voz.velocidad", "lina config comprobar", "lina voz", "lina pulsar"):
+    ok(H.clasificar(c)[0] != "bloqueado", "permitido (solo mira): " + c)
 print("fallos", f); sys.exit(1 if f else 0)
