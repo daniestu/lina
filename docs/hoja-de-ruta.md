@@ -2,14 +2,16 @@
 
 | Fase | Contenido |
 |---|---|
-| 0 | Estructura profesional del repositorio *(hecha)* |
-| 1 | Instalación y arranque en limpio: `install.sh`, servicio de usuario, primera ejecución guiada |
-| 2 | Nombre y voz configurables (voces elegibles con `lina voz`), asistente de configuración. Motor de voz intercambiable: Piper local por defecto, Kokoro y otros opcionales |
-| 3 | Seguridad parametrizable: sudo limitado a paquetes, niveles de autonomía, claves en el llavero |
-| 4 | Calidad: pruebas en pytest, CI, tipado y documentación |
-| 4b | Proveedores de IA intercambiables: capa de adaptadores con formato interno de herramientas (Gemini, API compatible con OpenAI, Anthropic, modelos locales y de empresa) |
-| 4c | Internacionalización: idioma configurable, textos y prompts por idioma, números en palabras por idioma, voces por idioma; primer idioma nuevo: inglés |
-| 5 | Otras distribuciones (Debian/Ubuntu, Fedora, openSUSE) y otros escritorios (GNOME, X11) |
-| 6 | Paquetes: AUR y otros |
-| 7 | Beta pública y comentarios |
-| 8 | Versión 1.0 |
+| 0 | Estructura profesional del repositorio *(hecha; falta el uso real de unos días)* |
+| 1 | Configuración, perfiles de autonomía y nombre y voz de Lina (`config.toml`, claves en el llavero) |
+| 2 | Seguridad y privilegios: sudo limitado a instalar paquetes, modelo de amenazas, consentimiento de privacidad |
+| 3 | Portabilidad entre distribuciones (Arch, Debian/Ubuntu, Fedora, openSUSE) |
+| 4 | Instalador y primer arranque guiado: `install.sh`, atajo automático, `lina doctor`, `lina update` |
+| 5 | Portabilidad de escritorio (KDE Plasma, GNOME, X11) |
+| 6 | Calidad e ingeniería: código dividido, CI, tipado, cobertura |
+| 7 | Proveedores de IA intercambiables: Gemini, API compatible con OpenAI, Anthropic, modelos locales y de empresa |
+| 8 | Internacionalización: idioma configurable, textos y prompts por idioma; el inglés será el primer idioma nuevo, tras la beta |
+| 9 | Documentación y publicación: README, licencias, paquete AUR, versión `v0.1.0-beta` |
+| 10 | Beta cerrada |
+
+En paralelo, el motor de voz será intercambiable: Piper en local por defecto, con Kokoro y otros como opciones.
