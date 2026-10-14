@@ -14,7 +14,7 @@ AYUDA = f"""Lina {__version__}: asistente de voz para el escritorio Linux.
   lina pulsar                equivale a pulsar el atajo (hablar / terminar de hablar / callarla). Ponlo en el atajo de teclado
   lina config [ORDEN]        ver y cambiar los ajustes (nombre, voz, perfil de autonomía, gasto…):  lina config ayuda
   lina voz [NOMBRE]          lista las voces o elige una (la descarga si hace falta)
-  lina clave NOMBRE          guarda una clave (por ejemplo de un servidor MCP) sin que se vea ni se dicte
+  lina clave [gemini|pago|NOMBRE]   guarda una clave (Gemini, de pago, de un servidor MCP…) en el llavero del sistema, sin que se vea ni se dicte
   lina manos-libres ORDEN    probar "frase" · eco · nivel   (ajustes del manos libres)
   lina indicador probar      enseña el resplandor de escucha
   lina interfaz ORDEN        diagnostico · preparar · estado   (control de programas con la pantalla)

@@ -301,7 +301,7 @@ def resumen():
     """Lo que se le cuenta al usuario cuando pregunta cuánto lleva gastado."""
     e = estado()
     if not e["hay_pago"]:
-        return (f"No hay clave de pago configurada (falta ~/.config/lina/gemini_pago.key), así que no se está gastando nada. "
+        return (f"No hay clave de pago configurada (añádela con:  lina clave pago), así que no se está gastando nada. "
                 f"Este mes llevo {e['llamadas_gratis']} llamadas con la clave gratuita.")
     texto = (f"Este mes ({e['mes']}) llevas gastados {_euros(e['gasto_eur'])} de {_euros(e['tope_eur'])} ({e['porcentaje']:.0f} %) con la clave de pago, "
              f"en {e['llamadas_pago']} llamadas; con la gratuita, {e['llamadas_gratis']}. ")
@@ -313,7 +313,7 @@ def resumen():
 def subir_tope(euros):
     """Cambia el tope de ESTE mes (solo lo llama el código ante una frase tuya, nunca la IA). Devuelve lo que se te dice."""
     if not hay_clave_de_pago():
-        return "No hay clave de pago configurada (falta ~/.config/lina/gemini_pago.key): no hay ningún gasto que topar."
+        return "No hay clave de pago configurada (añádela con:  lina clave pago): no hay ningún gasto que topar."
     if not (1 <= euros <= TOPE_MAXIMO_POR_VOZ):
         return (f"Por seguridad solo cambio el tope por voz entre 1 y {TOPE_MAXIMO_POR_VOZ} euros. Si quieres otra cifra, edita {ARCHIVO.name}.")
     with _lock:

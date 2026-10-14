@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 
 import requests
+from lina.nucleo import claves as CL
 from lina.nucleo import rutas as RUT
 
 CONFIG = RUT.CONFIG / "mcp.json"
@@ -72,7 +73,8 @@ def archivo_claves():
 
 
 def claves():
-    """Claves guardadas con `lina clave NOMBRE` (CLAVE=valor por línea). Así no hace falta tocar el entorno del servicio ni dictarlas por voz."""
+    """Claves de servidores MCP guardadas en el archivo de respaldo (CLAVE=valor por línea). Las que están en el llavero del sistema se
+    piden por nombre (ver valor_de())."""
     salida = {}
     try:
         for linea in archivo_claves().read_text(encoding="utf-8").splitlines():
@@ -84,6 +86,11 @@ def claves():
     return salida
 
 
+def valor_de(nombre):
+    """Valor de una variable de servidor MCP: entorno, llavero del sistema o archivo de respaldo."""
+    return CL.valor_mcp(nombre)
+
+
 def variables_de(valor):
     return re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", str(valor))
 
@@ -91,14 +98,12 @@ def variables_de(valor):
 def faltan_claves(conf):
     """Variables ${X} que usa la configuración y que no existen ni en el entorno ni en el archivo de claves."""
     textos = [conf.get("url", ""), conf.get("command", ""), *(conf.get("args") or []), *(conf.get("env") or {}).values(), *(conf.get("headers") or {}).values()]
-    guardadas = claves()
-    return sorted({v for t in textos for v in variables_de(t) if not os.environ.get(v) and not guardadas.get(v)})
+    return sorted({v for t in textos for v in variables_de(t) if not valor_de(v)})
 
 
 def expandir(valor):
     """${VARIABLE} → su valor (entorno o archivo de claves): así las claves no tienen que estar escritas en mcp.json."""
-    guardadas = claves() if "${" in str(valor) else {}
-    return re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", lambda m: os.environ.get(m.group(1)) or guardadas.get(m.group(1), ""), str(valor))
+    return re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", lambda m: valor_de(m.group(1)), str(valor))
 
 
 # ======================= esquemas: de JSON Schema a lo que admite Gemini =======================

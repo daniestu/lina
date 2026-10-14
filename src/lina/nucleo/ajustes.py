@@ -63,6 +63,7 @@ ESQUEMA = {
     },
     "privacidad": {
         "registro_ruido": (False, "bool", None, "true: se apunta en el registro lo que oye y descarta (solo para depurar)."),
+        "almacen_claves": ("auto", "opcion", ("auto", "archivo"), "auto: las claves van al llavero del sistema si lo hay (y si no, a un archivo solo tuyo). archivo: siempre archivo."),
     },
     "interfaz": {
         "indicador": (True, "bool", None, "Resplandor en los bordes: te escucha (azul), piensa (ámbar), habla (verde)."),

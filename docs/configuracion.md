@@ -80,6 +80,7 @@ que no se pueden desactivar. Los perfiles se aplican encima de `politica.txt`: p
 
 | Ajuste | De fábrica | Qué hace |
 |---|---|---|
+| `almacen_claves` | `"auto"` | auto: las claves van al llavero del sistema si lo hay (y si no, a un archivo solo tuyo). archivo: siempre archivo. |
 | `registro_ruido` | `false` | true: se apunta en el registro lo que oye y descarta (solo para depurar). |
 
 ### [interfaz] Interfaz
@@ -92,6 +93,23 @@ que no se pueden desactivar. Los perfiles se aplican encima de `politica.txt`: p
 | `indicador_intensidad` | `1.0` | Lo fuerte que brilla: 0.1 casi invisible … 1 normal … 2 muy fuerte. |
 | `indicador_juegos` | `false` | true: también se dibuja con un juego en primer plano. |
 | `indicador_instalar` | `true` | true: si faltan paquetes para dibujarlo, los instala solo (repositorios oficiales). |
+
+## Claves
+
+Las claves (Gemini gratuita, Gemini de pago, Tavily, las de servidores MCP) **no van en `config.toml`**. Se guardan en el llavero del sistema (GNOME Keyring, KWallet…
+a través de `secret-tool`, del paquete `libsecret`) y, si no hay llavero, en un archivo con permisos 600 dentro de `~/.config/lina`. Nunca se escriben en pantalla,
+no se dictan por voz y Lina las tapa en todo lo que imprime (el registro de `journalctl` no las contiene).
+
+```
+lina clave                 # qué claves hay y dónde (sin enseñarlas)
+lina clave gemini          # la gratuita
+lina clave pago            # la de pago: antes te pide un tope mensual, que es obligatorio
+lina clave NOMBRE          # otra, por ejemplo GITHUB_TOKEN para un servidor MCP
+lina clave borrar NOMBRE
+lina clave migrar          # pasa al llavero las que estén en archivos
+```
+
+Para forzar siempre archivo: `lina config poner privacidad.almacen_claves archivo`.
 
 ## Venías de una versión anterior
 

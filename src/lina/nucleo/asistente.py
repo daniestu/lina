@@ -28,6 +28,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from lina.nucleo import ajustes as AJ
+from lina.nucleo import claves as CL
 from lina.nucleo import rutas as RUT
 from lina.voz import voces as VOC
 
@@ -129,8 +130,7 @@ except ImportError:  # sin la librería evdev el asistente funciona igual, pero 
     evdev = None
 
 # ======================= CONFIGURACIÓN =======================
-CLAVE_GEMINI = RUT.CONFIG / "gemini.key"
-CLAVE_PAGO = RUT.CONFIG / "gemini_pago.key"       # A5: la clave de pago (con tope de gasto: config.toml, [gasto])
+# Las claves (Gemini gratuita, Gemini de pago, Tavily) las guarda claves.py: en el llavero del sistema o, si no hay, en un archivo 600. Ver `lina clave`.
 VOZ = VOC.VOZ_POR_DEFECTO                  # voz de Piper; main() la sustituye por la elegida en config.toml ([voz]) (ver voz/voces.py)
 PROMPT_WHISPER_CARACTERES = 650              # tamaño máximo de la pista que se le da a Whisper (si se pasa, olvida el principio)
 MODELO_WHISPER = "small"                    # voz a texto, en la CPU
@@ -183,7 +183,6 @@ PAUSA_MODELO_SEG = 180                      # tras un 503/429 o un timeout, se s
 PAUSA_BUSQUEDA_SEG = 1800                   # si la búsqueda de Google da error de cuota, se prueba sin ella este tiempo
 BUSQUEDA = "tavily"                         # "tavily": búsqueda propia (gratis) | "google": la de Gemini (pide cuenta de pago) | "ninguna"
 MAX_BUSQUEDAS = 2                           # búsquedas máximas por pregunta
-CLAVE_TAVILY = RUT.CONFIG / "tavily.key"
 CONFIRMAR_ACCIONES = True                   # True: lo que cambia el sistema espera tu "sí"; False: modo libre (solo se bloquea lo catastrófico)
 MAX_PASOS = 10                              # llamadas a herramientas máximas por pregunta
 
@@ -860,12 +859,12 @@ HERRAMIENTA_BUSCAR = {"functionDeclarations": [{
 
 def buscar_tavily(consulta):
     """Busca en la web con Tavily y devuelve los resultados como texto para que la IA los lea."""
-    if not CLAVE_TAVILY.exists():
+    if not CL.obtener("tavily"):
         return "La búsqueda web no está configurada."
     inicio = time.time()
     try:
         r = requests.post("https://api.tavily.com/search",
-                          headers={"Authorization": f"Bearer {CLAVE_TAVILY.read_text().strip()}"},
+                          headers={"Authorization": f"Bearer {CL.obtener('tavily')}"},
                           json={"query": consulta[:380], "search_depth": "basic", "max_results": 5},
                           timeout=12)
     except requests.RequestException as e:
@@ -1331,15 +1330,15 @@ class Asistente:
     def __init__(self):
         log(f"Cargando Whisper ({MODELO_WHISPER})...")
         self.whisper = WhisperModel(MODELO_WHISPER, device="cpu", compute_type="int8")
-        gratis = CLAVE_GEMINI.read_text().strip() if CLAVE_GEMINI.exists() else ""
-        pago = CLAVE_PAGO.read_text().strip() if CLAVE_PAGO.exists() else ""
+        gratis = CL.obtener("gemini")
+        pago = CL.obtener("gemini_pago")
         self.modo_privado = ARCHIVO_PRIVADO.exists()
         if self.modo_privado:
             log("Modo privado ACTIVADO (se recuerda de antes): no envío capturas de tu pantalla hasta que lo quites")
         PRES.configurar_claves(gratis, pago)
         self.clave = gratis or (pago if PRESUPUESTO_OK else "")      # (si solo hay una, esa; sin presupuesto.py la de pago no se usa)
         if not gratis:
-            log(f"Aviso: no encuentro la clave de Gemini en {CLAVE_GEMINI}")
+            log("Aviso: no encuentro la clave de Gemini. Guárdala con:  lina clave gemini")
         if PRES.hay_clave_de_pago():
             log(f"Clave de pago: configurada. Tope de este mes: {PRES.estado()['tope_eur']:g} € ({PRES.resumen().split('. Estado')[0][:110]})")
         self.estado = "esperando"  # esperando | grabando | pensando | hablando
@@ -3365,7 +3364,7 @@ class Asistente:
         if self.clave:
             grupos = self._preparar_grupos_mcp(self.elegir_grupos(pregunta))
             herramientas = G.herramientas(H.DECLARACIONES, grupos)
-            if BUSQUEDA == "tavily" and CLAVE_TAVILY.exists():
+            if BUSQUEDA == "tavily" and CL.obtener("tavily"):
                 herramientas = HERRAMIENTA_BUSCAR["functionDeclarations"] + herramientas
             self.herramientas_turno = herramientas        # la misma lista que usa Gemini: mas_herramientas la amplía en sitio
             self.grupos_turno = set(grupos)
@@ -3390,7 +3389,7 @@ class Asistente:
         pregunta_local = pregunta + ("\n[Nota: ahora mismo no tienes herramientas porque Gemini no responde. Si te piden una acción "
                                      "en el PC, di en una sola frase que ahora no puedes ejecutarla y que lo intente dentro de un "
                                      "rato. No des instrucciones ni comandos salvo que te los pidan.]")
-        if BUSQUEDA == "tavily" and CLAVE_TAVILY.exists() and self.contexto.get("tipo") == "juego":
+        if BUSQUEDA == "tavily" and CL.obtener("tavily") and self.contexto.get("tipo") == "juego":
             consulta = f"{self.contexto['nombre'] or ''} {self.pregunta_pura}".strip()
             pregunta_local = f"{pregunta_local}\n\n{buscar_tavily(consulta)}"
         r = preguntar_local(pregunta_local, imagen, permitir_escalar=False, historial=self.historial,
@@ -3439,6 +3438,7 @@ class Asistente:
 
 
 def main():
+    CL.proteger_salida()                                  # ninguna clave sale en el registro
     RUT.asegurar(RUT.CONFIG); RUT.asegurar(RUT.DATOS); RUT.asegurar(RUT.ESTADO); RUT.asegurar(RUT.EJECUCION)
     global VOZ
     VOZ = VOC.preparar(log=log) or VOZ
