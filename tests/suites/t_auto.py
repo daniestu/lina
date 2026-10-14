@@ -22,31 +22,34 @@ def ej2(argv,timeout=8):
     return ej(argv,timeout)
 S.EJ=ej2
 r=e.sistema("audio",{"accion":"volumen","valor":"50"}); print(r)
-ok("apuntado como receta" in r,"volumen absoluto verificado se apunta")
+ok("guardará como receta" in r,"volumen absoluto verificado: queda por confirmar")
+ok(R._cargar()==[],"aún no se guarda: falta que la petición se dé por cumplida")
+e.guardar_diferidas(e.pregunta_pura)
 rs=R._cargar(); ok(any(x["ajuste"]=="volumen" and "{valor}" in x["cambiar"] for x in rs),"receta volumen %s"%[x.get("cambiar") for x in rs])
 estado["vol"]="Volume: 0.50"
-r=e.sistema("audio",{"accion":"volumen","valor":"30"}); ok("apuntado" not in r,"no coincide con lo pedido: no se apunta")
+r=e.sistema("audio",{"accion":"volumen","valor":"30"}); ok("guardará como receta" not in r,"no coincide con lo pedido: no se apunta")
 estado["vol"]="Volume: 0.60"
-r=e.sistema("audio",{"accion":"subir"}); ok("apuntado" in r,"subir verificado: "+r)
+r=e.sistema("audio",{"accion":"subir"}); ok("guardará como receta" in r,"subir verificado: "+r)
 estado["vol"]="Volume: 0.40 [MUTED]"
-r=e.sistema("audio",{"accion":"silenciar"}); ok("apuntado" in r,"silenciar")
+r=e.sistema("audio",{"accion":"silenciar"}); ok("guardará como receta" in r,"silenciar")
+e.guardar_diferidas(e.pregunta_pura)
 n=len(R._cargar()); ok(n==3,"3 recetas distintas, no fusionadas: %s"%[x["ajuste"] for x in R._cargar()])
-r=e.sistema("energia",{"accion":"perfil","valor":"rendimiento"}); ok("apuntado" not in r,"perfil: powerprofilesctl simulado dice balanced → no")
+r=e.sistema("energia",{"accion":"perfil","valor":"rendimiento"}); ok("guardará como receta" not in r,"perfil: powerprofilesctl simulado dice balanced → no")
 # pantalla
 KS["outputs"][0]["currentModeId"]="3"
-r=e.sistema("pantalla",{"accion":"modo","salida":"DP-1","valor":"1920x1080@144"}); ok("apuntado" in r,"pantalla modo verificado: "+r[-120:])
+r=e.sistema("pantalla",{"accion":"modo","salida":"DP-1","valor":"1920x1080@144"}); ok("guardará como receta" in r,"pantalla modo verificado: "+r[-120:])
 KS["outputs"][0]["currentModeId"]="2"
-r=e.sistema("pantalla",{"accion":"escala","salida":"DP-1","valor":"1.5"}); ok("apuntado" not in r,"escala no aplicada → no")
+r=e.sistema("pantalla",{"accion":"escala","salida":"DP-1","valor":"1.5"}); ok("guardará como receta" not in r,"escala no aplicada → no")
 # no se apunta si el comando falla
 e.ejecutar=lambda c,m="tarea":"código de salida: 1\nerror"
 estado["vol"]="Volume: 0.20"
-r=e.sistema("audio",{"accion":"volumen","valor":"20"}); ok("apuntado" not in r,"comando fallido no se apunta")
+r=e.sistema("audio",{"accion":"volumen","valor":"20"}); ok("guardará como receta" not in r,"comando fallido no se apunta")
 
 # ---- B: red de seguridad con comandos sueltos ----
 a=A.Asistente.__new__(A.Asistente)
 a.ejecutor=H.Ejecutor(avisar=lambda *a,**k:None, confirmar=True); a.pregunta_pura="activa la luz nocturna"
 a.historial=[]
-def turno(*acc): a.acciones_turno=list(acc); a.ejecutor.receta_turno=False; a.ejecutor.duda=""; a._aprender_automatico()
+def turno(*acc): a.acciones_turno=list(acc); a.turno_aceptado=True; a.ejecutor.receta_turno=False; a.ejecutor.duda=""; a._aprender_automatico()
 OK="código de salida: 0\n"
 R.ARCHIVO=d/"r2.json"
 turno(("ejecutar_comando",{"comando":"kwriteconfig6 --file kwinrc --group NightColor --key Active true","motivo":"activar la luz nocturna"},OK),

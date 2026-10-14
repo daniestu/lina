@@ -398,6 +398,25 @@ def servir(entrada=None, salida=None):
             cr.fill()
         return False
 
+    def sin_ratón(widget, *_):
+        """Deja vacía la zona de entrada de la ventana: el ratón y el teclado pasan a lo que hay debajo. Se hace por tres vías porque en Wayland
+        la capa se vuelve a crear cada vez que se muestra, y con ella se pierde lo anterior."""
+        region = cairo.Region()
+        try:
+            widget.input_shape_combine_region(region)
+        except Exception:
+            pass
+        ventana = widget.get_window()
+        if ventana is not None:
+            try:
+                ventana.input_shape_combine_region(region, 0, 0)
+            except Exception:
+                pass
+            try:
+                ventana.set_pass_through(True)
+            except Exception:
+                pass
+
     def crear(monitor):
         v = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
         v.set_title("lina-indicador")
@@ -425,10 +444,9 @@ def servir(entrada=None, salida=None):
             capa.set_monitor(v, monitor)
         v.connect("draw", pintar)
 
-        def sin_ratón(widget):                                # que el ratón y los clics lo atraviesen
-            if widget.get_window() is not None:
-                widget.get_window().input_shape_combine_region(cairo.Region(), 0, 0)
-        v.connect("realize", sin_ratón)
+        v.connect("realize", sin_ratón)                      # que el ratón y los clics lo atraviesen: se repite al crearse y cada vez que se muestra
+        v.connect("map", sin_ratón)
+        v.connect("map-event", lambda w, e: sin_ratón(w) or False)
         return v
 
     def montar():
@@ -442,6 +460,7 @@ def servir(entrada=None, salida=None):
             if visible:
                 if not v.get_visible():
                     v.show_all()
+                    GLib.idle_add(lambda ventana=v: sin_ratón(ventana) and False)      # y otra vez ya mostrada
                 v.queue_draw()
             elif v.get_visible():
                 v.hide()

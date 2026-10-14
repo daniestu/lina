@@ -2368,6 +2368,14 @@ def buscar_ajuste_kde(consulta, valor=None):
 
 
 
+_LANZAMIENTO = re.compile(r"^\s*(?:abrir|abre|abriendo|lanzar|lanza|iniciar|inicia|arrancar|arranca)\b", re.I)
+
+
+def _es_lanzamiento(motivo):
+    """¿El «motivo» del comando es abrir un programa? Esos siguen en marcha hasta que el usuario los cierra, y eso no es «terminar una tarea»."""
+    return bool(_LANZAMIENTO.match(_sin_acentos(str(motivo or "")).strip()))
+
+
 class Ejecutor:
     def __init__(self, avisar=None, confirmar=True):
         self.avisar = avisar or (lambda texto: None)
@@ -2393,6 +2401,7 @@ class Ejecutor:
         self.tarea = time.strftime("%Y%m%d-%H%M%S")
         self.contaminado = ""                # de dónde viene el contenido de fuera leído en esta tarea (A2e), o vacío
         self.receta_turno = False            # ¿ya se apuntó alguna receta en esta tarea? (para no duplicar el apunte automático)
+        self.recetas_diferidas = []          # recetas por guardar: solo se guardan si al final se da por cumplido lo pedido (ver Asistente._cerrar_receta_interfaz)
         self.n_comandos = 0
         self.n_cambios = 0
         self.snapshot_tarea = None
@@ -3016,7 +3025,7 @@ class Ejecutor:
         if plan.get("previo") is not None:
             SIS._guardar_previo(plan["previo"])
         apuntada = self._receta_automatica(nombre, args or {}, plan, resultado, real)
-        return str(resultado) + ("\nCOMPROBADO AHORA: " + real if real else "") + (" (Queda apuntado como receta.)" if apuntada else "")
+        return str(resultado) + ("\nCOMPROBADO AHORA: " + real if real else "") + (" (Se guardará como receta solo si al final se confirma que lo pedido está cumplido.)" if apuntada else "")
 
     def _receta_automatica(self, nombre, args, plan, resultado, real):
         """Un ajuste cambiado con una herramienta de sistema y COMPROBADO en el estado real se apunta solo como receta."""
@@ -3026,15 +3035,15 @@ class Ejecutor:
         try:
             if not SIS.verificar_plan(nombre, args, plan, real):
                 return False
-            hecha = REC.aprender_comando(rec["ajuste"], rec.get("palabras", ""), self.pregunta_pura, rec["cambiar"], rec.get("valor_usado", ""),
-                                         rec.get("leer", ""), f"estado leído después: {str(real)[:100]}", web=bool(self.contaminado))
+            self.recetas_diferidas.append({"ajuste": rec["ajuste"], "palabras": rec.get("palabras", ""), "cambiar": rec["cambiar"],
+                                          "valor_usado": rec.get("valor_usado", ""), "leer": rec.get("leer", ""),
+                                          "comprobar": f"estado leído después: {str(real)[:100]}", "web": bool(self.contaminado)})
         except Exception as e:
             anotar(f"[receta-auto] fallo: {e!r}")
             return False
-        if hecha:
-            self.receta_turno = True
-            anotar(f"[receta-auto] {rec['ajuste']}: {rec['cambiar']}")
-        return bool(hecha)
+        self.receta_turno = True
+        anotar(f"[receta-auto] por confirmar: {rec['ajuste']}: {rec['cambiar']}")
+        return True
 
     def ver_juegos(self, buscar=None):
         """Los juegos instalados (Steam, Heroic, Lutris), agrupados por lanzador."""
@@ -3080,6 +3089,11 @@ class Ejecutor:
         try:
             salida, _ = proc.communicate(timeout=TIMEOUT_ESPERA)
         except subprocess.TimeoutExpired:
+            if _es_lanzamiento(motivo):               # un programa con ventana sigue en marcha mientras esté abierto: no es una tarea que «termine»
+                threading.Thread(target=self._esperar_sin_avisar, args=(proc, comando), daemon=True).start()
+                anotar(f"[abierto, sigue en marcha] {comando}")
+                return ("El programa se ha abierto y sigue en marcha, que es lo normal en una aplicación con ventana. Ya está abierto: no hay nada "
+                        "que esperar ni que avisar cuando se cierre.")
             threading.Thread(target=self._vigilar, args=(proc, comando, motivo, self._ctx_fondo), daemon=True).start()
             anotar(f"[segundo plano] {comando}")
             return (f"SIGUE EN SEGUNDO PLANO (lleva más de {TIMEOUT_ESPERA} s). El asistente avisará por voz al terminar. "
@@ -3107,6 +3121,23 @@ class Ejecutor:
             texto += ("\n[sudo pide contraseña: falta configurar sudo sin contraseña para el usuario. "
                       "Díselo al usuario.]")
         return texto
+
+    def guardar_diferidas(self, peticion):
+        """Guarda de verdad las recetas que estaban por confirmar. Devuelve las que se guardaron. Solo se llama cuando la petición se dio por cumplida."""
+        guardadas = []
+        diferidas, self.recetas_diferidas = list(getattr(self, "recetas_diferidas", None) or []), []
+        for d in diferidas:
+            receta = REC.aprender_comando(d["ajuste"], d["palabras"], peticion, d["cambiar"], d["valor_usado"], d["leer"], d["comprobar"], web=d["web"])
+            if receta:
+                self.receta_turno = True
+                guardadas.append(receta)
+        return guardadas
+
+    @staticmethod
+    def _esperar_sin_avisar(proc, comando):
+        """Recoge el final de un programa que abrió el usuario: solo se anota; ni se avisa por voz ni se corta (es suyo)."""
+        proc.wait()
+        anotar(f"[fin rc={proc.returncode}] {comando}")
 
     def _vigilar(self, proc, comando, motivo, ctx=None):
         try:

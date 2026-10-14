@@ -38,6 +38,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
+from lina.nucleo.turnos import HERRAMIENTAS_META, peticion_de_receta, solo_herramientas_meta
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -1031,14 +1032,14 @@ def verificar_cumplimiento(clave, peticion, acciones, respuesta, con_pantalla=Fa
     """Segunda opinión barata y sin saber de qué trata la petición: ¿lo que se contestó es lo que se pidió y lo respaldan las acciones realizadas?
     Devuelve True si NO está cumplido; False si lo está o no se pudo comprobar (ante la duda, no se molesta)."""
     lineas = []
-    ultimas = acciones[-8:]
+    ultimas = [a for a in acciones if a[0] not in HERRAMIENTAS_META][-8:]
     for k, (nombre, args, resultado) in enumerate(ultimas):
         dato = str(args.get("url") or args.get("consulta") or args.get("comando") or args.get("motivo") or args.get("nombre") or args.get("ventana") or "")[:100]
         limite = 1200 if k >= len(ultimas) - 3 else 160          # lo último con más detalle: si no, una lista larga se queda en su cabecera y la respuesta «no se apoya» en nada
         lineas.append(f"- {nombre} {dato} → {' | '.join(str(resultado).splitlines())[:limite]}")
     nota_pantalla = ("<contexto>A la petición se adjuntó una captura de la pantalla del usuario: la respuesta puede apoyarse también en lo que se ve en ella "
                      "(no figura en <acciones>).</contexto>\n") if con_pantalla else ""
-    contenido = (nota_pantalla + f"<peticion>\n{H._limpiar_para_ia(peticion, 400)}\n</peticion>\n<acciones>\n" + "\n".join(lineas) + "\n</acciones>\n"
+    contenido = (nota_pantalla + f"<peticion>\n{H._limpiar_para_ia(peticion, 400)}\n</peticion>\n<acciones>\n" + ("\n".join(lineas) or "(ninguna)") + "\n</acciones>\n"
                  f"<respuesta>\n{H._limpiar_para_ia(respuesta, 600)}\n</respuesta>")
     r = _mini_consulta_ia(clave, PROMPT_CUMPLIMIENTO, ESQUEMA_CUMPLIMIENTO, contenido, DECISIONES_CUMPLIMIENTO, "si se cumplió lo pedido")
     return bool(r and r["decision"] == "no_cumplido")
@@ -2022,6 +2023,13 @@ class Asistente:
 
     def _cerrar_receta_interfaz(self, aceptada):
         """Al terminar la petición: la receta pendiente se guarda solo si la respuesta se dio por buena (sin duda, sin objeción del revisor, sin reintento)."""
+        self.turno_aceptado = bool(aceptada)
+        diferidas = list(getattr(self.ejecutor, "recetas_diferidas", None) or [])
+        if aceptada and diferidas:
+            self.ejecutor.guardar_diferidas(self._peticion_de_receta())
+        elif diferidas:
+            log(f"Receta descartada ({len(diferidas)}): la petición no se dio por cumplida")
+        self.ejecutor.recetas_diferidas = []
         pendiente, self.receta_interfaz_pendiente = getattr(self, "receta_interfaz_pendiente", None), None
         if not pendiente or not aceptada:
             if pendiente:
@@ -2030,6 +2038,9 @@ class Asistente:
         receta = REC.aprender_interfaz(*pendiente)
         if receta:
             self.ejecutor.receta_turno = True
+
+    def _peticion_de_receta(self):
+        return peticion_de_receta(self.historial, getattr(self, "pregunta_pura", ""))
 
     def interfaz_por_vision(self, args, accion):
         """Clic donde la accesibilidad no llega: se mira la ventana con la visión, se comprueba el punto y se pulsa. Mismos topes y confirmaciones que pulsar."""
@@ -2444,12 +2455,11 @@ class Asistente:
         if not comprobado:
             return ("No guardo la receta: no consta que hayas comprobado que funciona. Lee el valor DESPUÉS del cambio con un comando de lectura (y pásalo en "
                     "«leer») o míralo con mirar_pantalla, y vuelve a llamar.")
-        receta = REC.aprender_comando(ajuste, args.get("palabras", ""), getattr(self, "pregunta_pura", ""), cambiar, args.get("valor_usado", ""), leer, comprobar,
-                                      web=bool(self.ejecutor.contaminado))
-        if not receta:
-            return "No he podido guardar la receta (revisa el nombre del ajuste: debe tener alguna palabra concreta)."
+        self.ejecutor.recetas_diferidas.append({"ajuste": ajuste, "palabras": args.get("palabras", ""), "cambiar": cambiar, "valor_usado": args.get("valor_usado", ""),
+                                                "leer": leer, "comprobar": comprobar, "web": bool(self.ejecutor.contaminado)})
         self.ejecutor.receta_turno = True
-        return (f"Receta guardada: «{receta['ajuste']}». La próxima vez que lo pidan se probará esto primero." + (" Se aprendió usando internet: se marcará como tal." if receta.get("web") else ""))
+        return (f"Receta anotada: «{ajuste}». Se guardará al terminar SOLO si se confirma que lo que pidió el usuario está cumplido; hasta entonces no "
+                "digas que ya está guardada.")
 
     # Verbos con los que empieza el «motivo» de un comando («activar la luz nocturna»): el nombre del ajuste es lo que viene después.
     _VERBO_INICIAL = re.compile(r"^(?:activar|desactivar|poner|pon|cambiar|ajustar|subir|bajar|quitar|apagar|encender|habilitar|deshabilitar|configurar|"
@@ -2478,7 +2488,7 @@ class Asistente:
         """Red de seguridad: si en esta petición se cambió UN ajuste con un comando y luego se leyó con un comando de lectura que mira lo mismo,
         pero nadie apuntó la receta (la IA suele olvidarse), se apunta aquí. El nombre sale del «motivo» del comando y el valor, de su último argumento."""
         ej = self.ejecutor
-        if ej.receta_turno or ej.duda or ej.pendientes or ej.contaminado:
+        if not getattr(self, "turno_aceptado", False) or ej.receta_turno or ej.duda or ej.pendientes or ej.contaminado:
             return
         hechas = [(n, a or {}, str(r)) for n, a, r in self.acciones_turno]
         if any(n in {"guardar_receta", "usar_receta", "probar_ajuste_kde"} for n, _, _ in hechas):
@@ -2521,7 +2531,7 @@ class Asistente:
         valor_usado = ""
         if len(toks) >= 3 and not toks[-1].startswith("-") and not toks[-2].startswith("-") and cambiar.count(toks[-1]) == 1:
             valor_usado = toks[-1]
-        receta = REC.aprender_comando(ajuste, "", self.pregunta_pura, cambiar, valor_usado, leer, f"leído después con {leer}: {salida}", web=False)
+        receta = REC.aprender_comando(ajuste, "", self._peticion_de_receta(), cambiar, valor_usado, leer, f"leído después con {leer}: {salida}", web=False)
         if receta:
             ej.receta_turno = True
             log(f"Receta apuntada automáticamente: «{receta['ajuste']}» (se cambió con un comando y se comprobó con otro; la IA no la había guardado)")
@@ -2844,6 +2854,11 @@ class Asistente:
         pide = getattr(self, "pedir_profundo", "") if not self.ejecutor.duda else ""     # si hay una duda de verdad, manda la duda
         obst = getattr(self, "obstaculo", "") if not self.ejecutor.duda else ""
         if (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes
+                and solo_herramientas_meta(self.acciones_turno) and "?" not in str(respuesta)):
+            obst = (f"lo que pidió el usuario («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») no se ha cumplido: has cargado herramientas pero no has hecho ni "
+                    f"leído NADA del equipo con ellas, así que no puedes afirmar cómo está; la respuesta fue: «{str(respuesta)[:200]}»")
+            log("La respuesta afirma algo sin haber hecho ni leído nada (solo se cargaron herramientas): reintento a fondo")
+        elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes
                 and fracaso_en_respuesta(respuesta, bool(self.acciones_turno))):
             obst = f"lo que pidió el usuario («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») no se ha cumplido; la respuesta fue: «{str(respuesta)[:200]}»"
             log("La respuesta dice que no se ha podido hacer lo pedido: reintento a fondo")
@@ -2859,7 +2874,7 @@ class Asistente:
                 or not self.clave):
             self._cerrar_receta_interfaz(not self.ejecutor.duda and not pide and not getattr(self, "insistiendo", False) and not self.ejecutor.pendientes)
             return respuesta, modelo
-        self.receta_interfaz_pendiente = None
+        self._cerrar_receta_interfaz(False)               # lo apuntado en el primer intento no vale: no se dio por cumplido
         self.pedir_profundo, self.obstaculo = "", ""
         self.insistiendo = True
         self.ejecutor.profundo = True
@@ -2925,6 +2940,11 @@ class Asistente:
                     log(f"{m}: contestó con una promesa en vez de con la respuesta: la descarto")
                     continue
                 if r:
+                    if self.ejecutor.recetas_diferidas and not pide:      # tras el reintento, lo apuntado solo vale si ahora sí se cumplió lo pedido
+                        bueno = (not self.ejecutor.duda and not self.ejecutor.pendientes and not fracaso_en_respuesta(r, True)
+                                 and not verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, r,
+                                                                bool(imagen is not None or self.pantalla_adjunta)))
+                        self._cerrar_receta_interfaz(bueno)
                     return r, f"{m} ({'a fondo' if pide else 'insistió a fondo'})"
         finally:
             if espera:
@@ -3334,6 +3354,8 @@ class Asistente:
         self.busquedas_turno = 0
         self.guion_herramientas = []
         self.acciones_turno = list(self.acciones_confirmadas)
+        self.turno_aceptado = False
+        self.ejecutor.recetas_diferidas = []
         self.acciones_confirmadas = []
         # 1) Modelo local primero, solo si PRIORIDAD = "local" y cabe en la gráfica
         if PRIORIDAD == "local" and puede_usar_local():
