@@ -6,6 +6,7 @@ from lina.nucleo import ajustes as AJ
 from lina.nucleo import herramientas as H
 from lina.nucleo import olvidar as OLV
 from lina.nucleo import privacidad as PRI
+from lina.nucleo import registro as REG
 from lina.nucleo import rutas as RUT
 
 
@@ -102,8 +103,8 @@ def test_olvidar_sin_terminal_o_con_algo_raro(datos):
 # ------------------------------------------------------------------ registro de acciones
 def test_el_registro_de_acciones_rota_y_tapa_claves(tmp_path, monkeypatch):
     ruta = tmp_path / "acciones.log"
-    monkeypatch.setattr(H, "ARCHIVO_ACCIONES", ruta)
-    monkeypatch.setattr(H, "MAX_REGISTRO_ACCIONES", 300)
+    monkeypatch.setattr(REG, "ARCHIVO_ACCIONES", ruta)
+    monkeypatch.setattr(REG, "MAX_REGISTRO_ACCIONES", 300)
     clave = "AI" + "zaSy" + "A" * 35
     H.anotar(f"curl -H 'x-goog-api-key: {clave}' https://example.com")
     assert clave not in ruta.read_text() and "example.com" in ruta.read_text()

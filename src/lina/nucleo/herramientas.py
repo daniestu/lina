@@ -36,6 +36,8 @@ from lina.nucleo import comandos
 from lina.nucleo import dependencias as DEP
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
+from lina.nucleo.procesos import _fuera_del_servicio  # noqa: F401
+from lina.nucleo.registro import ARCHIVO_ACCIONES, MAX_REGISTRO_ACCIONES, anotar, log, notificar  # noqa: F401
 from lina.nucleo import raiz as _RAIZ
 from lina.nucleo import rutas as RUT
 
@@ -66,7 +68,6 @@ except ImportError:          # si falta diario.py el asistente funciona igual, p
     diario = None
 
 # ======================= CONFIGURACIÓN =======================
-ARCHIVO_ACCIONES = RUT.REGISTRO_ACCIONES
 ARCHIVO_DIARIO_VISIBLE = RUT.DATOS / "diario_visible.txt"
 CARPETA_DOCUMENTOS = RUT.carpeta_usuario("DOCUMENTS", "Documents")
 PROTEGER_DATOS = True          # bloquea borrar/mover/sobrescribir en el disco de datos que el usuario marque
@@ -113,46 +114,6 @@ FLAGS_SEGUROS = {"libreoffice": {"--writer", "--calc", "--impress", "--draw", "-
 MENSAJE_PREPARADO = ("PREPARADO, NO EJECUTADO: todavía NO se ha hecho nada. Díselo al usuario en futuro y como pregunta, nombrando "
                      "exactamente QUÉ vas a hacer con los nombres reales que salen en esta acción (no inventes ni cambies nada). No uses el "
                      "pasado hasta que se haya ejecutado de verdad. Solo se ejecutará si responde que sí en su siguiente mensaje.")
-
-
-def log(mensaje):
-    print(f"[{time.strftime('%H:%M:%S')}] {mensaje}", flush=True)
-
-
-MAX_REGISTRO_ACCIONES = 1_000_000          # al pasar de ~1 MB el registro de acciones se rota: se guarda la mitad vieja como .1 (una sola copia)
-
-
-def _rotar(ruta, maximo):
-    try:
-        if ruta.stat().st_size > maximo:
-            ruta.replace(ruta.with_name(ruta.name + ".1"))
-    except OSError:
-        pass
-
-
-def anotar(linea):
-    """Cada acción queda escrita en acciones.log (con las claves tapadas y rotando el archivo para que no crezca sin fin)."""
-    try:
-        from lina.nucleo import claves as _claves
-        linea = _claves.limpiar(str(linea))
-    except Exception:
-        pass
-    try:
-        _rotar(ARCHIVO_ACCIONES, MAX_REGISTRO_ACCIONES)
-        fd = os.open(ARCHIVO_ACCIONES, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        with os.fdopen(fd, "a", encoding="utf-8") as f:
-            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {linea}\n")
-    except OSError:
-        pass
-
-
-def notificar(titulo, cuerpo=""):
-    if shutil.which("notify-send"):
-        try:
-            subprocess.Popen(["notify-send", "-a", "Asistente", titulo, cuerpo[:400]],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except OSError:
-            pass
 
 
 # ======================= CLASIFICAR COMANDOS =======================
@@ -1061,22 +1022,6 @@ def _critico_sistema(comando, _prof=0):
 
 _VARIABLE_SECRETA = re.compile(r"(?:KEY|TOKEN|SECRET|PASSW|CONTRASE|CLAVE|CREDENTIAL|AUTH)", re.I)
 _VARIABLES_UTILES = {"SSH_AUTH_SOCK", "XAUTHORITY", "GPG_TTY", "DBUS_SESSION_BUS_ADDRESS", "XDG_SESSION_TYPE"}
-_SCOPE_OK = None
-
-
-def _fuera_del_servicio(orden):
-    """Antepone `systemd-run --user --scope` para que el programa NO viva dentro del servicio del asistente (si no, al reiniciar el servicio
-    systemd lo mata: un juego, LibreOffice...). Si no está disponible o no funciona, la orden se deja como estaba."""
-    global _SCOPE_OK
-    if _SCOPE_OK is None:
-        _SCOPE_OK = False
-        if shutil.which("systemd-run") and os.environ.get("XDG_RUNTIME_DIR"):
-            try:
-                _SCOPE_OK = subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "--collect", "true"], capture_output=True,
-                                           timeout=5).returncode == 0
-            except (OSError, subprocess.SubprocessError):
-                _SCOPE_OK = False
-    return ["systemd-run", "--user", "--scope", "--quiet", "--collect", "--"] + list(orden) if _SCOPE_OK else list(orden)
 
 
 def _es_actualizacion_completa(comando):
