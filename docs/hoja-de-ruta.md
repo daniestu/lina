@@ -4,7 +4,7 @@
 |---|---|
 | 0 | Estructura profesional del repositorio *(hecha; falta el uso real de unos días)* |
 | 1 | Configuración, perfiles de autonomía y nombre y voz de Lina (`config.toml`, claves en el llavero) *(hecha: ajustes, `lina config`, perfiles, claves y órdenes de voz)* |
-| 2 | Seguridad y privilegios: sudo limitado a instalar paquetes, modelo de amenazas, consentimiento de privacidad |
+| 2 | Seguridad y privilegios: sudo limitado a instalar paquetes, modelo de amenazas, consentimiento de privacidad *(en curso: privilegios hechos; faltan privacidad, registros y modelo de amenazas)* |
 | 3 | Portabilidad entre distribuciones (Arch, Debian/Ubuntu, Fedora, openSUSE) |
 | 4 | Instalador y primer arranque guiado: `install.sh`, atajo automático, `lina doctor`, `lina update` |
 | 5 | Portabilidad de escritorio (KDE Plasma, GNOME, X11) |

@@ -1,0 +1,137 @@
+#!/usr/bin/python3 -I
+"""lina-instalar: el ÚNICO programa que Lina puede ejecutar como administrador sin pedir contraseña.
+
+Hace una sola cosa: instalar paquetes de los repositorios que el administrador ya tiene configurados en el sistema.
+
+    lina-instalar instalar PAQUETE [PAQUETE…]     instala (hasta 20)
+    lina-instalar gestor                          dice qué gestor usaría
+    lina-instalar version
+
+Qué garantiza, venga lo que venga en los argumentos:
+  · El gestor lo decide ESTE programa leyendo /etc/os-release (un archivo de root); nunca se elige por argumentos.
+  · Cada nombre se valida con una lista blanca estricta: sin opciones, rutas, URLs, comodines, versiones ni signos que el gestor interprete
+    (en apt, «paquete-» QUITARÍA el paquete; en dnf, «@grupo» instala un grupo).
+  · Nunca instala desde un archivo o dirección (-U, ./x.deb, https://…): solo nombres de los repositorios configurados en el sistema.
+  · No toca el software que concede privilegios (sudo, doas, polkit, pam, shadow).
+  · Entorno limpio, sin entrada estándar, con límite de tiempo; cada uso queda apuntado en el registro del sistema (syslog).
+  · No importa nada que no sea de la biblioteca estándar y debe pertenecer a root sin que nadie más pueda escribirlo
+    (si un usuario normal pudiera cambiar este archivo, la regla de sudoers sería una puerta abierta; `lina privilegios` lo comprueba).
+
+Este archivo es independiente del resto de Lina a propósito: es corto para que se pueda leer entero antes de dar permiso.
+"""
+import os
+import re
+import subprocess
+import sys
+
+VERSION = 1
+MAX_PAQUETES = 20
+TIEMPO = 1800
+OS_RELEASE = "/etc/os-release"
+PATH_SEGURO = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# familia -> orden base (sin paquetes). Todas sin preguntar y sin salir de los repositorios configurados.
+FAMILIAS = {
+    "arch":   ["pacman", "-S", "--noconfirm", "--needed", "--noprogressbar"],
+    "debian": ["apt-get", "install", "-y", "--no-install-recommends", "--no-remove"],
+    "fedora": ["dnf", "install", "-y"],
+    "suse":   ["zypper", "--non-interactive", "install", "--no-recommends"],
+}
+_IDS = {"arch": "arch", "cachyos": "arch", "endeavouros": "arch", "manjaro": "arch", "garuda": "arch", "artix": "arch", "arcolinux": "arch",
+        "debian": "debian", "ubuntu": "debian", "linuxmint": "debian", "pop": "debian", "elementary": "debian", "zorin": "debian", "kali": "debian", "neon": "debian",
+        "fedora": "fedora", "rhel": "fedora", "centos": "fedora", "rocky": "fedora", "almalinux": "fedora", "nobara": "fedora",
+        "opensuse": "suse", "suse": "suse", "opensuse-tumbleweed": "suse", "opensuse-leap": "suse"}
+
+# Lista blanca: letras (Fedora tiene paquetes con mayúsculas), números y . _ + - ; empieza por letra o número; no acaba en «-» (apt) ni lleva dos puntos seguidos
+NOMBRE_VALIDO = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,99}")
+# Software que concede o gestiona privilegios: no se toca desde aquí
+PROHIBIDOS = {"sudo", "sudo-rs", "doas", "opendoas", "polkit", "pam", "shadow", "passwd", "login", "util-linux", "libpam0g", "libpam-modules"}
+
+
+class Rechazo(Exception):
+    """Algo que no se hace: el mensaje se le enseña al usuario tal cual."""
+
+
+def familia(os_release=OS_RELEASE):
+    datos = {}
+    try:
+        with open(os_release, encoding="utf-8") as f:
+            for linea in f:
+                if "=" in linea and not linea.lstrip().startswith("#"):
+                    k, _, v = linea.partition("=")
+                    datos[k.strip()] = v.strip().strip('"').strip("'")
+    except OSError as e:
+        raise Rechazo(f"No puedo leer {os_release}: {e}")
+    for i in [datos.get("ID", "").lower()] + datos.get("ID_LIKE", "").lower().split():
+        if i in _IDS:
+            return _IDS[i]
+    raise Rechazo("No reconozco la distribución: instala los paquetes a mano.")
+
+
+def validar(nombres):
+    """Devuelve la lista limpia o lanza Rechazo con el primer problema."""
+    if not nombres:
+        raise Rechazo("Falta decir qué paquetes instalar.")
+    if len(nombres) > MAX_PAQUETES:
+        raise Rechazo(f"Demasiados paquetes de golpe (máximo {MAX_PAQUETES}).")
+    limpios = []
+    for n in nombres:
+        if not isinstance(n, str) or not NOMBRE_VALIDO.fullmatch(n) or n.endswith("-") or ".." in n:
+            raise Rechazo(f"Nombre de paquete no válido: {n[:60]!r}. Solo se admiten nombres sencillos de los repositorios del sistema.")
+        if n.lower() in PROHIBIDOS or n.lower().startswith("polkit"):
+            raise Rechazo(f"{n} concede o gestiona privilegios: no lo instalo desde aquí. Hazlo tú con tu contraseña.")
+        if n not in limpios:
+            limpios.append(n)
+    return limpios
+
+
+def orden(nombres, fam):
+    """Orden completa. Con «--» delante de los nombres donde el gestor lo admite: nada de lo que sigue puede tomarse por una opción."""
+    return FAMILIAS[fam] + (["--"] if fam in ("arch", "debian") else []) + nombres
+
+
+def apuntar(mensaje):
+    try:
+        import syslog
+        syslog.openlog("lina-instalar", syslog.LOG_PID, syslog.LOG_AUTH)
+        syslog.syslog(syslog.LOG_NOTICE, f"[usuario {os.environ.get('SUDO_USER') or os.environ.get('PKEXEC_UID') or '?'}] {mensaje}")
+    except Exception:
+        pass
+
+
+def instalar(nombres, os_release=OS_RELEASE, ejecutar=subprocess.run, euid=None):
+    if (os.geteuid() if euid is None else euid) != 0:
+        raise Rechazo("Este programa solo se usa con permisos de administrador (lo lanza Lina con sudo o pkexec).")
+    limpios = validar(nombres)
+    fam = familia(os_release)
+    cmd = orden(limpios, fam)
+    apuntar("instalar " + " ".join(limpios))
+    env = {"PATH": PATH_SEGURO, "LANG": "C", "LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive", "HOME": "/root"}
+    try:
+        return ejecutar(cmd, stdin=subprocess.DEVNULL, env=env, timeout=TIEMPO).returncode
+    except subprocess.TimeoutExpired:
+        raise Rechazo("El gestor de paquetes ha tardado demasiado y lo he parado.")
+    except OSError as e:
+        raise Rechazo(f"No he podido lanzar el gestor de paquetes: {e}")
+
+
+def main(argv):
+    try:
+        if argv[:1] == ["instalar"]:
+            return instalar(argv[1:])
+        if argv[:1] == ["gestor"] and len(argv) == 1:
+            print(FAMILIAS[familia()][0])
+            return 0
+        if argv[:1] == ["version"] and len(argv) == 1:
+            print(VERSION)
+            return 0
+        print(__doc__.split("\n\n")[0] + "\nUso: lina-instalar instalar PAQUETE… | gestor | version", file=sys.stderr)
+        return 2
+    except Rechazo as e:
+        print(f"lina-instalar: {e}", file=sys.stderr)
+        apuntar(f"rechazado: {e}")
+        return 3
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

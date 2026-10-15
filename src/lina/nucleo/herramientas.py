@@ -32,7 +32,11 @@ import fnmatch
 import xml.etree.ElementTree as ET
 
 from lina.nucleo import comandos
+from lina.nucleo import privilegios as PRIV
+from lina.nucleo import raiz as _RAIZ
 from lina.nucleo import rutas as RUT
+
+RAIZ_AYUDANTE = _RAIZ.AYUDANTE            # el único programa que Lina ejecuta como administrador sin contraseña (ver privilegios.py)
 try:
     from lina.modulos import juegoconf as JC
 except ImportError:
@@ -147,10 +151,13 @@ _PROPIO = (r"(?:^|/)lina/(?:nucleo|voz|escritorio|modulos|mcp|datos)/|site-packa
           r"plataforma|manos_libres|comandos|politica|diario|presupuesto|recetas|juegos|rutas|claves|ajustes)\.py|\.config/asistente|\.local/share/asistente")
 _SUDOERS = r"/etc/sudoers|\bvisudo\b|sudoers\.d"
 # Órdenes de Lina que cambian sus propios permisos, gasto, voz o claves: las da el usuario en su terminal o con el atajo, nunca la IA
-_ORDEN_PROPIA = r"(?:^|[\s;&|(`/])(?:lina|python3?\s+-m\s+lina(?:\.__main__)?)\s+(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S)"
+_ORDEN_PROPIA = (r"(?:^|[\s;&|(`/])(?:lina|python3?\s+-m\s+lina(?:\.__main__)?)\s+"
+                 r"(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S|privilegios\s+(?:instalar|total|quitar)\b)")
+# El ayudante de root y todo lo que lo activa: solo se usa instalando paquetes (la forma exacta que reconoce analizar_instalacion)
+_AYUDANTE_ROOT = r"/usr/lib/lina\b|org\.lina\.instalar|sudoers\.d/lina|nucleo/raiz\b|\braiz\.py|\bprivilegios\.py"
 
 # Prefijos que envuelven a otro comando, con las opciones de cada uno que llevan un valor detrás
-_PREFIJOS = {"sudo": {"-u", "-g", "-C", "-h", "-p", "-r", "-t", "-U", "-D", "-R"}, "doas": {"-u", "-C"},
+_PREFIJOS = {"sudo": {"-u", "-g", "-C", "-h", "-p", "-r", "-t", "-U", "-D", "-R"}, "doas": {"-u", "-C"}, "pkexec": {"--user", "-u"},
              "nohup": set(), "time": set(), "nice": {"-n"}, "ionice": {"-c", "-n", "-p"}, "command": set(),
              "exec": set(), "builtin": set(), "setsid": set(), "stdbuf": {"-i", "-o", "-e"},
              "timeout": {"-s", "-k"}, "env": {"-u", "-C", "-S"}}
@@ -253,6 +260,8 @@ def _bloqueado(comando, _profundidad=0):
         return "tocaría mi propio código o mi servicio"
     if re.search(_SUDOERS, bajo):
         return "tocaría los permisos de sudo"
+    if re.search(_AYUDANTE_ROOT, bajo) and not analizar_instalacion(comando):
+        return "tocaría el ayudante con el que instalo paquetes como administrador"
     if re.search(_ORDEN_PROPIA, bajo):
         return "cambiaría mis propios ajustes de permisos, gasto o claves (eso lo haces tú, o con el atajo)"
 
@@ -641,6 +650,11 @@ def analizar_instalacion(comando):
     t = _tokens(comando)
     if t and t[:2] == ["sudo", "-n"]:
         t = ["sudo"] + t[2:]
+    if t and t[:3] == ["sudo", RAIZ_AYUDANTE, "instalar"]:       # la forma que usa Lina cuando tiene el ayudante de root
+        nombres = t[3:]
+        if nombres and all(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,99}", a) for a in nombres):
+            return nombres
+        return None
     if not t or t[:2] != ["sudo", "pacman"]:
         return None
     resto = t[2:]
@@ -673,7 +687,7 @@ def _politica():
 
 
 def _con_sudo(segmento):
-    return re.match(r"^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:sudo|doas)\b", segmento) is not None
+    return re.match(r"^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:sudo|doas|pkexec)\b", segmento) is not None
 
 
 def _es_interprete(base):
@@ -918,6 +932,8 @@ def clasificar(comando):
     if motivo:
         return "bloqueado", motivo
     paquetes = analizar_instalacion(comando)
+    if PRIV.pide_contrasena(comando, paquetes):                  # sin permiso para sudo: se confirma con el atajo y la contraseña la pide el sistema
+        return "critico", "necesita permisos de administrador y tu contraseña (la pide el sistema, no yo)"
     if paquetes:
         nivel, motivo = evaluar_paquetes(paquetes)
         return ("critico", motivo) if nivel == "critico" else ("instalar", "")
@@ -3073,7 +3089,7 @@ class Ejecutor:
         fuente = _fuente_externa(comando)
         if fuente:
             self.contaminar(fuente)                  # lo que devuelva puede traer instrucciones: ver A2e
-        cmd = self.normalizar_sudo(comando)
+        cmd = PRIV.adaptar(self.normalizar_sudo(comando), analizar_instalacion(comando))      # según el permiso que haya: ayudante de root, pkexec o tal cual
         inicio = time.time()
         try:
             proc = subprocess.Popen(["bash", "-c", cmd], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -3759,7 +3775,7 @@ DECLARACIONES = [
      "description": ("Ejecuta un comando de shell (bash) en el PC del usuario. Casi todo se ejecuta al momento, sin preguntar; "
                      "solo lo crítico (discos, arranque, cuentas, red expuesta, borrar de forma definitiva, software de fuera, "
                      "dinero, apagar o reiniciar, tareas automáticas) queda pendiente de que el usuario lo confirme. "
-                     "Puedes usar sudo (funciona sin contraseña)."),
+                     "Puedes usar sudo: si el usuario no lo tiene sin contraseña, queda pendiente de su atajo y la contraseña la pide el sistema."),
      "parameters": {"type": "object",
                     "properties": {"comando": {"type": "string", "description": "El comando completo."},
                                    "motivo": {"type": "string",

@@ -18,6 +18,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - Velocidad de la voz ajustable (`voz.velocidad`).
 - Claves en el llavero del sistema (`lina clave gemini|pago|NOMBRE`), con respaldo en un archivo 600; la clave de pago exige un tope mensual; ninguna clave sale en el registro.
 - Lina conoce su propia documentación, comandos y ajustes (herramienta `mis_ajustes`): consulta, prueba y cambia voces y cambia ajustes cuando se lo pides, sin frases fijas; lo que da más permisos solo con el atajo; claves y gasto no los toca ella. La voz elegida se oye al instante.
+- Privilegios mínimos (`lina privilegios`): ayudante de root `lina-instalar` que solo instala paquetes de los repositorios del sistema, regla de sudoers que solo permite ese ayudante (con vista previa, consentimiento, validación con `visudo` y desinstalación), nivel «total» opcional con aviso y, sin regla, confirmación con el atajo y contraseña pedida por el sistema (polkit). La IA no puede tocar nada de esto.
 
 ### Eliminado
 - `scripts/probar_gemini.py` (diagnóstico antiguo, atado al archivo de clave de antes) y código sin uso.

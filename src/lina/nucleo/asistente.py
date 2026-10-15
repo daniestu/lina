@@ -30,6 +30,7 @@ from urllib.parse import urlparse
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import claves as CL
 from lina.nucleo import autoconocimiento as AUTO
+from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
 from lina.voz import voces as VOC
 
@@ -3468,7 +3469,8 @@ class Asistente:
 
 
 def main():
-    CL.proteger_salida()                                  # ninguna clave sale en el registro
+    CL.proteger_salida()                                           # ninguna clave sale en el registro
+    PRIV.COMPROBAR = True                                   # las órdenes con sudo se adaptan al permiso que haya (ver privilegios.py)
     RUT.asegurar(RUT.CONFIG); RUT.asegurar(RUT.DATOS); RUT.asegurar(RUT.ESTADO); RUT.asegurar(RUT.EJECUCION)
     global VOZ
     VOZ = VOC.preparar(log=log) or VOZ
