@@ -28,6 +28,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from lina.nucleo import ajustes as AJ
+from lina.nucleo import ejecucion as EJ
 from lina.nucleo import claves as CL
 from lina.nucleo import autoconocimiento as AUTO
 from lina.nucleo import modelos as MOD
@@ -2628,7 +2629,7 @@ class Asistente:
             antes, error_antes = None, None
             leer = "kreadconfig6" if shutil.which("kreadconfig6") else "kreadconfig5" if shutil.which("kreadconfig5") else None
             if leer:
-                rc_, out_ = H._ejecutar_simple([leer, "--file", archivo] + [x for g in grupos for x in ("--group", g)] + ["--key", clave])
+                rc_, out_ = EJ._ejecutar_simple([leer, "--file", archivo] + [x for g in grupos for x in ("--group", g)] + ["--key", clave])
                 valor_en_archivo = out_.strip() if rc_ == 0 else None
             log(f"Receta probada «{conocida.get('ajuste')}» ({conocida.get('id')}): no se lee el panel antes; en el archivo había «{valor_en_archivo}»")
         else:

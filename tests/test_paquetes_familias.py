@@ -1,6 +1,7 @@
 """Gestor de paquetes por familia (Arch, Debian/Ubuntu, Fedora, openSUSE): lo que Lina entiende, instala, comprueba y deshace en cada una."""
 import pytest
 
+from lina.nucleo import ejecucion as EJ
 from lina.nucleo import grupos as G
 from lina.nucleo import herramientas as H
 from lina.nucleo import plataforma as PL
@@ -258,7 +259,7 @@ def test_debian_paquete_quitado_con_configuracion_no_cuenta_como_instalado():
 def test_deshacer_una_instalacion_y_un_borrado(en, monkeypatch, familia):
     en(familia)
     lanzadas = []
-    monkeypatch.setattr(H, "_como_root", lambda argv, **k: (lanzadas.append(argv), (0, ""))[1])
+    monkeypatch.setattr(EJ, "_como_root", lambda argv, **k: (lanzadas.append(argv), (0, ""))[1])
     est, _ = H._deshacer_payload({"tipo": "paquetes", "nuevos": ["vlc"]})
     assert est == "ok" and lanzadas[-1] == PL.orden("quitar", ["vlc"], familia)
     est, _ = H._deshacer_payload({"tipo": "paquetes_quitados", "paquetes": ["vlc"]})
@@ -292,7 +293,7 @@ def test_snapshot_sin_herramienta_lo_explica(monkeypatch):
 def test_snapshot_con_timeshift(monkeypatch):
     monkeypatch.setattr(PL, "detectar_snapshots", lambda **k: "timeshift")
     llamadas = []
-    monkeypatch.setattr(H, "_ejecutar_simple", lambda argv, **k: (llamadas.append(argv), (0, "Snapshot '2026-10-15_16-20-00' created successfully"))[1])
+    monkeypatch.setattr(EJ, "_ejecutar_simple", lambda argv, **k: (llamadas.append(argv), (0, "Snapshot '2026-10-15_16-20-00' created successfully"))[1])
     monkeypatch.setattr(H, "_privilegios", lambda: ["sudo", "-n"])
     ident, motivo = H.crear_snapshot("lina: instalar")
     assert ident == "2026-10-15_16-20-00" and motivo == ""
@@ -301,7 +302,7 @@ def test_snapshot_con_timeshift(monkeypatch):
 
 def test_snapshot_con_snapper(monkeypatch):
     monkeypatch.setattr(PL, "detectar_snapshots", lambda **k: "snapper")
-    monkeypatch.setattr(H, "_ejecutar_simple", lambda argv, **k: (0, "42"))
+    monkeypatch.setattr(EJ, "_ejecutar_simple", lambda argv, **k: (0, "42"))
     monkeypatch.setattr(H, "_privilegios", lambda: [])
     assert H.crear_snapshot("x") == (42, "")
 

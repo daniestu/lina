@@ -33,6 +33,8 @@ import xml.etree.ElementTree as ET
 from lina.escritorio import sesion as SES
 from lina.nucleo import comandos
 from lina.nucleo import dependencias as DEP
+from lina.nucleo import ejecucion as EJ
+from lina.nucleo.ejecucion import _abs, _codigo_de_salida, _privilegios  # noqa: F401
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo.clasificador import (  # noqa: F401
@@ -396,26 +398,10 @@ _LECTORES = {"cat", "head", "tail", "less", "more", "grep", "egrep", "fgrep", "r
              "jq", "sed", "awk", "zcat", "unzip"}
 
 
-def _abs(ruta):
-    """Ruta absoluta y limpia (~, $HOME, relativas a tu carpeta personal, '..')."""
-    ruta = _normalizar_ruta(str(ruta))
-    if not ruta.startswith("/"):
-        ruta = _HOME + "/" + ruta
-    return os.path.normpath(ruta)
 
 
-def _privilegios():
-    return [] if os.geteuid() == 0 else ["sudo", "-n"]
 
 
-def _ejecutar_simple(argv, timeout=15, entrada=None):
-    """Un comando de comprobación o de deshacer, sin shell. Devuelve (código, salida) o (None, motivo) si no se pudo ejecutar."""
-    try:
-        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, input=entrada, errors="replace",
-                           env=dict(os.environ, LC_ALL="C.UTF-8", TERM="dumb"))
-        return r.returncode, (r.stdout + r.stderr).strip()
-    except (OSError, subprocess.SubprocessError) as e:
-        return None, str(e)
 
 
 def crear_snapshot(descripcion):
@@ -423,7 +409,7 @@ def crear_snapshot(descripcion):
     descripcion = re.sub(r"\s+", " ", str(descripcion)).strip()[:100]
     herramienta = PL.detectar_snapshots()
     if herramienta == "timeshift":
-        codigo, salida = _ejecutar_simple([*_privilegios(), "timeshift", "--create", "--scripted", "--comments", descripcion, "--tags", "O"], timeout=900)
+        codigo, salida = EJ._ejecutar_simple([*_privilegios(), "timeshift", "--create", "--scripted", "--comments", descripcion, "--tags", "O"], timeout=900)
         if codigo is None:
             return None, f"no he podido ejecutar timeshift ({salida[:100]})"
         if codigo != 0:
@@ -432,7 +418,7 @@ def crear_snapshot(descripcion):
         return (m.group(1) if m else time.strftime("%Y-%m-%d_%H-%M-%S")), ""
     if herramienta != "snapper":
         return None, "este equipo no tiene snapper ni Timeshift configurados, así que no hay snapshots"
-    codigo, salida = _ejecutar_simple([*_privilegios(), "snapper", "--config", "root", "create", "--type", "single",
+    codigo, salida = EJ._ejecutar_simple([*_privilegios(), "snapper", "--config", "root", "create", "--type", "single",
                                        "--cleanup-algorithm", "number", "--print-number", "--userdata", "lina=si",
                                        "--description", descripcion], timeout=60)
     if codigo is None:
@@ -647,7 +633,7 @@ def _existe(ruta):
 
 
 def _estado_servicio(unidad, user, que):
-    codigo, salida = _ejecutar_simple(["systemctl", *(["--user"] if user else []), que, unidad])
+    codigo, salida = EJ._ejecutar_simple(["systemctl", *(["--user"] if user else []), que, unidad])
     return (salida.splitlines() or [""])[0].strip() if codigo is not None else ""
 
 
@@ -722,15 +708,15 @@ def _capturar_previo(intenciones, id_entrada):
             if rutas:
                 payloads.append({"tipo": "papelera", "rutas": rutas})
         elif tipo == "paquetes_instalar":
-            nuevos = [n for n in it[1] if PL.esta_instalado(n, _ejecutar_simple) is False]
+            nuevos = [n for n in it[1] if PL.esta_instalado(n, EJ._ejecutar_simple) is False]
             if nuevos:
                 payloads.append({"tipo": "paquetes", "nuevos": nuevos})
         elif tipo == "paquetes_quitar":
-            instalados = [n for n in it[1] if PL.esta_instalado(n, _ejecutar_simple) is True]
+            instalados = [n for n in it[1] if PL.esta_instalado(n, EJ._ejecutar_simple) is True]
             if instalados:
                 payloads.append({"tipo": "paquetes_quitados", "paquetes": instalados})
         elif tipo == "flatpak_instalar":
-            nuevos = [a for a in it[1] if _ejecutar_simple(["flatpak", "info", a])[0] not in (0, None)]
+            nuevos = [a for a in it[1] if EJ._ejecutar_simple(["flatpak", "info", a])[0] not in (0, None)]
             if nuevos:
                 payloads.append({"tipo": "flatpak", "nuevos": nuevos})
         elif tipo == "servicio":
@@ -776,8 +762,6 @@ def _ruta_segura(ruta):
             and not ruta.startswith(("/dev/", "/proc/", "/sys/")))
 
 
-def _como_root(argv, **k):
-    return _ejecutar_simple([*_privilegios(), *argv], **k)
 
 
 def _deshacer_payload(p):
@@ -803,13 +787,13 @@ def _deshacer_payload(p):
         if os.path.isdir(ruta) and not os.path.islink(ruta):
             return "omitido", f"{ruta} ahora es una carpeta: no la toco"
         if _se_va_a_la_papelera(ruta):                            # algo tuyo: a la papelera, no se borra de verdad
-            codigo, salida = _ejecutar_simple(["gio", "trash", "--", ruta])
+            codigo, salida = EJ._ejecutar_simple(["gio", "trash", "--", ruta])
             return ("ok", f"{ruta} (creado por el asistente) va a la papelera") if codigo == 0 else ("fallo", f"{ruta}: {salida[:100]}")
         try:
             os.remove(ruta)
             return "ok", f"{ruta} (creado por el asistente) eliminado"
         except PermissionError:
-            codigo, salida = _como_root(["rm", "-f", "--", ruta])
+            codigo, salida = EJ._como_root(["rm", "-f", "--", ruta])
             return ("ok", f"{ruta} (creado por el asistente) eliminado") if codigo == 0 else ("fallo", f"{ruta}: {salida[:100]}")
         except OSError as e:
             return "fallo", f"{ruta}: {e}"
@@ -846,7 +830,7 @@ def _deshacer_payload(p):
             shutil.move(destino, origen)
             return "ok", f"{destino} vuelve a {origen}"
         except OSError:
-            codigo, salida = _como_root(["mv", "-n", "--", destino, origen])
+            codigo, salida = EJ._como_root(["mv", "-n", "--", destino, origen])
             return ("ok", f"{destino} vuelve a {origen}") if codigo == 0 else ("fallo", f"no he podido moverlo: {salida[:100]}")
     if tipo == "metadatos":
         if not _existe(ruta):
@@ -859,8 +843,8 @@ def _deshacer_payload(p):
             if p["uid"] != os.getuid() or p["gid"] != os.getgid():
                 os.chown(ruta, p["uid"], p["gid"])
         except PermissionError:
-            c1, s1 = _como_root(["chown", f"{p['uid']}:{p['gid']}", "--", ruta])
-            c2, s2 = _como_root(["chmod", format(modo, "o"), "--", ruta])
+            c1, s1 = EJ._como_root(["chown", f"{p['uid']}:{p['gid']}", "--", ruta])
+            c2, s2 = EJ._como_root(["chmod", format(modo, "o"), "--", ruta])
             if c1 != 0 or c2 != 0:
                 return "fallo", f"{ruta}: {(s1 or s2)[:100]}"
         except OSError as e:
@@ -890,18 +874,18 @@ def _deshacer_payload(p):
         orden_quitar = PL.orden("quitar", p.get("nuevos", []))
         if not orden_quitar:
             return "omitido", "no sé quitar paquetes en esta distribución"
-        codigo, salida = _como_root(orden_quitar, timeout=600)
+        codigo, salida = EJ._como_root(orden_quitar, timeout=600)
         nombres = ", ".join(p.get("nuevos", []))
         return ("ok", f"desinstalado {nombres}") if codigo == 0 else ("fallo", f"no he podido desinstalar {nombres}: {(salida.splitlines() or [''])[-1][:120]}")
     if tipo == "paquetes_quitados":
         orden_poner = PL.orden("instalar", p.get("paquetes", []))
         if not orden_poner:
             return "omitido", "no sé instalar paquetes en esta distribución"
-        codigo, salida = _como_root(orden_poner, timeout=600)
+        codigo, salida = EJ._como_root(orden_poner, timeout=600)
         nombres = ", ".join(p.get("paquetes", []))
         return ("ok", f"reinstalado {nombres}") if codigo == 0 else ("fallo", f"no he podido reinstalar {nombres}: {(salida.splitlines() or [''])[-1][:120]}")
     if tipo == "flatpak":
-        codigo, salida = _ejecutar_simple(["flatpak", "uninstall", "-y", "--noninteractive", *p.get("nuevos", [])], timeout=300)
+        codigo, salida = EJ._ejecutar_simple(["flatpak", "uninstall", "-y", "--noninteractive", *p.get("nuevos", [])], timeout=300)
         nombres = ", ".join(p.get("nuevos", []))
         return ("ok", f"desinstalado {nombres}") if codigo == 0 else ("fallo", f"no he podido desinstalar {nombres}: {salida[:120]}")
     if tipo == "servicio":
@@ -927,12 +911,12 @@ def _deshacer_payload(p):
             return "omitido", f"{unidad} ya está como antes"
         for paso in pasos:
             argv = ["systemctl", *(["--user"] if user else []), paso, unidad]
-            codigo, salida = _ejecutar_simple(argv) if user else _como_root(argv)
+            codigo, salida = EJ._ejecutar_simple(argv) if user else EJ._como_root(argv)
             if codigo != 0:
                 return "fallo", f"no he podido hacer «{paso}» en {unidad}: {salida[:100]}"
         return "ok", f"{unidad} vuelve a su estado anterior ({', '.join(pasos)})"
     if tipo == "valor_kernel":
-        codigo, salida = _como_root(["tee", ruta], entrada=str(p.get("antes", "")) + "\n")
+        codigo, salida = EJ._como_root(["tee", ruta], entrada=str(p.get("antes", "")) + "\n")
         return ("ok", f"{ruta} vuelve a valer {p.get('antes')}") if codigo == 0 else ("fallo", f"{ruta}: {salida[:100]}")
     if tipo == "ajuste_kde":
         programa, archivo, grupos, clave, antes = (p.get(k) for k in ("programa", "archivo", "grupos", "clave", "antes"))
@@ -947,7 +931,7 @@ def _deshacer_payload(p):
         for g in grupos:
             argv += ["--group", g]
         argv += ["--key", clave] + (["--delete"] if antes is None else [antes])
-        codigo, salida = _ejecutar_simple(argv)
+        codigo, salida = EJ._ejecutar_simple(argv)
         if codigo != 0:
             return "fallo", f"no he podido devolver «{clave}» en {archivo}: {salida[:100]}"
         return "ok", (f"«{clave}» de {archivo} vuelve a valer «{antes}»" if antes is not None else f"«{clave}» de {archivo} eliminado (no existía)")
@@ -1023,13 +1007,13 @@ def _verificar(intenciones, payloads=None):
                 c.append((not _existe(_abs(r)), f"{os.path.basename(r)} ya no está en su sitio", f"{os.path.basename(r)} SIGUE en su sitio"))
         elif tipo == "paquetes_instalar":
             for n in it[1]:
-                c.append((PL.esta_instalado(n, _ejecutar_simple) is True, f"{n} está instalado", f"{n} NO aparece instalado"))
+                c.append((PL.esta_instalado(n, EJ._ejecutar_simple) is True, f"{n} está instalado", f"{n} NO aparece instalado"))
         elif tipo == "paquetes_quitar":
             for n in it[1]:
-                c.append((PL.esta_instalado(n, _ejecutar_simple) is False, f"{n} ya no está instalado", f"{n} SIGUE instalado"))
+                c.append((PL.esta_instalado(n, EJ._ejecutar_simple) is False, f"{n} ya no está instalado", f"{n} SIGUE instalado"))
         elif tipo == "flatpak_instalar":
             for a in it[1]:
-                c.append((_ejecutar_simple(["flatpak", "info", a])[0] == 0, f"{a} está instalado", f"{a} NO aparece instalado"))
+                c.append((EJ._ejecutar_simple(["flatpak", "info", a])[0] == 0, f"{a} está instalado", f"{a} NO aparece instalado"))
         elif tipo == "ajuste_kde":
             _, programa, d = it
             leido, actual = _leer_ajuste(_PROGRAMAS_KWRITE[programa], d["archivo"], d["grupos"], d["clave"])
@@ -1073,9 +1057,6 @@ def _verificar(intenciones, payloads=None):
     return "Verificación: ✔ " + "; ".join(buenas) + "."
 
 
-def _codigo_de_salida(resultado):
-    m = re.match(r"código de salida: (-?\d+)", str(resultado))
-    return int(m.group(1)) if m else None
 
 
 
@@ -1121,15 +1102,15 @@ def _paquetes_que_traen(regex_nombre, avisar=None):
     consulta = PL.consulta_quien_trae(regex_nombre)
     if not consulta:
         return []
-    codigo, salida = _ejecutar_simple(consulta, timeout=60)
+    codigo, salida = EJ._ejecutar_simple(consulta, timeout=60)
     sincronizar = PL.sincronizar_archivos()
     if (codigo is None or codigo > 1 or re.search(r"database file for .* does not exist|use '-Fy'|cache is empty|apt-file update", salida)) \
             and sincronizar and not _estado_fdb["sincronizada"]:
         _estado_fdb["sincronizada"] = True            # la lista de archivos hay que bajarla una vez
         if avisar:
             avisar("Voy a actualizar la lista de archivos de paquetes para saber cuál trae ese programa. Tardará un momento.")
-        _como_root(sincronizar, timeout=240)
-        codigo, salida = _ejecutar_simple(consulta, timeout=60)
+        EJ._como_root(sincronizar, timeout=240)
+        codigo, salida = EJ._ejecutar_simple(consulta, timeout=60)
     return PL.pares_que_traen(salida)
 
 
@@ -1263,7 +1244,7 @@ def _paneles_kde():
     """{id: nombre} de los paneles de ajustes de KDE que existen de verdad (kcmshell6 --list); caché de 10 minutos."""
     if _cache_paneles["datos"] and time.time() - _cache_paneles["t"] < 600:
         return _cache_paneles["datos"]
-    codigo, salida = _ejecutar_simple(["kcmshell6", "--list"], timeout=20)
+    codigo, salida = EJ._ejecutar_simple(["kcmshell6", "--list"], timeout=20)
     datos = {}
     if codigo == 0:
         for linea in salida.splitlines():
@@ -1392,7 +1373,7 @@ def _leer_ajuste(programa_lectura, archivo, grupos, clave):
     for g in grupos:
         argv += ["--group", g]
     argv += ["--key", clave, "--default", _SIN_VALOR]
-    codigo, salida = _ejecutar_simple(argv)
+    codigo, salida = EJ._ejecutar_simple(argv)
     if codigo != 0:
         return False, None
     return True, (None if salida.strip() == _SIN_VALOR else salida)

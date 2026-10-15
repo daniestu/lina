@@ -5,6 +5,7 @@ import subprocess
 
 import pytest
 
+from lina.nucleo import ejecucion as EJ
 from lina.nucleo import herramientas as H
 from lina.nucleo import plataforma as PL
 
@@ -20,8 +21,8 @@ def test_detecta_la_familia_y_el_gestor_reales():
 
 def test_comprueba_paquetes_instalados_de_verdad(monkeypatch):
     monkeypatch.setenv("LINA_DISTRO", ESPERADA)
-    assert PL.esta_instalado("bash", H._ejecutar_simple) is True
-    assert PL.esta_instalado("paquete-que-no-existe-lina", H._ejecutar_simple) is False
+    assert PL.esta_instalado("bash", EJ._ejecutar_simple) is True
+    assert PL.esta_instalado("paquete-que-no-existe-lina", EJ._ejecutar_simple) is False
 
 
 def test_las_ordenes_de_consulta_existen_en_el_sistema(monkeypatch):
