@@ -34,6 +34,7 @@ from lina.nucleo import modelos as MOD
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
+from lina.escritorio import sesion as SES
 from lina.voz import voces as VOC
 
 import numpy as np
@@ -446,21 +447,12 @@ def pitido(frecuencia):
 def capturar_pantalla():
     """Captura la ventana activa (el juego o el navegador) con Spectacle."""
     CAPTURA.unlink(missing_ok=True)
-    try:
-        subprocess.run(["spectacle", "-b", "-n", "-a", "-o", str(CAPTURA)],
-                       timeout=10, capture_output=True)
-    except subprocess.TimeoutExpired:
-        pass
+    SES.actual().capturar(CAPTURA, activa=True, tiempo=10)
 
 
 def ventana_activa():
     """Título de la ventana activa, p. ej. 'Skyrim Special Edition' o 'GeoGuessr — Mozilla Firefox'."""
-    try:
-        r = subprocess.run(["kdotool", "getactivewindow", "getwindowname"],
-                           capture_output=True, text=True, timeout=3)
-        return r.stdout.strip()
-    except (subprocess.SubprocessError, FileNotFoundError):
-        return ""
+    return SES.actual().ventana_activa()["titulo"]
 
 
 # ======================= CONTEXTO: ¿QUÉ ESTÁ HACIENDO EL USUARIO? =======================
@@ -475,12 +467,7 @@ _juegos_steam = {}  # número de Steam -> nombre, para no releer los archivos ca
 
 def clase_activa():
     """Clase de la ventana activa. Los juegos de Steam salen como 'steam_app_<número>'."""
-    try:
-        r = subprocess.run(["kdotool", "getactivewindow", "getwindowclassname"],
-                           capture_output=True, text=True, timeout=3)
-        return r.stdout.strip()
-    except (subprocess.SubprocessError, FileNotFoundError):
-        return ""
+    return SES.actual().ventana_activa()["clase"]
 
 
 def carpetas_steam():
@@ -522,11 +509,7 @@ def nombre_juego_steam(appid):
 
 def pid_ventana_activa():
     """Proceso dueño de la ventana activa (0 si no se puede saber)."""
-    try:
-        r = subprocess.run(["kdotool", "getactivewindow", "getwindowpid"], capture_output=True, text=True, timeout=3)
-        return int(r.stdout.strip() or 0)
-    except (subprocess.SubprocessError, FileNotFoundError, ValueError):
-        return 0
+    return SES.actual().ventana_activa()["pid"]
 
 
 def detectar_contexto(titulo, clase, pid=0):
@@ -593,12 +576,10 @@ PROMPT_MIRAR = ("Eres los ojos de un asistente de voz. Mira la captura de pantal
 def capturar_para_mirar():
     """Captura la pantalla COMPLETA (un panel recién abierto puede no tener el foco). Devuelve la ruta o None."""
     CAPTURA_MIRAR.unlink(missing_ok=True)
-    try:
-        subprocess.run(["spectacle", "-b", "-n", "-f", "-o", str(CAPTURA_MIRAR)], timeout=15, capture_output=True)
-    except (subprocess.SubprocessError, OSError) as e:
-        log(f"No he podido capturar la pantalla para mirarla: {e!r}")
+    if not SES.actual().capturar(CAPTURA_MIRAR, activa=False, tiempo=15):
+        log(f"No he podido capturar la pantalla para mirarla en {SES.actual().nombre()}: " + SES.actual().capacidades()["captura"][1])
         return None
-    return CAPTURA_MIRAR if CAPTURA_MIRAR.exists() else None
+    return CAPTURA_MIRAR
 
 
 def _ver_pantalla(clave, pregunta, espera=2.0):
@@ -2522,7 +2503,7 @@ class Asistente:
     _VERBO_INICIAL = re.compile(r"^(?:activar|desactivar|poner|pon|cambiar|ajustar|subir|bajar|quitar|apagar|encender|habilitar|deshabilitar|configurar|"
                                 r"establecer|modificar|dejar|fijar|probar)\s+(?:(?:el|la|los|las|un|una|lo|al|a|del|de)\s+)*", re.I)
     _NO_AJUSTE = re.compile(r"^(?:rm|mv|cp|mkdir|rmdir|touch|tee|echo|git|python3?|bash|sh|zsh|fish|systemctl|kill|pkill|killall|xdg-open|notify-send|"
-                            r"sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|curl|wget|ln|chmod|chown|kdotool|spectacle|steam|kcmshell[56])$")
+                            r"sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|curl|wget|ln|chmod|chown|kdotool|xdotool|spectacle|grim|scrot|steam|kcmshell[56])$")
 
     @staticmethod
     def _relacionado(cambio, lectura):
@@ -3088,10 +3069,7 @@ class Asistente:
         url = str(args.get("url", "") or "").strip()
         foco = str(args.get("foco", "") or "").strip()[:200]
         if not url:                                              # «lee lo que he copiado»
-            try:
-                url = subprocess.run(["wl-paste", "-n"], capture_output=True, text=True, timeout=3).stdout.strip().splitlines()[0]
-            except (OSError, subprocess.SubprocessError, IndexError):
-                url = ""
+            url = (SES.actual().pegar().splitlines() or [""])[0].strip()
             if not url:
                 return "No me has dicho qué página y no hay ningún enlace copiado. Pídele al usuario que la diga o que copie el enlace."
         self.ejecutor.contaminar("página web")                   # A2e: lo que trae la web puede traer órdenes escondidas

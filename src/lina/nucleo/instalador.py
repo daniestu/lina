@@ -154,6 +154,10 @@ def paso_servicio(ctx, arrancar=True):
             ctx.aviso("!", "No he podido activar el servicio: " + (r.stderr or r.stdout or "sin detalle").strip()[:150])
             return False
         ctx.aviso("✔", "Servicio de usuario lina.service " + ("activado y arrancado" if arrancar else "activado"))
+        escr = ATAJO.escritorio()
+        if escr in ("sway", "hyprland", "otro"):
+            ctx.aviso("!", "Tu sesión puede no activar graphical-session.target, y entonces el servicio no arranca al iniciar sesión. Si pasa, añade a la configuración de tu escritorio:  "
+                      f"exec {ctx.bin / 'lina'}   (comprueba con  lina doctor  tras reiniciar sesión)")
         return True
     arranque = ctx.config / "autostart" / "lina.desktop"
     if ctx.simular:
@@ -173,7 +177,7 @@ def paso_atajo(ctx, tecla=None):
         return True
     tecla = tecla or ATAJO.TECLA_POR_DEFECTO.get(escr)
     if not tecla:
-        ctx.aviso("!", f"En este escritorio crea tú un atajo de teclado que ejecute:  {ctx.bin / 'lina'} pulsar")
+        ctx.aviso("!", ATAJO.a_mano(escr, ctx.bin / "lina"))
         return False
     if not ctx.simular and not ctx.preguntar(f"¿Creo el atajo global {tecla} para hablar con Lina?"):
         ctx.aviso("·", f"Vale. Cuando quieras, crea uno que ejecute:  {ctx.bin / 'lina'} pulsar")

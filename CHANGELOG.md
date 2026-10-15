@@ -5,6 +5,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Portabilidad de escritorio: `escritorio/sesion.py` detecta KDE, GNOME, XFCE, Cinnamon, sway, Hyprland y otros (Wayland o X11) y ofrece la ventana activa, la captura de pantalla
+  y el portapapeles con el método de cada uno (kdotool/xdotool/swaymsg/hyprctl, spectacle/gnome-screenshot/xfce4-screenshooter/grim/scrot, wl-clipboard/xclip/xsel). Lo que no se
+  puede hacer se dice, a ti y a la IA, en vez de fingirlo; en Wayland no se usan herramientas de captura de X11 (darían una imagen negra). `lina escritorio` y `lina doctor` lo
+  muestran. Atajo global automático también en Cinnamon y XFCE, y la línea exacta para sway e Hyprland. Gestión de ventanas por voz en X11 (xdotool), y las acciones que solo
+  existen en KWin se rechazan con una explicación fuera de KDE. Ver [escritorios](docs/escritorios.md).
 - Instalador y primer arranque guiado: `install.sh` en seis pasos con `--simular`, `lina preparar` (comando, modelos, servicio de usuario o arranque de sesión, atajo global en KDE y GNOME),
   `lina bienvenida` (clave de Gemini con validación, prueba de micrófono, nombre, autonomía y privacidad), `lina doctor` (con `--red` e `--informe` anonimizado),
   `lina update` (con `--comprobar` y `--volver`) y `lina uninstall` (solo quita lo anotado en el manifiesto). Si falta la clave de Gemini, Lina avisa con una notificación

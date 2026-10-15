@@ -12,6 +12,7 @@ from pathlib import Path
 
 from lina import __version__
 from lina.escritorio import atajo as ATAJO
+from lina.escritorio import sesion as SES
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import bienvenida as BIEN
 from lina.nucleo import claves as CL
@@ -43,6 +44,11 @@ class Sondas:
 
     def audio(self):
         return PL.detectar_audio()
+
+    def escritorio(self):
+        """(nombre del escritorio y sesión, capacidades {ventana, captura, portapapeles: (método|None, nota)}, paquetes que arreglarían lo que falta)."""
+        s = SES.Sesion()
+        return s.nombre(), s.capacidades(), s.paquetes_que_faltan()
 
     def microfonos(self):
         import sounddevice as sd
@@ -120,6 +126,19 @@ def comprobar(s=None, red=False):
         a(MAL, "Paquetes del sistema", "faltan: " + ", ".join(falta), _seguro(lambda: PL.orden_canonica_instalar(falta), "") or "")
     else:
         a(OK, "Paquetes del sistema", "los necesarios están instalados")
+    esc = _seguro(s.escritorio)
+    if isinstance(esc, Exception):
+        a(AVISO, "Escritorio", f"no he podido mirarlo ({esc})")
+    else:
+        nombre, caps, paquetes = esc
+        a(OK, "Escritorio", nombre)
+        etiqueta = {"ventana": "Ventana activa", "captura": "Captura de pantalla", "portapapeles": "Portapapeles", "indicador": "Resplandor de escucha"}
+        arreglo = _seguro(lambda: PL.orden_canonica_instalar(paquetes), "") if paquetes else ""
+        for clave, (metodo, nota) in caps.items():
+            if metodo:
+                a(AVISO if nota else OK, etiqueta[clave], f"con {metodo}" + (f" ({nota})" if nota else ""))
+            else:
+                a(AVISO if clave != "captura" else MAL, etiqueta[clave], nota, arreglo if isinstance(arreglo, str) else "")
     audio = _seguro(s.audio)
     a(OK if audio and not isinstance(audio, Exception) else AVISO, "Sonido", audio if audio and not isinstance(audio, Exception) else "no detecto PipeWire ni PulseAudio",
       "" if audio and not isinstance(audio, Exception) else "Sin servidor de sonido Lina no oye ni habla: instala pipewire (o pulseaudio) y arráncalo")

@@ -118,7 +118,8 @@ def test_preguntar_respeta_si_y_la_falta_de_terminal(tmp_path):
 def test_escritorio_detectado():
     assert A.escritorio({"XDG_CURRENT_DESKTOP": "KDE"}) == "kde"
     assert A.escritorio({"XDG_CURRENT_DESKTOP": "ubuntu:GNOME"}) == "gnome"
-    assert A.escritorio({"XDG_CURRENT_DESKTOP": "sway"}) == "otro"
+    assert A.escritorio({"XDG_CURRENT_DESKTOP": "sway"}) == "sway"
+    assert A.escritorio({"XDG_CURRENT_DESKTOP": "i3"}) == "otro"
 
 
 def test_atajo_kde_se_registra_y_se_quita(tmp_path):
@@ -163,3 +164,72 @@ def test_huella_de_voz_detecta_cambios(tmp_path):
 def test_voz_no_instalada_no_se_verifica(tmp_path):
     assert V.verificar("es_MX-claude-high", tmp_path)[0] is False
 
+
+
+# ---------------------------------------------------------------- atajo en más escritorios
+def test_escritorio_del_atajo_distingue_cinnamon_xfce_y_compositores():
+    assert A.escritorio({"XDG_CURRENT_DESKTOP": "X-Cinnamon"}) == "cinnamon"
+    assert A.escritorio({"XDG_CURRENT_DESKTOP": "XFCE"}) == "xfce"
+    assert A.escritorio({"SWAYSOCK": "x"}) == "sway"
+    assert A.escritorio({"XDG_CURRENT_DESKTOP": "Budgie:GNOME"}) == "gnome"
+    assert A.escritorio({"XDG_CURRENT_DESKTOP": "i3"}) == "otro"
+
+
+def test_atajo_cinnamon_se_registra_y_se_quita(tmp_path):
+    ordenes = []
+
+    def ej(o, **k):
+        ordenes.append(o)
+        return SimpleNamespace(returncode=0, stdout="['custom0']" if o[1:2] == ["get"] else "", stderr="")
+    hecho, msg, nota = A.registrar("cinnamon", "<Control><Alt>space", "/u/lina", tmp_path, ejecutar=ej, which=lambda n: "/bin/" + n)
+    assert hecho and nota["escritorio"] == "cinnamon"
+    assert ["gsettings", "set", "org.cinnamon.desktop.keybindings", "custom-list", "['custom0', 'lina']"] in ordenes
+    assert any(o[-2:] == ["binding", "['<Control><Alt>space']"] for o in ordenes)
+    ordenes.clear()
+    assert "Cinnamon quitado" in A.quitar(nota, tmp_path, ejecutar=ej, which=lambda n: "/bin/" + n)
+    assert ["gsettings", "set", "org.cinnamon.desktop.keybindings", "custom-list", "['custom0']"] in ordenes
+
+
+def test_atajo_xfce_se_registra_y_se_quita(tmp_path):
+    ordenes = []
+    ej = lambda o, **k: (ordenes.append(o), ok())[1]
+    hecho, msg, nota = A.registrar("xfce", "<Primary><Alt>space", "/u/lina", tmp_path, ejecutar=ej, which=lambda n: "/bin/" + n)
+    assert hecho and ordenes[0][:4] == ["xfconf-query", "-c", "xfce4-keyboard-shortcuts", "-p"]
+    assert ordenes[0][4] == "/commands/custom/<Primary><Alt>space" and ordenes[0][-1] == "/u/lina pulsar"
+    assert "XFCE quitado" in A.quitar(nota, tmp_path, ejecutar=ej, which=lambda n: "/bin/" + n) and ordenes[-1][-3:-1] == ["-r", "-p"]
+
+
+def test_atajo_no_acepta_propiedades_de_otro_sitio(tmp_path):
+    assert "no reconocida" in A.quitar({"escritorio": "xfce", "propiedad": "/otra/cosa"}, tmp_path, which=lambda n: "/bin/" + n)
+
+
+def test_sway_e_hyprland_dan_la_linea_exacta(tmp_path):
+    for escr, trozo in (("sway", "bindsym"), ("hyprland", "bind = SUPER")):
+        hecho, msg, nota = A.registrar(escr, "x", "/u/lina", tmp_path)
+        assert not hecho and trozo in msg and "/u/lina pulsar" in msg
+    assert not list(tmp_path.rglob("*"))                                  # no toca la configuración de nadie
+
+
+def test_ya_hay_atajo_en_xfce_y_cinnamon(tmp_path):
+    xf = lambda o, **k: SimpleNamespace(returncode=0, stdout="/commands/custom/<Primary><Alt>space   /u/lina pulsar\n", stderr="")
+    assert A.ya_hay_atajo("xfce", tmp_path, xf, lambda n: "/bin/" + n)
+    cn = lambda o, **k: SimpleNamespace(returncode=0, stdout="['custom0', 'lina']", stderr="")
+    assert A.ya_hay_atajo("cinnamon", tmp_path, cn, lambda n: "/bin/" + n)
+    assert not A.ya_hay_atajo("cinnamon", tmp_path, lambda o, **k: SimpleNamespace(returncode=0, stdout="['custom0']", stderr=""), lambda n: "/bin/" + n)
+
+
+def test_en_sway_el_servicio_avisa_de_que_puede_no_arrancar(tmp_path, monkeypatch):
+    monkeypatch.setattr(I.PL, "detectar_init", lambda: "systemd")
+    monkeypatch.setenv("SWAYSOCK", "/run/sway.sock")
+    c = ctx_en(tmp_path, which=lambda n: "/bin/" + n)
+    assert I.paso_servicio(c)
+    assert any("graphical-session.target" in t and "exec " in t for t in c.texto)
+
+
+def test_en_kde_no_hay_ese_aviso(tmp_path, monkeypatch):
+    monkeypatch.setattr(I.PL, "detectar_init", lambda: "systemd")
+    monkeypatch.delenv("SWAYSOCK", raising=False)
+    monkeypatch.delenv("HYPRLAND_INSTANCE_SIGNATURE", raising=False)
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")
+    c = ctx_en(tmp_path, which=lambda n: "/bin/" + n)
+    assert I.paso_servicio(c) and not any("graphical-session.target" in t for t in c.texto)

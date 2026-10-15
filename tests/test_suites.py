@@ -26,7 +26,8 @@ DEPENDEN_DEL_ENTORNO = {
 def _ejecutar(suite):
     with tempfile.TemporaryDirectory() as casa:
         env = {k: v for k, v in os.environ.items() if not k.startswith("XDG_")}
-        env.update(HOME=casa, PYTHONPATH=str(SRC) + os.pathsep + env.get("PYTHONPATH", ""), PYTHONDONTWRITEBYTECODE="1")
+        env.update(HOME=casa, PYTHONPATH=str(SRC) + os.pathsep + env.get("PYTHONPATH", ""), PYTHONDONTWRITEBYTECODE="1",
+                   XDG_CURRENT_DESKTOP="KDE", XDG_SESSION_TYPE="wayland")
         r = subprocess.run([sys.executable, suite.name], cwd=suite.parent, env=env, capture_output=True, text=True, timeout=600)
     salida = r.stdout + r.stderr
     malos = [l for l in salida.splitlines() if l.startswith("FALLO:") or l.startswith("FALLA ")]

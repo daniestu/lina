@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import time
 import unicodedata
+from lina.escritorio import sesion as SES
 from lina.nucleo import rutas as RUT
 
 EJ = None                                   # en las pruebas: función (argv, timeout) -> (código, salida)
@@ -97,7 +98,9 @@ def _mejores(consulta, elementos, textos_de, minimo=62, margen=0):
 # ----------------------------------------------------------------------------------------------------------------------
 #  VENTANAS (kdotool + atajos de KWin)
 # ----------------------------------------------------------------------------------------------------------------------
-_ID_VENTANA = re.compile(r"^\{?[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}?$")
+_ID_VENTANA = re.compile(r"^(\{?[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}?|\d{3,12})$")      # KWin: UUID · X11: número
+SOLO_KDE = {"mostrar_escritorio", "cambiar_escritorio", "mover_a_escritorio", "mover_a_monitor", "mosaico",
+            "maximizar", "pantalla_completa", "siempre_encima", "sin_bordes"}               # usan atajos de KWin
 _ATAJOS_VENTANA = {                             # nombre del atajo de KWin que se pulsa sobre la ventana activa
     "maximizar": "Window Maximize", "pantalla_completa": "Window Fullscreen", "siempre_encima": "Window Above Other Windows",
     "siempre_debajo": "Window Below Other Windows", "sin_bordes": "Window No Border",
@@ -111,8 +114,17 @@ ACCIONES_VENTANA = ["listar", "enfocar", "cerrar", "minimizar", "maximizar", "pa
                     "mosaico", "mover_a_monitor", "mover_a_escritorio", "mover", "tamano", "cambiar_escritorio", "mostrar_escritorio"]
 
 
+def _prog():
+    """El programa que maneja las ventanas aquí: kdotool (KDE) o xdotool (X11 y XWayland; habla igual). Sin ninguno, kdotool para que el error lo diga."""
+    return SES.actual().programa_ventanas() or "kdotool"
+
+
+def _kde():
+    return SES.actual().escritorio == "kde"
+
+
 def _kd(*args):
-    return ej(["kdotool", *args], timeout=10)
+    return ej([_prog(), *args], timeout=10)
 
 
 def _atributo(opc, ids, orden):
@@ -133,7 +145,8 @@ def listar_ventanas():
     for opc in (["--name", "."], ["--classname", "."], ["--class", "."]):
         rc, out = _kd("search", *opc)
         if rc is None:
-            return [], "kdotool no está instalado o no responde, así que no puedo ver las ventanas"
+            return [], (f"{_prog()} no está instalado o no responde, así que no puedo ver las ventanas" if _kde() or SES.actual().programa_ventanas()
+                        else f"En {SES.actual().nombre()} no tengo cómo manejar ventanas (haría falta xdotool en X11; en sway y Hyprland aún no está)")
         encontrados = [x.strip() for x in out.splitlines() if _ID_VENTANA.match(x.strip())]
         if encontrados:
             ids, usada = encontrados, opc
@@ -222,6 +235,9 @@ def planificar_ventanas(args):
     if accion not in ACCIONES_VENTANA:
         return {"error": f"Acción de ventanas desconocida «{accion}». Las hay: {', '.join(ACCIONES_VENTANA)}."}
     valor = str(args.get("valor", "") or "").strip()
+    if accion in SOLO_KDE and not _kde():
+        return {"error": f"«{accion}» solo sé hacerlo en KDE Plasma (usa atajos de KWin) y esto es {SES.actual().nombre()}. "
+                         "Aquí puedo: listar, enfocar, cerrar, minimizar, mover y tamano."}
     lista, error = listar_ventanas()
     if error:
         return {"error": error}
@@ -259,38 +275,38 @@ def planificar_ventanas(args):
 
     base = {"comprobar": comprobar, "espera": 0.6}
     if accion == "enfocar":
-        return {**base, "comando": f"kdotool windowactivate {_q(i)}", "motivo": f"enfocar la ventana {nombre}"}
+        return {**base, "comando": f"{_prog()} windowactivate {_q(i)}", "motivo": f"enfocar la ventana {nombre}"}
     if accion == "cerrar":
-        return {**base, "comando": f"kdotool windowclose {_q(i)}", "motivo": f"cerrar la ventana {nombre}", "espera": 1.2}
+        return {**base, "comando": f"{_prog()} windowclose {_q(i)}", "motivo": f"cerrar la ventana {nombre}", "espera": 1.2}
     if accion == "minimizar":
-        return {**base, "comando": f"kdotool windowminimize {_q(i)}", "motivo": f"minimizar la ventana {nombre}"}
+        return {**base, "comando": f"{_prog()} windowminimize {_q(i)}", "motivo": f"minimizar la ventana {nombre}"}
     if accion == "mover":
         m = re.fullmatch(r"\s*(-?\d{1,5})\s*[ ,x]\s*(-?\d{1,5})\s*", valor)
         if not m:
             return {"error": "Para mover, «valor» es «x,y» en píxeles (por ejemplo 100,50)."}
-        return {**base, "comando": f"kdotool windowmove {_q(i)} {int(m.group(1))} {int(m.group(2))}", "motivo": f"mover la ventana {nombre}"}
+        return {**base, "comando": f"{_prog()} windowmove {_q(i)} {int(m.group(1))} {int(m.group(2))}", "motivo": f"mover la ventana {nombre}"}
     if accion == "tamano":
         m = re.fullmatch(r"\s*(\d{2,5})\s*[ ,x]\s*(\d{2,5})\s*", valor)
         if not m:
             return {"error": "Para cambiar el tamaño, «valor» es «ancho,alto» en píxeles (por ejemplo 1280,720)."}
-        return {**base, "comando": f"kdotool windowsize {_q(i)} {int(m.group(1))} {int(m.group(2))}", "motivo": f"cambiar el tamaño de {nombre}"}
+        return {**base, "comando": f"{_prog()} windowsize {_q(i)} {int(m.group(1))} {int(m.group(2))}", "motivo": f"cambiar el tamaño de {nombre}"}
     if accion == "mover_a_escritorio":
         if not valor.isdigit() or not 1 <= int(valor) <= 20:
             return {"error": "Di el número de escritorio (1, 2, 3...) en «valor»."}
-        return {**base, "comando": f'kdotool windowactivate {_q(i)} && qdbus6 org.kde.kglobalaccel /component/kwin invokeShortcut "Window to Desktop {int(valor)}"',
+        return {**base, "comando": f'{_prog()} windowactivate {_q(i)} && qdbus6 org.kde.kglobalaccel /component/kwin invokeShortcut "Window to Desktop {int(valor)}"',
                 "motivo": f"mover {nombre} al escritorio {int(valor)}"}
     if accion == "mover_a_monitor":
         atajo = _ATAJOS_VENTANA["monitor_anterior" if _norm(valor) in {"anterior", "previo", "izquierda"} else "monitor_siguiente"]
-        return {**base, "comando": f'kdotool windowactivate {_q(i)} && qdbus6 org.kde.kglobalaccel /component/kwin invokeShortcut "{atajo}"',
+        return {**base, "comando": f'{_prog()} windowactivate {_q(i)} && qdbus6 org.kde.kglobalaccel /component/kwin invokeShortcut "{atajo}"',
                 "motivo": f"mover {nombre} a otro monitor"}
     if accion == "mosaico":
         lado = _MOSAICOS.get(_norm(valor).replace(" ", "_"))
         if not lado:
             return {"error": f"Para el mosaico, «valor» es uno de: {', '.join(_MOSAICOS)}."}
-        return {**base, "comando": f'kdotool windowactivate {_q(i)} && qdbus6 org.kde.kglobalaccel /component/kwin invokeShortcut "Window Quick Tile {lado}"',
+        return {**base, "comando": f'{_prog()} windowactivate {_q(i)} && qdbus6 org.kde.kglobalaccel /component/kwin invokeShortcut "Window Quick Tile {lado}"',
                 "motivo": f"colocar {nombre} a la {valor}"}
     atajo = _ATAJOS_VENTANA[accion]                              # maximizar, pantalla_completa, siempre_encima, sin_bordes
-    return {**base, "comando": f'kdotool windowactivate {_q(i)} && qdbus6 org.kde.kglobalaccel /component/kwin invokeShortcut "{atajo}"',
+    return {**base, "comando": f'{_prog()} windowactivate {_q(i)} && qdbus6 org.kde.kglobalaccel /component/kwin invokeShortcut "{atajo}"',
             "motivo": f"{accion.replace('_', ' ')} en {nombre} (alterna: si ya estaba así, lo quita)"}
 
 

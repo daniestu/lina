@@ -223,8 +223,10 @@ def _ydotool(argumentos, ejecutar=subprocess.run):
 
 
 def _kdotool(argumentos, ejecutar=subprocess.run):
+    """Maneja ventanas con kdotool (KDE) o xdotool (X11 y XWayland): hablan igual para lo que se usa aquí."""
     try:
-        r = ejecutar(["kdotool", *argumentos], capture_output=True, text=True, timeout=4)
+        from lina.escritorio import sesion as SES
+        r = ejecutar([SES.actual().programa_ventanas() or "kdotool", *argumentos], capture_output=True, text=True, timeout=4)
         return r.stdout.strip() if r.returncode == 0 else ""
     except (OSError, subprocess.SubprocessError):
         return ""

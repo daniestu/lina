@@ -10,3 +10,6 @@ if str(SRC) not in sys.path:
 import os  # noqa: E402
 
 os.environ.setdefault("LINA_DISTRO", "arch")
+# Y de KDE Plasma con Wayland, que es para lo que están escritas las pruebas de ventanas (las de otros escritorios pasan su propio entorno).
+os.environ.setdefault("XDG_CURRENT_DESKTOP", "KDE")
+os.environ.setdefault("XDG_SESSION_TYPE", "wayland")

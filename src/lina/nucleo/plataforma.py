@@ -83,6 +83,13 @@ PAQUETES = {
     "spectacle":       {"arch": "spectacle", "debian": "kde-spectacle", "fedora": "spectacle", "suse": "spectacle"},
     "playerctl":       {"arch": "playerctl", "debian": "playerctl", "fedora": "playerctl", "suse": "playerctl"},
     "libnotify":       {"arch": "libnotify", "debian": "libnotify-bin", "fedora": "libnotify", "suse": "libnotify-tools"},
+    "xclip":           {"arch": "xclip", "debian": "xclip", "fedora": "xclip", "suse": "xclip"},
+    "xdotool":         {"arch": "xdotool", "debian": "xdotool", "fedora": "xdotool", "suse": "xdotool"},
+    "xprop":           {"arch": "xorg-xprop", "debian": "x11-utils", "fedora": "xorg-x11-utils", "suse": "xprop"},
+    "grim":            {"arch": "grim", "debian": "grim", "fedora": "grim", "suse": "grim"},
+    "scrot":           {"arch": "scrot", "debian": "scrot", "fedora": "scrot", "suse": "scrot"},
+    "gnome-screenshot": {"arch": "gnome-screenshot", "debian": "gnome-screenshot", "fedora": "gnome-screenshot", "suse": "gnome-screenshot"},
+    "xfce4-screenshooter": {"arch": "xfce4-screenshooter", "debian": "xfce4-screenshooter", "fedora": "xfce4-screenshooter", "suse": "xfce4-screenshooter"},
     "wl-clipboard":    {"arch": "wl-clipboard", "debian": "wl-clipboard", "fedora": "wl-clipboard", "suse": "wl-clipboard"},
     "yt-dlp":          {"arch": "yt-dlp", "debian": "yt-dlp", "fedora": "yt-dlp", "suse": "yt-dlp"},
     "chromium":        {"arch": "chromium", "debian": "chromium", "fedora": "chromium", "suse": "chromium"},
@@ -648,7 +655,8 @@ if __name__ == "__main__":
     import sys
     if sys.argv[1:2] == ["base"]:          # lo usa install.sh: imprime la orden para instalar lo que falta del sistema (o nada, si no falta nada)
         _f = familia_actual()
-        _faltan = faltan(PAQUETES_BASE, _f) if _f else []
+        from lina.escritorio import sesion as _ses
+        _faltan = faltan(PAQUETES_BASE + tuple(_ses.Sesion().paquetes_que_faltan()), _f) if _f else []     # lo del sistema y lo que falta para el escritorio de este equipo
         if _faltan:
             print(manual(_faltan, _f))
         sys.exit(0 if _f else 3)

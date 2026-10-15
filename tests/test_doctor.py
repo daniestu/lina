@@ -7,6 +7,7 @@ class Todo(D.Sondas):
     def python(self): return (3, 12, 1)
     def base_que_falta(self): return []
     def audio(self): return "pipewire"
+    def escritorio(self): return "KDE Plasma (wayland)", {"ventana": ("kdotool", ""), "captura": ("spectacle", ""), "portapapeles": ("wl-copy", "")}, []
     def microfonos(self): return ["Micrófono integrado"]
     def modelos(self): return {"whisper": True, "voz": "es_MX-claude-high", "voz_integra": True}
     def clave(self): return "llavero"
@@ -102,3 +103,21 @@ def test_informe_completo_no_filtra_el_usuario():
 def test_estado_del_servicio_lo_que_dice_systemctl_de_verdad():
     assert D.estado_servicio("active\n") == "activo"
     assert D.estado_servicio("failed\n") == "failed" and D.estado_servicio("") == "inactivo"
+
+
+def test_escritorio_sin_herramientas_dice_que_instalar():
+    class Pelado(Todo):
+        def escritorio(self):
+            return "sway (wayland)", {"ventana": ("swaymsg", ""), "captura": (None, "no hay programa de captura: instala grim"),
+                                       "portapapeles": (None, "no hay programa de portapapeles: instala wl-clipboard")}, ["grim", "wl-clipboard"]
+    res = D.comprobar(Pelado())
+    e = {t: (est, arreglo) for est, t, d, arreglo in res}
+    assert e["Captura de pantalla"][0] == D.MAL and "grim" in e["Captura de pantalla"][1]
+    assert e["Portapapeles"][0] == D.AVISO and e["Ventana activa"][0] == D.OK
+
+
+def test_aviso_de_gnome_wayland_sale_como_aviso():
+    class Gnome(Todo):
+        def escritorio(self):
+            return "GNOME (wayland)", {"ventana": ("xdotool", "solo ven XWayland"), "captura": ("gnome-screenshot", ""), "portapapeles": ("wl-copy", "")}, []
+    assert estados(D.comprobar(Gnome()))["Ventana activa"] == D.AVISO

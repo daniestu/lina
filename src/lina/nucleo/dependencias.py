@@ -12,14 +12,28 @@ from lina.nucleo import rutas as RUT
 
 # función → (programa que se busca en el PATH, paquete lógico de plataforma.PAQUETES, para qué sirve)
 REGISTRO = {
-    "portapapeles": ("wl-copy", "wl-clipboard", "copiar al portapapeles"),
+    "portapapeles": ("wl-copy", "wl-clipboard", "copiar al portapapeles"),     # (en X11 es xclip: ver `_segun_sesion`)
     "youtube": ("yt-dlp", "yt-dlp", "buscar vídeos de YouTube"),
 }
 
 
+def _segun_sesion(funcion):
+    """El programa que toca en esta sesión: el portapapeles es wl-clipboard en Wayland y xclip en X11."""
+    programa, logico, para = REGISTRO[funcion]
+    if funcion == "portapapeles":
+        from lina.escritorio import sesion as SES
+        if SES.actual().tipo != "wayland":
+            return "xclip", "xclip", para
+    return programa, logico, para
+
+
 def asegurar(funcion, which=shutil.which, perfil=None, instalar=PL.instalar, log=lambda m: None):
     """(True, '') si el programa ya está o se acaba de instalar; (False, mensaje para el usuario o la IA) si no."""
-    programa, logico, para = REGISTRO[funcion]
+    programa, logico, para = _segun_sesion(funcion)
+    if funcion == "portapapeles":
+        from lina.escritorio import sesion as SES
+        if SES.actual().programa_portapapeles():              # cualquiera de los programas de portapapeles vale
+            return True, ""
     if which(programa):
         return True, ""
     orden = PL.orden_canonica_instalar([logico])

@@ -31,6 +31,7 @@ import difflib
 import fnmatch
 import xml.etree.ElementTree as ET
 
+from lina.escritorio import sesion as SES
 from lina.nucleo import comandos
 from lina.nucleo import dependencias as DEP
 from lina.nucleo import plataforma as PL
@@ -597,6 +598,18 @@ def _segmento_lectura(t):
         acciones = {"windowactivate", "windowclose", "windowmove", "windowsize", "windowminimize", "windowraise", "windowfocus",
                     "windowstate", "set_desktop", "set_desktop_for_window", "set_num_desktops", "keyup", "keydown", "key"}
         return not any(x in acciones for x in a)
+    if base == "xdotool":                       # leer ventanas sí; activar, cerrar, escribir, pulsar teclas, mover el ratón... no
+        acciones = {"windowactivate", "windowclose", "windowmove", "windowsize", "windowminimize", "windowraise", "windowfocus", "windowmap",
+                    "windowunmap", "windowkill", "windowreparent", "windowstate", "set_window", "set_desktop", "set_desktop_for_window",
+                    "set_num_desktops", "key", "keydown", "keyup", "type", "click", "mousemove", "mousemove_relative", "mousedown", "mouseup",
+                    "behave", "behave_screen_edge", "exec", "getwindowfocus_set"}
+        return bool(a) and not any(x in acciones for x in a)
+    if base == "hyprctl":
+        orden = next((x for x in a if not x.startswith("-")), "")
+        return orden in {"activewindow", "clients", "monitors", "workspaces", "activeworkspace", "version", "devices", "layers", "binds", "getoption",
+                         "cursorpos", "layouts", "systeminfo", "animations", "globalshortcuts"}
+    if base == "swaymsg":
+        return any(x.startswith("get_") for x in a) and ("-t" in a or "--type" in a or any(x.startswith("--type=") for x in a)) and "-m" not in a
     if base == "powerprofilesctl":
         return primero in {"get", "list", "version"}
     if base == "upower":
@@ -3831,10 +3844,8 @@ def copiar_portapapeles(texto):
     listo, motivo = DEP.asegurar("portapapeles")
     if not listo:
         return motivo
-    try:
-        subprocess.run(["wl-copy"], input=texto, text=True, timeout=5)
-    except (OSError, subprocess.SubprocessError) as e:
-        return f"No he podido copiar: {e}"
+    if not SES.actual().copiar(texto):
+        return "No he podido copiar al portapapeles (el programa de portapapeles ha fallado)."
     anotar(f"[portapapeles] {len(texto)} caracteres")
     notificar("Copiado al portapapeles", texto[:300])
     return "Copiado al portapapeles."
@@ -3884,6 +3895,7 @@ def _datos_estaticos():
                 break
         except OSError:
             pass
+    l += SES.actual().describir()                            # qué escritorio es y qué puede (y qué no) hacer Lina en él
     caps = PL.capacidades()                                  # gestor, init, audio, arranque, snapshots, GPU y módulos opcionales: leídos, no supuestos
     l += [x for x in PL.describir(caps) if not x.startswith(("Distribución:", "Escritorio:"))]
     if Path(RUTA_DATOS).exists():
