@@ -5,8 +5,9 @@ casa = Path(tempfile.mkdtemp())
 os.environ["HOME"] = str(casa)
 from lina.modulos import oficina as O; from lina.nucleo import herramientas as H; from lina.nucleo import grupos as G
 O.CASA = casa; O.CARPETAS = [casa/"Documentos", casa/"Descargas"]; O.COPIAS = casa/".local/share/lina/copias_oficina"
-H.CARPETA_DOCUMENTOS = casa/"Documentos"; H.OFI = O
-H._abrir_con_escritorio = lambda r: None
+from lina.nucleo import documentos as DOC
+DOC.CARPETA_DOCUMENTOS = casa/"Documentos"; DOC.OFI = O
+DOC._abrir_con_escritorio = lambda r: None
 fallos = 0
 def ok(c, m):
     global fallos
