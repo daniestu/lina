@@ -38,7 +38,7 @@ from lina.nucleo import asistente as A2
 llamadas=[]
 def mini(clave,prompt,esq,cont,val,et):
     llamadas.append(cont); return {"decision":"no_cumplido" if "Según la página" in cont else "cumplido","modelo":"x"}
-A._mini_consulta_ia=mini
+from lina.nucleo import ia as IA; IA._mini_consulta_ia=mini
 visto.clear(); a.insistiendo=False; a.obstaculo=""; a.pregunta_pura="lee la página copiada"
 a.acciones_turno=[("ejecutar_comando",{"comando":"wl-paste"},"https://x"),("buscar_web",{"consulta":"potions"},"5 resultados")]
 r,m=a._insistir_si_hace_falta("Según la página que tienes copiada, hay pociones.","l","rapido","lee la página copiada",None,[],"s")
