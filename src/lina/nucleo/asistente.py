@@ -30,6 +30,7 @@ from urllib.parse import urlparse
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import claves as CL
 from lina.nucleo import autoconocimiento as AUTO
+from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
 from lina.voz import voces as VOC
@@ -107,6 +108,7 @@ try:
 except ImportError:     # si falta politica.py, el asistente arranca en modo prudente
     PO = None
 from lina.nucleo import herramientas as H
+_ORDEN_DE_SOFTWARE = (r"\b(sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|pip3?|pipx|npm|npx|cargo|snap|curl|wget|eval|crontab)\b")
 from lina.modulos import organizacion as ORG
 try:
     from lina.voz import manos_libres as ML
@@ -781,8 +783,8 @@ def puede_usar_local():
 def preguntar_local(pregunta, imagen, permitir_escalar, historial=(), datos_sistema=""):
     sistema = INSTRUCCIONES + (INSTRUCCION_LOCAL if permitir_escalar else "")
     if datos_sistema:
-        sistema += ("\n\nDATOS DEL SISTEMA DEL USUARIO (no recomiendes comandos ni programas de otras distribuciones, "
-                    "como apt o .deb):\n" + datos_sistema)
+        sistema += (f"\n\nDATOS DEL SISTEMA DEL USUARIO (es {PL.detectar()['distro']}: no recomiendes comandos, paquetes ni programas "
+                    "de otras distribuciones):\n" + datos_sistema)
     mensaje = {"role": "user", "content": pregunta}
     if imagen:
         mensaje["images"] = [imagen]
@@ -2479,7 +2481,7 @@ class Asistente:
         if not donde:
             return "No guardo la receta: ese comando no se ejecutó bien en esta petición (solo se apunta lo que de verdad funcionó, tal cual se ejecutó)."
         if (H.clasificar(cambiar)[0] not in {"autonomo", "inocuo"}
-                or re.search(r"\b(sudo|pacman|yay|paru|flatpak|pip3?|pipx|npm|npx|cargo|apt|apt-get|dnf|snap|curl|wget|eval|crontab)\b", cambiar)):
+                or re.search(_ORDEN_DE_SOFTWARE, cambiar)):
             return "No guardo la receta: no es un simple cambio de ajuste (pide permisos especiales o es de los que preguntan antes)."
         ultimo = donde[-1]
         comprobado = False
@@ -2505,7 +2507,7 @@ class Asistente:
     _VERBO_INICIAL = re.compile(r"^(?:activar|desactivar|poner|pon|cambiar|ajustar|subir|bajar|quitar|apagar|encender|habilitar|deshabilitar|configurar|"
                                 r"establecer|modificar|dejar|fijar|probar)\s+(?:(?:el|la|los|las|un|una|lo|al|a|del|de)\s+)*", re.I)
     _NO_AJUSTE = re.compile(r"^(?:rm|mv|cp|mkdir|rmdir|touch|tee|echo|git|python3?|bash|sh|zsh|fish|systemctl|kill|pkill|killall|xdg-open|notify-send|"
-                            r"sudo|pacman|paru|yay|flatpak|curl|wget|ln|chmod|chown|kdotool|spectacle|steam|kcmshell[56])$")
+                            r"sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|curl|wget|ln|chmod|chown|kdotool|spectacle|steam|kcmshell[56])$")
 
     @staticmethod
     def _relacionado(cambio, lectura):
@@ -2543,7 +2545,7 @@ class Asistente:
         if len(cambios) != 1:                                      # varios pasos (cambiar + recargar...): que lo apunte la IA con guardar_receta
             return
         i, cambiar, motivo = cambios[0]
-        if (re.search(r"\b(sudo|pacman|yay|paru|flatpak|pip3?|pipx|npm|npx|cargo|apt|apt-get|dnf|snap|curl|wget|eval|crontab)\b", cambiar)
+        if (re.search(_ORDEN_DE_SOFTWARE, cambiar)
                 or re.search(r"[;&|<>`]|\$\(", cambiar) or len(cambiar) > 300):
             return
         try:
@@ -3314,7 +3316,8 @@ class Asistente:
             donde = url
         elif comando:
             if "/" not in comando and not shutil.which(comando):
-                ayuda = {"npx": "instala nodejs y npm (sudo pacman -S nodejs npm)", "uvx": "instala uv (sudo pacman -S uv)", "docker": "instala docker"}.get(comando, "instálalo primero")
+                ayuda = {"npx": f"instala nodejs y npm ({PL.manual(['nodejs', 'npm'], PL.familia_actual())})", "uvx": "instala uv (con tu gestor de paquetes, o con pipx)",
+                         "docker": "instala docker"}.get(comando, "instálalo primero")
                 return f"No encuentro el programa «{comando}»: {ayuda}."
             argumentos = [str(x) for x in (args.get("argumentos") or [])][:20]
             conf["command"], conf["args"] = comando, argumentos

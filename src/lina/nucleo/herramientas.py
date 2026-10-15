@@ -32,6 +32,7 @@ import fnmatch
 import xml.etree.ElementTree as ET
 
 from lina.nucleo import comandos
+from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import raiz as _RAIZ
 from lina.nucleo import rutas as RUT
@@ -575,8 +576,12 @@ def _segmento_lectura(t):
     if base == "systemctl":
         return primero in {"status", "is-active", "is-enabled", "is-failed", "list-units", "list-unit-files",
                            "list-timers", "list-sockets", "show", "cat", "get-default"}
-    if base in {"pacman", "paru", "yay"}:
-        return bool(a) and re.fullmatch(r"-(Q[a-z]*|Ss|Si|Sii|Sl|Sg|F[lox])", a[0]) is not None
+    if base in {"apt-cache", "dpkg-query"}:         # solo consultan la base de paquetes
+        return True
+    if base == "apt-file":
+        return primero in {"search", "list", "show", "find"}
+    if base in PL.GESTORES_PAQUETES:                # pacman, apt, dnf, zypper, dpkg, rpm…: solo mirar (buscar, listar, comprobar)
+        return PL.es_consulta(base, a)
     if base == "flatpak":
         return primero in {"list", "search", "info", "remote-ls", "remotes"}
     if base == "wpctl":
@@ -729,7 +734,7 @@ def _es_inocuo(comando):
 # Lo que NUNCA se abre «al instante» aunque aparezca en un .desktop: intérpretes, lanzadores genéricos y utilidades que borran, mueven o envían cosas.
 _NO_ES_UN_PROGRAMA_DE_VENTANA = {"env", "sh", "bash", "zsh", "fish", "dash", "python", "python3", "perl", "ruby", "node", "java", "sudo", "pkexec", "su", "doas",
                                  "snap", "nohup", "setsid", "time", "xdg-open", "rm", "mv", "cp", "dd", "chmod", "chown", "ln", "tee", "curl", "wget", "ssh", "scp",
-                                 "rsync", "nc", "ncat", "socat", "tar", "unzip", "kill", "killall", "pkill", "shred", "mkfs", "mount", "umount", "systemctl", "pacman"}
+                                 "rsync", "nc", "ncat", "socat", "tar", "unzip", "kill", "killall", "pkill", "shred", "mkfs", "mount", "umount", "systemctl"} | PL.GESTORES_PAQUETES
 
 
 def _apps_instaladas():
@@ -786,11 +791,10 @@ def _es_lanzamiento(comando):
 
 
 # ----- Instalar paquetes oficiales -----
-_FLAGS_INSTALAR = {"--noconfirm", "--needed", "--noprogressbar", "--color=never"}
-
 
 def analizar_instalacion(comando):
-    """Si es 'sudo pacman -S paquetes...' sencillo, devuelve la lista de paquetes; si no, None."""
+    """Si es una instalación sencilla con el gestor de ESTA distribución (sudo pacman -S, apt-get install, dnf install, zypper install…),
+    devuelve la lista de paquetes; si no, None."""
     if _METACARACTERES.search(comando):
         return None
     t = _tokens(comando)
@@ -801,19 +805,9 @@ def analizar_instalacion(comando):
         if nombres and all(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,99}", a) for a in nombres):
             return nombres
         return None
-    if not t or t[:2] != ["sudo", "pacman"]:
+    if not t or t[0] != "sudo":
         return None
-    resto = t[2:]
-    if resto.count("-S") != 1:
-        return None
-    paquetes = []
-    for a in resto:
-        if a == "-S" or a in _FLAGS_INSTALAR:
-            continue
-        if a.startswith("-") or not re.fullmatch(r"([a-z0-9@._+-]+/)?[a-z0-9@._+-]+", a):
-            return None
-        paquetes.append(a)
-    return paquetes or None
+    return PL.paquetes_a_instalar(t[1:])
 
 
 # ======================= POLÍTICA DE AUTONOMÍA =======================
@@ -822,7 +816,7 @@ _INTERPRETES = {"python", "python3", "perl", "ruby", "node", "php", "lua", "bash
 _COPIAN = {"cp", "rsync", "install", "ln", "scp"}          # solo importa el destino, no de dónde copian
 _VERBOS_SERVICIO = {"start", "stop", "restart", "reload", "try-restart", "reload-or-restart", "enable", "disable", "mask",
                     "unmask", "kill", "edit", "revert", "set-default", "isolate", "link", "preset"}
-_GESTORES_PAQUETES = {"pacman", "paru", "yay", "pikaur"}
+_GESTORES_PAQUETES = PL.GESTORES_PAQUETES
 
 
 def _politica():
@@ -923,7 +917,7 @@ def _regla_coincide(sec, base, args, resto, datos):
                 if any(fnmatch.fnmatchcase(u, v) for u in unidades):
                     return True
         elif tipo == "paquete" and base in _GESTORES_PAQUETES:
-            if _toca_paquetes(args, [v]):
+            if _toca_paquetes(base, args, [v]):
                 return True
         elif tipo == "ejecutar_desde":
             candidatos = [resto[0]]
@@ -938,12 +932,12 @@ def _regla_coincide(sec, base, args, resto, datos):
     return False
 
 
-def _toca_paquetes(args, patrones):
-    """¿Instala o quita (S, R, U) alguno de estos paquetes? (las consultas ya se descartan antes, por ser de lectura)"""
-    opciones = [a[1:] for a in args if a.startswith("-") and not a.startswith("--")]
-    if not any(c in o for o in opciones for c in "SRU") and not any(a in ("--sync", "--remove", "--upgrade") for a in args):
+def _toca_paquetes(base, args, patrones):
+    """¿Instala o quita (o instala desde un archivo) alguno de estos paquetes? (las consultas ya se descartan antes, por ser de lectura)"""
+    operacion, nombres = PL.interpretar(base, args)
+    if operacion not in ("instalar", "quitar", "local"):
         return False
-    nombres = [re.sub(r"^[\w.-]+/", "", a) for a in args if not a.startswith("-")]
+    nombres = [re.sub(r"^[\w.-]+/", "", n) for n in nombres]
     return any(fnmatch.fnmatchcase(n, pat) for n in nombres for pat in patrones)
 
 
@@ -1011,6 +1005,9 @@ def evaluar_politica(comando, _prof=0):
                 return "critico", "ejecuta código libre con permisos de administrador"
             if any(a in ("-c", "-e") for a in args) and _menciona_ruta_critica(" ".join(args), datos):
                 return "critico", "el código nombra rutas críticas del sistema"
+        if base in PL.GESTORES_PAQUETES and PL.interpretar(base, args)[0] == "local":      # un .deb/.rpm suelto o una URL: software de fuera, con cualquier gestor
+            return "critico", next((sec["motivo"] for sec in datos["secciones"] if sec["nombre"] == "software_de_fuera"),
+                                   "instala o ejecuta software de fuera de las fuentes de confianza")
         for sec in datos["secciones"]:
             if _regla_coincide(sec, base, args, resto, datos):
                 return "critico", sec["motivo"]
@@ -1069,8 +1066,8 @@ def _fuera_del_servicio(orden):
 
 
 def _es_actualizacion_completa(comando):
-    """pacman -Syu / -Su / -Syyu (también con paru o yay): actualiza todo el sistema."""
-    return bool(re.search(r"\b(?:pacman|paru|yay)\s+(?:--\w+\s+)*-\w*S\w*u|\b(?:pacman|paru|yay)\s+(?:--\w+\s+)*(?:-\w*u\w*S|--sysupgrade)", str(comando)))
+    """pacman -Syu, apt upgrade, dnf upgrade, zypper dup…: actualiza todo el sistema."""
+    return PL.es_actualizacion_completa(comando)
 
 
 def clasificar(comando):
@@ -1115,7 +1112,7 @@ def _recortar(salida):
 # Snapshot antes de cambiar el sistema, diario de cambios con «deshacer», verificación del resultado, topes por tarea y freno
 # si en la tarea se ha leído contenido de fuera. Las reglas están aquí; el almacenamiento, en diario.py.
 _SHELLS = {"bash", "sh", "zsh", "fish", "dash"}
-_SIN_SNAPSHOT = {"snapper", "pacman", "paru", "yay", "pikaur", "journalctl", "mount", "umount", "swapon", "swapoff",
+_SIN_SNAPSHOT = PL.GESTORES_PAQUETES | {"snapper", "timeshift", "journalctl", "mount", "umount", "swapon", "swapoff",
                  "sync", "kill", "pkill", "killall", "reboot", "poweroff", "shutdown", "halt", "loginctl", "sleep"}
 _SERVICIO_SOLO_AHORA = {"start", "stop", "restart", "reload", "try-restart", "reload-or-restart", "kill", "reset-failed",
                         "daemon-reload", "daemon-reexec"}                 # no cambian nada guardado: no piden snapshot
@@ -1156,8 +1153,19 @@ def _ejecutar_simple(argv, timeout=15, entrada=None):
 
 
 def crear_snapshot(descripcion):
-    """Snapshot de Btrfs con snapper (configuración «root»), que snapper borra solo al cabo del tiempo. (número, "") o (None, motivo)."""
+    """Snapshot antes de cambiar el sistema, con lo que haya: snapper (Btrfs, configuración «root») o Timeshift. (identificador, "") o (None, motivo)."""
     descripcion = re.sub(r"\s+", " ", str(descripcion)).strip()[:100]
+    herramienta = PL.detectar_snapshots()
+    if herramienta == "timeshift":
+        codigo, salida = _ejecutar_simple([*_privilegios(), "timeshift", "--create", "--scripted", "--comments", descripcion, "--tags", "O"], timeout=900)
+        if codigo is None:
+            return None, f"no he podido ejecutar timeshift ({salida[:100]})"
+        if codigo != 0:
+            return None, (salida.splitlines() or ["timeshift ha fallado"])[-1][:150]
+        m = re.search(r"Snapshot '?(\S+?)'? created", salida) or re.search(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})", salida)
+        return (m.group(1) if m else time.strftime("%Y-%m-%d_%H-%M-%S")), ""
+    if herramienta != "snapper":
+        return None, "este equipo no tiene snapper ni Timeshift configurados, así que no hay snapshots"
     codigo, salida = _ejecutar_simple([*_privilegios(), "snapper", "--config", "root", "create", "--type", "single",
                                        "--cleanup-algorithm", "number", "--print-number", "--userdata", "lina=si",
                                        "--description", descripcion], timeout=60)
@@ -1269,21 +1277,6 @@ def _destino_final(fuente, destino):
     return os.path.join(d, os.path.basename(_normalizar_ruta(str(fuente)))) if os.path.isdir(d) else d
 
 
-def _paquetes_de(args):
-    """(operación, nombres) de un comando de pacman/paru/yay: 'instalar', 'quitar', 'actualizar' o None."""
-    letras = "".join(a[1:] for a in args if a.startswith("-") and not a.startswith("--"))
-    nombres = [re.sub(r"^[\w.-]+/", "", a) for a in args if not a.startswith("-")]
-    if "R" in letras or "--remove" in args:
-        return "quitar", nombres
-    if "U" in letras or "--upgrade" in args:
-        return None, []
-    if "S" in letras or "--sync" in args:
-        if "u" in letras and not nombres:
-            return "actualizar", []
-        return "instalar", nombres
-    return None, []
-
-
 def _intenciones_de_cambio(comando, _prof=0):
     """[(tipo, datos...)] de lo que va a cambiar un comando, para anotarlo, deshacerlo y comprobarlo."""
     out = []
@@ -1355,13 +1348,13 @@ def _intenciones_de_cambio(comando, _prof=0):
         elif base in ("rm", "unlink", "shred", "srm", "wipe"):
             out.append(("sin_deshacer", "borrado definitivo (sin papelera)"))
         elif base in _GESTORES_PAQUETES:
-            operacion, nombres = _paquetes_de(args)
+            operacion, nombres = PL.interpretar(base, args)
             if operacion == "instalar" and nombres:
                 out.append(("paquetes_instalar", nombres))
             elif operacion == "quitar" and nombres:
                 out.append(("paquetes_quitar", nombres))
             elif operacion == "actualizar":
-                out.append(("sin_deshacer", "actualización del sistema (para volver atrás están las snapshots de pacman)"))
+                out.append(("sin_deshacer", "actualización del sistema (para volver atrás, las snapshots si las hay)"))
         elif base == "flatpak":
             sin_opciones = [a for a in args if not a.startswith("-")]
             if sin_opciones[:1] == ["install"]:
@@ -1463,11 +1456,11 @@ def _capturar_previo(intenciones, id_entrada):
             if rutas:
                 payloads.append({"tipo": "papelera", "rutas": rutas})
         elif tipo == "paquetes_instalar":
-            nuevos = [n for n in it[1] if _ejecutar_simple(["pacman", "-Qq", n])[0] not in (0, None)]
+            nuevos = [n for n in it[1] if PL.esta_instalado(n, _ejecutar_simple) is False]
             if nuevos:
                 payloads.append({"tipo": "paquetes", "nuevos": nuevos})
         elif tipo == "paquetes_quitar":
-            instalados = [n for n in it[1] if _ejecutar_simple(["pacman", "-Qq", n])[0] == 0]
+            instalados = [n for n in it[1] if PL.esta_instalado(n, _ejecutar_simple) is True]
             if instalados:
                 payloads.append({"tipo": "paquetes_quitados", "paquetes": instalados})
         elif tipo == "flatpak_instalar":
@@ -1530,7 +1523,7 @@ def _deshacer_payload(p):
             return "omitido", f"ruta no válida en el diario: {ruta!r}"
     elif tipo in ("archivo", "archivo_nuevo", "enlace", "metadatos") and not _ruta_segura(ruta):
         return "omitido", f"ruta no válida en el diario: {ruta!r}"
-    if tipo in ("paquetes", "paquetes_quitados", "flatpak"):    # nombres que no pueden colarse como opciones de pacman o flatpak
+    if tipo in ("paquetes", "paquetes_quitados", "flatpak"):    # nombres que no pueden colarse como opciones del gestor de paquetes o de flatpak
         nombres = p.get("nuevos" if tipo != "paquetes_quitados" else "paquetes", [])
         if not nombres or not all(isinstance(n, str) and re.fullmatch(r"[A-Za-z0-9@._+][A-Za-z0-9@._+-]*", n) for n in nombres):
             return "omitido", "nombre de paquete no válido en el diario"
@@ -1628,11 +1621,17 @@ def _deshacer_payload(p):
         estados = {e for e, _ in resultados}
         return ("fallo" if "fallo" in estados else "ok" if "ok" in estados else "omitido"), "; ".join(m for _, m in resultados)
     if tipo == "paquetes":
-        codigo, salida = _como_root(["pacman", "-Rns", "--noconfirm", *p.get("nuevos", [])], timeout=600)
+        orden_quitar = PL.orden("quitar", p.get("nuevos", []))
+        if not orden_quitar:
+            return "omitido", "no sé quitar paquetes en esta distribución"
+        codigo, salida = _como_root(orden_quitar, timeout=600)
         nombres = ", ".join(p.get("nuevos", []))
         return ("ok", f"desinstalado {nombres}") if codigo == 0 else ("fallo", f"no he podido desinstalar {nombres}: {(salida.splitlines() or [''])[-1][:120]}")
     if tipo == "paquetes_quitados":
-        codigo, salida = _como_root(["pacman", "-S", "--needed", "--noconfirm", *p.get("paquetes", [])], timeout=600)
+        orden_poner = PL.orden("instalar", p.get("paquetes", []))
+        if not orden_poner:
+            return "omitido", "no sé instalar paquetes en esta distribución"
+        codigo, salida = _como_root(orden_poner, timeout=600)
         nombres = ", ".join(p.get("paquetes", []))
         return ("ok", f"reinstalado {nombres}") if codigo == 0 else ("fallo", f"no he podido reinstalar {nombres}: {(salida.splitlines() or [''])[-1][:120]}")
     if tipo == "flatpak":
@@ -1758,10 +1757,10 @@ def _verificar(intenciones, payloads=None):
                 c.append((not _existe(_abs(r)), f"{os.path.basename(r)} ya no está en su sitio", f"{os.path.basename(r)} SIGUE en su sitio"))
         elif tipo == "paquetes_instalar":
             for n in it[1]:
-                c.append((_ejecutar_simple(["pacman", "-Qq", n])[0] == 0, f"{n} está instalado", f"{n} NO aparece instalado"))
+                c.append((PL.esta_instalado(n, _ejecutar_simple) is True, f"{n} está instalado", f"{n} NO aparece instalado"))
         elif tipo == "paquetes_quitar":
             for n in it[1]:
-                c.append((_ejecutar_simple(["pacman", "-Qq", n])[0] not in (0, None), f"{n} ya no está instalado", f"{n} SIGUE instalado"))
+                c.append((PL.esta_instalado(n, _ejecutar_simple) is False, f"{n} ya no está instalado", f"{n} SIGUE instalado"))
         elif tipo == "flatpak_instalar":
             for a in it[1]:
                 c.append((_ejecutar_simple(["flatpak", "info", a])[0] == 0, f"{a} está instalado", f"{a} NO aparece instalado"))
@@ -1853,26 +1852,20 @@ def _ejecutables_parecidos(programa):
 
 
 def _paquetes_que_traen(regex_nombre, avisar=None):
-    """[(paquete, programa)] de los repositorios oficiales (pacman -F). Baja la lista de archivos si falta."""
-    consulta = ["pacman", "-Fx", rf"^usr/(local/)?s?bin/{regex_nombre}$"]
+    """[(paquete, programa)] de los repositorios oficiales (pacman -F, apt-file…). Baja la lista de archivos si falta. [] si esta distribución no sabe."""
+    consulta = PL.consulta_quien_trae(regex_nombre)
+    if not consulta:
+        return []
     codigo, salida = _ejecutar_simple(consulta, timeout=60)
-    if (codigo is None or codigo > 1 or re.search(r"database file for .* does not exist|use '-Fy'", salida)) \
-            and not _estado_fdb["sincronizada"]:
-        _estado_fdb["sincronizada"] = True            # la lista de archivos de pacman hay que bajarla una vez
+    sincronizar = PL.sincronizar_archivos()
+    if (codigo is None or codigo > 1 or re.search(r"database file for .* does not exist|use '-Fy'|cache is empty|apt-file update", salida)) \
+            and sincronizar and not _estado_fdb["sincronizada"]:
+        _estado_fdb["sincronizada"] = True            # la lista de archivos hay que bajarla una vez
         if avisar:
-            avisar("Voy a actualizar la lista de archivos de pacman para saber qué paquete trae ese programa. Tardará un momento.")
-        _como_root(["pacman", "-Fy"], timeout=240)
+            avisar("Voy a actualizar la lista de archivos de paquetes para saber cuál trae ese programa. Tardará un momento.")
+        _como_root(sincronizar, timeout=240)
         codigo, salida = _ejecutar_simple(consulta, timeout=60)
-    pares, paquete = [], None
-    for linea in salida.splitlines():
-        m = re.match(r"^([\w.+-]+)/([\w.@+-]+) ", linea)
-        if m:
-            paquete = m.group(2)
-            continue
-        m = re.match(r"^\s+usr/(?:local/)?s?bin/([\w.+-]+)\s*$", linea)
-        if m and paquete:
-            pares.append((paquete, m.group(1)))
-    return list(dict.fromkeys(pares))[:8]
+    return PL.pares_que_traen(salida)
 
 
 def _sugerir_paquete(programa, avisar=None):
@@ -1886,16 +1879,17 @@ def _sugerir_paquete(programa, avisar=None):
         paquetes = list(dict.fromkeys(p for p, _ in exactos))[:3]
         otros = f" (también lo trae: {', '.join(paquetes[1:])})" if len(paquetes) > 1 else ""
         return (f"«{programa}» no está instalado. Lo trae el paquete «{paquetes[0]}» de los repositorios oficiales{otros}: "
-                f"instálalo con `sudo pacman -S --noconfirm --needed {paquetes[0]}` (va directo, sin preguntar) y repite el comando.")
+                f"instálalo con `{PL.orden_canonica_instalar([paquetes[0]])}` (va directo, sin preguntar) y repite el comando.")
     base = re.sub(r"[-_.]?\d+$", "", programa)
     similares = _paquetes_que_traen(re.escape(base) + r"[\w.+-]*", avisar) if len(base) >= 3 else []
     if similares:
         paquetes = list(dict.fromkeys(p for p, _ in similares))[:3]
         trae = "; ".join(f"«{p}» (trae {', '.join(e for q, e in similares if q == p)[:60]})" for p in paquetes)
         return (f"«{programa}» no está instalado. Hay paquetes oficiales con programas de nombre parecido: {trae}. Si es el mismo programa con "
-                f"otro nombre, instálalo con `sudo pacman -S --noconfirm --needed {paquetes[0]}` (va directo) y usa ese nombre; compruébalo con su `--help`.")
-    return (f"«{programa}» no está instalado y no lo encuentro en los repositorios oficiales. Mira si existe en Flathub "
-            f"(`flatpak search {programa}`); si solo está en el AUR hay que preguntar al usuario. Si no hay forma de conseguirlo, "
+                f"otro nombre, instálalo con `{PL.orden_canonica_instalar([paquetes[0]])}` (va directo) y usa ese nombre; compruébalo con su `--help`.")
+    return (f"«{programa}» no está instalado y no lo encuentro en los repositorios oficiales (o esta distribución no me deja buscar por archivo: "
+            f"prueba `{PL.FAMILIAS.get(PL.familia_actual(), PL._GENERICO)['texto_buscar']} {programa}`). Mira si existe en Flathub "
+            f"(`flatpak search {programa}`); si solo está en {PL.FAMILIAS.get(PL.familia_actual(), PL._GENERICO)['texto_externo']} hay que preguntar al usuario. Si no hay forma de conseguirlo, "
             "díselo con claridad en vez de dar el trabajo por hecho.")
 
 
@@ -1908,7 +1902,8 @@ def control_no_visible(texto):
     return bool(_NO_VISIBLE.search(_sin_acentos(str(texto or "").lower())))
 
 
-_RELLENO_PENDIENTE = {"deshacer", "cambio", "anotado", "ultimo", "aplicado", "sistema", "sudo", "pacman", "noconfirm", "needed", "paru", "yay",
+_RELLENO_PENDIENTE = PL.GESTORES_PAQUETES | {"deshacer", "cambio", "anotado", "ultimo", "aplicado", "sistema", "sudo", "noconfirm", "needed", "purge", "remove",
+                                              "assumeyes", "recommends", "interactive",
                       "systemctl", "hacer", "instalar", "desinstalar", "reinstalar", "quitar", "restaurar", "devolver", "recuperar", "paquete",
                       "paquetes", "archivo", "archivos", "servicio", "ajuste", "carpeta", "fichero", "programa", "aplicacion", "tarea",
                       "voy", "como", "estaba", "para", "este", "esta", "esto", "con", "los", "las", "del"}
@@ -3029,8 +3024,7 @@ class Ejecutor:
     # --- Ejecución ---
     @staticmethod
     def _canonico_instalar(comando):
-        paquetes = analizar_instalacion(comando)
-        return "sudo pacman -S --noconfirm --needed " + " ".join(paquetes)
+        return PL.orden_canonica_instalar(analizar_instalacion(comando))
 
     @staticmethod
     def _entorno():
@@ -3814,7 +3808,7 @@ def buscar_youtube(consulta, cantidad=5):
     exe = shutil.which("yt-dlp")
     if not exe:
         return ("yt-dlp no está instalado, y hace falta para buscar vídeos. Propón al usuario instalarlo "
-                "(sudo pacman -S yt-dlp).")
+                f"({PL.orden_canonica_instalar(['yt-dlp'])}).")
     try:
         r = subprocess.run([exe, "--flat-playlist", "--no-warnings", "--print",
                             "%(title)s | %(channel)s | %(duration_string)s | https://www.youtube.com/watch?v=%(id)s",
@@ -3834,7 +3828,7 @@ def copiar_portapapeles(texto):
     if not texto:
         return "No hay nada que copiar."
     if not shutil.which("wl-copy"):
-        return "Falta wl-clipboard para copiar al portapapeles. Propón instalarlo (sudo pacman -S wl-clipboard)."
+        return f"Falta wl-clipboard para copiar al portapapeles. Propón instalarlo ({PL.orden_canonica_instalar(['wl-clipboard'])})."
     try:
         subprocess.run(["wl-copy"], input=texto, text=True, timeout=5)
     except (OSError, subprocess.SubprocessError) as e:
@@ -3888,11 +3882,8 @@ def _datos_estaticos():
                 break
         except OSError:
             pass
-    from lina.nucleo import plataforma as PL
-    _gestor = PL.detectar().get("gestor") or "pacman"
-    l.append(f"Gestores de paquetes: {_gestor} (repositorios oficiales) es el principal"
-             + (", paru para el AUR" if shutil.which("paru") else "")
-             + (", flatpak" if shutil.which("flatpak") else "") + ".")
+    caps = PL.capacidades()                                  # gestor, init, audio, arranque, snapshots, GPU y módulos opcionales: leídos, no supuestos
+    l += [x for x in PL.describir(caps) if not x.startswith(("Distribución:", "Escritorio:"))]
     if Path(RUTA_DATOS).exists():
         l.append(f"{RUTA_DATOS} es un disco de datos" + (", protegido contra borrados." if PROTEGER_DATOS else "."))
     try:                                                    # las carpetas de verdad del usuario (en español): así no se crean ~/Music ni ~/Documents por error
@@ -3906,7 +3897,7 @@ def _datos_estaticos():
             l.append("Carpetas del usuario (usa SIEMPRE estas rutas, no las inglesas): " + ", ".join(sorted(carpetas)) + ".")
     except OSError:
         pass
-    if shutil.which("snapper") and Path("/etc/snapper/configs/root").exists():
+    if caps.get("snapshots") == "snapper":
         l.append("La raíz tiene snapshots de snapper (Btrfs); la carpeta personal no los tiene.")
     _estaticos = "\n".join(l)
     return _estaticos

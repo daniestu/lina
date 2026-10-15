@@ -20,7 +20,41 @@ ARREGLOS=()            # cosas que 'preparar' puede arreglar
 
 marca() { CAP["$1"]="$2"; }
 tiene() { command -v "$1" >/dev/null 2>&1; }
-paquete() { pacman -Qq "$1" >/dev/null 2>&1; }
+
+# Familia de la distribución (como lina.nucleo.plataforma) y paquetes con el nombre de cada una
+FAMILIA="${LINA_DISTRO:-$( . /etc/os-release 2>/dev/null
+  for i in ${ID:-} ${ID_LIKE:-}; do case "$i" in
+    arch|cachyos|endeavouros|manjaro|garuda|artix) echo arch; break;;
+    debian|ubuntu|linuxmint|pop|elementary|zorin|kali|neon) echo debian; break;;
+    fedora|rhel|centos|rocky|almalinux|nobara) echo fedora; break;;
+    opensuse*|suse|sles) echo suse; break;;
+  esac; done )}"
+real() {
+  case "$FAMILIA:$1" in
+    debian:python-gobject) echo python3-gi;;
+    fedora:python-gobject|suse:python-gobject) echo python3-gobject;;
+    *) echo "$1";;
+  esac
+}
+paquete() {
+  local p; p="$(real "$1")"
+  case "$FAMILIA" in
+    arch) pacman -Qq "$p";;
+    debian) dpkg-query -W -f='${db:Status-Abbrev}' "$p" 2>/dev/null | grep -q '^ii';;
+    fedora|suse) rpm -q "$p";;
+    *) return 1;;
+  esac >/dev/null 2>&1
+}
+instalar_paquetes() {
+  local r=() p; for p in "$@"; do r+=("$(real "$p")"); done
+  case "$FAMILIA" in
+    arch) $SUDO pacman -S --needed --noconfirm "${r[@]}";;
+    debian) $SUDO apt-get install -y --no-install-recommends "${r[@]}";;
+    fedora) $SUDO dnf install -y "${r[@]}";;
+    suse) $SUDO zypper --non-interactive install --no-recommends "${r[@]}";;
+    *) echo "  No conozco el gestor de paquetes de esta distribución: instala a mano ${r[*]}"; return 1;;
+  esac
+}
 
 socket_ydotool() {
   local s
@@ -144,7 +178,7 @@ preparar() {
   for p in ydotool python-gobject at-spi2-core; do paquete "$p" || faltan+=("$p"); done
   if [ "${#faltan[@]}" -gt 0 ]; then
     echo "  Instalo: ${faltan[*]}"
-    $SUDO pacman -S --needed --noconfirm "${faltan[@]}" || { mal "No he podido instalar ${faltan[*]}"; }
+    instalar_paquetes "${faltan[@]}" || { mal "No he podido instalar ${faltan[*]}"; }
   else ok "Paquetes ya instalados"; fi
 
   # permisos de /dev/uinput para el usuario de la sesión (sin tener que cerrar sesión)

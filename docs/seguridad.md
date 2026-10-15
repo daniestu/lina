@@ -38,7 +38,7 @@ Para activarlo o quitarlo (`instalar`, `total`, `quitar`):
 
 El ayudante `lina-instalar` (`src/lina/datos/privilegios/lina-instalar`, un archivo que se lee entero en un minuto):
 
-- decide el gestor (pacman, apt, dnf, zypper) leyendo `/etc/os-release`, nunca por argumentos;
+- decide el gestor (pacman, apt, dnf, zypper) leyendo `/etc/os-release`, nunca por argumentos (en Debian/Ubuntu, si falla la primera vez, refresca las listas con `apt-get update` y repite una vez);
 - acepta solo nombres sencillos (`[A-Za-z0-9._+-]`, sin opciones, rutas, URLs, comodines, versiones, `paquete-` de apt ni `@grupo` de dnf) y nunca instala desde un archivo o dirección;
 - no toca el software que concede privilegios (sudo, doas, polkit, pam, shadow);
 - usa un entorno limpio, sin entrada y con límite de tiempo, y apunta cada uso en el registro del sistema (`journalctl -t lina-instalar`).

@@ -27,3 +27,26 @@ jobs:
         run: python scripts/comprobar_rastros.py
       - name: Pruebas
         run: pytest
+
+  familias:
+    name: Núcleo en ${{ matrix.nombre }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.imagen }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {nombre: Arch, familia: arch, imagen: "archlinux:latest", preparar: "pacman -Syu --noconfirm --needed python python-pip gcc portaudio sudo"}
+          - {nombre: Debian, familia: debian, imagen: "debian:stable", preparar: "apt-get update && apt-get install -y python3 python3-venv python3-pip libportaudio2 sudo"}
+          - {nombre: Fedora, familia: fedora, imagen: "fedora:latest", preparar: "dnf install -y python3 python3-pip portaudio sudo"}
+          - {nombre: openSUSE, familia: suse, imagen: "opensuse/tumbleweed", preparar: "zypper --non-interactive install python3 python3-pip libportaudio2 sudo"}
+    env:
+      LINA_FAMILIA_ESPERADA: ${{ matrix.familia }}
+    steps:
+      - name: Preparar el sistema
+        run: ${{ matrix.preparar }}
+      - uses: actions/checkout@v4
+      - name: Instalar
+        run: python3 -m venv /tmp/v && /tmp/v/bin/pip install -e ".[dev]"
+      - name: Pruebas
+        run: /tmp/v/bin/pytest

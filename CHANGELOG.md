@@ -5,6 +5,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Portabilidad entre distribuciones: `plataforma.py` es ahora el único sitio que conoce pacman, apt, dnf y zypper (instalar, quitar, actualizar, buscar, comprobar,
+  qué paquete trae un programa), con tablas de paquetes por familia y detección de lo que hay (servicios, audio, snapshots, arranque, GPU, juegos, copias).
+  El filtro de comandos entiende los cuatro gestores, la política vigila el kernel y el arranque de cada familia y pide confirmación para PPA, COPR, `.deb`, `.rpm` y similares.
+  Timeshift como alternativa a snapper. Las instrucciones para la IA se adaptan a la distribución. Contenedores de Arch, Debian, Fedora y openSUSE en la CI y
+  `scripts/probar_en_contenedores.sh`. Ver [portabilidad](docs/portabilidad.md).
 - Si Lina necesita ver la pantalla y no hay permiso, lo pide ella (explicando que la captura va a Google) y solo se activa si confirmas con el atajo; con «no» no insiste.
 - Sin captura en la petición, Lina sabe que no ve nada y no describe la pantalla (solo conoce el título de la ventana).
 - Estructura de proyecto con paquete `lina` (`src/`), comando `lina` y datos del usuario en las carpetas estándar XDG

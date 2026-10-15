@@ -3,8 +3,8 @@
 Asistente de voz en español para el escritorio Linux. Le hablas («Oye Lina, …») o pulsas un atajo, y ella entiende lo que
 quieres, lo hace en tu equipo (abrir programas, ajustar el sistema, manejar ventanas, buscar, escribir documentos…) y te contesta con voz.
 
-> **Estado: beta temprana (0.1).** Funciona de forma completa en Arch Linux y derivados con KDE Plasma (Wayland). El soporte para otras
-> distribuciones y escritorios está en marcha: mira la [hoja de ruta](docs/hoja-de-ruta.md).
+> **Estado: beta temprana (0.1).** Funciona de forma completa en Arch Linux y derivados con KDE Plasma (Wayland). El núcleo ya se prueba también en Debian/Ubuntu,
+> Fedora y openSUSE ([portabilidad](docs/portabilidad.md)); el soporte de otros escritorios está en marcha: mira la [hoja de ruta](docs/hoja-de-ruta.md).
 
 ## Qué hace distinto
 

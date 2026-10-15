@@ -108,7 +108,12 @@ def instalar(nombres, os_release=OS_RELEASE, ejecutar=subprocess.run, euid=None)
     apuntar("instalar " + " ".join(limpios))
     env = {"PATH": PATH_SEGURO, "LANG": "C", "LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive", "HOME": "/root"}
     try:
-        return ejecutar(cmd, stdin=subprocess.DEVNULL, env=env, timeout=TIEMPO).returncode
+        codigo = ejecutar(cmd, stdin=subprocess.DEVNULL, env=env, timeout=TIEMPO).returncode
+        if codigo != 0 and fam == "debian":              # apt sin listas al día no encuentra los paquetes (instalación nueva): se refrescan y se repite una vez
+            apuntar("apt-get update y reintento")
+            ejecutar(["apt-get", "update"], stdin=subprocess.DEVNULL, env=env, timeout=TIEMPO)
+            codigo = ejecutar(cmd, stdin=subprocess.DEVNULL, env=env, timeout=TIEMPO).returncode
+        return codigo
     except subprocess.TimeoutExpired:
         raise Rechazo("El gestor de paquetes ha tardado demasiado y lo he parado.")
     except OSError as e:

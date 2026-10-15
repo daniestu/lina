@@ -31,6 +31,7 @@ from pathlib import Path
 
 import numpy as np
 from lina.nucleo import ajustes as AJ
+from lina.nucleo import plataforma as PL
 from lina.nucleo import rutas as RUT
 
 FRECUENCIA = 16000
@@ -52,7 +53,7 @@ PREDETERMINADOS = {
     "indicador_color": "azul",    # color al escucharte: azul, rojo, verde, morado, naranja, amarillo, rosa, cian, blanco o #rrggbb
     "indicador_grosor": "40",     # píxeles que entra el resplandor desde el borde
     "indicador_intensidad": "1.0", # lo fuerte que brilla: 0.1 casi invisible … 1 normal … 2 muy fuerte
-    "indicador_instalar": "si",   # si: si faltan paquetes para dibujarlo (gtk3, gtk-layer-shell…), los instala solo con pacman (repositorios oficiales)
+    "indicador_instalar": "si",   # si: si faltan paquetes para dibujarlo (gtk3, gtk-layer-shell…), los instala solo con el gestor de paquetes (repositorios oficiales)
     "indicador_juegos": "no",     # si: también se dibuja con un juego en primer plano (por defecto no, para no molestar jugando)
     "parecido": "0.78",           # lo parecido que tiene que sonar el nombre (0-1). Más bajo = acepta más variantes (y más falsos avisos)
 }
@@ -401,7 +402,7 @@ def configurar_eco(accion="instalar", log=print):
         FICHERO_ECO.unlink(missing_ok=True)
         _reiniciar_audio()
         log("Cancelación de eco: no se ha podido crear (seguramente falta el módulo webrtc de PipeWire). Dejo el audio como estaba. "
-            "Diagnóstico:  pacman -Qs webrtc ; ls /usr/lib/spa-0.2/aec")
+            f"Diagnóstico:  {PL.FAMILIAS.get(PL.familia_actual(), PL._GENERICO)['texto_consultar']} | grep -i webrtc ; find /usr/lib* -path '*spa-0.2/aec*'")
         return False
     MARCA_FALLO.unlink(missing_ok=True)
     usar_fuente_eco(log)

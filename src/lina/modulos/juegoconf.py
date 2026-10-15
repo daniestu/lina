@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
+from lina.nucleo import plataforma as PL
 from lina.nucleo import rutas as RUT
 
 try:
@@ -203,7 +204,7 @@ def mangohud(args):
     if accion not in {"ver", "activar", "quitar", "preset", "borrar", "deshacer"}:
         return "Acciones de MangoHud: ver, activar, quitar, preset, borrar, deshacer."
     instalado = shutil.which("mangohud") is not None
-    aviso = "" if instalado else "\nAVISO: no encuentro el programa mangohud instalado (pacman -S mangohud lib32-mangohud)."
+    aviso = "" if instalado else f"\nAVISO: no encuentro el programa mangohud instalado ({PL.manual(['mangohud'], PL.familia_actual())})."
     lineas = _leer_mangohud()
     nota_uso = ("\nSe aplica la próxima vez que se abra el juego, y solo en los juegos que lo usen: en Steam, con la opción de lanzamiento "
                 "«mangohud %command%» (herramienta opciones_lanzamiento).")

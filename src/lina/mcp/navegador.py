@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from lina.nucleo import plataforma as PL
 from lina.nucleo import rutas as RUT
 
 CONFIG = Path(os.environ.get("MCP_CONFIG_PRUEBA") or RUT.CONFIG / "mcp.json")
@@ -17,11 +18,12 @@ if not Path(CHROMIUM).exists():
     if os.environ.get("SIN_INSTALAR_PRUEBA"):
         sys.exit("(prueba) falta chromium")
     print("Instalando Chromium (pide tu contraseña)...")
-    if subprocess.run(["sudo", "pacman", "-S", "--needed", "--noconfirm", "chromium"]).returncode != 0:
-        sys.exit("No he podido instalar Chromium. Instálalo a mano (sudo pacman -S chromium) y vuelve a ejecutar esto.")
+    _orden = PL.orden("instalar", ["chromium"])
+    if not _orden or subprocess.run(["sudo", *_orden]).returncode != 0:
+        sys.exit(f"No he podido instalar Chromium. Instálalo a mano ({PL.manual(['chromium'], PL.familia_actual())}) y vuelve a ejecutar esto.")
     CHROMIUM = shutil.which("chromium") or "/usr/bin/chromium"
 if not shutil.which("npx"):
-    sys.exit("Falta Node.js: sudo pacman -S nodejs npm   y vuelve a ejecutar esto.")
+    sys.exit(f"Falta Node.js: {PL.manual(['nodejs', 'npm'], PL.familia_actual())}   y vuelve a ejecutar esto.")
 
 try:
     datos = json.loads(CONFIG.read_text(encoding="utf-8"))

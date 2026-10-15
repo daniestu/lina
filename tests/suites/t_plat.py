@@ -31,7 +31,7 @@ class R:
 cmds=[]; logs=[]
 def ej(c,**k): cmds.append(c); return R(0)
 deb={"familia":"debian","gestor":"apt-get","tiene_gestor":True,"distro":"Ubuntu"}
-ok(P.instalar(["pygobject"],logs.append,ej,deb) and cmds[-1]==["sudo","-n","apt-get","install","-y","--no-install-recommends","python3-gi"],"instala en debian %s"%cmds[-1])
+ok(P.instalar(["pygobject"],logs.append,ej,deb) and cmds[-1]==["sudo","-n","apt-get","install","-y","--no-install-recommends","--no-remove","python3-gi"],"instala en debian %s"%cmds[-1])
 ok(not P.instalar(["x"],logs.append,ej,{"familia":None,"tiene_gestor":False,"distro":"Void"}) and any("no reconozco" in l for l in logs),"distro desconocida: avisa")
 ok(not P.instalar(["x"],logs.append,ej,{"familia":"arch","gestor":"pacman","tiene_gestor":False,"distro":"A"}),"sin gestor instalado")
 m=pathlib.Path(tempfile.mkdtemp())/"m"; n=len(cmds)

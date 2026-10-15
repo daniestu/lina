@@ -82,6 +82,29 @@ def test_apt_no_puede_quitar_paquetes(tmp_path):
     assert "--no-remove" in f.llamadas[0][0]
 
 
+class FalsoQueFallaLaPrimera:
+    """El primer `apt-get install` falla (listas sin bajar); `apt-get update` y el segundo intento van bien."""
+    def __init__(self):
+        self.llamadas = []
+
+    def __call__(self, cmd, **kw):
+        self.llamadas.append(cmd)
+        malo = cmd[1] == "install" and sum(1 for c in self.llamadas if c[1] == "install") == 1
+        return subprocess.CompletedProcess(cmd, 100 if malo else 0)
+
+
+def test_debian_refresca_las_listas_y_reintenta_una_vez(tmp_path):
+    f = FalsoQueFallaLaPrimera()
+    assert LI.instalar(["ydotool"], os_release(tmp_path, "ID=ubuntu\nID_LIKE=debian"), f, euid=0) == 0
+    assert [c[1] for c in f.llamadas] == ["install", "update", "install"]
+
+
+def test_solo_debian_reintenta(tmp_path):
+    f = Falso(codigo=1)
+    assert LI.instalar(["ydotool"], os_release(tmp_path, "ID=fedora"), f, euid=0) == 1
+    assert len(f.llamadas) == 1
+
+
 def test_distribucion_desconocida_no_hace_nada(tmp_path):
     f = Falso()
     with pytest.raises(LI.Rechazo):

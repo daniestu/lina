@@ -19,11 +19,11 @@
 #     motivo TEXTO                      lo que se te dice al pedir confirmación
 #     programa NOMBRE                   cualquier uso de ese programa (admite *, por ejemplo  mkfs.*)
 #     subcomando PROGRAMA PAL1 PAL2     ese programa con alguna de esas palabras (btrfs balance)
-#     bandera PROGRAMA OPC1 OPC2        ese programa con alguna de esas opciones (pacman -U)
+#     bandera PROGRAMA OPC1 OPC2        ese programa con alguna de esas opciones (pacman -U, dpkg -i)
 #     ruta PATRON                       si el comando modifica algo en esa ruta. Admite *; sin * incluye
 #                                       todo lo que haya dentro. ~ es tu carpeta personal.
 #     servicio UNIDAD                   systemctl start/stop/restart/enable/disable... de ese servicio
-#     paquete PATRON                    instalar o quitar ese paquete con pacman, paru o yay
+#     paquete PATRON                    instalar o quitar ese paquete con pacman, apt, dnf, zypper (o paru, yay…)
 #     ejecutar_desde RUTA               ejecutar un programa o script que esté en esa ruta
 #
 #  PERFIL Y ATAJOS
@@ -103,8 +103,8 @@ subcomando btrfs balance check device rescue resize defragment scrub
 
 
 # 2) Arranque: gestor de arranque (Limine, GRUB, systemd-boot...), fstab, parámetros del kernel, initramfs.
-#    Los paquetes de esta sección se vigilan al instalarlos o quitarlos (una actualización normal, pacman -Syu,
-#    no entra: ya crea su propia snapshot).
+#    Los paquetes de esta sección se vigilan al instalarlos o quitarlos (una actualización normal del sistema
+#    no entra). Los nombres de los kernels y bibliotecas base de Arch, Debian/Ubuntu, Fedora y openSUSE están todos aquí.
 [arranque]
 motivo toca el arranque del sistema, el kernel o los controladores base
 ruta /boot
@@ -117,6 +117,10 @@ ruta /etc/default/grub
 ruta /etc/kernel
 ruta /etc/mkinitcpio.conf
 ruta /etc/mkinitcpio.d
+ruta /etc/initramfs-tools
+ruta /etc/grub.d
+ruta /etc/dracut.conf
+ruta /etc/dracut.conf.d
 ruta /etc/modprobe.d
 ruta /etc/modules-load.d
 ruta /etc/sysctl.conf
@@ -132,6 +136,12 @@ programa grub-*
 programa update-grub
 programa sbctl
 programa dracut
+programa update-initramfs
+programa grub2-*
+programa grubby
+programa mokutil
+programa kernelstub
+programa lilo
 programa kernel-install
 programa depmod
 programa modprobe
@@ -151,6 +161,33 @@ paquete base
 paquete btrfs-progs
 paquete nvidia*
 paquete lib32-nvidia*
+paquete linux-image*
+paquete linux-headers*
+paquete linux-generic*
+paquete linux-modules*
+paquete linux-firmware
+paquete kernel
+paquete kernel-*
+paquete grub*
+paquete shim*
+paquete initramfs-tools*
+paquete dracut*
+paquete systemd-boot*
+paquete libc6
+paquete glibc-*
+paquete base-files
+paquete base-passwd
+paquete apt
+paquete dpkg
+paquete dnf
+paquete dnf5
+paquete rpm
+paquete zypper
+paquete akmod-nvidia*
+paquete xorg-x11-drv-nvidia*
+paquete x11-video-nvidia*
+paquete libnvidia*
+paquete btrfsprogs
 
 
 # 3) Usuarios, contraseñas, permisos de administrador, claves y credenciales.
@@ -251,8 +288,8 @@ bandera find -delete -exec -execdir -ok
 
 
 # 6) Ejecutar scripts bajados de internet, o software de fuera de las fuentes de confianza.
-#    Va directo: repositorios oficiales de pacman y Flathub. Pide confirmación: el AUR (paru, yay), pip, npm,
-#    cargo..., paquetes sueltos (pacman -U), añadir repositorios y ejecutar lo que haya en Descargas.
+#    Va directo: los repositorios oficiales de tu distribución y Flathub. Pide confirmación: el AUR (paru, yay), los PPA y COPR,
+#    pip, npm, cargo..., paquetes sueltos (pacman -U, dpkg -i, rpm -i), añadir repositorios y ejecutar lo que haya en Descargas.
 [software_de_fuera]
 motivo instala o ejecuta software de fuera de las fuentes de confianza
 programa paru
@@ -261,6 +298,12 @@ programa pikaur
 programa aurman
 programa makepkg
 programa pacman-key
+programa add-apt-repository
+programa apt-add-repository
+programa apt-key
+programa ppa-purge
+programa alien
+programa rpmbuild
 programa pip
 programa pip3
 programa pipx
@@ -276,9 +319,21 @@ programa composer
 programa *.AppImage
 programa *.run
 bandera pacman -U --upgrade
+bandera dpkg -i --install --unpack
+bandera rpm -i -U -F -ivh -Uvh --install --upgrade --freshen
+subcomando dnf copr config-manager install-from-url
+subcomando zypper addrepo ar modifyrepo mr removerepo rr
+subcomando snap install refresh
 subcomando flatpak remote-add remote-modify remote-delete
 ruta /etc/pacman.conf
 ruta /etc/pacman.d
+ruta /etc/apt/sources.list
+ruta /etc/apt/sources.list.d
+ruta /etc/apt/trusted.gpg.d
+ruta /etc/apt/keyrings
+ruta /etc/yum.repos.d
+ruta /etc/dnf
+ruta /etc/zypp
 ruta /usr/local/bin
 ruta /usr/local/sbin
 ruta /opt
@@ -369,7 +424,7 @@ subcomando systemctl enable link preset
 
 # 11) Modificar archivos que pertenecen a programas instalados (/usr/bin, /usr/lib, /usr/share...).
 #     Evita que el asistente «arregle» un programa editando /usr/bin con sed o creando enlaces ahí.
-#     Esos archivos son de pacman: un parche a mano se pierde o rompe cosas al actualizar. Instalar con pacman NO entra aquí.
+#     Esos archivos son de los paquetes (pacman, apt, dnf, zypper): un parche a mano se pierde o rompe cosas al actualizar. Instalar con el gestor de paquetes NO entra aquí.
 #     Si no la quieres, borra la sección entera.
 [archivos_de_paquetes]
 motivo modifica archivos de programas instalados (/usr, /bin...): un parche a mano se pierde o rompe al actualizar

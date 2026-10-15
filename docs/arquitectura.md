@@ -15,7 +15,7 @@ src/lina/
     diario.py           registro de cambios y «deshacer»
     presupuesto.py      control del gasto de la clave de pago
     comandos.py         palabras y frases con significado fijo (sí/no, cancelar…)
-    plataforma.py       distribución, gestor de paquetes e instalación de dependencias
+    plataforma.py       distribución (Arch, Debian, Fedora, openSUSE), gestor de paquetes y capacidades del equipo
     rutas.py            carpetas XDG y archivos de fábrica
   voz/                manos libres («Oye Lina»), voces de Piper (`lina voz`) e indicador visual de escucha
   escritorio/         control de programas: accesibilidad (AT-SPI), D-Bus de KDE, visión
