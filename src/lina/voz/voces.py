@@ -24,9 +24,9 @@ BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/" + REVISION
 CATALOGO = {
     "es": {
         "es_MX-claude-high": {"modelo": "es_MX-claude-high", "carpeta": "es/es_MX/claude/high", "locutor": None,
-                              "descripcion": "Claude · México · calidad alta (por defecto)"},
+                              "descripcion": "Claude · México · calidad alta · femenina (por defecto)"},
         "es_ES-davefx-medium": {"modelo": "es_ES-davefx-medium", "carpeta": "es/es_ES/davefx/medium", "locutor": None,
-                                "descripcion": "Dave · España · calidad media"},
+                                "descripcion": "Dave · España · calidad media · masculina"},
         "es_ES-sharvard-medium-1": {"modelo": "es_ES-sharvard-medium", "carpeta": "es/es_ES/sharvard/medium", "locutor": 0,
                                     "descripcion": "Sharvard, hablante 1 · España · calidad media"},
         "es_ES-sharvard-medium-2": {"modelo": "es_ES-sharvard-medium", "carpeta": "es/es_ES/sharvard/medium", "locutor": 1,

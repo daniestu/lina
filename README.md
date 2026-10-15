@@ -38,6 +38,17 @@ lina voz                             # elegir otra voz
 
 Cada ajuste está explicado en [docs/configuracion.md](docs/configuracion.md).
 
+## Privacidad y permisos
+
+```sh
+lina privacidad       # qué se envía a la IA y qué no; decides si se envían capturas de pantalla
+lina privilegios      # qué permisos de administrador tiene Lina (por defecto, ninguno)
+lina olvidar          # borrar lo que guarda de ti
+```
+
+Sin telemetría. Las capturas no se envían hasta que lo permites, y la contraseña de administrador nunca pasa por Lina. Detalles y modelo de amenazas en
+[docs/seguridad.md](docs/seguridad.md).
+
 ## Documentación
 
 - [Configuración](docs/configuracion.md)

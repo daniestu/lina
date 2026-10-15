@@ -13,7 +13,8 @@ def test_la_ayuda_trae_comandos_ajustes_con_valor_y_voces(aj):
     t = AUTO.ayuda(aj=aj)
     assert "lina voz" in t and "lina config poner" in t
     assert "voz.velocidad = 1.0" in t and "autonomia.perfil = " in t
-    assert "es_ES-davefx-medium" in t and "no lo inventes" in t         # no hay datos de género: se le dice que no los invente
+    assert "es_ES-davefx-medium" in t and "no lo inventes" in t         # solo consta el género de dos voces: de las demás se le dice que no lo invente
+    assert "femenina (por defecto)" in t and "masculina" in t
 
 
 def test_los_manuales_se_leen_enteros(aj):

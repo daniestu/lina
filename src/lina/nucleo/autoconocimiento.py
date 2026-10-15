@@ -5,14 +5,13 @@ La IA decide qué hacer con esto (nada de frases fijas). Este módulo solo le da
   · cambiar(...): cambiar un ajuste, con las mismas protecciones de siempre. Lo que da más permisos o más gasto solo se hace si el usuario
     ha pulsado el atajo (no por «Oye Lina») y no se ha leído nada de fuera en esta petición. Las claves y el tope de gasto no se tocan desde aquí.
 """
-from pathlib import Path
 
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import rutas as RUT
 
 CARPETA = RUT.PAQUETE / "datos" / "ayuda"
 # Lo que la IA nunca cambia por su cuenta: dinero y claves (los cambia el usuario con su voz o en la terminal)
-INTOCABLES = {("gasto", "tope_mensual_eur"), ("gasto", "eur_por_usd"), ("gasto", "avisos_porcentaje"), ("privacidad", "almacen_claves")}
+INTOCABLES = {("gasto", "tope_mensual_eur"), ("gasto", "eur_por_usd"), ("gasto", "avisos_porcentaje"), ("privacidad", "almacen_claves"), ("privacidad", "capturas")}
 
 
 def manuales():
@@ -36,8 +35,8 @@ def _voces():
     for nombre, ficha in voces.CATALOGO[voces.IDIOMA].items():
         lineas.append(f"  {'*' if nombre == actual else ' '} {nombre}: {ficha['descripcion']} "
                       f"[{'instalada' if voces.instalada(nombre) else 'se descarga al elegirla'}]")
-    return ("Voces (* = la actual). Aquí NO consta si cada una es de hombre o de mujer: no lo inventes, haz que el usuario las oiga "
-            "(accion=probar_voz) y que decida él:\n" + "\n".join(lineas))
+    return ("Voces (* = la actual). Solo consta el género de las que lo dicen (femenina/masculina); de las demás no lo sabemos: no lo inventes, "
+            "haz que el usuario las oiga (accion=probar_voz) y que decida él:\n" + "\n".join(lineas))
 
 
 def ayuda(tema=None, aj=None):
@@ -66,8 +65,8 @@ def cambiar(clave, valor, voz_libre=False, contaminado=False, aj=None):
     if not n:
         return False, f"No existe el ajuste «{clave}». Mira los que hay con accion=ayuda."
     if n in INTOCABLES:
-        return False, ("Eso no lo cambias tú: el dinero y las claves los cambia solo el usuario. Dile que lo haga por voz con el atajo "
-                       "(«sube el tope de gasto a N euros») o en la terminal con «lina config poner» o «lina clave».")
+        return False, ("Eso no lo cambias tú: el dinero, las claves y el consentimiento de privacidad los cambia solo el usuario. Dile que use el atajo "
+                       "(«sube el tope de gasto a N euros») o la terminal: «lina config poner», «lina clave» o «lina privacidad».")
     try:
         nuevo = AJ.validar(n[0], n[1], valor)
     except ValueError as e:

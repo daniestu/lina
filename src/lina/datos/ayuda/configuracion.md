@@ -94,6 +94,8 @@ que no se pueden desactivar. Los perfiles se aplican encima de `politica.txt`: p
 | Ajuste | De fábrica | Qué hace |
 |---|---|---|
 | `almacen_claves` | `"auto"` | auto: las claves van al llavero del sistema si lo hay (y si no, a un archivo solo tuyo). archivo: siempre archivo. |
+| `capturas` | `"preguntar"` | Enviar capturas de tu pantalla a la IA. `preguntar`: aún no has decidido, no se envía ninguna (decídelo con `lina privacidad`) · `si`: cuando hacen falta, nunca en modo privado ni con ventanas sensibles · `no`: nunca. La IA no puede cambiarlo. |
+| `registrar_preguntas` | `true` | true: lo que dices y lo que contesto queda en el registro del sistema (journalctl), útil para depurar. false: se omite. |
 | `registro_ruido` | `false` | true: se apunta en el registro lo que oye y descarta (solo para depurar). |
 
 ### [interfaz] Interfaz

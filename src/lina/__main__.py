@@ -16,6 +16,8 @@ AYUDA = f"""Lina {__version__}: asistente de voz para el escritorio Linux.
   lina voz [NOMBRE]          lista las voces o elige una (la descarga si hace falta)
   lina clave [gemini|pago|NOMBRE]   guarda una clave (Gemini, de pago, de un servidor MCP…) en el llavero del sistema, sin que se vea ni se dicte
   lina privilegios [instalar|total|quitar]   qué permisos de administrador tiene Lina y cómo dárselos o quitárselos (siempre tras enseñarte lo que se escribe)
+  lina privacidad [si|no]    qué se envía a la IA y qué no, y si permites enviar capturas de tu pantalla
+  lina olvidar [QUÉ]         borra lo que Lina guarda de ti: diario, registro de acciones, recetas, registro del sistema (antes enseña qué y cuánto)
   lina manos-libres ORDEN    probar "frase" · eco · nivel   (ajustes del manos libres)
   lina indicador probar      enseña el resplandor de escucha
   lina interfaz ORDEN        diagnostico · preparar · estado   (control de programas con la pantalla)
@@ -65,6 +67,12 @@ def main(argv=None):
     if orden == "privilegios":
         from lina.nucleo import privilegios
         return privilegios.principal(resto)
+    if orden == "privacidad":
+        from lina.nucleo import privacidad
+        return privacidad.principal(resto)
+    if orden == "olvidar":
+        from lina.nucleo import olvidar
+        return olvidar.principal(resto)
     if orden == "voz":
         from lina.voz import voces
         return voces.principal(resto)

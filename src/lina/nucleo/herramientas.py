@@ -116,10 +116,28 @@ def log(mensaje):
     print(f"[{time.strftime('%H:%M:%S')}] {mensaje}", flush=True)
 
 
-def anotar(linea):
-    """Cada acción queda escrita en acciones.log."""
+MAX_REGISTRO_ACCIONES = 1_000_000          # al pasar de ~1 MB el registro de acciones se rota: se guarda la mitad vieja como .1 (una sola copia)
+
+
+def _rotar(ruta, maximo):
     try:
-        with ARCHIVO_ACCIONES.open("a", encoding="utf-8") as f:
+        if ruta.stat().st_size > maximo:
+            ruta.replace(ruta.with_name(ruta.name + ".1"))
+    except OSError:
+        pass
+
+
+def anotar(linea):
+    """Cada acción queda escrita en acciones.log (con las claves tapadas y rotando el archivo para que no crezca sin fin)."""
+    try:
+        from lina.nucleo import claves as _claves
+        linea = _claves.limpiar(str(linea))
+    except Exception:
+        pass
+    try:
+        _rotar(ARCHIVO_ACCIONES, MAX_REGISTRO_ACCIONES)
+        fd = os.open(ARCHIVO_ACCIONES, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
             f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {linea}\n")
     except OSError:
         pass
@@ -143,7 +161,8 @@ _OBJETIVOS_PELIGROSOS = {"/", "/*", "/home", "/home/*", "/boot", "/boot/*", "/et
 
 _SECRETOS = [r"\.config/lina", r"\.ssh\b", r"\.gnupg", r"/etc/shadow", r"/etc/gshadow",
              r"\bid_(rsa|ed25519|ecdsa|dsa)\b", r"\.netrc", r"\.aws/", r"logins\.json", r"key4\.db",
-             r"cookies\.sqlite", r"login data", r"\.mozilla", r"\.pgpass", r"\.key\b"]
+             r"cookies\.sqlite", r"login data", r"\.mozilla", r"\.pgpass", r"\.key\b",
+             r"/proc/(?:self|thread-self|\d+|\*)/(?:environ|mem|maps)", r"\bsecret-tool\b", r"\bkwallet(?:cli|-query)\b", r"\bkeyctl\b", r"gnome-keyring"]
 _PROPIO = (r"(?:^|/)lina/(?:nucleo|voz|escritorio|modulos|mcp|datos)/|site-packages/lina|/src/lina/|\.config/lina|\.local/share/lina|\.local/state/lina|"
           r"lina\.service|systemd/user/lina|systemctl[^;|&\n]*\blina\b|mcp\.json|mcp_estado|"
           r"\b(?:politica|comandos|activacion|presupuesto|paquetes_confiables|alias|vocabulario|disco_datos)\.txt|config\.toml|mcp_claves|"
@@ -152,7 +171,7 @@ _PROPIO = (r"(?:^|/)lina/(?:nucleo|voz|escritorio|modulos|mcp|datos)/|site-packa
 _SUDOERS = r"/etc/sudoers|\bvisudo\b|sudoers\.d"
 # Órdenes de Lina que cambian sus propios permisos, gasto, voz o claves: las da el usuario en su terminal o con el atajo, nunca la IA
 _ORDEN_PROPIA = (r"(?:^|[\s;&|(`/])(?:lina|python3?\s+-m\s+lina(?:\.__main__)?)\s+"
-                 r"(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S|privilegios\s+(?:instalar|total|quitar)\b)")
+                 r"(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S|privilegios\s+(?:instalar|total|quitar)\b|privacidad\s+(?:si|no|preguntar|sí)\b|olvidar\b)")
 # El ayudante de root y todo lo que lo activa: solo se usa instalando paquetes (la forma exacta que reconoce analizar_instalacion)
 _AYUDANTE_ROOT = r"/usr/lib/lina\b|org\.lina\.instalar|sudoers\.d/lina|nucleo/raiz\b|\braiz\.py|\bprivilegios\.py"
 
@@ -243,6 +262,130 @@ def _quitar_prefijos(t):
     return t
 
 
+# ======================= CONTENIDO HOSTIL: descargar y ejecutar, tuberías a un intérprete, reverse shells =======================
+_SHELLS = {"bash", "sh", "zsh", "fish", "dash", "ksh", "csh", "tcsh"}
+_DESCARGAN = {"curl", "wget", "aria2c", "lftp"}
+_CLONAN = {"git", "svn", "hg"}
+_A_UN_SHELL = re.compile(r"\|\s*(?:sudo\s+(?:-\S+\s+)*|env\s+\S+\s+)?(?:ba|z|da|fi|k|c|tc)?sh\b")
+_A_UN_INTERPRETE = re.compile(r"\|\s*(?:sudo\s+(?:-\S+\s+)*)?(?:python[\d.]*|perl|ruby|node|php|lua)\s*(?:-\s*)?(?:$|[;&|)\n])")
+_SUSTITUCION_A_SHELL = re.compile(r"(?:^|[;&|\s])(?:(?:ba|z|da|fi|k)?sh\s+(?:-\w+\s+)*[\"']?\$\(|(?:ba|z|da|fi|k)?sh\s+<\(|eval\s+[\"']?\$\(|(?:source|\.)\s+<\()")
+_CODIGO_CON_RED = re.compile(r"urlopen|requests\.(?:get|post)|urllib|http\.client|fetch\(|\bcurl\b|\bwget\b|https?://")
+_CODIGO_QUE_EJECUTA = re.compile(r"\b(?:exec|eval|system|popen|execSync|spawnSync|spawn|subprocess)\b")
+_CODIGO_DESTRUCTIVO = re.compile(r"\brm\s+-\w*[rf]|rmtree|os\.(?:remove|unlink|rmdir)|\bunlink\(|\brmdir\(|\bshred\b|\bmkfs|\bdd\s+if=|truncate\(")
+
+
+def _codigo_en_linea(base, args):
+    """El texto de «python -c '…'», «node -e '…'», «perl -e '…'», o None."""
+    if not _es_interprete(base) or base in _SHELLS:
+        return None
+    for i, a in enumerate(args):
+        if a in ("-c", "-e", "-E", "--eval", "--command") and i + 1 < len(args):
+            return args[i + 1]
+    return None
+
+
+def _nombres_descargados(base, args, texto):
+    """Nombres de archivo que escribe una descarga (curl -o x, wget -O x, curl URL > x, o el nombre de la URL con -O / wget a secas)."""
+    nombres = set()
+    urls = [a for a in args if re.match(r"[A-Za-z][\w+.-]*://", a)]
+    for i, a in enumerate(args):
+        if a in ("-o", "--output", "-O", "--output-document") and i + 1 < len(args) and not args[i + 1].startswith("-") and base == "wget" or \
+                a in ("-o", "--output") and base == "curl" and i + 1 < len(args):
+            nombres.add(os.path.basename(args[i + 1]))
+        elif a.startswith(("--output=", "--output-document=")):
+            nombres.add(os.path.basename(a.split("=", 1)[1]))
+    if base == "curl" and any(a in ("-O", "--remote-name") or (a.startswith("-") and not a.startswith("--") and "O" in a[1:]) for a in args):
+        nombres |= {os.path.basename(u.split("?")[0].rstrip("/")) for u in urls}
+    if base == "wget" and not nombres:
+        nombres |= {os.path.basename(u.split("?")[0].rstrip("/")) or "index.html" for u in urls}
+    nombres |= {os.path.basename(m) for m in re.findall(r">\s*(\S+)", texto)}
+    nombres.discard("")
+    return nombres
+
+
+def _que_ejecuta(resto):
+    """Lo que ejecuta un segmento: el programa si lo lanza por ruta (./x, /tmp/x), o el primer argumento de un intérprete/shell/source."""
+    if not resto:
+        return []
+    base = os.path.basename(resto[0])
+    candidatos = []
+    if "/" in resto[0] or resto[0] in {"source", "."}:
+        candidatos.append(os.path.basename(resto[0]))
+    if _es_interprete(base) or base in _SHELLS or resto[0] in {"source", "."}:
+        primero = next((a for a in resto[1:] if not a.startswith("-")), None)
+        if primero:
+            candidatos.append(os.path.basename(primero))
+    return candidatos
+
+
+def _descarga_y_ejecuta(comando):
+    """'descargaría y ejecutaría…' si en el mismo comando algo se descarga y luego se ejecuta lo descargado; si no, None."""
+    descargados, clonados = set(), False
+    for seg in _segmentos(comando):
+        t = _tokens(seg)
+        resto = _quitar_prefijos(t) if t else None
+        if not resto:
+            continue
+        base = os.path.basename(resto[0])
+        ejecuta = _que_ejecuta(resto)
+        if descargados and any(e in descargados for e in ejecuta):
+            return "ejecutaría un programa que acaba de descargar sin que nadie lo revise"
+        if clonados and (any(c.startswith("./") or c.endswith((".sh", ".py", ".run", ".bin")) for c in ejecuta) or "/" in resto[0]
+                         or base in {"make", "cmake", "cargo", "npm", "pnpm", "yarn", "pip", "pip3", "meson", "ninja", "go"}):
+            return "ejecutaría lo que acaba de bajar de un repositorio sin que nadie lo revise"
+        if base in _DESCARGAN:
+            descargados |= _nombres_descargados(base, resto[1:], seg)
+        elif base in _CLONAN and resto[1:2] in (["clone"], ["checkout"], ["co"]):
+            clonados = True
+    return None
+
+
+def _bloqueado_hostil(comando):
+    """Bloqueos duros contra contenido hostil: scripts de internet, tuberías a un intérprete, reverse shells."""
+    bajo = comando.lower()
+    if re.search(r"/dev/(?:tcp|udp)/", bajo):
+        return "abriría una conexión de red desde la shell (típico de una puerta trasera)"
+    if _A_UN_SHELL.search(bajo) or _A_UN_INTERPRETE.search(bajo):
+        return "ejecutaría como código lo que le llega por una tubería, sin poder revisarlo"
+    if _SUSTITUCION_A_SHELL.search(bajo):
+        return "ejecutaría como código el resultado de otra orden, sin poder revisarlo"
+    motivo = _descarga_y_ejecuta(comando)
+    if motivo:
+        return motivo
+    for seg in _segmentos(comando):
+        t = _tokens(seg)
+        resto = _quitar_prefijos(t) if t else None
+        if not resto:
+            continue
+        codigo = _codigo_en_linea(os.path.basename(resto[0]), resto[1:])
+        if codigo and _CODIGO_CON_RED.search(codigo) and _CODIGO_QUE_EJECUTA.search(codigo):
+            return "descargaría código y lo ejecutaría sin que nadie lo revise"
+    return None
+
+
+def _critico_extra(comando):
+    """Cosas que pasan por el filtro anterior pero piden el atajo: código libre que puede borrar, contenedores con acceso total, software de fuera."""
+    for seg in _segmentos(comando):
+        t = _tokens(seg)
+        resto = _quitar_prefijos(t) if t else None
+        if not resto:
+            continue
+        base, args = os.path.basename(resto[0]), resto[1:]
+        codigo = _codigo_en_linea(base, args)
+        if codigo and _CODIGO_DESTRUCTIVO.search(codigo):
+            return "ejecuta código libre que puede borrar archivos"
+        if base in {"docker", "podman", "nerdctl"} and ("--privileged" in args or any(re.match(r"(?:-v|--volume)(?:=|\s*)/(?::|\s|$)", a) or a in ("/:/host",) or a.startswith("/:") for a in args)
+                                                      or re.search(r"(?:-v|--volume)[= ]+/:", " ".join(args))):
+            return "da a un contenedor acceso total al equipo (equivale a ser administrador)"
+        if base in {"flatpak", "snap"} and "install" in args and (any(a.endswith((".flatpakref", ".flatpak", ".snap")) or "://" in a for a in args)
+                                                              or {"--dangerous", "--devmode", "--classic"} & set(args)):
+            return "instala software de fuera de las tiendas oficiales"
+        if base == "setfacl" and any(a in ("-R", "--recursive") for a in args):
+            return "cambia permisos de acceso en masa"
+    return None
+
+
+
 def _bloqueado(comando, _profundidad=0):
     """Si el comando está prohibido siempre, devuelve el motivo; si no, None."""
     bajo = comando.lower()
@@ -264,6 +407,9 @@ def _bloqueado(comando, _profundidad=0):
         return "tocaría el ayudante con el que instalo paquetes como administrador"
     if re.search(_ORDEN_PROPIA, bajo):
         return "cambiaría mis propios ajustes de permisos, gasto o claves (eso lo haces tú, o con el atajo)"
+    motivo = _bloqueado_hostil(comando)
+    if motivo:
+        return motivo
 
     for seg in _segmentos(comando):
         t = _tokens(seg)
@@ -902,6 +1048,8 @@ def _critico_sistema(comando, _prof=0):
     return None
 
 
+_VARIABLE_SECRETA = re.compile(r"(?:KEY|TOKEN|SECRET|PASSW|CONTRASE|CLAVE|CREDENTIAL|AUTH)", re.I)
+_VARIABLES_UTILES = {"SSH_AUTH_SOCK", "XAUTHORITY", "GPG_TTY", "DBUS_SESSION_BUS_ADDRESS", "XDG_SESSION_TYPE"}
 _SCOPE_OK = None
 
 
@@ -943,7 +1091,7 @@ def clasificar(comando):
         return "inocuo", ""
     if _es_lectura(comando):
         return "lectura", ""
-    motivo = _critico_sistema(comando)
+    motivo = _critico_sistema(comando) or _critico_extra(comando)
     if motivo:
         return "critico", motivo
     return evaluar_politica(comando)
@@ -2886,7 +3034,9 @@ class Ejecutor:
 
     @staticmethod
     def _entorno():
-        return dict(os.environ, LC_ALL="C.UTF-8", TERM="dumb", PAGER="cat", SYSTEMD_PAGER="", GIT_PAGER="cat")
+        """El entorno de las órdenes de la IA: sin variables que parezcan claves, tokens o contraseñas (así `printenv` no puede filtrarlas)."""
+        limpio = {k: v for k, v in os.environ.items() if not _VARIABLE_SECRETA.search(k) or k in _VARIABLES_UTILES}
+        return dict(limpio, LC_ALL="C.UTF-8", TERM="dumb", PAGER="cat", SYSTEMD_PAGER="", GIT_PAGER="cat")
 
     def lanzar(self, comando):
         """Abre un programa o enlace sin esperar a que termine. Va en su propio «scope» de systemd: si el asistente se reinicia, no se cierra lo que abrió."""

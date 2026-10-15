@@ -1526,7 +1526,7 @@ class Asistente:
         with self.cerrojo_whisper:
             segmentos, _ = self.whisper.transcribe(audio, language="es", vad_filter=True, initial_prompt=prompt_whisper())
             texto = " ".join(s.text for s in segmentos).strip()
-        log(f"Pregunta: «{texto}» ({time.time() - inicio:.1f} s)")
+        log(f"Pregunta: «{texto if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'}» ({time.time() - inicio:.1f} s)")
         return texto
 
     # --- Manos libres («Oye Lina») ---
@@ -1744,7 +1744,7 @@ class Asistente:
             log(f"La IA ofrecía una destrucción total («{str(respuesta)[:100]}»): se sustituye por la negativa")
             H.anotar(f"[bloqueado] la IA ofreció una destrucción total: «{str(respuesta)[:120]}»")
             respuesta = H.AVISO_DESTRUCCION_TOTAL
-        log(f"Respuesta [{origen}]: {respuesta} ({time.time() - inicio:.1f} s en total)")
+        log(f"Respuesta [{origen}]: {respuesta if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'} ({time.time() - inicio:.1f} s en total)")
         try:
             self._aprender_automatico()
         except Exception as e:                                     # aprender es un extra: nunca debe estropear la respuesta
@@ -2255,6 +2255,9 @@ class Asistente:
         if nombre == "ver_pantalla":
             if self.modo_privado:
                 return "No puedo ver la pantalla: el usuario está en modo privado. Díselo y no adivines lo que hay en ella."
+            if AJ.actuales(log=lambda m: None).get("privacidad", "capturas") != "si":
+                return ("No puedo ver la pantalla: el usuario no me ha dado permiso para enviar capturas. Díselo en una frase y que lo decida él en la terminal con "
+                        "«lina privacidad»; no adivines lo que hay en ella.")
             if self.pantalla_adjunta:
                 return "La captura ya va adjunta a esta petición: úsala."
             if not self.captura_guardada:
@@ -2748,6 +2751,8 @@ class Asistente:
         """Por qué NO se puede enviar una captura ahora (o «» si se puede). Esto no lo decide la IA: es privacidad."""
         if self.modo_privado:
             return "estás en modo privado"
+        if AJ.actuales(log=lambda m: None).get("privacidad", "capturas") != "si":
+            return "no has dado tu permiso para enviar capturas (decídelo con:  lina privacidad)"
         if C.ventana_sensible(self.titulo if titulo is None else titulo, (self.contexto or {}).get("clase", "") if clase is None else clase):
             return "la ventana activa parece sensible (banco, facturación, contraseñas…)"
         return ""
@@ -3470,6 +3475,16 @@ class Asistente:
 
 def main():
     CL.proteger_salida()                                           # ninguna clave sale en el registro
+    if AJ.actuales(log=lambda m: None).get("privacidad", "capturas") == "preguntar":
+        log("Capturas de pantalla: aún no has decidido si las envío a la IA, así que no envío ninguna. Decídelo con:  lina privacidad")
+        aviso = RUT.DATOS / "aviso_privacidad"
+        if not aviso.exists():                                  # una sola vez: que no se quede en el registro sin que lo veas
+            H.notificar("Lina: capturas de pantalla sin decidir", "No enviaré ninguna captura a la IA hasta que lo decidas. En una terminal:  lina privacidad")
+            try:
+                aviso.parent.mkdir(parents=True, exist_ok=True)
+                aviso.write_text("1", encoding="utf-8")
+            except OSError:
+                pass
     PRIV.COMPROBAR = True                                   # las órdenes con sudo se adaptan al permiso que haya (ver privilegios.py)
     RUT.asegurar(RUT.CONFIG); RUT.asegurar(RUT.DATOS); RUT.asegurar(RUT.ESTADO); RUT.asegurar(RUT.EJECUCION)
     global VOZ

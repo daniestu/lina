@@ -62,6 +62,9 @@ ESQUEMA = {
         "avisos_porcentaje": ([50, 80, 100], "lista", None, "Te aviso al llegar a estos porcentajes del tope. Al 100 % la clave de pago deja de usarse."),
     },
     "privacidad": {
+        "capturas": ("preguntar", "opcion", ("preguntar", "si", "no"), "Enviar capturas de tu pantalla a la IA cuando haga falta. preguntar: aún no has decidido, no se envía ninguna "
+                     "(decídelo con:  lina privacidad) · si: se envían cuando hacen falta, nunca en modo privado ni con ventanas sensibles · no: nunca."),
+        "registrar_preguntas": (True, "bool", None, "true: lo que dices y lo que contesto queda en el registro del sistema (journalctl), útil para depurar. false: se omite."),
         "registro_ruido": (False, "bool", None, "true: se apunta en el registro lo que oye y descarta (solo para depurar)."),
         "almacen_claves": ("auto", "opcion", ("auto", "archivo"), "auto: las claves van al llavero del sistema si lo hay (y si no, a un archivo solo tuyo). archivo: siempre archivo."),
     },

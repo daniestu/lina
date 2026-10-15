@@ -247,6 +247,7 @@ programa wipe
 programa srm
 programa truncate
 programa dd
+bandera find -delete -exec -execdir -ok
 
 
 # 6) Ejecutar scripts bajados de internet, o software de fuera de las fuentes de confianza.
@@ -363,6 +364,7 @@ ruta /usr/lib/udev/rules.d
 programa crontab
 programa at
 programa batch
+subcomando systemctl enable link preset
 
 
 # 11) Modificar archivos que pertenecen a programas instalados (/usr/bin, /usr/lib, /usr/share...).

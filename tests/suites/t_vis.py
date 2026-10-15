@@ -8,6 +8,8 @@ def ok(c,m):
     global f
     if not c: f+=1; print("FALLO:",m)
 from lina.escritorio import interfaz_vision as V; from lina.escritorio import interfaz as INT
+from lina.nucleo import ajustes as AJ
+AJ.actuales(log=lambda m: None).establecer("privacidad", "capturas", "si")          # con permiso para enviar capturas
 
 # --- geometría
 kscreen=json.dumps({"outputs":[{"enabled":True,"pos":{"x":0,"y":0},"size":{"width":3840,"height":2160},"scale":1.5},{"enabled":False,"pos":{"x":9,"y":9},"size":{"width":10,"height":10},"scale":1}]})
