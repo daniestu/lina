@@ -1146,7 +1146,7 @@ class Asistente:
         if ctx.get("ventana"):
             resumen += f" (ventana «{ctx['ventana'][:50]}»)"
 
-        def hacer(a=dict(args)):
+        def hacer(a=dict(args)):  # noqa: B006 (copia a propósito: la acción se ejecuta más tarde)
             self.pasos_interfaz = getattr(self, "pasos_interfaz", 0) + 1
             H.anotar("[interfaz] " + resumen)
             r = INT.herramienta(a)

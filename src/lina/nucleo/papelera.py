@@ -221,6 +221,3 @@ def vaciar_papelera():
     anotar(f"[papelera] vaciada: {total} elementos borrados para siempre")
     return f"Papelera vaciada: {total} elementos borrados para siempre."
 
-
-from lina.nucleo.documentos import (CARPETA_DOCUMENTOS, _abrir_con_escritorio, _escribir_docx, _ruta_libre, crear_documento,  # noqa: E402,F401
-                                    documento_en_columnas, oficina_hoja, oficina_presentacion)

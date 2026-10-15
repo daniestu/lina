@@ -4,9 +4,21 @@
 src/lina/
   __main__.py         comando `lina` (arrancar, pulsar, clave, manos-libres, …)
   nucleo/             el cerebro
-    asistente.py        bucle principal: oír → pensar (Gemini) → actuar → hablar
+    asistente.py        bucle principal: oír → pensar → actuar → hablar (la clase Asistente)
+    ia.py               hablar con la IA: Gemini (reintentos, pausas por cuota, topes de gasto), modelo local, búsqueda web
+    constantes.py       modelos, tiempos, topes y texto base para la IA
+    texto.py            fecha para la IA, números a palabras, limpieza del texto antes de decirlo
+    opcionales.py       módulos que, si faltan, no impiden arrancar (presupuesto)
     grupos.py           qué herramientas se le enseñan a la IA según lo que se pide
-    herramientas.py     las herramientas y las capas de seguridad (qué es crítico, qué se bloquea)
+    declaraciones.py    las herramientas tal como se le describen a la IA (solo datos)
+    herramientas.py     el ejecutor de comandos con sus capas de seguridad (confirmaciones, snapshots, deshacer, verificación)
+    clasificador.py     qué es de solo lectura, qué lanza un programa, qué es hostil y qué se bloquea siempre (funciones puras)
+    papelera.py         los borrados pasan a la papelera; ver, restaurar y vaciar
+    documentos.py       documentos de Word, hojas de cálculo y presentaciones
+    resolver.py         ajustes de KDE, paquetes del AUR de confianza, fechas relativas y programas que faltan
+    ejecucion.py        ejecutar una orden sencilla (sin shell), con o sin permisos de administrador
+    registro.py         registro de acciones (con las claves tapadas) y notificaciones
+    procesos.py         lanzar programas fuera del servicio de Lina
     ajustes.py          config.toml: ajustes con validación, perfiles de autonomía y `lina config`
     politica.py         reglas de lo crítico (politica.txt) con el perfil de autonomía por encima
     turnos.py           pequeñas reglas sobre qué cuenta como petición nueva y qué como seguimiento

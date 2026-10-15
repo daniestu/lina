@@ -33,7 +33,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "pre-commit"]
+dev = ["pytest", "pytest-cov", "coverage>=7.10", "ruff", "mypy", "pre-commit", "types-requests"]
 
 [project.scripts]
 lina = "lina.__main__:main"
@@ -54,8 +54,35 @@ target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E9", "F63", "F7", "F82", "F401", "F811", "F841"]
+# F: errores de programación (nombres sin definir, imports sin usar…); B006/B007/B023: trampas de Python; PLE y W6: errores seguros
+select = ["E9", "F", "B006", "B007", "B023", "PLE", "W6"]
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["F401", "F841", "F811", "F821"]
+"tests/**" = ["F401", "F841", "F811", "F821", "B007"]
+
+[tool.coverage.run]
+source = ["src/lina"]
+branch = false
+parallel = true
+patch = ["subprocess"]        # varias pruebas lanzan Lina como proceso aparte (tests/suites): se cuentan también
+
+[tool.coverage.report]
+show_missing = false
+skip_empty = true
+exclude_also = ["if __name__ == .__main__.:", "raise NotImplementedError"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src/lina"]
+ignore_missing_imports = true      # evdev, sounddevice, faster_whisper, piper… no traen tipos
+check_untyped_defs = false         # se irá endureciendo módulo a módulo
+warn_unused_ignores = true
+no_implicit_optional = true
+show_error_codes = true
+
+# Los módulos pequeños y limpios se comprueban a fondo desde ya.
+[[tool.mypy.overrides]]
+module = ["lina.nucleo.registro", "lina.nucleo.procesos", "lina.nucleo.ejecucion", "lina.nucleo.texto", "lina.nucleo.constantes",
+          "lina.nucleo.opcionales", "lina.nucleo.declaraciones", "lina.nucleo.rutas", "lina.nucleo.dependencias"]
+check_untyped_defs = true

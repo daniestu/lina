@@ -65,7 +65,7 @@ def _steam():
             except OSError:
                 continue
 
-            def campo(k):
+            def campo(k, t=t):
                 r = re.search(r'"' + k + r'"\s+"([^"]*)"', t)
                 return r.group(1) if r else ""
             appid, nombre, instalado = campo("appid"), _limpiar_nombre(campo("name")), campo("installdir")

@@ -8,7 +8,7 @@
 | 3 | Portabilidad entre distribuciones (Arch, Debian/Ubuntu, Fedora, openSUSE) *(hecha: capa de paquetes y capacidades en `plataforma.py`, [detalles](portabilidad.md))* |
 | 4 | Instalador y primer arranque guiado: `install.sh`, atajo automático, `lina bienvenida`, `lina doctor`, `lina update` *(hecha, falta probarla en instalaciones reales; [detalles](instalacion.md))* |
 | 5 | Portabilidad de escritorio (KDE Plasma, GNOME, X11, sway/Hyprland) *(hecha, falta probarla en equipos reales distintos de KDE; [detalles](escritorios.md))* |
-| 6 | Calidad e ingeniería: código dividido, CI, tipado, cobertura |
+| 6 | Calidad e ingeniería: código dividido, CI, tipado, cobertura *(hecha en parte: `herramientas.py` y `asistente.py` divididos, cobertura y mypy en la CI sin bloquear; falta partir la clase `Asistente`, anotar tipos y fijar el mínimo de cobertura con los primeros datos de la CI)* |
 | 7 | Proveedores de IA intercambiables: Gemini, API compatible con OpenAI, Anthropic, modelos locales y de empresa |
 | 8 | Internacionalización: idioma configurable, textos y prompts por idioma; el inglés será el primer idioma nuevo, tras la beta |
 | 9 | Documentación y publicación: README, licencias, paquete AUR, versión `v0.1.0-beta` |

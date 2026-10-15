@@ -22,7 +22,7 @@ def _ajustes_con_valores(aj):
     filas = []
     for seccion, claves in AJ.ESQUEMA.items():
         filas.append(f"[{seccion}] {AJ.TITULOS[seccion]}")
-        for clave, (defecto, tipo, restr, nota) in claves.items():
+        for clave, (_defecto, tipo, restr, nota) in claves.items():
             limites = f" (de {restr[0]} a {restr[1]})" if tipo in ("int", "float") and restr else (f" (opciones: {', '.join(restr)})" if tipo == "opcion" else "")
             filas.append(f"  {seccion}.{clave} = {AJ.a_toml(aj.get(seccion, clave))}{limites} · {nota}")
     return "\n".join(filas)

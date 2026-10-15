@@ -128,7 +128,7 @@ def _vista_previa(accion, usuario, contenido):
     lineas = ["Esto es TODO lo que se va a escribir, como administrador:", ""]
     if accion == "quitar":
         return "Se borrarán, si existen:\n  " + "\n  ".join([RAIZ.SUDOERS_TOTAL, RAIZ.SUDOERS_INSTALAR, RAIZ.POLKIT, RAIZ.AYUDANTE])
-    lineas += [f"1) {RAIZ.AYUDANTE}   (root:root, 755)", f"   El ayudante: un solo archivo corto que solo instala paquetes de los repositorios de tu sistema.",
+    lineas += [f"1) {RAIZ.AYUDANTE}   (root:root, 755)", "   El ayudante: un solo archivo corto que solo instala paquetes de los repositorios de tu sistema.",
                f"   Léelo entero antes de aceptar:  less {AYUDANTE_PAQUETE}", f"   Huella (sha256): {hashlib.sha256(contenido).hexdigest()}", "",
                f"2) {RAIZ.SUDOERS_INSTALAR}   (root, 440)   — se valida con visudo antes de activarse", ""]
     lineas += ["   | " + l for l in RAIZ.sudoers_instalar(usuario).splitlines()]

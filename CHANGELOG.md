@@ -4,6 +4,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Cambiado
+- Código más fácil de mantener: `herramientas.py` pasa de 4 300 a unas 2 000 líneas y `asistente.py` de 3 600 a unas 2 750, repartidos en módulos con una sola
+  responsabilidad (`clasificador`, `papelera`, `documentos`, `resolver`, `ejecucion`, `registro`, `procesos`, `declaraciones`, `ia`, `constantes`, `texto`, `opcionales`).
+  El comportamiento no cambia salvo el arreglo de abajo. Ver [arquitectura](docs/arquitectura.md).
+- Calidad: ruff comprueba más reglas (`F` completo, trampas de Python como argumentos mutables y variables de bucle capturadas); la CI mide la cobertura con `pytest-cov`
+  y pasa mypy como aviso informativo, sin bloquear, mientras se anotan los módulos.
+
+### Arreglado
+- La clase «lanzar» de la clasificación de comandos no se alcanzaba nunca: una segunda función con el mismo nombre tapaba a la buena, así que abrir un programa conocido
+  con un enlace no se trataba como un lanzamiento. Con pruebas.
+
 ### Añadido
 - Portabilidad de escritorio: `escritorio/sesion.py` detecta KDE, GNOME, XFCE, Cinnamon, sway, Hyprland y otros (Wayland o X11) y ofrece la ventana activa, la captura de pantalla
   y el portapapeles con el método de cada uno (kdotool/xdotool/swaymsg/hyprctl, spectacle/gnome-screenshot/xfce4-screenshooter/grim/scrot, wl-clipboard/xclip/xsel). Lo que no se
