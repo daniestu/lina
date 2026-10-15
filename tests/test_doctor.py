@@ -97,3 +97,8 @@ def test_informe_completo_no_filtra_el_usuario():
     sal = []
     D.principal(["--informe"], Todo(), salida=sal.append, home="/ho" + "me/zoe", usuario="zoe", equipo="mipc")
     assert "/ho" + "me/zoe" not in sal[0] and "Lina " in sal[0]
+
+
+def test_estado_del_servicio_lo_que_dice_systemctl_de_verdad():
+    assert D.estado_servicio("active\n") == "activo"
+    assert D.estado_servicio("failed\n") == "failed" and D.estado_servicio("") == "inactivo"

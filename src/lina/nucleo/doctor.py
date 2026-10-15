@@ -23,6 +23,12 @@ OK, AVISO, MAL = "ok", "aviso", "mal"
 SIMBOLO = {OK: "✔", AVISO: "!", MAL: "✘"}
 
 
+def estado_servicio(salida_de_systemctl):
+    """`systemctl is-active` habla en inglés (active, inactive, failed, activating…): 'activo' si funciona; si no, lo que dijo, o 'inactivo'."""
+    t = (salida_de_systemctl or "").strip()
+    return "activo" if t == "active" else (t or "inactivo")
+
+
 class Sondas:
     """Todo lo que se mira del equipo, en un sitio, para poder sustituirlo en las pruebas."""
 
@@ -56,7 +62,7 @@ class Sondas:
         if PL.detectar_init() != "systemd":
             return "sin_systemd"
         r = subprocess.run(["systemctl", "--user", "is-active", "lina.service"], capture_output=True, text=True, timeout=10)
-        return (r.stdout or "").strip() or "inactivo"
+        return estado_servicio(r.stdout)
 
     def proceso(self):
         try:
