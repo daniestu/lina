@@ -5,6 +5,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Si Lina necesita ver la pantalla y no hay permiso, lo pide ella (explicando que la captura va a Google) y solo se activa si confirmas con el atajo; con «no» no insiste.
+- Sin captura en la petición, Lina sabe que no ve nada y no describe la pantalla (solo conoce el título de la ventana).
 - Estructura de proyecto con paquete `lina` (`src/`), comando `lina` y datos del usuario en las carpetas estándar XDG
   (`~/.config/lina`, `~/.local/share/lina`, `~/.local/state/lina`).
 - Pruebas automáticas (`tests/`) y comprobación de que no se cuelan secretos ni datos personales.

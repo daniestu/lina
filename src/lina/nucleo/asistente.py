@@ -1708,6 +1708,9 @@ class Asistente:
         if pista:
             pregunta += f"\n[SISTEMA: {pista}]"
         pregunta_sin_receta = pregunta                            # en el historial NO entra la nota de recetas (se reenviaría en todos los turnos siguientes)
+        if not imagen and not self.pedir_pantalla:
+            pregunta += ("\n[SISTEMA: esta petición NO lleva captura de pantalla: no sabes lo que hay en ella (solo el título de la ventana). "
+                         "Si lo que te piden depende de verla, usa ver_pantalla; sin imagen NUNCA describas lo que se ve.]")
         pregunta += f"\n[SISTEMA: {texto_fecha_hora()}]"            # la hora no se inventa ni se reutiliza: va en cada petición (y no entra en el historial)
         previas = []                                              # lo último que pidió el usuario: para «ahora desactívala», que sola no dice de qué habla
         for h in reversed(self.historial):
@@ -2057,7 +2060,7 @@ class Asistente:
             return "Describe qué hay que pulsar (por ejemplo «el botón Reproducir» o «el icono de la lupa»)."
         motivo_no = self._motivo_sin_pantalla(ventana_activa(), clase_activa())
         if motivo_no:
-            return f"No miro la ventana para hacer clic: {motivo_no}. Díselo al usuario; que lo pulse él."
+            return self._permiso_de_capturas() or f"No miro la ventana para hacer clic: {motivo_no}. Díselo al usuario; que lo pulse él."
         if re.search(H._PROPIO, ventana_activa(), re.I):
             return "Esa ventana es de los archivos del propio asistente: no los toco por la interfaz."
         riesgo_previo = INT.riesgo({"accion": "clic", "nombre": args.get("descripcion", "")}, ventana_activa())
@@ -2196,7 +2199,9 @@ class Asistente:
             self.miradas = getattr(self, "miradas", 0) + 1
             H.anotar(f"[pantalla] {str(args.get('pregunta', ''))[:150]}")
             motivo_no = self._motivo_sin_pantalla(ventana_activa(), clase_activa())
-            if motivo_no:
+            if motivo_no and self._permiso_de_capturas():
+                resultado = self._permiso_de_capturas()
+            elif motivo_no:
                 resultado = f"No miro la pantalla: {motivo_no}. Díselo al usuario y no adivines lo que hay en ella."
             else:
                 resultado = mirar_pantalla(self._claves("mini"), args.get("pregunta", ""), args.get("espera", 2))
@@ -2255,9 +2260,9 @@ class Asistente:
         if nombre == "ver_pantalla":
             if self.modo_privado:
                 return "No puedo ver la pantalla: el usuario está en modo privado. Díselo y no adivines lo que hay en ella."
-            if AJ.actuales(log=lambda m: None).get("privacidad", "capturas") != "si":
-                return ("No puedo ver la pantalla: el usuario no me ha dado permiso para enviar capturas. Díselo en una frase y que lo decida él en la terminal con "
-                        "«lina privacidad»; no adivines lo que hay en ella.")
+            sin_permiso = self._permiso_de_capturas()
+            if sin_permiso:
+                return sin_permiso
             if self.pantalla_adjunta:
                 return "La captura ya va adjunta a esta petición: úsala."
             if not self.captura_guardada:
@@ -2332,6 +2337,12 @@ class Asistente:
         if accion == "ayuda":
             return AUTO.ayuda(args.get("tema"))
         if accion == "cambiar":
+            if (str(args.get("ajuste") or "").strip().lower() in ("privacidad.capturas", "capturas")
+                    and str(args.get("valor") or "").strip().lower() in ("si", "sí", "s", "true", "1")):
+                # el consentimiento nunca lo cambia la IA: lo deja pendiente y lo confirma el usuario con el atajo
+                if self.modo_privado:
+                    return "Está activado el modo privado: no envío capturas hasta que el usuario lo quite. Díselo."
+                return self._permiso_de_capturas() or "Ya tienes permiso para enviar capturas: no hay nada que cambiar."
             hecho, texto = AUTO.cambiar(args.get("ajuste"), args.get("valor"), voz_libre=self.origen_voz_libre,
                                         contaminado=bool(self.ejecutor.contaminado))
             log(f"Ajuste cambiado por la IA: {args.get('ajuste')!r} -> {args.get('valor')!r}: {'hecho' if hecho else texto[:120]}")
@@ -2747,6 +2758,42 @@ class Asistente:
             log("Pista de voz: " + pista[:230])
         return pista
 
+    def _permiso_de_capturas(self):
+        """Lo que se le dice a la IA cuando necesita ver la pantalla y el usuario no ha dado permiso (o «» si no es ese el problema).
+        Sin decidir: se deja PENDIENTE de la confirmación del usuario (solo con el atajo) pedirlo, porque lo ha necesitado ella, no porque él lo pidiera.
+        La IA nunca se lo concede sola. Si dijo que NO, se respeta: solo lo cambia él en la terminal."""
+        if self.modo_privado:
+            return ""
+        estado = AJ.actuales(log=lambda m: None).get("privacidad", "capturas")
+        if estado == "si":
+            return ""
+        if estado == "no":
+            return ("No puedo ver la pantalla: el usuario decidió que NUNCA envíes capturas. Respétalo: díselo en una frase y que, si cambia de opinión, "
+                    "lo decida él en una terminal con «lina privacidad». No adivines lo que hay en ella.")
+        if self.ejecutor.contaminado:
+            return ("No puedo ver la pantalla: el usuario aún no ha dado permiso para enviar capturas y, como en esta tarea has leído contenido de fuera, "
+                    "no lo propongo ahora. Díselo y que lo decida él con «lina privacidad».")
+        self.peticion_de_capturas = getattr(self, "pregunta_pura", "")
+        r = self.ejecutor.preparar_accion(
+            "Dar permiso a Lina para enviar capturas de tu pantalla a la IA (Gemini, de Google) cuando hagan falta, empezando por la petición de ahora. "
+            "Nunca en modo privado ni con ventanas sensibles; se revoca con «lina privacidad no»",
+            self._conceder_capturas, motivo="permiso para ver la pantalla", razon="es un permiso de privacidad que solo da el usuario")
+        return ("Aún no puedes ver la pantalla: el usuario no ha decidido si permite enviar capturas, y lo necesitas para lo que pide. " + r +
+                " Explícale en una frase que para esto necesitas ver su pantalla y que la captura se enviaría a Google (Gemini); pregúntale si te deja. "
+                "NO describas lo que hay en la pantalla: no lo sabes.")
+
+    def _conceder_capturas(self):
+        """Se ejecuta SOLO cuando el usuario confirma con el atajo: guarda el permiso y deja lista la captura para retomar lo que pidió."""
+        AJ.actuales(log=lambda m: None).establecer("privacidad", "capturas", "si")
+        H.anotar("[privacidad] capturas = si (confirmado por el usuario con el atajo, a petición de la IA)")
+        imagen = getattr(self, "imagen_del_turno", None)
+        if imagen and not self._motivo_sin_pantalla():
+            self.captura_guardada, self.pedir_pantalla = imagen, True
+            ya = f" Retoma lo que pidió antes: «{getattr(self, 'peticion_de_capturas', '')[:200]}». La captura se te adjuntará al terminar esta respuesta."
+        else:
+            ya = " Ahora mismo no hay captura utilizable (ventana sensible o modo privado): díselo; podrá pedírtelo de nuevo."
+        return "Permiso concedido por el usuario (se puede quitar con «lina privacidad no»)." + ya
+
     def _motivo_sin_pantalla(self, titulo=None, clase=None):
         """Por qué NO se puede enviar una captura ahora (o «» si se puede). Esto no lo decide la IA: es privacidad."""
         if self.modo_privado:
@@ -2761,7 +2808,7 @@ class Asistente:
         """¿Va la captura con la pregunta? En un juego, siempre. Fuera, solo si hablas de lo que ves o seguías pidiendo ayuda con la pantalla;
         si no, la IA la pide con ver_pantalla cuando la necesite. En modo privado o con una ventana sensible, NUNCA (ni se guarda).
         Devuelve la imagen a enviar (o None) y deja la captura guardada para cuando se pida."""
-        self.captura_guardada, self.pantalla_adjunta = imagen, False
+        self.captura_guardada, self.pantalla_adjunta, self.imagen_del_turno = imagen, False, imagen
         if not imagen:
             return None
         motivo_no = self._motivo_sin_pantalla()

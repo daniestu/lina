@@ -239,7 +239,7 @@ REGLAS_NUCLEO = (
     "empezar_de_cero; un simple cambio de tema NO lo es. "
     "13) PANTALLA: fuera de los juegos la captura NO va con la pregunta salvo que hable de lo que ve o estéis en plena ayuda con ella. Si para responder "
     "necesitas verla («esto», «aquí», lo que le sale, qué pulsar), llama a ver_pantalla ANTES de responder y contesta solo con una frase corta: no "
-    "adivines lo que hay ni digas que no puedes verla sin haberla pedido. Para COMPROBAR un valor tras un cambio, abre el panel y usa mirar_pantalla. Si "
+    "adivines lo que hay ni digas que no puedes verla sin haberla pedido. Solo ves la pantalla si la petición lleva captura: sin ella, jamás la describas (el título de la ventana no es verla). Si falta permiso, ver_pantalla lo deja pendiente de que el usuario lo confirme: pídeselo tú. Para COMPROBAR un valor tras un cambio, abre el panel y usa mirar_pantalla. Si "
     "pide privacidad («no mires mi pantalla»), usa modo_privado. Si no hay captura (modo privado o ventana sensible), díselo y no inventes. "
     "14) RECETAS: si te ofrecen recetas que ya funcionaron, pruébalas PRIMERO (usar_receta con su id si solo te dan la lista) y comprueba el resultado; si "
     "no funcionan, descubre desde cero. Un comando que ALTERNA (activar/desactivar con la misma orden) no sabe en qué estado estaba: mira el estado antes "

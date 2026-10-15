@@ -27,7 +27,9 @@ Lina nunca ve ni guarda tu contraseña de administrador. Hay tres niveles; el ac
 
 Para activarlo o quitarlo (`instalar`, `total`, `quitar`):
 
-1. Lo haces tú en una terminal; la IA no puede (está bloqueado en el código) y sin terminal no hay consentimiento.
+1. Lo decides tú: en una terminal, o confirmando con el atajo cuando Lina lo pide porque lo necesita para lo que le has pedido. La IA no puede
+   concederlo sola (está bloqueado en el código); la confirmación con el atajo no se acepta por manos libres ni si en la tarea se ha leído contenido de fuera,
+   y con «no» Lina no vuelve a preguntar.
 2. Antes de nada se **enseña todo lo que se va a escribir** (el ayudante con su huella, la regla de sudoers exacta, la política de polkit).
 3. Lo que se ejecuta como administrador es el texto de `src/lina/nucleo/raiz.py` (corto, solo biblioteca estándar), enviado con `sudo`/`pkexec` con los datos por la entrada
    estándar: es lo mismo que se mostró, no un archivo que otro proceso pudiera cambiar mientras escribes la contraseña.

@@ -43,4 +43,6 @@ lina privacidad si       permito las capturas cuando hagan falta
 lina privacidad no       nunca capturas
 ```
 
-La IA no puede cambiar esta decisión: la tomas tú, en una terminal.
+La IA no puede cambiar esta decisión sola: la tomas tú. Si dejaste «preguntar» y para lo que le pides Lina necesita ver tu pantalla, te lo pedirá ella
+(explicando que la captura va a Google) y solo se activa si lo confirmas pulsando el atajo; con la voz de manos libres no vale. Si dijiste «no», no
+insiste: solo lo cambias tú en una terminal.

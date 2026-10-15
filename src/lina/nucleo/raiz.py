@@ -68,7 +68,6 @@ def comprobar_ayudante(contenido):
 
 def _carpeta_segura(ruta, raiz, estricto):
     """Cada carpeta del camino (desde la raíz) debe ser de root, no ser un enlace y no poder escribirla nadie más: si no, otro usuario podría cambiar el ayudante."""
-    actual = raiz.rstrip("/") or "/"
     partes = [p for p in ruta.strip("/").split("/") if p]
     for i in range(len(partes) + 1):
         c = os.path.join(raiz, *partes[:i]) if i else (raiz or "/")
