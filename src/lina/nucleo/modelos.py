@@ -3,6 +3,7 @@
 Se descargan una vez (con `lina modelos`, que ejecuta el instalador) y después todo funciona sin internet. Whisper se baja con la librería
 faster-whisper, que comprueba la integridad de cada archivo contra la huella que publica Hugging Face; las voces las comprueba voz/voces.py.
 """
+from lina.nucleo import ajustes as AJ
 from lina.voz import voces as VOC
 
 MODELO_WHISPER = "small"                    # voz a texto, en la CPU
@@ -40,7 +41,7 @@ def asegurar_whisper(log=print, descargar=None):
 
 def estado(descargar=None):
     """{'whisper': bool, 'voz': nombre|None, 'voz_integra': True|False|None}: lo que hay ahora mismo."""
-    elegida = VOC.voz_elegida()
+    elegida = AJ.solo_lectura().get("voz", "voz")                  # sin crear config.toml: ver el estado no cambia nada
     ok = VOC.instalada(elegida)
     return {"whisper": whisper_listo(descargar), "voz": elegida if ok else None, "voz_integra": VOC.verificar(elegida)[0] if ok else False}
 

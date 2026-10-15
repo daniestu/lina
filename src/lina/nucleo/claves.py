@@ -135,6 +135,8 @@ def archivo_borrar(nombre):
 # ----------------------------------------------------------------------------------------------------------------------
 def _quiere_llavero():
     try:
+        if not (RUT.CONFIG / AJ.NOMBRE_ARCHIVO).exists():
+            return True                                          # sin ajustes todavía: «auto». Leer una clave no debe crear el archivo
         return AJ.actuales(log=lambda m: None).get("privacidad", "almacen_claves") != "archivo"
     except Exception:
         return True

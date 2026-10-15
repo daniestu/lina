@@ -6,7 +6,7 @@
 | 1 | Configuración, perfiles de autonomía y nombre y voz de Lina (`config.toml`, claves en el llavero) *(hecha: ajustes, `lina config`, perfiles, claves y órdenes de voz)* |
 | 2 | Seguridad y privilegios: sudo limitado a instalar paquetes, modelo de amenazas, consentimiento de privacidad *(hecha)* |
 | 3 | Portabilidad entre distribuciones (Arch, Debian/Ubuntu, Fedora, openSUSE) *(hecha: capa de paquetes y capacidades en `plataforma.py`, [detalles](portabilidad.md))* |
-| 4 | Instalador y primer arranque guiado: `install.sh`, atajo automático, `lina doctor`, `lina update` |
+| 4 | Instalador y primer arranque guiado: `install.sh`, atajo automático, `lina bienvenida`, `lina doctor`, `lina update` *(hecha, falta probarla en instalaciones reales; [detalles](instalacion.md))* |
 | 5 | Portabilidad de escritorio (KDE Plasma, GNOME, X11) |
 | 6 | Calidad e ingeniería: código dividido, CI, tipado, cobertura |
 | 7 | Proveedores de IA intercambiables: Gemini, API compatible con OpenAI, Anthropic, modelos locales y de empresa |

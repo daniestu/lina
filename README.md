@@ -23,8 +23,10 @@ cd lina
 ./install.sh
 ```
 
-Después, crea un atajo de teclado global (por ejemplo `Meta+Espacio`) que ejecute `lina pulsar`, y guarda tu clave de Gemini cuando
-Lina te la pida. 
+El instalador te enseña cada paso, crea el atajo de teclado y el servicio, y termina con `lina bienvenida`, que te guía para poner tu clave de Gemini
+(gratuita), probar el micrófono y decidir la libertad y la privacidad de Lina. Después: `lina doctor` para comprobar que todo está bien y `lina update`
+para actualizar. Más detalle en [instalación](docs/instalacion.md).
+
 ## Ajustes
 
 Todo está en un único archivo, `~/.config/lina/config.toml`, y se cambia con `lina config` (se aplica sin reiniciar):
@@ -51,6 +53,7 @@ Sin telemetría. Las capturas no se envían hasta que lo permites, y la contrase
 
 ## Documentación
 
+- [Instalación](docs/instalacion.md)
 - [Configuración](docs/configuracion.md)
 - [Arquitectura](docs/arquitectura.md)
 - [Seguridad y confirmaciones](docs/seguridad.md)

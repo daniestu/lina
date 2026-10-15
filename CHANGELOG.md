@@ -5,6 +5,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Instalador y primer arranque guiado: `install.sh` en seis pasos con `--simular`, `lina preparar` (comando, modelos, servicio de usuario o arranque de sesión, atajo global en KDE y GNOME),
+  `lina bienvenida` (clave de Gemini con validación, prueba de micrófono, nombre, autonomía y privacidad), `lina doctor` (con `--red` e `--informe` anonimizado),
+  `lina update` (con `--comprobar` y `--volver`) y `lina uninstall` (solo quita lo anotado en el manifiesto). Si falta la clave de Gemini, Lina avisa con una notificación
+  y por voz (como mucho una vez al día) en vez de quedarse muda. Las voces descargadas se verifican (tamaño, formato y huella). Programas opcionales (portapapeles, YouTube)
+  se instalan al usarlos, salvo en el perfil prudente. Ver [instalación](docs/instalacion.md).
 - Portabilidad entre distribuciones: `plataforma.py` es ahora el único sitio que conoce pacman, apt, dnf y zypper (instalar, quitar, actualizar, buscar, comprobar,
   qué paquete trae un programa), con tablas de paquetes por familia y detección de lo que hay (servicios, audio, snapshots, arranque, GPU, juegos, copias).
   El filtro de comandos entiende los cuatro gestores, la política vigila el kernel y el arranque de cada familia y pide confirmación para PPA, COPR, `.deb`, `.rpm` y similares.

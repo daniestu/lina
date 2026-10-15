@@ -370,6 +370,11 @@ def migrar(carpeta=None, log=print):
 _instancia = {"ajustes": None, "ruta": None}
 
 
+def solo_lectura():
+    """Los ajustes tal como están, SIN crear ni migrar nada (para diagnósticos y simulaciones). Sin archivo, valores de fábrica."""
+    return Ajustes(RUT.CONFIG / NOMBRE_ARCHIVO, log=lambda m: None)
+
+
 def actuales(log=print):
     """Los ajustes del usuario (se crean y migran la primera vez; se releen solos al cambiar el archivo)."""
     ruta = RUT.CONFIG / NOMBRE_ARCHIVO

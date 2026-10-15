@@ -32,6 +32,7 @@ import fnmatch
 import xml.etree.ElementTree as ET
 
 from lina.nucleo import comandos
+from lina.nucleo import dependencias as DEP
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import raiz as _RAIZ
@@ -3805,10 +3806,10 @@ def buscar_youtube(consulta, cantidad=5):
     consulta = str(consulta or "").strip()
     if not consulta:
         return "Falta la búsqueda."
+    listo, motivo = DEP.asegurar("youtube")
     exe = shutil.which("yt-dlp")
-    if not exe:
-        return ("yt-dlp no está instalado, y hace falta para buscar vídeos. Propón al usuario instalarlo "
-                f"({PL.orden_canonica_instalar(['yt-dlp'])}).")
+    if not listo or not exe:
+        return motivo or "yt-dlp no está disponible."
     try:
         r = subprocess.run([exe, "--flat-playlist", "--no-warnings", "--print",
                             "%(title)s | %(channel)s | %(duration_string)s | https://www.youtube.com/watch?v=%(id)s",
@@ -3827,8 +3828,9 @@ def copiar_portapapeles(texto):
     texto = str(texto or "")
     if not texto:
         return "No hay nada que copiar."
-    if not shutil.which("wl-copy"):
-        return f"Falta wl-clipboard para copiar al portapapeles. Propón instalarlo ({PL.orden_canonica_instalar(['wl-clipboard'])})."
+    listo, motivo = DEP.asegurar("portapapeles")
+    if not listo:
+        return motivo
     try:
         subprocess.run(["wl-copy"], input=texto, text=True, timeout=5)
     except (OSError, subprocess.SubprocessError) as e:
