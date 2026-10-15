@@ -1345,7 +1345,9 @@ class Asistente:
         PRES.configurar_claves(gratis, pago)
         self.clave = gratis or (pago if PRESUPUESTO_OK else "")      # (si solo hay una, esa; sin presupuesto.py la de pago no se usa)
         if not gratis:
-            log("Aviso: no encuentro la clave de Gemini. Guárdala con:  lina clave gemini")
+            log("Aviso: no encuentro la clave de Gemini. Guárdala con:  lina clave gemini   (o  lina bienvenida)")
+            if not pago:
+                threading.Thread(target=self._avisar_sin_clave, daemon=True).start()
         if PRES.hay_clave_de_pago():
             log(f"Clave de pago: configurada. Tope de este mes: {PRES.estado()['tope_eur']:g} € ({PRES.resumen().split('. Estado')[0][:110]})")
         self.estado = "esperando"  # esperando | grabando | pensando | hablando
@@ -1381,6 +1383,18 @@ class Asistente:
         else:
             log("AVISO: falta politica.py: el asistente funciona en modo prudente (pide confirmación para casi todo)")
         H.hechos_sistema()  # precalienta los datos del sistema para que la primera pregunta no espere
+
+    def _avisar_sin_clave(self):
+        """Sin clave Lina no puede contestar y, si no se avisa, parece rota: notificación siempre, y por voz como mucho una vez al día."""
+        from lina.nucleo import bienvenida as BIEN
+        try:
+            subprocess.Popen(["notify-send", "-a", "Lina", "Lina necesita una clave de Gemini", BIEN.AVISO_SIN_CLAVE],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            pass
+        if BIEN.toca_avisar():
+            time.sleep(6)                                  # que termine de arrancar
+            self.avisar(BIEN.AVISO_SIN_CLAVE)
 
     # --- Qué hacer cada vez que se pulsa el atajo ---
     def pulsacion(self):
