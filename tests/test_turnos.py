@@ -28,6 +28,6 @@ def test_la_receta_cuenta_la_peticion_original():
 
 def test_abrir_un_programa_no_es_una_tarea_que_termine():
     for motivo in ("abrir Firefox", "Abre el navegador", "lanzar Steam", "iniciar el editor", "Abrir Dolphin (entendí «dolfin»)"):
-        assert H._es_lanzamiento(motivo), motivo
+        assert H._motivo_es_abrir(motivo), motivo
     for motivo in ("actualizar el sistema", "copiar la carpeta de fotos", "descargar el archivo", "tarea", "cerrar Firefox", ""):
-        assert not H._es_lanzamiento(motivo), motivo
+        assert not H._motivo_es_abrir(motivo), motivo

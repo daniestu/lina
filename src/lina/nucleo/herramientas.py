@@ -42,7 +42,7 @@ from lina.nucleo.clasificador import (  # noqa: F401
     _DESTRUCCION_TOTAL, _DT_OBJ, _EXTENSIONES_ABRIBLES, _HERRAMIENTAS_DISCO, _HOME, _INOCUO_REGEX, _INTERPRETES, _LECTURA_SIMPLE,
     _METACARACTERES, _NO_ES_UN_PROGRAMA_DE_VENTANA, _OBJETIVOS_PELIGROSOS, _ORDEN_PROPIA, _PREFIJOS, _PROGRAMAS_PANELES, _PROPIO,
     _SECRETOS, _SHELLS, _SUDOERS, _SUDO_LECTURA, _SUSTITUCION_A_SHELL, _apps_instaladas, _bloqueado, _bloqueado_hostil,
-    _codigo_en_linea, _critico_extra, _descarga_y_ejecuta, _disco_de_datos, _es_inocuo, _es_interprete,
+    _codigo_en_linea, _critico_extra, _descarga_y_ejecuta, _disco_de_datos, _es_inocuo, _es_interprete, _es_lanzamiento,
     _es_lectura, _es_objetivo_peligroso, _limpiar_escapes, _nombres_descargados, _normalizar_ruta, _que_ejecuta, _quitar_prefijos,
     _ruta_abrible, _segmento_lectura, _segmentos, _sin_acentos, _tokens, analizar_instalacion, destruccion_total,
 )
@@ -1799,7 +1799,7 @@ def buscar_ajuste_kde(consulta, valor=None):
 _LANZAMIENTO = re.compile(r"^\s*(?:abrir|abre|abriendo|lanzar|lanza|iniciar|inicia|arrancar|arranca)\b", re.I)
 
 
-def _es_lanzamiento(motivo):
+def _motivo_es_abrir(motivo):
     """¿El «motivo» del comando es abrir un programa? Esos siguen en marcha hasta que el usuario los cierra, y eso no es «terminar una tarea»."""
     return bool(_LANZAMIENTO.match(_sin_acentos(str(motivo or "")).strip()))
 
@@ -2510,7 +2510,7 @@ class Ejecutor:
         try:
             salida, _ = proc.communicate(timeout=TIMEOUT_ESPERA)
         except subprocess.TimeoutExpired:
-            if _es_lanzamiento(motivo):               # un programa con ventana sigue en marcha mientras esté abierto: no es una tarea que «termine»
+            if _motivo_es_abrir(motivo):               # un programa con ventana sigue en marcha mientras esté abierto: no es una tarea que «termine»
                 threading.Thread(target=self._esperar_sin_avisar, args=(proc, comando), daemon=True).start()
                 anotar(f"[abierto, sigue en marcha] {comando}")
                 return ("El programa se ha abierto y sigue en marcha, que es lo normal en una aplicación con ventana. Ya está abierto: no hay nada "
