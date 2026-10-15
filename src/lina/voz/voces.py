@@ -6,6 +6,8 @@ a ~/.local/share/lina/voces/ y, si no hay internet, usa cualquier otra que ya te
 La voz que se usa se elige con `lina voz NOMBRE` (se guarda en config.toml, sección [voz]).
 El catálogo está organizado por idioma para poder añadir otros más adelante.
 """
+import hashlib
+import json
 import os
 import sys
 import urllib.request
@@ -92,18 +94,34 @@ def instalada(nombre, carpeta=None):
     return all(p.is_file() and p.stat().st_size > 0 for p in archivos(nombre, carpeta))
 
 
-def _descargar(url, destino, abrir):
+def _descargar(url, destino, abrir, sha256=None):
+    """Baja un archivo a `destino` comprobando que llega entero: tamaño igual al que anuncia el servidor, JSON válido si es un .json y, si el
+    catálogo trae la huella (sha256), que coincida. Devuelve la huella del archivo."""
     parcial = destino.with_name(destino.name + ".parcial")
+    suma, total = hashlib.sha256(), 0
     with abrir(url, TIEMPO) as r, open(parcial, "wb") as f:
+        anunciado = getattr(getattr(r, "headers", None), "get", lambda *_: None)("Content-Length")
         while True:
             trozo = r.read(TROZO)
             if not trozo:
                 break
             f.write(trozo)
-    if parcial.stat().st_size == 0:
+            suma.update(trozo)
+            total += len(trozo)
+    try:
+        if total == 0:
+            raise OSError("descarga vacía")
+        if anunciado and str(anunciado).isdigit() and int(anunciado) != total:
+            raise OSError(f"descarga incompleta ({total} de {anunciado} bytes)")
+        if destino.suffix == ".json":
+            json.loads(parcial.read_text(encoding="utf-8"))
+        if sha256 and suma.hexdigest() != sha256.lower():
+            raise OSError("la huella no coincide con la del catálogo")
+    except (OSError, ValueError) as e:
         parcial.unlink(missing_ok=True)
-        raise OSError("descarga vacía")
+        raise OSError(str(e)) from e
     os.replace(parcial, destino)
+    return suma.hexdigest()
 
 
 def _abrir(url, tiempo):
@@ -122,8 +140,10 @@ def asegurar(nombre, carpeta=None, log=print, abrir=_abrir):
     try:
         base.mkdir(parents=True, exist_ok=True)
         log(f"Voz: descargando {nombre} (la primera vez; unos 60 MB)…")
+        huellas = _leer_huellas(base)
         for destino in reversed(archivos(nombre, base)):               # primero el pequeño (.json), luego el modelo
-            _descargar(f"{BASE}/{ficha['carpeta']}/{destino.name}", destino, abrir)
+            huellas[destino.name] = _descargar(f"{BASE}/{ficha['carpeta']}/{destino.name}", destino, abrir, (ficha.get("sha256") or {}).get(destino.suffix))
+        _guardar_huellas(base, huellas)
     except (OSError, ValueError) as e:
         log(f"Voz: no he podido descargar {nombre} ({e}).")
         for p in base.glob(f"{ficha['modelo']}.*.parcial"):
@@ -131,6 +151,42 @@ def asegurar(nombre, carpeta=None, log=print, abrir=_abrir):
         return False
     log(f"Voz: {nombre} lista.")
     return True
+
+
+def _leer_huellas(base):
+    try:
+        d = json.loads((Path(base) / "huellas.json").read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _guardar_huellas(base, huellas):
+    try:
+        (Path(base) / "huellas.json").write_text(json.dumps(huellas, indent=1, sort_keys=True), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def verificar(nombre, carpeta=None):
+    """(estado, detalle) de una voz instalada: True si sus archivos son los que se descargaron, False si cambiaron o faltan, None si no hay huella guardada."""
+    base = Path(carpeta or RUT.VOCES)
+    if not instalada(nombre, carpeta):
+        return False, "no está instalada"
+    huellas = _leer_huellas(base)
+    sin_huella = True
+    for destino in archivos(nombre, base):
+        esperada = huellas.get(destino.name)
+        if not esperada:
+            continue
+        sin_huella = False
+        suma = hashlib.sha256()
+        with open(destino, "rb") as f:
+            for trozo in iter(lambda: f.read(TROZO), b""):
+                suma.update(trozo)
+        if suma.hexdigest() != esperada:
+            return False, f"{destino.name} no es el que se descargó (¿corrupto?): bórralo y vuelve a elegir la voz"
+    return (None, "sin huella guardada (se instaló antes de que se guardaran)") if sin_huella else (True, "íntegra")
 
 
 def disponibles(carpeta=None):

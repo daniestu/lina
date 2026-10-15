@@ -93,6 +93,11 @@ PAQUETES = {
     "flatpak":         {"arch": "flatpak", "debian": "flatpak", "fedora": "flatpak", "suse": "flatpak"},
     "mangohud":        {"arch": "mangohud", "debian": "mangohud", "fedora": "mangohud", "suse": "mangohud"},
     "gamemode":        {"arch": "gamemode", "debian": "gamemode", "fedora": "gamemode", "suse": "gamemode"},
+    "python-venv":     {"arch": "python", "debian": "python3-venv", "fedora": "python3", "suse": "python3"},
+    "python-pip":      {"arch": "python-pip", "debian": "python3-pip", "fedora": "python3-pip", "suse": "python3-pip"},
+    "python-dev":      {"arch": "python", "debian": "python3-dev", "fedora": "python3-devel", "suse": "python3-devel"},
+    "gcc":             {"arch": "gcc", "debian": "build-essential", "fedora": "gcc", "suse": "gcc"},
+    "git":             {"arch": "git", "debian": "git", "fedora": "git", "suse": "git"},
     "snapper":         {"arch": "snapper", "debian": "snapper", "fedora": "snapper", "suse": "snapper"},
 }
 
@@ -164,6 +169,23 @@ def orden_instalar(logicos, familia):
         return None
     reales, _ = nombres_reales(logicos, familia)
     return ["sudo", "-n", *FAMILIAS[familia]["instalar"], *reales]
+
+
+# Lo que hace falta del sistema para instalar Lina (los compiladores son para `evdev`, que se compila al instalarlo)
+PAQUETES_BASE = ("python-venv", "python-pip", "python-dev", "gcc", "git", "portaudio", "libnotify")
+
+
+def faltan(logicos, familia=None, ejecutar=None):
+    """Los nombres lógicos cuyo paquete NO está instalado (lo comprueba con el gestor de la familia). Los que esta familia no tiene se ignoran."""
+    fam = familia or familia_actual()
+    ejecutar = ejecutar or (lambda a: _correr(a, 15))
+    out = []
+    for n in logicos:
+        real = PAQUETES.get(n, {}).get(fam, n) if n in PAQUETES else n
+        c = consulta_instalado(real, fam)
+        if c and interpreta_instalado(*ejecutar(c), familia=fam) is not True:
+            out.append(n)
+    return out
 
 
 def manual(logicos, familia):
@@ -623,6 +645,13 @@ def describir(caps=None):
 
 
 if __name__ == "__main__":
+    import sys
+    if sys.argv[1:2] == ["base"]:          # lo usa install.sh: imprime la orden para instalar lo que falta del sistema (o nada, si no falta nada)
+        _f = familia_actual()
+        _faltan = faltan(PAQUETES_BASE, _f) if _f else []
+        if _faltan:
+            print(manual(_faltan, _f))
+        sys.exit(0 if _f else 3)
     d = detectar()
     print(f"Distribución: {d['distro']} · familia: {d['familia'] or 'desconocida'} · gestor: {d['gestor'] or '—'} ({'instalado' if d['tiene_gestor'] else 'no encontrado'})")
     print(f"Escritorio: {d['escritorio'] or '—'} · sesión: {d['sesion'] or '—'}")

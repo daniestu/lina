@@ -30,6 +30,7 @@ from urllib.parse import urlparse
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import claves as CL
 from lina.nucleo import autoconocimiento as AUTO
+from lina.nucleo import modelos as MOD
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
@@ -137,7 +138,7 @@ except ImportError:  # sin la librería evdev el asistente funciona igual, pero 
 # Las claves (Gemini gratuita, Gemini de pago, Tavily) las guarda claves.py: en el llavero del sistema o, si no hay, en un archivo 600. Ver `lina clave`.
 VOZ = VOC.VOZ_POR_DEFECTO                  # voz de Piper; main() la sustituye por la elegida en config.toml ([voz]) (ver voz/voces.py)
 PROMPT_WHISPER_CARACTERES = 650              # tamaño máximo de la pista que se le da a Whisper (si se pasa, olvida el principio)
-MODELO_WHISPER = "small"                    # voz a texto, en la CPU
+MODELO_WHISPER = MOD.MODELO_WHISPER      # voz a texto, en la CPU (ver modelos.py)
 MODELO_LOCAL = "qwen3-vl:8b-instruct"       # modelo de visión de Ollama
 MODELOS_GEMINI = ["gemini-flash-lite-latest", "gemini-flash-latest"]  # modo rápido, en orden de preferencia (Flash gratis: solo 20 al día)
 MODELOS_PROFUNDO = ["gemini-flash-latest", "gemini-flash-lite-latest"]  # modo "a fondo": primero el más potente

@@ -10,9 +10,9 @@ MOTOR="$(command -v podman || command -v docker || true)"
 declare -A IMAGEN=([arch]=archlinux:latest [debian]=debian:stable [fedora]=fedora:latest [suse]=opensuse/tumbleweed)
 declare -A PREPARAR=(
   [arch]="pacman -Syu --noconfirm --needed python python-pip gcc portaudio sudo"
-  [debian]="apt-get update && apt-get install -y python3 python3-venv python3-pip libportaudio2 sudo"
-  [fedora]="dnf install -y python3 python3-pip portaudio sudo"
-  [suse]="zypper --non-interactive install python3 python3-pip libportaudio2 sudo"
+  [debian]="apt-get update && apt-get install -y python3 python3-venv python3-pip python3-dev build-essential libportaudio2 sudo"
+  [fedora]="dnf install -y python3 python3-pip python3-devel gcc portaudio sudo"
+  [suse]="zypper --non-interactive install python3 python3-pip python3-devel gcc libportaudio2 sudo"
 )
 FAMILIAS=("$@"); [ ${#FAMILIAS[@]} -gt 0 ] || FAMILIAS=(arch debian fedora suse)
 fallos=0

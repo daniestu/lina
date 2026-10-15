@@ -22,6 +22,10 @@ AYUDA = f"""Lina {__version__}: asistente de voz para el escritorio Linux.
   lina indicador probar      enseña el resplandor de escucha
   lina interfaz ORDEN        diagnostico · preparar · estado   (control de programas con la pantalla)
   lina sistema               qué distribución, gestor de paquetes y escritorio detecta
+  lina preparar              (lo hace install.sh) comando, modelos, servicio y atajo; --simular dice lo que haría sin tocar nada
+  lina modelos [estado]      descarga (o dice si están) el modelo de voz a texto y la voz de Lina
+  lina atajo [TECLA]         crea el atajo de teclado global para hablar con Lina (KDE y GNOME)
+  lina uninstall [--todo]    quita lo que instaló Lina; --todo también tus ajustes, claves y datos
   lina mcp [--config]        servidor MCP de Lina para otras IAs
   lina --version
 """
@@ -76,6 +80,18 @@ def main(argv=None):
     if orden == "voz":
         from lina.voz import voces
         return voces.principal(resto)
+    if orden == "preparar":
+        from lina.nucleo import instalador
+        return instalador.preparar(resto)
+    if orden in ("uninstall", "desinstalar"):
+        from lina.nucleo import instalador
+        return instalador.desinstalar(resto)
+    if orden == "atajo":
+        from lina.nucleo import instalador
+        return instalador.atajo_cli(resto)
+    if orden == "modelos":
+        from lina.nucleo import modelos
+        return modelos.principal(resto)
     if orden == "manos-libres":
         return _modulo("lina.voz.manos_libres", resto)
     if orden == "indicador":

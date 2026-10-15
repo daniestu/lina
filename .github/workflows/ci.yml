@@ -37,9 +37,9 @@ jobs:
       matrix:
         include:
           - {nombre: Arch, familia: arch, imagen: "archlinux:latest", preparar: "pacman -Syu --noconfirm --needed python python-pip gcc portaudio sudo"}
-          - {nombre: Debian, familia: debian, imagen: "debian:stable", preparar: "apt-get update && apt-get install -y python3 python3-venv python3-pip libportaudio2 sudo"}
-          - {nombre: Fedora, familia: fedora, imagen: "fedora:latest", preparar: "dnf install -y python3 python3-pip portaudio sudo"}
-          - {nombre: openSUSE, familia: suse, imagen: "opensuse/tumbleweed", preparar: "zypper --non-interactive install python3 python3-pip libportaudio2 sudo"}
+          - {nombre: Debian, familia: debian, imagen: "debian:stable", preparar: "apt-get update && apt-get install -y python3 python3-venv python3-pip python3-dev build-essential libportaudio2 sudo"}
+          - {nombre: Fedora, familia: fedora, imagen: "fedora:latest", preparar: "dnf install -y python3 python3-pip python3-devel gcc portaudio sudo"}
+          - {nombre: openSUSE, familia: suse, imagen: "opensuse/tumbleweed", preparar: "zypper --non-interactive install python3 python3-pip python3-devel gcc libportaudio2 sudo"}
     env:
       LINA_FAMILIA_ESPERADA: ${{ matrix.familia }}
     steps:
