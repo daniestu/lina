@@ -2,6 +2,7 @@
 import re
 import shutil
 import subprocess
+import time
 import unicodedata
 from pathlib import Path
 
@@ -10,6 +11,24 @@ from lina.nucleo.procesos import _fuera_del_servicio
 from lina.nucleo.registro import anotar
 
 CARPETA_DOCUMENTOS = RUT.carpeta_usuario("DOCUMENTS", "Documents")
+
+
+_CREADOS = {}                       # documentos que Lina ha creado en esta sesión: ruta -> momento
+VIDA_CREADOS_SEG = 1800             # durante este rato se pueden rehacer (al corregir un documento no salen copias «(2)», «(3)»)
+
+
+def _ruta_nueva(ruta):
+    """Ruta para un documento nuevo: nunca sobrescribe lo del usuario, pero sí un documento que Lina misma acaba de crear con ese
+    nombre (si lo está rehaciendo porque no cabía, por ejemplo)."""
+    ruta = Path(ruta)
+    creado = _CREADOS.get(str(ruta))
+    if creado is not None and time.time() - creado < VIDA_CREADOS_SEG and ruta.is_file():
+        return ruta
+    return _ruta_libre(ruta)
+
+
+def _recordar(ruta):
+    _CREADOS[str(ruta)] = time.time()
 
 
 def _ruta_libre(ruta):
@@ -122,11 +141,12 @@ def crear_documento(nombre, contenido, formato="docx", abrir=True):
             docx = None
             formato = "md"
             aviso = " (no he podido instalar python-docx, así que lo guardé como .md)"
-    ruta = _ruta_libre(CARPETA_DOCUMENTOS / f"{base}.{formato}")
+    ruta = _ruta_nueva(CARPETA_DOCUMENTOS / f"{base}.{formato}")
     if formato == "docx":
         _escribir_docx(docx, ruta, contenido)
     else:
         ruta.write_text(contenido, encoding="utf-8")
+    _recordar(ruta)
     anotar(f"[documento] {ruta}")
     if abrir and shutil.which("xdg-open"):
         try:
@@ -204,16 +224,17 @@ def documento_en_columnas(a):
         return "Falta oficina.py: no puedo crear documentos con diseño."
     try:
         CARPETA_DOCUMENTOS.mkdir(parents=True, exist_ok=True)
-        ruta = OFI.ruta_libre(CARPETA_DOCUMENTOS / f"{OFI.nombre_seguro(a.get('nombre') or a.get('titulo'), 'documento')}.docx")
+        ruta = _ruta_nueva(CARPETA_DOCUMENTOS / f"{OFI.nombre_seguro(a.get('nombre') or a.get('titulo'), 'documento')}.docx")
         spec = {k: a.get(k) for k in ("titulo", "resumen", "color", "foto", "izquierda", "derecha")}
         escala, paginas = OFI.crear_documento_columnas(ruta, spec)
+        _recordar(ruta)
         anotar(f"[documento-diseño] {ruta} (letra al {int(escala * 100)} %, {paginas if paginas else '?'} página/s)")
         if a.get("abrir", True):
             _abrir_con_escritorio(ruta)
         foto = str(a.get("foto") or "").strip().lower()
         nota_foto = "" if foto and foto not in ("hueco", "ninguna") else " Tiene un hueco para la foto: si quiere ponerla, dime la ruta de la imagen y lo rehago con ella."
         if paginas and paginas > 1:
-            return f"Documento creado en {_corta(ruta)}, pero NO cabe en una página ({paginas}); acorta el texto (menos puntos o frases más cortas) y vuelve a crearlo.{nota_foto}"
+            return f"Documento creado en {_corta(ruta)}, pero NO cabe en una página ({paginas}); acorta el texto (menos puntos o frases más cortas) y vuelve a crearlo UNA vez con el MISMO nombre (sustituye a este, no hace otro). Si aun así no cabe, díselo al usuario en vez de seguir haciendo documentos.{nota_foto}"
         if paginas is None:                                   # sin LibreOffice no se puede medir: no se afirma que cabe
             return (f"Documento creado en {_corta(ruta)}: cabecera de color, columna lateral y columna principal, pensado para una página A4. "
                     f"No he podido comprobar si cabe en una página (hace falta LibreOffice); díselo al usuario.{nota_foto}")

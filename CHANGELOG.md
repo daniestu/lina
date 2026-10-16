@@ -12,6 +12,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
   y pasa mypy como aviso informativo, sin bloquear, mientras se anotan los módulos.
 
 ### Arreglado
+- Currículum (documento con columnas): la tabla llenaba el A4 sin margen y, al crecer un poco la cabecera, la hoja se iba a dos páginas; ahora deja casi 1 cm de holgura y la
+  cabecera no crece (foto de 4 cm y párrafo vacío mínimo). Y una petición ya no deja tres documentos: si Lina rehace un documento que acaba de crear (porque no cabía), lo
+  sustituye en vez de guardar «(2)» y «(3)»; lo que es tuyo nunca se sobrescribe.
 - Los documentos con columnas decían «una página A4» aunque sin LibreOffice no se pueda medir si cabe; ahora avisan de que no lo han podido comprobar.
 - La prueba del ayudante de root dependía de quién la ejecutara (fallaba fuera de root); ahora fija el usuario.
 - La clase «lanzar» de la clasificación de comandos no se alcanzaba nunca: una segunda función con el mismo nombre tapaba a la buena, así que abrir un programa conocido

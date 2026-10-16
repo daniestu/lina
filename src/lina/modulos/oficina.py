@@ -707,7 +707,9 @@ _ALIAS_PALETA = {"granate": "rojo", "burdeos": "rojo", "marino": "azul", "celest
                  "oscuro": "gris", "plomo": "gris", "teal": "turquesa", "cian": "turquesa", "verde oscuro": "verde"}
 FUENTE = "Arial"                # existe en Windows y, como Liberation Sans, en Linux: se ve igual en los dos
 ANCHO_LATERAL, ANCHO_PRINCIPAL = 6.4, 14.6        # cm (A4 = 21 cm)
-ALTO_CABECERA, ALTO_CUERPO = 5.4, 23.6
+# La suma deja casi 1 cm libre en el A4: la cabecera nunca debe crecer por encima de su alto (con la foto y los márgenes caben en 4,9 cm),
+# porque si la tabla se pasa un poco de la página, el párrafo que Word exige tras ella cae en una hoja nueva.
+ALTO_CABECERA, ALTO_CUERPO = 5.2, 23.6
 
 
 def paleta(nombre):
@@ -940,9 +942,9 @@ def _foto_cuadrada(ruta, lado_px=600):
 
 
 def _poner_foto(celda, foto, fuerte, suave):
-    from docx.shared import Cm
+    from docx.shared import Cm, Pt
     from docx.enum.text import WD_ALIGN_PARAGRAPH as AL
-    lado = 4.4
+    lado = 4.0
     ruta = None
     if foto and _plano(foto) not in ("hueco", "ninguna", "no", "sin foto"):
         p = Path(str(foto)).expanduser()
@@ -951,6 +953,8 @@ def _poner_foto(celda, foto, fuerte, suave):
     p0 = celda.paragraphs[0]
     p0.alignment = AL.CENTER
     p0.paragraph_format.space_after = 0
+    if ruta is None:
+        p0.paragraph_format.line_spacing = Pt(1)                    # el párrafo vacío de antes del hueco no debe ocupar sitio
     if ruta is not None:
         p0.add_run().add_picture(_foto_cuadrada(ruta), width=Cm(lado))
         return True
@@ -997,7 +1001,7 @@ def _crear_docx_columnas(ruta, spec, s):
     _altura_fila(t.rows[0], ALTO_CABECERA)
     _sombrear(cab_izq, suave)
     _sombrear(cab_der, fuerte)
-    _margenes_celda(cab_izq, arriba=0.5, abajo=0.5, izq=0.9, der=0.9)
+    _margenes_celda(cab_izq, arriba=0.4, abajo=0.4, izq=0.9, der=0.9)
     _margenes_celda(cab_der, arriba=0.5, abajo=0.5, izq=0.8, der=0.9)
     _vertical(cab_izq, "center")
     _vertical(cab_der, "center")
