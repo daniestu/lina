@@ -9,8 +9,6 @@ import re
 import shutil
 import time
 
-from lina.nucleo import asistente as _A  # se usa al llamar (no al importar): así valen los parches de pruebas
-
 
 class MixinMCP:
     def _iniciar_mcp(self):
@@ -234,3 +232,7 @@ class MixinMCP:
                     + ("…" if len(hs) > 12 else "") + ". Las que no son de solo lectura pedirán confirmación cada vez. Díselo en una frase.")
         return self.ejecutor.preparar_accion(f"Añadir el servidor MCP «{nombre}»: {donde}", hacer, "añadir un servidor MCP",
                                              razon="ejecuta software de terceros en tu equipo, que actuará con tus permisos. Dile exactamente qué se va a ejecutar")
+
+
+# Al final a propósito: asistente.py importa este módulo y este importa a asistente.py; así vale importar cualquiera de los dos primero.
+from lina.nucleo import asistente as _A  # se usa al llamar (no al importar): así valen los parches de pruebas

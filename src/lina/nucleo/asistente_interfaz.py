@@ -7,8 +7,6 @@ from lina.nucleo.registro import log
 from lina.nucleo.turnos import peticion_de_receta
 import re
 
-from lina.nucleo import asistente as _A  # se usa al llamar (no al importar): así valen los parches de pruebas
-
 
 class MixinInterfaz:
     def _paso_hecho(self, paso):
@@ -205,3 +203,7 @@ class MixinInterfaz:
         r = hacer()
         log(f"Interfaz ({self.pasos_interfaz}/{tope}): {resumen} → " + r.splitlines()[0][:140])
         return r
+
+
+# Al final a propósito: asistente.py importa este módulo y este importa a asistente.py; así vale importar cualquiera de los dos primero.
+from lina.nucleo import asistente as _A  # se usa al llamar (no al importar): así valen los parches de pruebas

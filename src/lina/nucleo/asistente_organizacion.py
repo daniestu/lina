@@ -10,8 +10,6 @@ import re
 import subprocess
 import time
 
-from lina.nucleo import asistente as _A  # se usa al llamar (no al importar): así valen los parches de pruebas
-
 
 class MixinOrganizacion:
     def herramienta_oficina(self, nombre, args):
@@ -142,3 +140,7 @@ class MixinOrganizacion:
             return self.ejecutor.preparar_accion(descripcion, funcion, motivo,
                                                  razon="en esta petición has leído contenido de internet, que podría traer instrucciones escondidas")
         return None
+
+
+# Al final a propósito: asistente.py importa este módulo y este importa a asistente.py; así vale importar cualquiera de los dos primero.
+from lina.nucleo import asistente as _A  # se usa al llamar (no al importar): así valen los parches de pruebas
