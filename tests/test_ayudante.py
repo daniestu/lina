@@ -127,7 +127,8 @@ def test_un_rechazo_no_llega_nunca_al_gestor(tmp_path):
     assert f.llamadas == []
 
 
-def test_main_devuelve_codigos(capsys):
+def test_main_devuelve_codigos(capsys, monkeypatch):
+    monkeypatch.setattr(LI.os, "geteuid", lambda: 0)          # como root, que es como lo lanza Lina; sin esto la prueba dependería de quién la ejecute
     assert LI.main([]) == 2 and LI.main(["version"]) == 0 and LI.main(["gestor", "extra"]) == 2
     assert LI.main(["instalar", "-Syu"]) == 3
     assert "no válido" in capsys.readouterr().err

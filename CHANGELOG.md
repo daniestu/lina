@@ -12,6 +12,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
   y pasa mypy como aviso informativo, sin bloquear, mientras se anotan los módulos.
 
 ### Arreglado
+- Los documentos con columnas decían «una página A4» aunque sin LibreOffice no se pueda medir si cabe; ahora avisan de que no lo han podido comprobar.
+- La prueba del ayudante de root dependía de quién la ejecutara (fallaba fuera de root); ahora fija el usuario.
 - La clase «lanzar» de la clasificación de comandos no se alcanzaba nunca: una segunda función con el mismo nombre tapaba a la buena, así que abrir un programa conocido
   con un enlace no se trataba como un lanzamiento. Con pruebas.
 

@@ -214,6 +214,9 @@ def documento_en_columnas(a):
         nota_foto = "" if foto and foto not in ("hueco", "ninguna") else " Tiene un hueco para la foto: si quiere ponerla, dime la ruta de la imagen y lo rehago con ella."
         if paginas and paginas > 1:
             return f"Documento creado en {_corta(ruta)}, pero NO cabe en una página ({paginas}); acorta el texto (menos puntos o frases más cortas) y vuelve a crearlo.{nota_foto}"
+        if paginas is None:                                   # sin LibreOffice no se puede medir: no se afirma que cabe
+            return (f"Documento creado en {_corta(ruta)}: cabecera de color, columna lateral y columna principal, pensado para una página A4. "
+                    f"No he podido comprobar si cabe en una página (hace falta LibreOffice); díselo al usuario.{nota_foto}")
         return (f"Documento creado en {_corta(ruta)}: una página A4 con cabecera de color, columna lateral y columna principal"
                 + (f" (letra reducida al {int(escala * 100)} % para que quepa)" if escala < 1 else "") + f".{nota_foto}")
     except OFI.ErrorOficina as e:
