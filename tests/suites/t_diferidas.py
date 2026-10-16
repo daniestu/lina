@@ -18,7 +18,7 @@ def ok(c, m):
 def falso_asistente(historial, actual):
     ej = H.Ejecutor(avisar=lambda *a, **k: None, confirmar=True)
     a = SimpleNamespace(ejecutor=ej, historial=historial, pregunta_pura=actual, turno_aceptado=False, receta_interfaz_pendiente=None)
-    a._peticion_de_receta = lambda: A.peticion_de_receta(a.historial, a.pregunta_pura)
+    a._peticion_de_receta = lambda: __import__("lina.nucleo.turnos", fromlist=["x"]).peticion_de_receta(a.historial, a.pregunta_pura)
     return a
 
 def receta_de_prueba():
