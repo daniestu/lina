@@ -116,19 +116,26 @@ def renderizar(ruta_html, ruta_pdf, timeout=90, ejecutar=subprocess.run, which=s
     motivos = []
     nav = navegador(which)
     if nav:
-        with tempfile.TemporaryDirectory(prefix="lina-nav-") as perfil:
-            orden = [nav, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--hide-scrollbars", "--disable-extensions", "--no-first-run",
-                     "--mute-audio", f"--user-data-dir={perfil}", "--host-resolver-rules=MAP * ~NOTFOUND", f"--print-to-pdf={ruta_pdf}",
-                     ruta_html.resolve().as_uri()]
-            if os.geteuid() == 0:                                  # como root el navegador exige --no-sandbox (Lina no corre como root; las pruebas sí)
-                orden.insert(2, "--no-sandbox")
-            try:
-                ejecutar(orden, capture_output=True, text=True, timeout=timeout)
-            except (OSError, subprocess.SubprocessError) as e:
-                motivos.append(f"el navegador no pudo: {e}")
-        if ruta_pdf.is_file() and ruta_pdf.stat().st_size > 0:
-            return "navegador", ""
-        motivos.append("el navegador no generó el PDF")
+        # Sin --no-sandbox primero; si no arranca (root, o Ubuntu 24.04 que restringe los espacios de usuario sin perfil de AppArmor para
+        # ese navegador) se repite sin él: el HTML ya viene limpio (sin scripts ni recursos externos) y no hay red.
+        for sin_caja in ((True,) if os.geteuid() == 0 else (False, True)):
+            if ruta_pdf.is_file():
+                ruta_pdf.unlink()
+            with tempfile.TemporaryDirectory(prefix="lina-nav-") as perfil:
+                orden = [nav, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--hide-scrollbars", "--disable-extensions",
+                         "--no-first-run", "--mute-audio", "--disable-dev-shm-usage", f"--user-data-dir={perfil}",
+                         "--host-resolver-rules=MAP * ~NOTFOUND", f"--print-to-pdf={ruta_pdf}", ruta_html.resolve().as_uri()]
+                if sin_caja:
+                    orden.insert(2, "--no-sandbox")
+                try:
+                    r = ejecutar(orden, capture_output=True, text=True, timeout=timeout)
+                    ultimo = [x for x in (getattr(r, "stderr", "") or "").strip().splitlines() if x.strip()][-1:]
+                except (OSError, subprocess.SubprocessError) as e:
+                    motivos.append(f"el navegador no pudo: {e}")
+                    ultimo = []
+            if ruta_pdf.is_file() and ruta_pdf.stat().st_size > 0:
+                return "navegador", ""
+        motivos.append("el navegador no generó el PDF" + (f" ({ultimo[0][:160]})" if ultimo else ""))
     peso = which("weasyprint")
     if peso:
         try:

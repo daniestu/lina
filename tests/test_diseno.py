@@ -157,3 +157,22 @@ def test_word_real_de_una_pagina(tmp_path):
     motor, motivo = DIS.a_word(html, docx)
     assert motor, motivo
     assert DIS.paginas_word(docx) in (1, None)
+
+
+def test_si_el_navegador_no_arranca_con_caja_se_repite_sin_ella(tmp_path, monkeypatch):
+    monkeypatch.setattr(DIS.os, "geteuid", lambda: 1000)
+    ordenes = []
+
+    def ejecutar(cmd, *a, **k):
+        ordenes.append(cmd)
+        if "--no-sandbox" in cmd:
+            (tmp_path / "s.pdf").write_bytes(b"%PDF")
+        class R:
+            returncode = 0
+            stdout = ""
+            stderr = "sin espacios de usuario"
+        return R()
+    html = tmp_path / "e.html"
+    html.write_text(HTML)
+    motor, _ = DIS.renderizar(html, tmp_path / "s.pdf", ejecutar=ejecutar, which=lambda n: "/usr/bin/google-chrome" if n == "google-chrome" else None)
+    assert motor == "navegador" and len(ordenes) == 2 and "--no-sandbox" not in ordenes[0]
