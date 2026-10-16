@@ -5,6 +5,11 @@ src/lina/
   __main__.py         comando `lina` (arrancar, pulsar, clave, manos-libres, …)
   nucleo/             el cerebro
     asistente.py        bucle principal: oír → pensar → actuar → hablar (la clase Asistente)
+    asistente_mcp.py        └ herramientas externas (servidores MCP)
+    asistente_interfaz.py   └ control de programas por interfaz (accesibilidad y visión) y sus recetas
+    asistente_ajustes.py    └ probar y aprender ajustes de configuración
+    asistente_pantalla.py   └ cuándo se puede mirar la pantalla
+    asistente_organizacion.py └ notas, recordatorios, ofimática y lectura de la web
     ia.py               hablar con la IA: Gemini (reintentos, pausas por cuota, topes de gasto), modelo local, búsqueda web
     constantes.py       modelos, tiempos, topes y texto base para la IA
     texto.py            fecha para la IA, números a palabras, limpieza del texto antes de decirlo
