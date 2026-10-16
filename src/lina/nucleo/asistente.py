@@ -1159,8 +1159,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             return resultado
         if nombre == "ejecutar_comando":
             return self.ejecutor.herramienta(args)
-        if nombre == "documento_en_columnas":
-            return H.documento_en_columnas(args)
+        if nombre == "disenar_documento":
+            return H.disenar_documento(args)
         if nombre == "crear_documento":
             return H.crear_documento(args.get("nombre", ""), args.get("contenido", ""), args.get("formato", "docx"))
         if nombre == "buscar_youtube":
@@ -1333,7 +1333,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             elif nombre.startswith("mcp__"):
                 srv, hh = self.mcp.buscar(nombre) if self.mcp else (None, None)
                 descripcion = f"usar «{hh['name'] if hh else nombre}» de {srv.nombre if srv else 'un servidor MCP'}"
-            elif nombre in ("crear_documento", "documento_en_columnas"):
+            elif nombre in ("crear_documento", "disenar_documento"):
                 descripcion = f"crear el documento «{args.get('nombre', '')}»"
             elif nombre in ("hoja_calculo", "presentacion"):
                 if _plano_simple(args.get("accion")) == "leer":

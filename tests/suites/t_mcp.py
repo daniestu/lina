@@ -69,7 +69,7 @@ conf2 = {"mcpServers": {"lina": {"command": sys.executable, "args": ["-m", "lina
 g2 = M.Gestor(casa / "c2.json", casa / "e2.json"); g2.ruta_config.write_text(json.dumps(conf2)); g2.recargar()
 hs = g2.descubrir("lina"); nombres = [h["name"] for h in hs]
 print(nombres)
-ok({"notas", "recordatorios", "hoja_calculo", "presentacion", "documento_en_columnas", "crear_documento", "consultar_pc"} <= set(nombres), "el servidor ofrece sus herramientas")
+ok({"notas", "recordatorios", "hoja_calculo", "presentacion", "disenar_documento", "crear_documento", "consultar_pc"} <= set(nombres), "el servidor ofrece sus herramientas")
 ok("ejecutar_comando" not in nombres and "abrir_app" not in nombres, "NO ofrece ejecutar_comando ni abrir_app")
 for h in hs: M.declaracion("lina", h)
 s2 = g2.servidores["lina"]

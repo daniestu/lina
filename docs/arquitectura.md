@@ -19,7 +19,8 @@ src/lina/
     herramientas.py     el ejecutor de comandos con sus capas de seguridad (confirmaciones, snapshots, deshacer, verificación)
     clasificador.py     qué es de solo lectura, qué lanza un programa, qué es hostil y qué se bloquea siempre (funciones puras)
     papelera.py         los borrados pasan a la papelera; ver, restaurar y vaciar
-    documentos.py       documentos de Word, hojas de cálculo y presentaciones
+    documentos.py       documentos de Word, hojas de cálculo, presentaciones y PDF con diseño
+    diseno.py           HTML de la IA → PDF (limpieza, navegador o WeasyPrint, cuenta de páginas)
     resolver.py         ajustes de KDE, paquetes del AUR de confianza, fechas relativas y programas que faltan
     ejecucion.py        ejecutar una orden sencilla (sin shell), con o sin permisos de administrador
     registro.py         registro de acciones (con las claves tapadas) y notificaciones

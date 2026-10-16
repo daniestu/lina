@@ -83,7 +83,7 @@ def herramientas():
         _con("recordatorios", lambda a: ORG.recordatorios(a), _ESCRIBE),
         _con("hoja_calculo", sin_abrir(H.oficina_hoja), _ESCRIBE),
         _con("presentacion", sin_abrir(H.oficina_presentacion), _ESCRIBE),
-        _con("documento_en_columnas", sin_abrir(H.documento_en_columnas), _ESCRIBE),
+        _con("disenar_documento", sin_abrir(H.disenar_documento), _ESCRIBE),
         _con("crear_documento", _crear_documento, _ESCRIBE),
     ]
     if W is not None:

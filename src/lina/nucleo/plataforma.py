@@ -91,6 +91,7 @@ PAQUETES = {
     "gnome-screenshot": {"arch": "gnome-screenshot", "debian": "gnome-screenshot", "fedora": "gnome-screenshot", "suse": "gnome-screenshot"},
     "xfce4-screenshooter": {"arch": "xfce4-screenshooter", "debian": "xfce4-screenshooter", "fedora": "xfce4-screenshooter", "suse": "xfce4-screenshooter"},
     "wl-clipboard":    {"arch": "wl-clipboard", "debian": "wl-clipboard", "fedora": "wl-clipboard", "suse": "wl-clipboard"},
+    "weasyprint":      {"arch": "python-weasyprint", "debian": "weasyprint", "fedora": "weasyprint", "suse": "python3-WeasyPrint"},
     "yt-dlp":          {"arch": "yt-dlp", "debian": "yt-dlp", "fedora": "yt-dlp", "suse": "yt-dlp"},
     "chromium":        {"arch": "chromium", "debian": "chromium", "fedora": "chromium", "suse": "chromium"},
     "nodejs":          {"arch": "nodejs", "debian": "nodejs", "fedora": "nodejs", "suse": "nodejs-default"},

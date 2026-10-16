@@ -13,6 +13,7 @@ from lina.nucleo import rutas as RUT
 # función → (programa que se busca en el PATH, paquete lógico de plataforma.PAQUETES, para qué sirve)
 REGISTRO = {
     "portapapeles": ("wl-copy", "wl-clipboard", "copiar al portapapeles"),     # (en X11 es xclip: ver `_segun_sesion`)
+    "pdf_html": ("weasyprint", "weasyprint", "crear documentos con diseño en PDF"),     # solo si no hay navegador (Chromium, Chrome, Brave…)
     "youtube": ("yt-dlp", "yt-dlp", "buscar vídeos de YouTube"),
 }
 

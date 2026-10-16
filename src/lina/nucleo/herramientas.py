@@ -51,7 +51,7 @@ from lina.nucleo.declaraciones import (  # noqa: F401
     DECLARACIONES,
 )
 from lina.nucleo.documentos import (  # noqa: F401
-    CARPETA_DOCUMENTOS, _abrir_con_escritorio, _escribir_docx, _ruta_libre, crear_documento, documento_en_columnas, oficina_hoja,
+    CARPETA_DOCUMENTOS, _abrir_con_escritorio, _escribir_docx, _ruta_libre, crear_documento, disenar_documento, oficina_hoja,
     oficina_presentacion,
 )
 from lina.nucleo.resolver import (  # noqa: F401

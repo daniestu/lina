@@ -4,7 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Añadido
+- Documentos con diseño propio (`disenar_documento`): currículum, factura, cartel, menú, carta con membrete… Lina diseña el documento ella misma (HTML y CSS),
+  lo convierte a PDF con el navegador que haya instalado (Chromium, Chrome, Brave, Edge, Vivaldi) o, si no hay, con WeasyPrint (lo instala bajo demanda),
+  cuenta las páginas y, si no caben, se corrige una vez. No hay plantillas. El resultado es un PDF; el HTML queda guardado para retocarlo. Se quitan
+  los scripts y los recursos externos del HTML y las fotos locales se incrustan.
+
 ### Cambiado
+- Sustituye a `documento_en_columnas` (plantilla fija de currículum en Word, que no servía para otros documentos y no siempre cabía en una página).
 - Código más fácil de mantener: `herramientas.py` pasa de 4 300 a unas 2 000 líneas y `asistente.py` de 3 600 a unas 1 800 (la clase `Asistente` reparte parte de sus métodos en cinco módulos `asistente_*.py`), repartidos en módulos con una sola
   responsabilidad (`clasificador`, `papelera`, `documentos`, `resolver`, `ejecucion`, `registro`, `procesos`, `declaraciones`, `ia`, `constantes`, `texto`, `opcionales`).
   El comportamiento no cambia salvo el arreglo de abajo. Ver [arquitectura](docs/arquitectura.md).

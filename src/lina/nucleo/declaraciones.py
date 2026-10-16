@@ -17,33 +17,32 @@ DECLARACIONES = [
                     "required": ["comando", "motivo"]}},
     {"name": "crear_documento",
      "description": ("Crea un documento en la carpeta Documentos (Word .docx por defecto) con el texto que escribas y lo "
-                     "abre. Usa Markdown sencillo: # títulos, - listas, 1. listas numeradas, **negrita**, *cursiva*, tablas con |. Es para texto corrido; si quiere un diseño (currículum, ficha, columnas, foto) usa documento_en_columnas."),
+                     "abre. Usa Markdown sencillo: # títulos, - listas, 1. listas numeradas, **negrita**, *cursiva*, tablas con |. Es para texto corrido; si quiere un diseño (currículum, factura, ficha, columnas, foto) usa disenar_documento."),
      "parameters": {"type": "object",
                     "properties": {"nombre": {"type": "string", "description": "Nombre del archivo, sin extensión."},
                                    "contenido": {"type": "string", "description": "Texto completo del documento."},
                                    "formato": {"type": "string", "enum": ["docx", "md", "txt"]}},
                     "required": ["nombre", "contenido"]}},
-    {"name": "documento_en_columnas",
-     "description": ("Crea un documento Word (.docx) de UNA página A4 con DISEÑO: cabecera de color con hueco para la foto, nombre y resumen, y debajo dos columnas "
-                     "(una lateral con fondo suave y otra principal). Para currículums, fichas, hojas informativas. Para textos corridos usa crear_documento."),
+    {"name": "disenar_documento",
+     "description": ("Crea un PDF con DISEÑO PROPIO en Documentos: currículum, factura, presupuesto, cartel, menú, carta formal con membrete, ficha… "
+                     "Lo diseñas TÚ escribiendo el documento completo en HTML con su CSS dentro de <style>, como lo haría un diseñador web; Lina lo convierte a PDF, "
+                     "cuenta las páginas y te dice si cabe. No hay plantillas: piensa el diseño según el tipo de documento y su contenido. "
+                     "Pautas: "
+                     "(1) Hoja A4: `@page{size:A4;margin:0}` y un contenedor de 210mm x 297mm con `overflow:hidden` si es de una página; márgenes interiores de 12-18mm. "
+                     "(2) Letra: sans-serif del sistema (Arial, Helvetica, sans-serif); cuerpo 10-11pt, nunca menos de 9pt; jerarquía clara (nombre o título grande, secciones en versalitas o color, resto normal). "
+                     "(3) Color: una paleta de 2-3 colores (uno de acento, un gris suave de fondo, texto casi negro) y `-webkit-print-color-adjust:exact;print-color-adjust:exact` para que los fondos se impriman. "
+                     "(4) Maquetación con flexbox o tablas; evita CSS grid y `gap`. Sin JavaScript, sin fuentes ni imágenes de internet. "
+                     "(5) Espacio: aire entre secciones y alineaciones consistentes; si el contenido no cabe, recorta texto antes que encoger la letra. "
+                     "(6) No inventes datos que parezcan reales (teléfonos, direcciones, empresas, cifras): usa los que dé el usuario o marcadores claros como [Teléfono], o pregúntale. "
+                     "(7) Fotos o logotipos: pasa la ruta del archivo local en <img src=\"/ruta/foto.jpg\"> y Lina lo incrusta; sin foto, no dejes recuadros vacíos salvo que el usuario lo quiera. "
+                     "Si responde «NO cabe», vuelve a llamar UNA sola vez con el MISMO nombre (sustituye al anterior). Para texto corrido usa crear_documento."),
      "parameters": {"type": "object",
                     "properties": {"nombre": {"type": "string", "description": "Nombre del archivo, sin extensión."},
-                                   "titulo": {"type": "string", "description": "Lo grande de la cabecera (el nombre de la persona)."},
-                                   "resumen": {"type": "string", "description": "Texto breve bajo el nombre (perfil profesional, 2-3 líneas)."},
-                                   "color": {"type": "string", "description": "azul (por defecto), rojo, verde, morado, naranja, gris, turquesa o #RRGGBB."},
-                                   "foto": {"type": "string", "description": "Ruta de la imagen de la persona; vacío o «hueco» deja un recuadro para ponerla; «ninguna» quita el recuadro."},
-                                   "izquierda": {"type": "array", "description": "Columna lateral, estrecha: contacto, aptitudes, idiomas, diplomas, informática...",
-                                                 "items": {"type": "object", "properties": {"titulo": {"type": "string"}, "elementos": {"type": "array", "items": {"type": "object", "properties": {
-                                                     "tipo": {"type": "string", "enum": ["texto", "lista", "entrada", "barra"], "description": "texto: una línea (con detalle opcional debajo); lista: viñetas en puntos; entrada: título, detalle en color, fecha a la derecha y viñetas; barra: nivel con barra."},
-                                                     "texto": {"type": "string"}, "detalle": {"type": "string"}, "fecha": {"type": "string"},
-                                                     "puntos": {"type": "array", "items": {"type": "string"}}, "nivel": {"type": "integer", "description": "Barra: 0 a 100."}}}}}}},
-                                   "derecha": {"type": "array", "description": "Columna principal, ancha: experiencia, formación, proyectos...",
-                                               "items": {"type": "object", "properties": {"titulo": {"type": "string"}, "elementos": {"type": "array", "items": {"type": "object", "properties": {
-                                                     "tipo": {"type": "string", "enum": ["texto", "lista", "entrada", "barra"]},
-                                                     "texto": {"type": "string"}, "detalle": {"type": "string"}, "fecha": {"type": "string"},
-                                                     "puntos": {"type": "array", "items": {"type": "string"}}, "nivel": {"type": "integer"}}}}}}},
+                                   "html": {"type": "string", "description": "Documento completo: HTML con el CSS en <style>."},
+                                   "paginas": {"type": "integer", "description": "Páginas que debe ocupar como máximo (por defecto 1)."},
+                                   "accion": {"type": "string", "enum": ["crear", "ver_html"], "description": "ver_html devuelve el HTML guardado de un diseño anterior, para retocarlo."},
                                    "abrir": {"type": "boolean", "description": "Abrirlo al terminar (por defecto sí)."}},
-                    "required": ["nombre", "titulo", "izquierda", "derecha"]}},
+                    "required": ["nombre"]}},
     {"name": "hoja_calculo",
      "description": ("Excel (.xlsx) en Documentos: crear una hoja con datos y fórmulas, leer una existente, añadir filas al final o cambiar celdas concretas. "
                      "Antes de editar se guarda copia. Para tablas, presupuestos, listas con cuentas; el texto redactado va en crear_documento."),
