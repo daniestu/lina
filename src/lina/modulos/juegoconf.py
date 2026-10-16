@@ -21,11 +21,11 @@ from lina.nucleo import rutas as RUT
 try:
     from lina.modulos import sistema as SIS
 except ImportError:                                  # sin sistema.py no hay ni búsqueda aproximada ni lectura de procesos
-    SIS = None
+    SIS = None  # type: ignore[assignment]
 try:
     from lina.modulos import juegos as JUE
 except ImportError:
-    JUE = None
+    JUE = None  # type: ignore[assignment]
 
 _HOME = Path.home()
 DIR_COPIAS = RUT.DATOS / "copias_juego"

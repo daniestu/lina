@@ -43,24 +43,24 @@ from lina.nucleo.turnos import solo_herramientas_meta
 try:
     from lina.modulos import web as W
 except ImportError:
-    W = None
+    W = None  # type: ignore[assignment]
 try:
     from lina.modulos import notas as NOT
 except ImportError:
-    NOT = None
+    NOT = None  # type: ignore[assignment]
 try:
     from lina.mcp import cliente as MC
 except ImportError:
-    MC = None
+    MC = None  # type: ignore[assignment]
 try:
     from lina.modulos import recordatorios as RECORD
 except ImportError:
-    RECORD = None
+    RECORD = None  # type: ignore[assignment]
 from lina.nucleo.opcionales import PRES, PRESUPUESTO_OK  # noqa: F401
 try:
     from lina.modulos import juegos as JUE
 except ImportError:                   # sin juegos.py no hay biblioteca de juegos, pero todo lo demás funciona
-    JUE = None
+    JUE = None  # type: ignore[assignment]
     print("Aviso: falta juegos.py; arranco sin biblioteca de juegos", flush=True)
 try:
     from lina.nucleo import recetas as REC
@@ -77,36 +77,36 @@ except ImportError:                   # sin recetas el asistente funciona igual 
         def para_comando(self, comando): return None
         def probada_kde(self, *a, **k): return None
         def tipos(self, ids): return []
-    REC = _SinRecetas()
+    REC = _SinRecetas()  # type: ignore[assignment]
     print("Aviso: falta recetas.py; arranco sin recetas aprendidas", flush=True)
 try:
     from lina.nucleo import politica as PO
 except ImportError:     # si falta politica.py, el asistente arranca en modo prudente
-    PO = None
+    PO = None  # type: ignore[assignment]
 from lina.nucleo import herramientas as H
 _ORDEN_DE_SOFTWARE = (r"\b(sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|pip3?|pipx|npm|npx|cargo|snap|curl|wget|eval|crontab)\b")
 try:
     from lina.voz import manos_libres as ML
 except ImportError:
-    ML = None
+    ML = None  # type: ignore[assignment]
 try:
     from lina.escritorio import interfaz as INT
 except ImportError:
-    INT = None
+    INT = None  # type: ignore[assignment]
 try:
     from lina.voz import indicador as IND
 except ImportError:
-    IND = None
+    IND = None  # type: ignore[assignment]
 try:
     from lina.escritorio import interfaz_vision as VIS
 except ImportError:
-    VIS = None
+    VIS = None  # type: ignore[assignment]
 
 try:
     import evdev
     from evdev import ecodes
 except ImportError:  # sin la librería evdev el asistente funciona igual, pero sin mando
-    evdev = None
+    evdev = None  # type: ignore[assignment]
 
 from lina.nucleo.constantes import (  # noqa: F401
     ANCHO_MAX_CAPTURA, ARCHIVO_PID, ARCHIVO_PRIVADO, ARCHIVO_VOCABULARIO, AUDIO_RESPUESTA, AVISO_ESPERA_A_FONDO, BUSQUEDA,
@@ -192,7 +192,7 @@ CLASES_SISTEMA = {
     "kate", "kwrite", "code", "codium", "vscodium", "emacs", "gvim", "sublime", "zed",
     "jetbrains", "idea", "pycharm", "clion", "webstorm", "goland", "rider",
 }
-_juegos_steam = {}  # número de Steam -> nombre, para no releer los archivos cada vez
+_juegos_steam: dict = {}  # número de Steam -> nombre, para no releer los archivos cada vez
 
 
 def clase_activa():

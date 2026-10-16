@@ -492,7 +492,7 @@ def borrado_definitivo(texto):
 import os
 from difflib import SequenceMatcher
 
-_cache_apps = {"firma": None, "datos": []}
+_cache_apps: dict = {"firma": None, "datos": []}
 
 
 def _dirs_apps():
@@ -724,7 +724,7 @@ def lista_de_apps_para_la_ia(texto, apps=None, ruta_log=None, maximo=70, caracte
 # y también puedes editarlo a mano. Es una lista TUYA: ninguna actualización la pisa.
 ARCHIVO_ALIAS = RUT.CONFIG / "alias.txt"
 MAX_ALIAS = 200
-_cache_alias = {"marca": None, "datos": {}}
+_cache_alias: dict = {"marca": None, "datos": {}}
 _CABECERA_ALIAS = ("# Lo que el reconocimiento de voz suele OÍR mal = lo que querías decir. Una por línea: «lo oído = lo que significa».\n"
                    "# Las apunta el asistente cuando le dices «cuando oigas cait quiero decir Kate»; también puedes editar este archivo a mano.\n")
 _NO_ES_ALIAS = {"para", "por", "con", "sin", "que", "los", "las", "una", "uno", "del", "como", "pero", "sobre", "esto", "eso", "este", "esta", "mas", "muy",

@@ -40,9 +40,9 @@ PRECIOS_DEFECTO = {                  # dólares por millón de tokens: (desde, e
 
 _lock = threading.RLock()
 _claves = {"gratis": "", "pago": ""}
-_avisos_pendientes = []
+_avisos_pendientes: list = []
 _cache_conf = {"marca": "x", "datos": None}
-_precio_desconocido_avisado = set()
+_precio_desconocido_avisado: set = set()
 
 
 def log(mensaje):

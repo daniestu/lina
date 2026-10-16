@@ -74,27 +74,27 @@ from lina.nucleo.papelera import (  # noqa: F401
 try:
     from lina.modulos import juegoconf as JC
 except ImportError:
-    JC = None
+    JC = None  # type: ignore[assignment]
 try:
     from lina.modulos import sistema as SIS
 except ImportError:
-    SIS = None
+    SIS = None  # type: ignore[assignment]
 try:
     from lina.modulos import juegos
 except ImportError:                    # sin juegos.py el asistente funciona igual (sin la biblioteca de juegos)
-    juegos = None
+    juegos = None  # type: ignore[assignment]
 try:
     from lina.nucleo import recetas as REC
 except ImportError:                       # si falta el archivo (actualización a medias), el asistente sigue sin recetas en vez de caerse
-    REC = None
+    REC = None  # type: ignore[assignment]
 try:
     from lina.nucleo import politica
 except ImportError:          # si falta politica.py el asistente arranca igualmente, en modo prudente (pide confirmación casi siempre)
-    politica = None
+    politica = None  # type: ignore[assignment]
 try:
     from lina.nucleo import diario
 except ImportError:          # si falta diario.py el asistente funciona igual, pero sin diario de cambios ni «deshacer»
-    diario = None
+    diario = None  # type: ignore[assignment]
 
 # ======================= CONFIGURACIÓN =======================
 ARCHIVO_DIARIO_VISIBLE = RUT.DATOS / "diario_visible.txt"

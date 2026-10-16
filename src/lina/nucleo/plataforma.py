@@ -111,7 +111,7 @@ PAQUETES = {
 }
 
 
-_cache_osr = {}
+_cache_osr: dict = {}
 
 
 def leer_os_release(ruta="/etc/os-release"):

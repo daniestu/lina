@@ -269,7 +269,7 @@ def _formato_cambios(c):
 # con su estado (marcada o no). Sirven aunque el menú esté cerrado y permiten interruptores EXACTOS: leer el estado, actuar solo si hace falta y verificarlo.
 import concurrent.futures
 
-_CACHE_ACC = {}
+_CACHE_ACC: dict = {}
 
 
 def _busctl(argumentos, ejecutar=subprocess.run, timeout=5):
@@ -437,7 +437,7 @@ def accionar(args, kdo=None, bus=_busctl):
     return f"Accionado «{a['texto']}» en {servicio}. No tiene estado que comprobar: mira el resultado con la pantalla o los controles."
 
 
-ULTIMO = {}          # lo último que se hizo de verdad (para apuntar recetas por nombre de control)
+ULTIMO: dict = {}          # lo último que se hizo de verdad (para apuntar recetas por nombre de control)
 
 
 def _destino_args(args):

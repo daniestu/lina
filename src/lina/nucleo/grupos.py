@@ -70,7 +70,7 @@ _VERBOS = r"\b(cambia|cambiar|pon|ponme|poner|activa|activar|desactiva|desactiva
 # Si lo que se dice es corto («ahora desactívala», «sí»), se sigue hablando de lo mismo.
 PALABRAS_CORTO = 8
 
-_REGEX = {}
+_REGEX: dict = {}
 
 
 def _plano(texto):

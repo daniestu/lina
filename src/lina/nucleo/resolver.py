@@ -23,7 +23,7 @@ _estado_fdb = {"sincronizada": False}                 # la base de archivos de p
 _cache_paneles = {"t": 0.0, "datos": {}}
 _AUR_HELPERS = {"paru", "yay", "pikaur", "aurman"}
 ARCHIVO_CONFIABLES = RUT.editable("paquetes_confiables.txt")
-_cache_conf = {"marca": None, "datos": set()}
+_cache_conf: dict = {"marca": None, "datos": set()}
 _PROGRAMAS_KWRITE = {"kwriteconfig6": "kreadconfig6", "kwriteconfig5": "kreadconfig5"}
 _SIN_VALOR = "__SIN_VALOR_ASISTENTE__"
 
@@ -443,7 +443,7 @@ def buscar_clave_en_binarios(app, palabras):
 
 
 # ---- Aprender mirando: qué clave se mueve cuando el usuario lo cambia en el panel ----
-_foto_config = {"datos": {}}
+_foto_config: dict = {"datos": {}}
 
 
 def _parsear_ini(texto):

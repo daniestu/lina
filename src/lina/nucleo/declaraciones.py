@@ -2,7 +2,7 @@
 
 Son solo datos: lo que hace cada herramienta está en herramientas.py y asistente.py."""
 
-DECLARACIONES = [
+DECLARACIONES: list[dict] = [
     {"name": "ejecutar_comando",
      "description": ("Ejecuta un comando de shell (bash) en el PC del usuario. Casi todo se ejecuta al momento, sin preguntar; "
                      "solo lo crítico (discos, arranque, cuentas, red expuesta, borrar de forma definitiva, software de fuera, "

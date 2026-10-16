@@ -1,7 +1,7 @@
 """Pruebas contra la distribución REAL en la que se ejecutan. Se activan con LINA_FAMILIA_ESPERADA=arch|debian|fedora|suse
 (la CI las lanza dentro de contenedores de cada familia; en tu equipo, `scripts/probar_en_contenedores.sh`)."""
 import os
-import subprocess
+import shutil
 
 import pytest
 
@@ -28,10 +28,11 @@ def test_comprueba_paquetes_instalados_de_verdad(monkeypatch):
 def test_las_ordenes_de_consulta_existen_en_el_sistema(monkeypatch):
     monkeypatch.setenv("LINA_DISTRO", ESPERADA)
     for orden in (PL.consulta_instalado("bash"), PL.orden("buscar", ["zzzz"]), PL.orden("instalar", ["bash"]), PL.orden("quitar", ["bash"])):
-        assert orden and subprocess.run(["which", orden[0]], capture_output=True).returncode == 0, orden
+        assert orden and shutil.which(orden[0]), orden
 
 
-def test_las_capacidades_se_leen_sin_romperse():
+def test_las_capacidades_se_leen_sin_romperse(monkeypatch):
+    monkeypatch.delenv("LINA_DISTRO", raising=False)         # conftest la fija a arch; aquí se quiere lo que dice el sistema de verdad
     c = PL.capacidades()
     assert c["familia"] == ESPERADA and c["init"] in ("systemd", "openrc", "runit", "s6", "otro")
     assert PL.describir(c)

@@ -14,7 +14,7 @@ CARPETA_DOCUMENTOS = RUT.carpeta_usuario("DOCUMENTS", "Documents")
 
 
 DIR_DISENOS = RUT.DATOS / "disenos"       # el HTML de cada diseño, para poder retocarlo
-_CREADOS = {}                       # documentos que Lina ha creado en esta sesión: ruta -> momento
+_CREADOS: dict = {}                       # documentos que Lina ha creado en esta sesión: ruta -> momento
 VIDA_CREADOS_SEG = 1800             # durante este rato se pueden rehacer (al corregir un documento no salen copias «(2)», «(3)»)
 
 
@@ -161,9 +161,9 @@ def crear_documento(nombre, contenido, formato="docx", abrir=True):
 # ======================= EXCEL Y POWERPOINT (C3) =======================
 try:
     from lina.modulos import oficina as OFI
-    OFI.ANOTAR = anotar
+    OFI.ANOTAR = anotar  # type: ignore[assignment]
 except ImportError:
-    OFI = None
+    OFI = None  # type: ignore[assignment]
 
 
 def _abrir_con_escritorio(ruta):

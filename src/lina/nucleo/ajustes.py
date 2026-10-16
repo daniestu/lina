@@ -26,7 +26,7 @@ MODOS_CATEGORIA = ("perfil", "confirmar", "libre")
 # Estas categorías se confirman siempre con el atajo, en todos los perfiles y sin interruptor: tocar discos, arranque, cuentas, dinero y gasto.
 SIEMPRE_CONFIRMAN = ("discos_y_particiones", "arranque", "cuentas_y_credenciales", "dinero", "gasto_del_asistente")
 
-ESQUEMA = {
+ESQUEMA: dict = {
     "asistente": {
         "nombre": ("Lina", "texto", None, "Cómo se llama el asistente. Es también la palabra de activación («Oye Lina»)."),
     },

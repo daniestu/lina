@@ -28,7 +28,7 @@ SERVICIO = "lina"
 ARCHIVO_MCP = "mcp_claves.env"
 TIEMPO_LLAVERO = 8                      # segundos: si el llavero está bloqueado y pide desbloquearse, no se espera eternamente
 
-_cache = {}
+_cache: dict = {}
 BUSCAR = shutil.which                    # dónde está un programa (se cambia en las pruebas)
 
 

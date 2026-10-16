@@ -74,7 +74,7 @@ def preguntar_local(pregunta, imagen, permitir_escalar, historial=(), datos_sist
         return None
 
 
-_pausa_modelo = {}
+_pausa_modelo: dict = {}
 
 
 def _id_pausa(modelo, clave):

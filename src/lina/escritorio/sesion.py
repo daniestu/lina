@@ -328,7 +328,7 @@ class Sesion:
         return l
 
 
-_actual = {}
+_actual: dict = {}
 
 
 def actual():

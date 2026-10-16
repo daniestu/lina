@@ -11,11 +11,11 @@ from lina.nucleo import herramientas as H
 try:
     from lina.modulos import notas as NOT
 except ImportError:
-    NOT = None
+    NOT = None  # type: ignore[assignment]
 try:
     from lina.modulos import recordatorios as RECORD
 except ImportError:
-    RECORD = None
+    RECORD = None  # type: ignore[assignment]
 
 
 def _plano_simple(texto):

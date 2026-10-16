@@ -23,7 +23,7 @@ from lina.modulos import organizacion as ORG
 try:
     from lina.modulos import web as W
 except ImportError:
-    W = None
+    W = None  # type: ignore[assignment]
 
 VERSIONES = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 NOMBRE, VERSION = "lina", "1.0"
