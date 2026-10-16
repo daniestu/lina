@@ -125,3 +125,35 @@ def test_render_real_en_una_pagina(tmp_path):
     motor, motivo = DIS.renderizar(html, pdf)
     assert motor, motivo
     assert DIS.paginas_pdf(pdf) in (1, None)
+
+
+def test_formato_word_usa_libreoffice_y_mide_el_docx(tmp_path, monkeypatch):
+    _aislar(tmp_path, monkeypatch)
+    monkeypatch.setattr(DIS, "programa_oficina", lambda which=None: "/usr/bin/soffice")
+
+    def a_word(html, destino, **k):
+        destino.write_bytes(b"PK-falso")
+        return "libreoffice", ""
+    monkeypatch.setattr(DIS, "a_word", a_word)
+    monkeypatch.setattr(DIS, "paginas_word", lambda *a, **k: 2)
+    texto = DOC.disenar_documento({"nombre": "plantilla", "html": HTML, "formato": "Word", "paginas": 2, "abrir": False})
+    assert "(Word)" in texto and "NO cabe" not in texto
+    assert (tmp_path / "Documentos" / "plantilla.docx").is_file() and not (tmp_path / "Documentos" / "plantilla.pdf").exists()
+
+
+def test_formato_word_sin_libreoffice_pide_la_dependencia(tmp_path, monkeypatch):
+    _aislar(tmp_path, monkeypatch)
+    from lina.nucleo import dependencias as DEP
+    monkeypatch.setattr(DIS, "programa_oficina", lambda which=None: None)
+    monkeypatch.setattr(DEP, "asegurar", lambda f, **k: (False, f"falta {f}"))
+    assert DOC.disenar_documento({"nombre": "x", "html": HTML, "formato": "docx"}) == "falta word_html"
+
+
+@pytest.mark.skipif(not DIS.programa_oficina(), reason="sin LibreOffice")
+def test_word_real_de_una_pagina(tmp_path):
+    html = tmp_path / "a.html"
+    html.write_text('<html><body><table width="100%"><tr><td bgcolor="#1f3a5f" style="color:#fff">Título</td></tr></table></body></html>')
+    docx = tmp_path / "a.docx"
+    motor, motivo = DIS.a_word(html, docx)
+    assert motor, motivo
+    assert DIS.paginas_word(docx) in (1, None)

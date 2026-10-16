@@ -7,7 +7,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ### Añadido
 - Documentos con diseño propio (`disenar_documento`): currículum, factura, cartel, menú, carta con membrete… Lina diseña el documento ella misma (HTML y CSS),
   lo convierte a PDF con el navegador que haya instalado (Chromium, Chrome, Brave, Edge, Vivaldi) o, si no hay, con WeasyPrint (lo instala bajo demanda),
-  cuenta las páginas y, si no caben, se corrige una vez. No hay plantillas. El resultado es un PDF; el HTML queda guardado para retocarlo. Se quitan
+  cuenta las páginas y, si no caben, se corrige una vez. No hay plantillas. El formato es el que pida el usuario: PDF (por defecto) o Word (.docx, pasando el mismo diseño por LibreOffice, que instala bajo demanda y con el que
+  también mide las páginas). El HTML queda guardado para retocarlo. Se quitan
   los scripts y los recursos externos del HTML y las fotos locales se incrustan.
 
 ### Cambiado

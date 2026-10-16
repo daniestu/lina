@@ -14,6 +14,7 @@ from lina.nucleo import rutas as RUT
 REGISTRO = {
     "portapapeles": ("wl-copy", "wl-clipboard", "copiar al portapapeles"),     # (en X11 es xclip: ver `_segun_sesion`)
     "pdf_html": ("weasyprint", "weasyprint", "crear documentos con diseño en PDF"),     # solo si no hay navegador (Chromium, Chrome, Brave…)
+    "word_html": ("soffice", "libreoffice", "crear documentos Word con diseño"),
     "youtube": ("yt-dlp", "yt-dlp", "buscar vídeos de YouTube"),
 }
 

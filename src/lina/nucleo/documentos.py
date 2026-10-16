@@ -241,38 +241,45 @@ def disenar_documento(a):
         pedidas = max(1, min(20, int(a.get("paginas") or 1)))
     except (TypeError, ValueError):
         pedidas = 1
+    formato = "docx" if _plano_acciones(a.get("formato")) in ("docx", "word", "doc") else "pdf"
     html, avisos = DIS.limpiar_html(html)
-    if not DIS.motor_disponible():
+    if formato == "docx":
+        if not DIS.programa_oficina():
+            ok, mensaje = DEP.asegurar("word_html")
+            if not ok:
+                return mensaje
+    elif not DIS.motor_disponible():
         ok, mensaje = DEP.asegurar("pdf_html")
         if not ok:
             return mensaje
     try:
         fuente.write_text(html, encoding="utf-8")
         CARPETA_DOCUMENTOS.mkdir(parents=True, exist_ok=True)
-        ruta = _ruta_nueva(CARPETA_DOCUMENTOS / f"{nombre}.pdf")
-        temporal = ruta.with_name(f".{ruta.stem}.lina.pdf")
-        motor, motivo = DIS.renderizar(fuente, temporal)
+        ruta = _ruta_nueva(CARPETA_DOCUMENTOS / f"{nombre}.{formato}")
+        temporal = ruta.with_name(f".{ruta.stem}.lina.{formato}")
+        motor, motivo = (DIS.a_word if formato == "docx" else DIS.renderizar)(fuente, temporal)
         if motor is None:
-            return f"No he podido generar el PDF: {motivo}."
+            return f"No he podido generar el documento: {motivo}."
         temporal.replace(ruta)
         _recordar(ruta)
-        paginas = DIS.paginas_pdf(ruta)
+        paginas = (DIS.paginas_word if formato == "docx" else DIS.paginas_pdf)(ruta)
         anotar(f"[documento-diseño] {ruta} ({motor}, {paginas if paginas else '?'} página/s, pedidas {pedidas})")
         if a.get("abrir", True):
             _abrir_con_escritorio(ruta)
     except Exception as e:
         anotar(f"[documento-diseño] error {type(e).__name__}: {e}")
         return f"No he podido crear el documento con diseño ({type(e).__name__})."
+    tipo = "Word" if formato == "docx" else "PDF"
     nota = (" Avisos: " + "; ".join(avisos) + ".") if avisos else ""
     if paginas is None:                                      # sin poder medir no se afirma que cabe
-        return f"Documento creado en {_corta(ruta)} (PDF), pero no he podido contar sus páginas: díselo al usuario, que lo compruebe al abrirlo.{nota}"
+        return f"Documento creado en {_corta(ruta)} ({tipo}), pero no he podido contar sus páginas: díselo al usuario, que lo compruebe al abrirlo.{nota}"
     if paginas > pedidas:
         return (f"Documento creado en {_corta(ruta)}, pero NO cabe: ocupa {paginas} páginas y pediste {pedidas}. Vuelve a llamar UNA vez con el MISMO "
                 f"nombre (sustituye a este, no hace otro) con menos texto, letra o márgenes algo menores (nunca por debajo de 9 pt) o menos adornos. "
                 f"Si aun así no cabe, díselo al usuario en vez de seguir.{nota}")
     if paginas < pedidas:
-        return f"Documento creado en {_corta(ruta)} (PDF): ocupa {paginas} página/s, menos de las {pedidas} previstas.{nota}"
-    return f"Documento creado en {_corta(ruta)} (PDF): {paginas} página/s A4, como se pidió.{nota}"
+        return f"Documento creado en {_corta(ruta)} ({tipo}): ocupa {paginas} página/s, menos de las {pedidas} previstas.{nota}"
+    return f"Documento creado en {_corta(ruta)} ({tipo}): {paginas} página/s A4, como se pidió.{nota}"
 
 
 def oficina_presentacion(a):

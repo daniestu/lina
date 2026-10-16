@@ -156,3 +156,51 @@ def paginas_pdf(ruta, ejecutar=subprocess.run, which=shutil.which):
     except OSError:
         return None
     return n or None
+
+
+# ---- Word: el mismo HTML, pasado por LibreOffice (solo entiende tablas y CSS sencillo; sin flexbox ni grid)
+def programa_oficina(which=shutil.which):
+    return which("soffice") or which("libreoffice")
+
+
+def _con_libreoffice(entrada, formato, carpeta, ejecutar, timeout, filtro=None):
+    perfil = Path(carpeta) / "perfil"
+    orden = [programa_oficina(), f"-env:UserInstallation={perfil.resolve().as_uri()}", "--headless"]
+    if filtro:
+        orden += [f"--infilter={filtro}"]
+    orden += ["--convert-to", formato, "--outdir", str(carpeta), str(entrada)]
+    ejecutar(orden, capture_output=True, text=True, timeout=timeout)
+
+
+def a_word(ruta_html, ruta_docx, timeout=120, ejecutar=subprocess.run, which=shutil.which):
+    """Convierte el HTML en .docx. Devuelve ("libreoffice", "") o (None, motivo)."""
+    if not programa_oficina(which):
+        return None, "falta LibreOffice para crear el Word"
+    ruta_html, ruta_docx = Path(ruta_html), Path(ruta_docx)
+    with tempfile.TemporaryDirectory(prefix="lina-doc-") as t:
+        copia = Path(t) / "documento.html"
+        copia.write_bytes(ruta_html.read_bytes())
+        try:
+            _con_libreoffice(copia, "docx:MS Word 2007 XML", t, ejecutar, timeout, filtro="HTML (StarWriter)")
+        except (OSError, subprocess.SubprocessError) as e:
+            return None, f"LibreOffice no pudo: {e}"
+        hecho = Path(t) / "documento.docx"
+        if not hecho.is_file() or hecho.stat().st_size == 0:
+            return None, "LibreOffice no generó el Word"
+        shutil.copyfile(hecho, ruta_docx)
+    return "libreoffice", ""
+
+
+def paginas_word(ruta, timeout=120, ejecutar=subprocess.run, which=shutil.which):
+    """Páginas del .docx tal como las pone LibreOffice (Word puede variar un poco), o None."""
+    if not programa_oficina(which):
+        return None
+    with tempfile.TemporaryDirectory(prefix="lina-doc-") as t:
+        copia = Path(t) / "documento.docx"
+        copia.write_bytes(Path(ruta).read_bytes())
+        try:
+            _con_libreoffice(copia, "pdf", t, ejecutar, timeout)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        pdf = Path(t) / "documento.pdf"
+        return paginas_pdf(pdf, ejecutar=ejecutar, which=which) if pdf.is_file() else None

@@ -24,7 +24,7 @@ DECLARACIONES = [
                                    "formato": {"type": "string", "enum": ["docx", "md", "txt"]}},
                     "required": ["nombre", "contenido"]}},
     {"name": "disenar_documento",
-     "description": ("Crea un PDF con DISEÑO PROPIO en Documentos: currículum, factura, presupuesto, cartel, menú, carta formal con membrete, ficha… "
+     "description": ("Crea un documento (PDF o Word .docx, según pida el usuario) con DISEÑO PROPIO en Documentos: currículum, factura, presupuesto, cartel, menú, carta formal con membrete, ficha… "
                      "Lo diseñas TÚ escribiendo el documento completo en HTML con su CSS dentro de <style>, como lo haría un diseñador web; Lina lo convierte a PDF, "
                      "cuenta las páginas y te dice si cabe. No hay plantillas: piensa el diseño según el tipo de documento y su contenido. "
                      "Pautas: "
@@ -35,10 +35,12 @@ DECLARACIONES = [
                      "(5) Espacio: aire entre secciones y alineaciones consistentes; si el contenido no cabe, recorta texto antes que encoger la letra. "
                      "(6) No inventes datos que parezcan reales (teléfonos, direcciones, empresas, cifras): usa los que dé el usuario o marcadores claros como [Teléfono], o pregúntale. "
                      "(7) Fotos o logotipos: pasa la ruta del archivo local en <img src=\"/ruta/foto.jpg\"> y Lina lo incrusta; sin foto, no dejes recuadros vacíos salvo que el usuario lo quiera. "
+                     "FORMATO WORD (docx): LibreOffice solo entiende HTML sencillo, así que maqueta TODO con <table> (width, cellpadding, bgcolor, valign como atributos HTML; los colores también en style), sin flexbox, grid, posiciones absolutas ni sombras; tamaños en pt. Si te piden una plantilla, deja marcadores como [Nombre] para rellenar. "
                      "Si responde «NO cabe», vuelve a llamar UNA sola vez con el MISMO nombre (sustituye al anterior). Para texto corrido usa crear_documento."),
      "parameters": {"type": "object",
                     "properties": {"nombre": {"type": "string", "description": "Nombre del archivo, sin extensión."},
                                    "html": {"type": "string", "description": "Documento completo: HTML con el CSS en <style>."},
+                                   "formato": {"type": "string", "enum": ["pdf", "docx"], "description": "El que pida el usuario: Word/plantilla editable = docx; PDF o sin indicación = pdf."},
                                    "paginas": {"type": "integer", "description": "Páginas que debe ocupar como máximo (por defecto 1)."},
                                    "accion": {"type": "string", "enum": ["crear", "ver_html"], "description": "ver_html devuelve el HTML guardado de un diseño anterior, para retocarlo."},
                                    "abrir": {"type": "boolean", "description": "Abrirlo al terminar (por defecto sí)."}},
