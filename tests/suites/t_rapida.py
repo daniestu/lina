@@ -27,7 +27,7 @@ ej.herramienta=lambda x:"código de salida: 0\n"
 ej.deshacer=lambda i:"Deshecho: x"
 a.ejecutor=ej; a.modo_privado=False
 H._validar_panel_kde=lambda c:None
-import shutil; _w=shutil.which; A.shutil.which=lambda n,*x,**k:"/usr/bin/"+n if n.startswith("k") else _w(n,*x,**k)
+import shutil; _w=shutil.which; shutil.which=lambda n,*x,**k:"/usr/bin/"+n if n.startswith("k") else _w(n,*x,**k)
 EJ._ejecutar_simple=lambda argv,**k:(0,"false")
 args={"archivo":"kwinrc","grupos":["NightColor"],"clave":"Active","valor":"true","panel":"kcm_nightlight","control":"Horas de cambio","esperado":"Amanecer y anochecer","ajuste":"luz nocturna"}
 r=a.probar_ajuste_kde(dict(args)); print(r[:260])
