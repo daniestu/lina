@@ -18,6 +18,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
   El comportamiento no cambia salvo el arreglo de abajo. Ver [arquitectura](docs/arquitectura.md).
 - Calidad: ruff comprueba más reglas (`F` completo, trampas de Python como argumentos mutables y variables de bucle capturadas); la CI mide la cobertura con `pytest-cov`
   y pasa mypy como aviso informativo, sin bloquear, mientras se anotan los módulos.
+  La CI falla si la cobertura baja del 63 % (hoy es del 67 %).
 
 ### Arreglado
 - Currículum (documento con columnas): la tabla llenaba el A4 sin margen y, al crecer un poco la cabecera, la hoja se iba a dos páginas; ahora deja casi 1 cm de holgura y la

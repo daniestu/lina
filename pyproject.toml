@@ -69,6 +69,7 @@ patch = ["subprocess"]        # varias pruebas lanzan Lina como proceso aparte (
 
 [tool.coverage.report]
 show_missing = false
+fail_under = 63               # la CI mide 67 %; esto impide que baje sin que se note (subirlo cuando suba)
 skip_empty = true
 exclude_also = ["if __name__ == .__main__.:", "raise NotImplementedError"]
 
