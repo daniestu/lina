@@ -380,17 +380,25 @@ def _empieza(solo, entrada):
 
 
 # ---- Lo que usa el asistente ----
-_RELLENO_CANCELAR = {"ya", "eso", "esto", "todo", "por", "favor", "porfa", "vale", "venga", "gracias", "ahora", "mismo", "asistente", "y"}
+_RELLENO_CANCELAR_ES = {"ya", "eso", "esto", "todo", "por", "favor", "porfa", "vale", "venga", "gracias", "ahora", "mismo", "asistente", "y"}
+_RELLENO_CANCELAR_EN = {"it", "that", "this", "all", "please", "now", "thanks", "thank", "you", "assistant", "right", "already", "and", "lina"}
+_RELLENO_CANCELAR = IDI.PorIdioma({"es": _RELLENO_CANCELAR_ES, "en": _RELLENO_CANCELAR_EN})
 
 
-_PANTALLA_CLARA = {"esto", "aqui", "ahi", "pantalla", "ventana", "mira", "mirar", "mirame", "ves", "veo", "pone", "dice", "salio", "sale", "aparece", "este", "estos"}
-_PANTALLA_FRASES = ("que hago", "que pulso", "donde le doy", "donde pulso", "que significa", "que es eso", "que me sale", "que me aparece", "lo que veo", "lo que ves")
+_PANTALLA_CLARA_EN = {"this", "here", "screen", "window", "look", "see", "says", "shows", "appears", "these"}
+_PANTALLA_FRASES_EN = ("what do i do", "what do i click", "where do i click", "what does this mean", "what is that", "what is this", "what's this", "what's on", "what i see", "what you see")
+_PANTALLA_CLARA_ES = {"esto", "aqui", "ahi", "pantalla", "ventana", "mira", "mirar", "mirame", "ves", "veo", "pone", "dice", "salio", "sale", "aparece", "este", "estos"}
+_PANTALLA_FRASES_ES = ("que hago", "que pulso", "donde le doy", "donde pulso", "que significa", "que es eso", "que me sale", "que me aparece", "lo que veo", "lo que ves")
+
+
+_PANTALLA_CLARA = {"es": _PANTALLA_CLARA_ES, "en": _PANTALLA_CLARA_EN}
+_PANTALLA_FRASES = {"es": _PANTALLA_FRASES_ES, "en": _PANTALLA_FRASES_EN}
 
 
 def pide_mirar(texto):
     """¿Hablas de lo que ves en pantalla («esto», «aquí», «qué pone», «mira…»)? Es solo un atajo: si no lo detecta, la IA puede pedir la captura."""
     solo = normalizar(texto)
-    return bool(set(solo.split()) & _PANTALLA_CLARA) or any(f in solo for f in _PANTALLA_FRASES)
+    return bool(set(solo.split()) & IDI.segun(_PANTALLA_CLARA)) or any(f in solo for f in IDI.segun(_PANTALLA_FRASES))
 
 
 def ventana_sensible(titulo, clase=""):
@@ -881,7 +889,11 @@ _OLVIDAR = re.compile(r"^(?:olvida|borra|quita|elimina)\s+(?:el\s+)?alias\s+(?:d
                       re.IGNORECASE)
 
 
-_ALIAS_POR_IDIOMA = {"es": (_ENSENAR, _ENSENAR_POR, _APRENDE, _OLVIDAR)}          # las frases con las que se enseña o se quita un alias, por idioma
+_EN_ENSENAR = re.compile(r"^(?:when|if)\s+(?:i|you\s+hear|you\s+see)\s+(?:say\s+|hear\s+)?(?P<oido>.+?)[,;]?\s+(?:i\s+mean|i\s+meant|it\s+means|that\s+means|understand\s+it\s+as)\s+(?P<sig>.+)$", re.IGNORECASE)
+_EN_ENSENAR_POR = re.compile(r"^(?:understand|read)\s+(?P<oido>.+?)\s+as\s+(?P<sig>.+)$", re.IGNORECASE)
+_EN_APRENDE = re.compile(r"^(?:learn|remember)\s+that\s+(?P<oido>.+?)\s+(?:is|means|stands\s+for)\s+(?P<sig>.+)$", re.IGNORECASE)
+_EN_OLVIDAR = re.compile(r"^(?:forget|delete|remove|drop)\s+(?:the\s+)?alias\s+(?:for\s+)?(?P<oido>.+)$|^forget\s+that\s+(?P<oido2>.+?)\s+(?:is|means)\s+.+$", re.IGNORECASE)
+_ALIAS_POR_IDIOMA = {"es": (_ENSENAR, _ENSENAR_POR, _APRENDE, _OLVIDAR), "en": (_EN_ENSENAR, _EN_ENSENAR_POR, _EN_APRENDE, _EN_OLVIDAR)}          # las frases con las que se enseña o se quita un alias, por idioma
 
 
 def entender_alias(texto, apps=None):

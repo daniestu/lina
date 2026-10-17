@@ -48,9 +48,11 @@ def test_las_instrucciones_en_espanol_son_las_de_siempre(es):
 
 
 def test_con_otro_idioma_las_instrucciones_salen_de_su_tabla(en, monkeypatch):
-    assert CON.instrucciones() == CON.INSTRUCCIONES                     # aún no hay inglesas: el español
     monkeypatch.setattr(CON, "INSTRUCCIONES_POR_IDIOMA", {**CON.INSTRUCCIONES_POR_IDIOMA, "en": "You are a voice assistant."})
     assert CON.instrucciones() == "You are a voice assistant."
+    monkeypatch.setattr(I, "IDIOMAS", ("es", "fr"))
+    monkeypatch.setattr(I, "LECTOR", lambda: Ajustes("fr"))
+    assert CON.instrucciones() == CON.INSTRUCCIONES                     # un idioma sin instrucciones propias: el español
 
 
 # --- fecha y números para la voz ---
@@ -167,3 +169,57 @@ def test_las_notas_ignoran_las_palabras_vacias_de_cada_idioma(es, monkeypatch):
 
 def test_abrir_un_programa_en_espanol_como_siempre(es):
     assert RES._motivo_es_abrir("Abrir Dolphin") is True and RES._motivo_es_abrir("Cambiar el volumen") is False
+
+
+# --- el inglés entregado (fase 8, paso 5) ---
+
+def test_el_ingles_se_puede_elegir_y_tiene_todo_lo_que_hace_falta():
+    from lina.voz import voces as V
+    assert "en" in I.IDIOMAS
+    assert I.POR_DEFECTO in CON.INSTRUCCIONES_POR_IDIOMA and "en" in CON.INSTRUCCIONES_POR_IDIOMA
+    assert "Always answer in English" in CON.INSTRUCCIONES_POR_IDIOMA["en"]
+    assert V.POR_DEFECTO["en"] in V.CATALOGO["en"] and I.comprobar("en") == []
+    for tabla in (TX._FECHA_POR_IDIOMA, C._ALIAS_POR_IDIOMA, NOT._PARAR_POR_IDIOMA, RES._LANZAMIENTO_POR_IDIOMA, G._VERBOS_POR_IDIOMA):
+        assert "en" in tabla
+    for g, patron in G._PALABRAS.items():
+        assert isinstance(patron, dict) and "en" in patron, g
+
+
+def test_el_catalogo_ingles_cubre_todos_los_textos_envueltos():
+    """Cada T("…") con texto literal tiene su traducción inglesa (y cada traducción corresponde a algún texto)."""
+    import ast
+    from pathlib import Path
+    raiz = Path(I.__file__).parent.parent
+    textos = set()
+    for f in raiz.rglob("*.py"):
+        for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+            if isinstance(n, ast.Call) and getattr(n.func, "id", getattr(n.func, "attr", None)) == "T" and n.args \
+                    and isinstance(n.args[0], ast.Constant) and isinstance(n.args[0].value, str):
+                textos.add(n.args[0].value)
+    cat = I.catalogo("en")
+    assert textos - set(cat) == set() and set(cat) - textos == set()
+
+
+def test_con_lina_en_ingles_se_traduce_y_las_redes_de_seguridad_entienden_ingles(monkeypatch):
+    monkeypatch.setattr(I, "LECTOR", lambda: Ajustes("en"))
+    monkeypatch.setattr(I, "_catalogos", {})
+    assert I.T("No te he oído.") == "I did not hear you."
+    assert I.T("Recordatorio: {texto}.", texto="tea") == "Reminder: tea."
+    assert TX.afirma_hecho("I've installed it, all set.") and TX.afirma_hecho("Done.")
+    assert not TX.afirma_hecho("Which one do you want me to install?")
+    assert TX.admite_duda("I couldn't verify that it worked.") and not TX.admite_duda("It is installed.")
+    assert TX.PIDE_CONFIRMACION.search("Shall I install it?") and not TX.PIDE_CONFIRMACION.search("It is installed.")
+    assert "Eres un asistente" not in CON.instrucciones() and CON.instrucciones().startswith("You are a voice assistant")
+    assert "It is now 22:49" in TX.texto_fecha_hora(datetime(2026, 10, 17, 22, 49))
+    assert G.elegir("turn up the volume") == {"sistema"} and "juegos" in G.elegir("open steam")
+    assert C.entender_alias("When I say cait I mean Kate") == ("aprender", "cait", "Kate")
+    assert C.quiere_cancelar("stop") and C.quiere_cancelar("cancel that please") and not C.quiere_cancelar("stop the music and play jazz")
+    assert RES._motivo_es_abrir("Open Dolphin") is True and RES._motivo_es_abrir("Change the volume") is False
+    assert NOT._palabras("the note about shopping") == ["shopping"]
+
+
+def test_el_archivo_de_palabras_ingles_entregado_no_tiene_avisos():
+    from pathlib import Path
+    ruta = Path(RUT.DEFECTOS) / "comandos.en.txt"
+    secciones, avisos = C._parsear(ruta.read_text(encoding="utf-8"))
+    assert avisos == [] and set(C.SECCIONES) <= set(secciones)

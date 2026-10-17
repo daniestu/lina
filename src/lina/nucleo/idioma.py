@@ -18,7 +18,7 @@ import tomllib
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import rutas as RUT
 
-IDIOMAS = AJ.IDIOMAS          # los que se pueden elegir (se añade «en» cuando su traducción esté entregada, fase 8 paso 5)
+IDIOMAS = AJ.IDIOMAS          # los que se pueden elegir
 POR_DEFECTO = "es"
 CARPETA = RUT.DEFECTOS / "idiomas"
 
@@ -54,6 +54,25 @@ def segun(tabla):
     """El valor de una tabla {idioma: valor} para el idioma activo. Si no tiene el suyo, el del español (siempre debe tenerlo)."""
     codigo = actual()
     return tabla[codigo] if codigo in tabla else tabla[POR_DEFECTO]
+
+
+class PorIdioma:
+    """Un patrón (o un conjunto) que cambia con el idioma: se usa igual que el objeto de `re` o la colección que sustituye (`.search`, `.match`, `in`)."""
+
+    def __init__(self, tabla):
+        self.tabla = tabla
+
+    def _actual(self):
+        return segun(self.tabla)
+
+    def search(self, *a, **k):
+        return self._actual().search(*a, **k)
+
+    def match(self, *a, **k):
+        return self._actual().match(*a, **k)
+
+    def __contains__(self, x):
+        return x in self._actual()
 
 
 def catalogo(codigo):

@@ -66,9 +66,36 @@ _PALABRAS = {
     "interfaz": r"\b(boton(es)?|pulsa(r)?|haz clic|clic en|click|dale a|aprieta|casilla|marca(r)? (la|el)|desmarca(r)?|desplegable|pestana|que (hay|ves|aparece|botones)|controles de|elementos de la ventana|instalador|acepta(r)? (el|la|los)|siguiente|barra de (ruta|rutor|rutas|direcciones|direccion|busqueda|herramientas|menu|estado)|(escribe|teclea|pon|introduce|rellena)\w* .{0,40}\\b(en|dentro de) (la|el|este|esta|ese|esa) (barra|campo|caja|cuadro|casilla|buscador|ventana|formulario)|cuadro de (texto|dialogo|busqueda)|campo de (texto|busqueda)|menu (archivo|editar|ver|herramientas|ajustes)|senala(r)? (el|la|los|las)|archivos ocultos|vista en (columnas|iconos|detalles|lista)|(muestra|oculta|activa|desactiva|cambia|abre|cierra) .{0,40}\b(en|de) (dolphin|kate|okular|gwenview|ark|konsole)|(dolphin|kate|okular|gwenview)\b.{0,40}\b(muestra|oculta|activa|desactiva|vista|panel|pestana))\b",
     "memoria": r"\b(gast|presupuesto|euros|tope|diario|has cambiado|has hecho|te oi mal|queria decir|me refiero|aprendido|recetas|olvida como|alias)",
 }
+# Las mismas palabras en inglés (el español sigue siendo la base: un grupo sin su tabla inglesa se activa con las españolas, que no encajarán)
+_PALABRAS_EN = {
+    "ajustes_kde": r"\b(settings?|configur|kde|plasma|panel|theme|font|cursor|wallpaper|animation|effect|shortcut|mouse|touchpad|keyboard|language|"
+                   r"taskbar|widget|screensaver|notifications?|night light|dark mode|dark|colou?r|transparen|scal(e|ing)|dpi|double click|lock|idle|autostart|default)",
+    "sistema": r"\b(window|minimi[sz]|maximi[sz]|fullscreen|full screen|close|focus|process|kill|cpu|\bram\b|service|systemd|wi-?fi|network|internet|"
+               r"bluetooth|connection|dns|ping|power|battery|suspend|hibernate|reboot|restart|shut ?down|power off|lock|session|monitor|resolution|"
+               r"refresh rate|\bhz\b|rotate|vrr|hdr|brightness|volume|audio|sound|mute|microphone|speakers?|headphones?|output|d-?bus|kwin|"
+               r"backup|snapshot|snapper|dmidecode|temperature|profile)",
+    "juegos": r"\b(games?|steam|proton|mangohud|fps|launch options?|heroic|lutris|hud|gamemode)",
+    "archivos": r"\b(documents?|word|docx|resume|cv|leaflet|flyer|excel|xlsx|spreadsheet|table|powerpoint|pptx|presentation|slides?|letter|report|"
+                r"clipboard|youtube|video|trash|recycle bin|delete|remove|recover|restore|empty)",
+    "web": r"(https?://|www\.|\.(com|es|org|net|io|dev)\b|\b(web ?page|website|this link|the link|link|article|news|url|read (this|the) (page|site)|"
+           r"summari[sz]e (this|that|the) (page|site|article)|what does (the|that|this) (page|site|article) say)\b)",
+    "organizacion": r"\b(notes?|jot down|write down|remind me|reminders?|alarm|timer|countdown|shopping list|what do i have (pending|written)|wake me|"
+                    r"in (\d+|an?|half an?|a few) (minutes?|hours?|days?))",
+    "mcp": r"\b(mcp|tool servers?|model context|connect (to|with) (a |the |my |your )?(browser|github|calendar|mail|gmail|database)|real browser)",
+    "yo": r"\b(your voice|voices|speed|glow|your settings|your configuration|configure yourself|your commands|what can you do|what do you know how to do|"
+          r"how are you set up|how do i (change|configure|use|adjust) you|your name|what.s your name|your profile|your autonomy|hands.?free|your documentation)",
+    "interfaz": r"\b(buttons?|press|click|click on|tick|checkbox|untick|dropdown|tab|what (is|do you see|appears|buttons)|controls? of|window elements|installer|"
+                r"accept the|next|address bar|search bar|toolbar|status bar|text box|text field|dialog|menu (file|edit|view|tools|settings)|hidden files|"
+                r"(show|hide|enable|disable|change|open|close) .{0,40}\b(in|of) (dolphin|kate|okular|gwenview|ark|konsole))\b",
+    "memoria": r"\b(spend|spent|budget|euros|dollars|cap|diary|changelog|you changed|you did|you misheard|i meant|i mean|learned|recipes|forget how|alias)",
+}
+for _g, _p in _PALABRAS_EN.items():
+    _PALABRAS[_g] = {"es": _PALABRAS[_g], "en": _p}
+
 # Verbos de «cambiar algo»: si no ha saltado ningún otro grupo, lo más probable es un ajuste.
 _VERBOS = r"\b(cambia|cambiar|pon|ponme|poner|activa|activar|desactiva|desactivar|quita|quitar|sube|baja|habilita|deshabilita)\b"
-_VERBOS_POR_IDIOMA = {"es": _VERBOS}                    # los verbos de «cambia/pon/activa…» con los que se pide tocar un ajuste, por idioma
+_VERBOS_EN = r"\b(change|set|turn on|turn off|switch on|switch off|enable|disable|activate|deactivate|raise|lower|increase|decrease|remove)\b"
+_VERBOS_POR_IDIOMA = {"es": _VERBOS, "en": _VERBOS_EN}                    # los verbos de «cambia/pon/activa…» con los que se pide tocar un ajuste, por idioma
 # Si lo que se dice es corto («ahora desactívala», «sí»), se sigue hablando de lo mismo.
 PALABRAS_CORTO = 8
 

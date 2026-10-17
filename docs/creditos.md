@@ -19,5 +19,15 @@ la que se elige a `~/.local/share/lina/voces/` la primera vez que la necesita.
 - Las voces `davefx` y `sharvard` se entrenaron a partir de la voz inglesa *lessac* (calidad media).
 - Cada voz tiene su ficha (`MODEL_CARD`) en su carpeta del repositorio de voces.
 
+### Voces inglesas (experimental)
+
+| Voz | Datos de entrenamiento | Licencia de los datos |
+|---|---|---|
+| `en_US-lessac-medium` (por defecto en inglés) | Blizzard 2013 Lessac, Universidad de Edimburgo (CSTR) | **Sin comprobar**: la ficha remite a la página de licencia del conjunto de datos |
+| `en_US-amy-medium` | [mycroft-ai/mimic3-voices](https://github.com/MycroftAI/mimic3-voices) | **Sin comprobar**: la ficha no la indica |
+
+La ficha de cada modelo declara MIT para el modelo, pero eso no dice nada de los datos con los que se entrenó. **Antes de publicar `v0.1.0-beta` hay que leer
+esas licencias y, si no permiten el uso, quitar la voz del catálogo** (`src/lina/voz/voces.py`). Las voces no viajan en el repositorio: se descargan al elegirlas.
+
 Cómo elegir voz: `lina voz` lista las que hay y `lina voz NOMBRE` cambia de voz.
 Si publicas una versión que incluya alguna voz, mantén estas atribuciones.

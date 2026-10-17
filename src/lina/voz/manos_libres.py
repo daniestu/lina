@@ -41,7 +41,7 @@ PREDETERMINADOS = {
     "activo": "si",               # si / no
     "nombre": "lina",
     "alias": "",                  # otros nombres que también valen, separados por comas
-    "prefijos": "oye, escucha, hey, ey, eh, hola, oiga, atiende, despierta, ok, vale, oie",
+    "prefijos": "oye, escucha, hey, ey, eh, hola, oiga, atiende, despierta, ok, vale, oie, listen, hi, hello, okay",
     "sin_prefijo": "si",          # si: vale decir solo «Lina, …» al principio de la frase
     "seguimiento": "8",           # segundos tras responderte (solo si lo pediste por manos libres, nunca con el atajo) en los que puedes seguir hablando sin decir el nombre (0 = nunca)
     "espera_orden": "6",          # segundos que espera tu orden tras decir solo «Oye Lina»

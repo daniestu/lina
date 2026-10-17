@@ -733,7 +733,8 @@ def buscar_ajuste_kde(consulta, valor=None):
 
 
 _LANZAMIENTO = re.compile(r"^\s*(?:abrir|abre|abriendo|lanzar|lanza|iniciar|inicia|arrancar|arranca)\b", re.I)
-_LANZAMIENTO_POR_IDIOMA = {"es": _LANZAMIENTO}          # cómo empieza el «motivo» de una orden de abrir un programa, por idioma
+_LANZAMIENTO_EN = re.compile(r"^\s*(?:open|opening|launch|launching|start|starting|run|running)\b", re.I)
+_LANZAMIENTO_POR_IDIOMA = {"es": _LANZAMIENTO, "en": _LANZAMIENTO_EN}          # cómo empieza el «motivo» de una orden de abrir un programa, por idioma
 
 
 def _motivo_es_abrir(motivo):

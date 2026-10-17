@@ -1397,7 +1397,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
     # Verbos con los que empieza el «motivo» de un comando («activar la luz nocturna»): el nombre del ajuste es lo que viene después.
     _VERBO_INICIAL = re.compile(r"^(?:activar|desactivar|poner|pon|cambiar|ajustar|subir|bajar|quitar|apagar|encender|habilitar|deshabilitar|configurar|"
                                 r"establecer|modificar|dejar|fijar|probar)\s+(?:(?:el|la|los|las|un|una|lo|al|a|del|de)\s+)*", re.I)
-    _VERBO_INICIAL_POR_IDIOMA = {"es": _VERBO_INICIAL}
+    _VERBO_INICIAL_EN = re.compile(r"^(?:turn on|turn off|enable|disable|set|change|adjust|raise|lower|increase|decrease|remove|switch on|switch off|"
+                                   r"configure|modify|leave|try|put)\s+(?:(?:the|a|an|to|on|off|up|down)\s+)*", re.I)
+    _VERBO_INICIAL_POR_IDIOMA = {"es": _VERBO_INICIAL, "en": _VERBO_INICIAL_EN}
     _NO_AJUSTE = re.compile(r"^(?:rm|mv|cp|mkdir|rmdir|touch|tee|echo|git|python3?|bash|sh|zsh|fish|systemctl|kill|pkill|killall|xdg-open|notify-send|"
                             r"sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|curl|wget|ln|chmod|chown|kdotool|xdotool|spectacle|grim|scrot|steam|kcmshell[56])$")
 

@@ -1,0 +1,212 @@
+# ============================================================================================
+#  VOICE COMMANDS (ENGLISH)
+#  Words and phrases Lina reacts to when she speaks English. Same sections as comandos.txt; see that file for how each one works.
+#  Edit it freely: it is re-read when you save it. A section you delete falls back to the SPANISH factory values, so keep all of them.
+#  The "yes" and "no" lists decide whether something runs on your PC, so only you change them, by hand.
+# ============================================================================================
+
+[reiniciar_conversacion]
+new conversation
+start over
+forget everything
+forget what i said
+forget the above
+clear the conversation
+
+[cancelar]
+stop
+stop it
+stop that
+cancel
+cancel that
+cancel it
+cancel everything
+never mind
+forget it
+leave it
+abort
+halt
+enough
+that's enough
+do nothing
+don't do anything
+do not continue
+don't continue
+
+[profundo_peticiones_abiertas]
+set everything up
+set it all up
+get everything ready
+leave it configured
+i want to be able to
+
+[ventanas_sensibles]
+bank
+banking
+paypal
+revolut
+billing
+invoice
+card
+cards
+iban
+password
+passwords
+keepass
+keepassxc
+bitwarden
+1password
+lastpass
+kwallet
+wallet
+payment
+payments
+checkout
+taxes
+api key
+api keys
+token
+secret
+private browsing
+incognito
+
+[profundo_frases]
+think carefully
+think hard
+think it through
+think deeply
+think about it
+think step by step
+reason it out
+reason carefully
+analyze carefully
+analyse carefully
+analyze in depth
+look carefully
+check carefully
+double check
+verify carefully
+take your time
+take your time with this
+no rush
+in depth
+thoroughly
+step by step
+deep reasoning
+reasoning mode
+deep mode
+best model
+most powerful model
+smartest model
+
+[profundo_ordenes_en_cualquier_sitio]
+think it over
+ponder
+investigate
+dig into
+make sure
+meticulously
+in detail
+
+[profundo_verbos_al_principio]
+think
+reason
+analyze
+analyse
+investigate
+reflect
+study
+examine
+evaluate
+
+[profundo_verbos_no_si_va_despues_de]
+what
+who
+how
+when
+where
+why
+do
+does
+did
+not
+to
+can
+will
+
+[profundo_automatico]
+diagnose
+troubleshoot
+repair
+debug
+optimize
+optimise
+automate
+script
+backup
+back up
+
+[borrar_definitivo]
+permanently
+for good
+forever
+irrecoverable
+irrecoverably
+bypass the trash
+without the trash
+skip the trash
+
+[confirmar_si_al_principio]
+yes
+yeah
+yep
+ok
+okay
+sure
+go ahead
+do it
+proceed
+confirmed
+confirm
+alright
+please do
+absolutely
+of course
+perfect
+
+[confirmar_si_en_cualquier_sitio]
+install it
+run it
+execute it
+delete it
+remove it
+create it
+open it
+update it
+uninstall it
+fix it
+configure it
+enable it
+disable it
+turn it on
+turn it off
+do it
+
+[confirmar_no]
+no
+nope
+never
+cancel
+stop
+wait
+hold on
+don't
+do not
+not
+nothing
+rather
+instead
+neither
+nor
+but
+however

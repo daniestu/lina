@@ -21,7 +21,9 @@ MAX_LEER = 4000            # lo que se devuelve a la IA al leer una nota entera
 EXTENSIONES = {".md", ".txt"}
 _PARAR = {"de", "la", "el", "los", "las", "un", "una", "unos", "unas", "que", "en", "y", "a", "mi", "mis", "me", "con", "por", "para", "del", "al",
           "nota", "notas", "sobre", "lo", "se", "es", "tengo", "tenia", "dime", "busca", "buscame", "donde", "apunte", "apuntes", "apuntado"}
-_PARAR_POR_IDIOMA = {"es": _PARAR}          # palabras que no cuentan al buscar en las notas, por idioma
+_PARAR_EN = {"the", "a", "an", "of", "to", "in", "on", "and", "my", "me", "about", "for", "with", "is", "it", "that", "note", "notes", "what", "do", "i",
+             "have", "find", "search", "tell", "where", "wrote", "written", "down", "saved", "did"}
+_PARAR_POR_IDIOMA = {"es": _PARAR, "en": _PARAR_EN}          # palabras que no cuentan al buscar en las notas, por idioma
 
 
 def _plano(texto):

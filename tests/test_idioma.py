@@ -32,7 +32,7 @@ def en(tmp_path, monkeypatch):
 
 def test_el_idioma_por_defecto_es_el_espanol():
     assert AJ.ESQUEMA["asistente"]["idioma"][0] == "es" and I.POR_DEFECTO == "es"
-    assert I.IDIOMAS == AJ.IDIOMAS == ("es",)
+    assert I.IDIOMAS == AJ.IDIOMAS == ("es", "en")
 
 
 def test_en_espanol_el_texto_sale_tal_cual_y_con_sus_huecos(monkeypatch):
@@ -43,10 +43,15 @@ def test_en_espanol_el_texto_sale_tal_cual_y_con_sus_huecos(monkeypatch):
     assert I.T("Llaves {{literales}} y {n}", n=3) == "Llaves {literales} y 3"
 
 
-@pytest.mark.parametrize("valor", ["fr", "", None, "EN ", 7])
+@pytest.mark.parametrize("valor", ["fr", "", None, 7])
 def test_un_idioma_desconocido_o_roto_cae_al_espanol(monkeypatch, valor):
     monkeypatch.setattr(I, "LECTOR", lambda: Ajustes(valor))
     assert I.actual() == "es"
+
+
+def test_el_codigo_del_idioma_se_normaliza(monkeypatch):
+    monkeypatch.setattr(I, "LECTOR", lambda: Ajustes(" EN "))
+    assert I.actual() == "en"
 
 
 def test_un_config_roto_no_deja_a_lina_muda(monkeypatch):
@@ -107,8 +112,10 @@ def test_con_los_ajustes_de_verdad(tmp_path):
     assert I.actual(lambda: ajustes) == "es"
     ajustes.establecer("asistente", "idioma", "es")
     assert I.actual(lambda: ajustes) == "es"
-    with pytest.raises(Exception):                                  # «en» todavía no se puede elegir: no está entregado
-        ajustes.establecer("asistente", "idioma", "en")
+    ajustes.establecer("asistente", "idioma", "en")
+    assert I.actual(lambda: ajustes) == "en"
+    with pytest.raises(Exception):                                  # un idioma que no está entregado no se puede elegir
+        ajustes.establecer("asistente", "idioma", "fr")
 
 
 # --- voces y reconocimiento de voz según el idioma ---
@@ -127,8 +134,10 @@ def test_las_voces_que_se_ofrecen_son_las_del_idioma_activo(voces_en):
     assert V.idioma() == "en" and list(V.catalogo()) == ["en_US-prueba-medium"] and V.por_defecto() == "en_US-prueba-medium"
 
 
-def test_sin_voces_en_ese_idioma_se_usan_las_espanolas(en):
+def test_sin_voces_en_ese_idioma_se_usan_las_espanolas(en, monkeypatch):
     from lina.voz import voces as V
+    monkeypatch.setattr(I, "IDIOMAS", ("es", "fr"))
+    monkeypatch.setattr(I, "LECTOR", lambda: Ajustes("fr"))
     assert V.idioma() == "es" and "es_MX-claude-high" in V.catalogo() and V.por_defecto() == V.VOZ_POR_DEFECTO
 
 

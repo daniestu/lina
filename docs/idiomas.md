@@ -30,6 +30,16 @@ Las tablas se consultan con `idioma.segun(tabla)`: el valor del idioma activo o,
 - `T()` ya envuelve los textos fijos que Lina dice o muestra: sus frases, las notificaciones, los mensajes de las órdenes de voz y la salida de `lina ia`.
   Todavía **no** están envueltos: `lina doctor`, los archivos de `ayuda/`, el README, las descripciones y resultados de las herramientas, los textos
   auxiliares que se envían a la IA y los registros (logs). En español todo sale igual que antes.
+- **Inglés (experimental, paso 5).** `idioma = "en"` lo activa (`lina ajustes` o por voz). Trae: `datos/idiomas/en.toml` (todas las frases envueltas),
+  instrucciones inglesas para la IA, `comandos.en.txt` (sí/no, cancelar, modo a fondo…), frases de «aprende que…», palabras que activan cada grupo de
+  herramientas, fecha para la IA, palabras vacías de las notas, verbos de abrir programas y dos voces de Piper. También las **redes de seguridad** que
+  detectan una respuesta que da algo por hecho (`afirma_hecho`), que reconoce una duda (`admite_duda`) o que pide confirmación (`PIDE_CONFIRMACION`) tienen su
+  versión inglesa: sin ellas Lina podría decir «done» sin haberlo hecho y nada lo frenaría.
+- Lo que **no** está traducido y sigue en español incluso con `idioma = "en"`: las descripciones y resultados de las herramientas (la IA los entiende y le
+  contesta al usuario en inglés), las reglas de cada grupo de herramientas, `lina doctor`, `ayuda/`, el README, `AYUDA` de `lina ia` y los avisos largos de
+  seguridad. También son solo españolas las pistas de pantalla/rellenos de `pendiente_dicho` y el reconocimiento de nombres de ajustes de KDE en español.
+- **Sin probar por mí:** Whisper en inglés, las voces inglesas, la calidad de las traducciones (necesitan una revisión nativa) y la licencia de los datos
+  de las voces (ver `docs/creditos.md`). Las pruebas automáticas comprueban que cada regla elige su tabla inglesa, no que Lina «suene» bien.
 - El primer argumento de `T()` es solo posicional, así que un hueco puede llamarse `texto`.
 
 ## Cómo añadir un idioma

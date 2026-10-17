@@ -24,7 +24,16 @@ def _fecha_es(d):
             "Úsala tal cual para la hora, la fecha y los cálculos con ellas; no la inventes ni repitas una de antes.")
 
 
-_FECHA_POR_IDIOMA = {"es": _fecha_es}
+_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+
+def _fecha_en(d):
+    return (f"It is now {d.strftime('%H:%M')} on {_DAYS[d.weekday()]}, {_MONTHS[d.month - 1]} {d.day}, {d.year} (the computer's time). "
+            "Use it as is for the time, the date and any calculation with them; do not make one up or reuse an earlier one.")
+
+
+_FECHA_POR_IDIOMA = {"es": _fecha_es, "en": _fecha_en}
 
 
 def texto_fecha_hora(ahora=None):
@@ -164,16 +173,27 @@ def limpiar_para_voz(texto):
     return limpio
 
 
-# Detecta cuándo la IA pide confirmación («¿lo hago?») por si no ha dejado nada preparado
-AFIRMA_HECHO = re.compile(
+# Detecta cuándo la IA da algo por hecho (son las redes que impiden que Lina diga «listo» sin haberlo hecho: cada idioma tiene las suyas)
+_AFIRMA_HECHO_ES = re.compile(
     r"\b(ya\s+)?(he|hemos|ha|han)\s+(creado|hecho|instalado|configurado|cambiado|borrado|movido|eliminado|desinstalado|abierto|"
     r"activado|desactivado|actualizado|puesto|dejado|quitado|renombrado|copiado|escrito|reiniciado|aplicado|guardado|ajustado)\b"
     r"|\b(esta|queda|ya esta)\s+(hech[oa]|cread[oa]|instalad[oa]|configurad[oa]|list[oa])\b|\b(listo|hecho)\b"
     r"|\b(desactivad|activad|cambiad|puest|quitad|instalad|configurad|ajustad|aplicad|guardad|cread|borrad|abiert|reiniciad|apagad|encendid)[oa]s?\b")
 
 
-ADMITE_DUDA = re.compile(r"no (he|has|pude|puedo|hemos|se ha|ha) (podido|logrado|conseguido|funcionado|comprobado)|no puedo (garantizar|asegurar|confirmar)|"
+_AFIRMA_HECHO_EN = re.compile(
+    r"\b(i\s+have|i\s?ve|we\s+have|we\s?ve|i\s+just|i\s+already)\s+(created|made|installed|configured|changed|deleted|removed|moved|uninstalled|opened|"
+    r"enabled|disabled|turned|updated|set|put|renamed|copied|written|restarted|applied|saved|adjusted|switched|fixed)\b"
+    r"|\b(it\s+is|it\s?s|that\s+is|that\s?s|is\s+now|has\s+been|have\s+been)\s+(done|created|installed|configured|set|ready|enabled|disabled|"
+    r"changed|deleted|removed|moved|updated|applied|saved)\b|\b(all\s+set|done|finished)\b")
+AFIRMA_HECHO = IDI.PorIdioma({"es": _AFIRMA_HECHO_ES, "en": _AFIRMA_HECHO_EN})
+
+_ADMITE_DUDA_ES = re.compile(r"no (he|has|pude|puedo|hemos|se ha|ha) (podido|logrado|conseguido|funcionado|comprobado)|no puedo (garantizar|asegurar|confirmar)|"
                          r"sin garantia|no (estoy|estamos) segur|no lo he (conseguido|logrado)|no (ha|han) funcionado|no se ha podido")
+_ADMITE_DUDA_EN = re.compile(r"(i|we) (could not|could ?n.?t|cannot|can ?not|can ?t|was not able|wasn.?t able|am not able|haven.?t been able|have not been able) "
+                             r"(to )?(do|check|verify|confirm|guarantee|make|get|manage|find)|not sure|no guarantee|(did not|didn.?t|has not|hasn.?t|have not|haven.?t) (work|worked|succeed|succeeded)|"
+                             r"unable to")
+ADMITE_DUDA = IDI.PorIdioma({"es": _ADMITE_DUDA_ES, "en": _ADMITE_DUDA_EN})
 
 
 def admite_duda(texto):
@@ -186,5 +206,8 @@ def afirma_hecho(texto):
     return AFIRMA_HECHO.search(C.normalizar(texto)) is not None
 
 
-PIDE_CONFIRMACION = re.compile(r"¿[^?]*\b(lo hago|la hago|los hago|lo confirmas|confirmas|confirmo|procedo|lo ejecuto|"
+_PIDE_CONFIRMACION_ES = re.compile(r"¿[^?]*\b(lo hago|la hago|los hago|lo confirmas|confirmas|confirmo|procedo|lo ejecuto|"
                                r"lo instalo|lo borro|lo muevo|lo creo)\b[^?]*\?", re.I)
+_PIDE_CONFIRMACION_EN = re.compile(r"\b(shall i|should i|do you want me to|want me to|may i|can i go ahead|do you confirm|can you confirm|"
+                                   r"shall i proceed|should i proceed|ok to proceed|go ahead and)\b[^?]*\?", re.I)
+PIDE_CONFIRMACION = IDI.PorIdioma({"es": _PIDE_CONFIRMACION_ES, "en": _PIDE_CONFIRMACION_EN})

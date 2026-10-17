@@ -34,8 +34,15 @@ CATALOGO = {
         "es_ES-sharvard-medium-2": {"modelo": "es_ES-sharvard-medium", "carpeta": "es/es_ES/sharvard/medium", "locutor": 1,
                                     "descripcion": "Sharvard, hablante 2 · España · calidad media"},
     },
+    # Inglés (experimental): modelos del mismo repositorio de voces. La licencia de sus datos NO está comprobada (ver docs/creditos.md).
+    "en": {
+        "en_US-lessac-medium": {"modelo": "en_US-lessac-medium", "carpeta": "en/en_US/lessac/medium", "locutor": None,
+                                "descripcion": "Lessac · United States · medium quality · female (default)"},
+        "en_US-amy-medium": {"modelo": "en_US-amy-medium", "carpeta": "en/en_US/amy/medium", "locutor": None,
+                             "descripcion": "Amy · United States · medium quality · female"},
+    },
 }
-POR_DEFECTO = {"es": "es_MX-claude-high"}     # la voz de cada idioma cuando no se ha elegido otra
+POR_DEFECTO = {"es": "es_MX-claude-high", "en": "en_US-lessac-medium"}     # la voz de cada idioma cuando no se ha elegido otra
 VOZ_POR_DEFECTO = POR_DEFECTO["es"]
 TIEMPO = 60
 TROZO = 1 << 20
