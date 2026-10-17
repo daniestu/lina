@@ -13,6 +13,8 @@ from lina.nucleo import claves as CL
 from lina.nucleo import herramientas as H
 from lina.nucleo import plataforma as PL
 from lina.nucleo import proveedor_gemini as PG
+from lina.nucleo import proveedor_anthropic as PAN  # noqa: F401  (los proveedores se registran al importarse)
+from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
 from lina.nucleo.constantes import (BUSQUEDA, ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCIONES, INSTRUCCION_LOCAL, MAX_ESPERAS_CUOTA, MAX_PASOS,
                                     MODELO_LOCAL, MODELOS_CONFIRMACION, MODELOS_GEMINI, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, REINTENTOS_SERVIDOR,

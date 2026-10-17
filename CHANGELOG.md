@@ -11,6 +11,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
   también mide las páginas). El HTML queda guardado para retocarlo. Se quitan
   los scripts y los recursos externos del HTML y las fotos locales se incrustan.
 
+### Añadido
+- Fase 7, pasos 2 y 3: proveedores `openai` (OpenAI y todo lo que copia su API: OpenRouter, Groq, Mistral, Ollama, LM Studio, vLLM, servidores de
+  empresa, con dirección base propia y clave opcional) y `anthropic`. Probados contra servidores simulados con el formato publicado de cada API,
+  todavía no contra los servicios reales, y sin activar: Lina sigue usando Gemini hasta el paso 4.
+
 ### Cambiado
 - Fase 7, paso 1: la conversación con la IA pasa a una interfaz común (`proveedores.py`) y Gemini es el primer proveedor (`proveedor_gemini.py`).
   El bucle de herramientas, los reintentos, la espera de cuota, la cancelación y las mini-consultas de seguridad se escriben una sola vez y valen para

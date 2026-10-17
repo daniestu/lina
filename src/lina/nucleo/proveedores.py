@@ -38,7 +38,7 @@ class ErrorIA:
 def tipo_de_estado(estado):
     if estado == 429:
         return "cuota"
-    if estado in (500, 502, 503, 504):
+    if estado in (500, 502, 503, 504, 529):            # 529: «sobrecargado» (Anthropic)
         return "servidor"
     if estado in (401, 403):
         return "auth"

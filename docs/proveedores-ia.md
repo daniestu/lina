@@ -47,9 +47,9 @@ no cuestan nada.
 
 ## Entrega por pasos
 
-1. Interfaz común y proveedor Gemini; el código actual pasa a usarlos (sin cambios de comportamiento: las mismas pruebas deben seguir pasando).
-2. Proveedor `openai`.
-3. Proveedor `anthropic`.
+1. (hecho) Interfaz común y proveedor Gemini; el código actual pasa a usarlos (sin cambios de comportamiento: las mismas pruebas deben seguir pasando).
+2. (hecho) Proveedor `openai`.
+3. (hecho) Proveedor `anthropic`.
 4. Configuración: `[ia]`, `lina ia`, claves por proveedor, asistente de bienvenida, doctor y presupuesto.
 5. Documentación y pruebas contra servidores simulados.
 
