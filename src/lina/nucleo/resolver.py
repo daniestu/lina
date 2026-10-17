@@ -64,7 +64,7 @@ def _paquetes_que_traen(regex_nombre, avisar=None):
             and sincronizar and not _estado_fdb["sincronizada"]:
         _estado_fdb["sincronizada"] = True            # la lista de archivos hay que bajarla una vez
         if avisar:
-            avisar("Voy a actualizar la lista de archivos de paquetes para saber cuál trae ese programa. Tardará un momento.")
+            avisar(IDI.T("Voy a actualizar la lista de archivos de paquetes para saber cuál trae ese programa. Tardará un momento."))
         EJ._como_root(sincronizar, timeout=240)
         codigo, salida = EJ._ejecutar_simple(consulta, timeout=60)
     return PL.pares_que_traen(salida)
@@ -108,7 +108,11 @@ _RELLENO_PENDIENTE = PL.GESTORES_PAQUETES | {"deshacer", "cambio", "anotado", "u
                                               "assumeyes", "recommends", "interactive",
                       "systemctl", "hacer", "instalar", "desinstalar", "reinstalar", "quitar", "restaurar", "devolver", "recuperar", "paquete",
                       "paquetes", "archivo", "archivos", "servicio", "ajuste", "carpeta", "fichero", "programa", "aplicacion", "tarea",
-                      "voy", "como", "estaba", "para", "este", "esta", "esto", "con", "los", "las", "del"}
+                      "voy", "como", "estaba", "para", "este", "esta", "esto", "con", "los", "las", "del",
+                      # lo mismo en inglés (el motivo lo escribe la IA en el idioma del usuario)
+                      "undo", "last", "change", "changes", "applied", "install", "uninstall", "reinstall", "remove", "restore", "recover", "package", "packages",
+                      "file", "files", "service", "setting", "settings", "folder", "program", "app", "task", "going", "the", "this", "that", "with", "and",
+                      "for", "from", "was", "will", "back", "previous"}
 
 
 def que_pendiente(p):

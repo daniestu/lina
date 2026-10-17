@@ -13,15 +13,16 @@ from lina.nucleo import ajustes as AJ
 from lina.nucleo import claves as CL
 from lina.nucleo import privacidad as PRIV
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import N_, T
 
 ENLACE_CLAVE = "https://aistudio.google.com/apikey"
 MODELO_PRUEBA = "gemini-flash-lite-latest"
 MARCA = "bienvenida.json"
-AVISO_SIN_CLAVE = ("Todavía no tengo clave de Gemini, así que no puedo responderte. Es gratis: abre una terminal y escribe lina bienvenida, "
-                   "o directamente lina clave gemini.")
-PERFILES = {"1": ("autonomo", "Autónoma: hace sola casi todo y te pregunta solo por lo crítico (borrar de verdad, instalar de fuera, apagar…)."),
-            "2": ("equilibrado", "Equilibrada: además te pregunta antes de cambiar nada tras haber leído contenido de internet."),
-            "3": ("prudente", "Prudente: te pide confirmación para casi todo lo que cambie algo en tu equipo.")}
+AVISO_SIN_CLAVE = (N_("Todavía no tengo clave de Gemini, así que no puedo responderte. Es gratis: abre una terminal y escribe lina bienvenida, "
+                   "o directamente lina clave gemini."))
+PERFILES = {"1": ("autonomo", N_("Autónoma: hace sola casi todo y te pregunta solo por lo crítico (borrar de verdad, instalar de fuera, apagar…).")),
+            "2": ("equilibrado", N_("Equilibrada: además te pregunta antes de cambiar nada tras haber leído contenido de internet.")),
+            "3": ("prudente", N_("Prudente: te pide confirmación para casi todo lo que cambie algo en tu equipo."))}
 
 
 # ---------------------------------------------------------------- comprobaciones (inyectables para probarlas sin red ni micrófono)
@@ -31,14 +32,14 @@ def validar_clave(clave, enviar=requests.post):
         r = enviar(f"https://generativelanguage.googleapis.com/v1beta/models/{MODELO_PRUEBA}:generateContent", headers={"x-goog-api-key": clave},
                    json={"contents": [{"role": "user", "parts": [{"text": "Responde solo: ok"}]}]}, timeout=15)
     except requests.RequestException:
-        return None, "no he podido conectar para comprobarla"
+        return None, T("no he podido conectar para comprobarla")
     if r.status_code == 200:
         return True, "funciona"
     if r.status_code in (400, 401, 403):
-        return False, "Google dice que esa clave no es válida"
+        return False, T("Google dice que esa clave no es válida")
     if r.status_code == 429:
-        return True, "es válida (ahora mismo has llegado al límite gratuito)"
-    return None, f"Google ha contestado {r.status_code}; la guardo y se comprobará al usarla"
+        return True, T("es válida (ahora mismo has llegado al límite gratuito)")
+    return None, T("Google ha contestado {v1}; la guardo y se comprobará al usarla", v1=r.status_code)
 
 
 def medir_microfono(segundos=2.0, grabar=None):
@@ -84,7 +85,7 @@ class Charla:
         return r or defecto
 
     def si_no(self, texto, defecto=True):
-        r = self.pregunta(f"{texto} [{'S/n' if defecto else 's/N'}] ").lower()
+        r = self.pregunta(f"{texto} [{T('S/n') if defecto else T('s/N')}] ").lower()
         return defecto if not r else r in ("s", "si", "sí", "y", "yes")
 
     def titulo(self, n, texto):
@@ -92,97 +93,96 @@ class Charla:
 
     # 1
     def paso_clave(self):
-        self.titulo(1, "Clave de Gemini (la inteligencia de Lina)")
+        self.titulo(1, T("Clave de Gemini (la inteligencia de Lina)"))
         if CL.obtener("gemini"):
-            self.salida("  ✔ Ya hay una clave de Gemini guardada.")
-            if not self.si_no("  ¿La compruebo?", False):
+            self.salida(T("  ✔ Ya hay una clave de Gemini guardada."))
+            if not self.si_no(T("  ¿La compruebo?"), False):
                 self.resultado["clave"] = "ya estaba"
                 return
             ok, detalle = validar_clave(CL.obtener("gemini"), self.enviar)
             self.salida(f"  {'✔' if ok else '!' if ok is None else '✘'} {detalle}")
             self.resultado["clave"] = "ya estaba"
             return
-        self.salida(f"  Lina usa Gemini para entenderte. La clave es gratuita (no hace falta tarjeta):\n    1) abre  {ENLACE_CLAVE}\n"
-                    "    2) entra con tu cuenta de Google y pulsa «Crear clave de API»\n    3) copia la clave y pégala aquí (no se ve al escribir).")
+        self.salida(T("  Lina usa Gemini para entenderte. La clave es gratuita (no hace falta tarjeta):\n    1) abre  {ENLACE_CLAVE}\n    2) entra con tu cuenta de Google y pulsa «Crear clave de API»\n    3) copia la clave y pégala aquí (no se ve al escribir).", ENLACE_CLAVE=ENLACE_CLAVE))
         for intento in range(3):
-            clave = self.secreto("  Clave (Intro para saltar este paso): ").strip()
+            clave = self.secreto(T("  Clave (Intro para saltar este paso): ")).strip()
             if not clave:
-                self.salida("  Vale. Sin clave Lina no puede responder; cuando la tengas:  lina clave gemini")
+                self.salida(T("  Vale. Sin clave Lina no puede responder; cuando la tengas:  lina clave gemini"))
                 self.resultado["clave"] = "saltado"
                 return
             ok, detalle = validar_clave(clave, self.enviar)
             if ok is False:
-                self.salida(f"  ✘ {detalle}. Prueba otra vez (quedan {2 - intento}).")
+                self.salida(T("  ✘ {detalle}. Prueba otra vez (quedan {v1}).", detalle=detalle, v1=2 - intento))
                 continue
             try:
                 _, donde = CL.guardar("gemini", clave)
             except ValueError as e:
-                self.salida(f"  ✘ No la he guardado: {e}.")
+                self.salida(T("  ✘ No la he guardado: {e}.", e=e))
                 continue
-            self.salida(f"  ✔ Clave guardada en {donde} ({detalle}).")
+            self.salida(T("  ✔ Clave guardada en {donde} ({detalle}).", donde=donde, detalle=detalle))
             self.resultado["clave"] = "guardada"
             return
         self.resultado["clave"] = "fallida"
 
     # 2
     def paso_microfono(self):
-        self.titulo(2, "Micrófono")
-        if not self.si_no("  Voy a escucharte 2 segundos: di algo en voz normal. ¿Empezamos?"):
+        self.titulo(2, T("Micrófono"))
+        if not self.si_no(T("  Voy a escucharte 2 segundos: di algo en voz normal. ¿Empezamos?")):
             self.resultado["microfono"] = "saltado"
             return
         nivel, error = medir_microfono(2.0, self.grabar)
         if error:
-            self.salida(f"  ✘ No he podido usar el micrófono ({error}).\n    Mira que esté enchufado y no silenciado, y repite luego con:  lina bienvenida")
+            self.salida(T("  ✘ No he podido usar el micrófono ({error}).\n    Mira que esté enchufado y no silenciado, y repite luego con:  lina bienvenida", error=error))
             self.resultado["microfono"] = "fallo"
         elif nivel < 0.01:
-            self.salida(f"  ! No oigo nada ({barra(nivel)}). Revisa que no esté silenciado ni sea otro dispositivo (ajustes de sonido).")
+            self.salida(T("  ! No oigo nada ({v1}). Revisa que no esté silenciado ni sea otro dispositivo (ajustes de sonido).", v1=barra(nivel)))
             self.resultado["microfono"] = "silencio"
         else:
-            self.salida(f"  ✔ Te oigo: {barra(nivel)}")
+            self.salida(T("  ✔ Te oigo: {barra}", barra=barra(nivel)))
             self.resultado["microfono"] = "bien"
 
     # 3
     def paso_nombre(self):
-        self.titulo(3, "Cómo se llama")
+        self.titulo(3, T("Cómo se llama"))
         actual = self.aj.get("asistente", "nombre")
-        nombre = self.pregunta(f"  Nombre del asistente, y palabra para activarlo («Oye {actual}») [Intro = {actual}]: ", actual)
+        nombre = self.pregunta(T("  Nombre del asistente, y palabra para activarlo («Oye {actual}») [Intro = {actual}]: ", actual=actual), actual)
         if nombre != actual:
             try:
                 self.aj.establecer("asistente", "nombre", nombre)
             except ValueError as e:
                 self.salida(f"  ✘ {e}")
                 return
-        self.salida(f"  ✔ Se llama {nombre}.")
+        self.salida(T("  ✔ Se llama {nombre}.", nombre=nombre))
         self.resultado["nombre"] = nombre
 
     # 4
     def paso_autonomia(self):
-        self.titulo(4, "Cuánta libertad tiene")
+        self.titulo(4, T("Cuánta libertad tiene"))
         actual = self.aj.get("autonomia", "perfil")
         for k, (clave, texto) in PERFILES.items():
-            self.salida(f"  {k}) {texto}" + ("   ← ahora" if clave == actual else ""))
-        self.salida("  Hagas lo que hagas, lo crítico (discos, arranque, cuentas, dinero) siempre lo confirmas tú con el atajo de teclado.")
-        r = self.pregunta("  Elige 1, 2 o 3 [Intro = dejarlo como está]: ")
+            self.salida(f"  {k}) " + T(texto) + (T("   ← ahora") if clave == actual else ""))
+        self.salida(T("  Hagas lo que hagas, lo crítico (discos, arranque, cuentas, dinero) siempre lo confirmas tú con el atajo de teclado."))
+        r = self.pregunta(T("  Elige 1, 2 o 3 [Intro = dejarlo como está]: "))
         if r in PERFILES:
             self.aj.establecer("autonomia", "perfil", PERFILES[r][0])
-            self.salida(f"  ✔ Perfil {PERFILES[r][0]}.")
+            self.salida(T("  ✔ Perfil {perfil}.", perfil=PERFILES[r][0]))
             self.resultado["perfil"] = PERFILES[r][0]
         else:
             self.resultado["perfil"] = actual
 
     # 5
     def paso_privacidad(self):
-        self.titulo(5, "Privacidad: capturas de pantalla")
+        self.titulo(5, T("Privacidad: capturas de pantalla"))
         PRIV.principal([], entrada=self.entrada, salida=self.salida, ajustes=self.aj, es_terminal=self.terminal)
         self.resultado["capturas"] = PRIV.estado(self.aj)
 
     def contar(self):
         s = self.resultado
-        self.salida("\nListo. Resumen:")
-        self.salida(f"  Clave de Gemini: {s.get('clave', '-')} · Micrófono: {s.get('microfono', '-')} · Perfil: {s.get('perfil', '-')} · Capturas: {s.get('capturas', '-')}")
+        self.salida(T("\nListo. Resumen:"))
+        self.salida(T("  Clave de Gemini: {v1} · Micrófono: {v2} · Perfil: {v3} · Capturas: {v4}", v1=s.get('clave', '-'), v2=s.get('microfono', '-'), v3=s.get('perfil', '-'), v4=s.get('capturas', '-')))
         if s.get("clave") in ("saltado", "fallida"):
-            self.salida("  Falta la clave de Gemini: sin ella no puedo responder.  →  lina clave gemini")
-        self.salida(f"  Para hablarme: pulsa tu atajo o di «Oye {s.get('nombre', 'Lina')}».  Si algo no va:  lina doctor")
+            self.salida(T("  Falta la clave de Gemini: sin ella no puedo responder.  →  lina clave gemini"))
+        self.salida(T("  Para hablarme: pulsa tu atajo o di «Oye {v1}».  Si algo no va:  lina doctor", v1=s.get('nombre', 'Lina')))
 
 
 def marcar_hecha(ruta=None):
@@ -203,19 +203,19 @@ def ya_hecha(ruta=None):
 
 def principal(argv, charla=None, ruta_marca=None):
     if "-h" in argv or "--help" in argv:
-        print("lina bienvenida   te acompaña para dejar Lina lista: clave de Gemini, micrófono, nombre, autonomía y privacidad. Se puede repetir.")
+        print(T("lina bienvenida   te acompaña para dejar Lina lista: clave de Gemini, micrófono, nombre, autonomía y privacidad. Se puede repetir."))
         return 0
     import sys
     c = charla or Charla(terminal=sys.stdin.isatty())
     if not c.terminal:
-        c.salida("La bienvenida es una conversación: ábrela en una terminal con  lina bienvenida")
+        c.salida(T("La bienvenida es una conversación: ábrela en una terminal con  lina bienvenida"))
         return 2
-    c.salida("¡Hola! Soy Lina. Vamos a dejarme lista (cinco cosas, un par de minutos). Intro en cualquier pregunta = lo que está entre corchetes.")
+    c.salida(T("¡Hola! Soy Lina. Vamos a dejarme lista (cinco cosas, un par de minutos). Intro en cualquier pregunta = lo que está entre corchetes."))
     try:
         for paso in (c.paso_clave, c.paso_microfono, c.paso_nombre, c.paso_autonomia, c.paso_privacidad):
             paso()
     except KeyboardInterrupt:
-        c.salida("\nLo dejamos aquí. Cuando quieras seguir:  lina bienvenida")
+        c.salida(T("\nLo dejamos aquí. Cuando quieras seguir:  lina bienvenida"))
         return 1
     marcar_hecha(ruta_marca)
     c.contar()

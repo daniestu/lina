@@ -165,11 +165,11 @@ def estado_de_resultado(resultado):
 def limpiar_para_voz(texto):
     """Quita lo que no se debe leer en voz alta: bloques de código, enlaces y marcas de formato."""
     sin_codigo = re.sub(r"```.*?```", " ", texto, flags=re.S)
-    limpio = re.sub(r"https?://\S+", "un enlace", sin_codigo)
+    limpio = re.sub(r"https?://\S+", IDI.T("un enlace"), sin_codigo)
     limpio = re.sub(r"[*#_`]", "", limpio)
     limpio = re.sub(r"\s+", " ", limpio).strip()
     if not limpio and texto.strip():
-        return "Es código y no lo leo en voz alta."
+        return IDI.T("Es código y no lo leo en voz alta.")
     return limpio
 
 

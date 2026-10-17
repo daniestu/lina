@@ -193,7 +193,7 @@ def test_el_catalogo_ingles_cubre_todos_los_textos_envueltos():
     textos = set()
     for f in raiz.rglob("*.py"):
         for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
-            if isinstance(n, ast.Call) and getattr(n.func, "id", getattr(n.func, "attr", None)) == "T" and n.args \
+            if isinstance(n, ast.Call) and getattr(n.func, "id", getattr(n.func, "attr", None)) in ("T", "N_") and n.args \
                     and isinstance(n.args[0], ast.Constant) and isinstance(n.args[0].value, str):
                 textos.add(n.args[0].value)
     cat = I.catalogo("en")

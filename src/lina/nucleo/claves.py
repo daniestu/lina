@@ -20,10 +20,12 @@ import sys
 
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import T
+from lina.nucleo.idioma import N_
 
-CONOCIDAS = {"gemini": ("gemini.key", "clave gratuita de Gemini"), "gemini_pago": ("gemini_pago.key", "clave de pago de Gemini"),
-             "tavily": ("tavily.key", "clave de Tavily (búsqueda)"),
-             "openai": ("openai.key", "clave de OpenAI (o del servicio compatible que uses)"), "anthropic": ("anthropic.key", "clave de Anthropic")}
+CONOCIDAS = {"gemini": ("gemini.key", N_("clave gratuita de Gemini")), "gemini_pago": ("gemini_pago.key", N_("clave de pago de Gemini")),
+             "tavily": ("tavily.key", N_("clave de Tavily (búsqueda)")),
+             "openai": ("openai.key", N_("clave de OpenAI (o del servicio compatible que uses)")), "anthropic": ("anthropic.key", N_("clave de Anthropic"))}
 ALIAS = {"gemini-pago": "gemini_pago", "pago": "gemini_pago", "gratis": "gemini", "gratuita": "gemini"}
 SERVICIO = "lina"
 ARCHIVO_MCP = "mcp_claves.env"
@@ -56,7 +58,7 @@ def _secret_tool(args, entrada=None, ejecutar=subprocess.run):
 
 
 def llavero_guardar(nombre, valor, ejecutar=subprocess.run):
-    cod, _ = _secret_tool(["store", f"--label=Lina: {nombre}", "service", SERVICIO, "nombre", nombre], entrada=valor, ejecutar=ejecutar)
+    cod, _ = _secret_tool(["store", T("--label=Lina: {nombre}", nombre=nombre), "service", SERVICIO, "nombre", nombre], entrada=valor, ejecutar=ejecutar)
     if cod != 0:
         return False
     return llavero_leer(nombre, ejecutar) == valor                  # se comprueba leyendo: no se da por guardada una clave que no se puede recuperar
@@ -167,15 +169,15 @@ def guardar(nombre, valor, ejecutar=subprocess.run):
     nombre = normalizar(nombre)
     valor = str(valor or "").strip()
     if not _valido(nombre) or not valor or "\n" in valor or "\r" in valor:
-        raise ValueError("nombre o valor de clave no válidos")
+        raise ValueError(T("nombre o valor de clave no válidos"))
     _cache.pop(nombre, None)
     if _quiere_llavero() and llavero_guardar(nombre, valor, ejecutar):
         archivo_borrar(nombre)                                       # que no quede una copia en claro
         _cache[nombre] = valor
-        return "llavero", "el llavero del sistema"
+        return "llavero", T("el llavero del sistema")
     ruta = archivo_guardar(nombre, valor)
     _cache[nombre] = valor
-    return "archivo", f"{ruta} (solo lo puedes leer tú; no he encontrado un llavero del sistema que funcione)"
+    return "archivo", T("{ruta} (solo lo puedes leer tú; no he encontrado un llavero del sistema que funcione)", ruta=ruta)
 
 
 def borrar(nombre, ejecutar=subprocess.run):
@@ -264,19 +266,19 @@ def _pedir_tope(entrada, salida):
     """El tope mensual es obligatorio al añadir una clave de pago: se pide (número mayor que 0) y se guarda en config.toml."""
     aj = AJ.actuales(log=lambda m: None)
     actual = aj.get("gasto", "tope_mensual_eur")
-    salida("La clave de pago cuesta dinero de verdad, así que hace falta un tope mensual (cuando se alcance, Lina deja de usarla sola).")
+    salida(T("La clave de pago cuesta dinero de verdad, así que hace falta un tope mensual (cuando se alcance, Lina deja de usarla sola)."))
     for _ in range(3):
-        texto = entrada(f"Tope mensual en euros (obligatorio; ahora está en {actual:g}): ").strip()
+        texto = entrada(T("Tope mensual en euros (obligatorio; ahora está en {actual:g}): ", actual=actual)).strip()
         try:
             tope = float(texto.replace(",", "."))
             if tope <= 0:
                 raise ValueError
             AJ.validar("gasto", "tope_mensual_eur", tope)
             aj.establecer("gasto", "tope_mensual_eur", tope)
-            salida(f"Tope mensual: {tope:g} €.")
+            salida(T("Tope mensual: {tope:g} €.", tope=tope))
             return tope
         except ValueError:
-            salida("Escribe un número mayor que 0 (por ejemplo 10).")
+            salida(T("Escribe un número mayor que 0 (por ejemplo 10)."))
     return None
 
 
@@ -288,40 +290,40 @@ def principal(argv, entrada=input, secreto=getpass.getpass, salida=print, ejecut
             d = donde_esta(n, ejecutar)
             if d:
                 hay = True
-                salida(f"  {n:16} guardada en: {d}")
+                salida(T("  {n:16} guardada en: {d}", n=n, d=d))
         if not hay:
-            salida("No hay ninguna clave guardada. Para la de Gemini:  lina clave gemini")
-        salida("Llavero del sistema: " + ("disponible" if llavero_disponible(ejecutar) else "no encontrado (se usan archivos con permisos 600; instala libsecret para usarlo)"))
+            salida(T("No hay ninguna clave guardada. Para la de Gemini:  lina clave gemini"))
+        salida(T("Llavero del sistema: ") + ("disponible" if llavero_disponible(ejecutar) else T("no encontrado (se usan archivos con permisos 600; instala libsecret para usarlo)")))
         return 0
     orden = argv[0]
     if orden == "migrar" and len(argv) == 1:
         movidas = migrar_a_llavero(ejecutar)
         if not movidas:
-            salida("No había nada que mover (o el llavero del sistema no está disponible).")
+            salida(T("No había nada que mover (o el llavero del sistema no está disponible)."))
         for n, bien in movidas:
-            salida(f"  {n}: " + ("movida al llavero" if bien else "no he podido guardarla en el llavero; sigue en su archivo"))
+            salida(f"  {n}: " + (T("movida al llavero") if bien else T("no he podido guardarla en el llavero; sigue en su archivo")))
         return 0
     if orden == "borrar" and len(argv) == 2:
         n = normalizar(argv[1])
-        salida(f"Clave {n} " + ("borrada." if borrar(n, ejecutar) else "no estaba guardada."))
+        salida(T("Clave {n} ", n=n) + (T("borrada.") if borrar(n, ejecutar) else T("no estaba guardada.")))
         return 0
     if len(argv) != 1 or not _valido(normalizar(orden)):
         salida(__doc__)
         return 2
     nombre = normalizar(orden)
     if nombre == "gemini_pago" and _pedir_tope(entrada, salida) is None:
-        salida("Sin tope mensual no guardo la clave de pago.")
+        salida(T("Sin tope mensual no guardo la clave de pago."))
         return 1
-    valor = secreto(f"Pega aquí {nombre} (no se ve al escribir): ").strip()
+    valor = secreto(T("Pega aquí {nombre} (no se ve al escribir): ", nombre=nombre)).strip()
     if not valor or "\n" in valor:
-        salida("No has escrito nada; no se ha guardado.")
+        salida(T("No has escrito nada; no se ha guardado."))
         return 1
     try:
         _, detalle = guardar(nombre, valor, ejecutar)
     except ValueError as e:
-        salida(f"No se ha guardado: {e}.")
+        salida(T("No se ha guardado: {e}.", e=e))
         return 1
-    salida(f"Guardada {nombre} en {detalle}. Reinicia a Lina para que la use:  systemctl --user restart lina")
+    salida(T("Guardada {nombre} en {detalle}. Reinicia a Lina para que la use:  systemctl --user restart lina", nombre=nombre, detalle=detalle))
     return 0
 
 

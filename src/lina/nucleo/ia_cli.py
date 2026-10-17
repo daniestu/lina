@@ -4,9 +4,9 @@ import base64
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import ia_activa as IAC
 from lina.nucleo import proveedores as P
-from lina.nucleo.idioma import T
+from lina.nucleo.idioma import N_, T
 
-AYUDA = """lina ia                                  con qué IA habla Lina ahora y si está lista
+AYUDA = N_("""lina ia                                  con qué IA habla Lina ahora y si está lista
 lina ia usar PROVEEDOR [opciones]        cambia de proveedor: gemini · anthropic · openai (OpenAI y compatibles)
     --modelo NOMBRE       modelo para el día a día
     --profundo NOMBRE     modelo para el modo «a fondo»
@@ -15,7 +15,7 @@ lina ia usar PROVEEDOR [opciones]        cambia de proveedor: gemini · anthropi
 lina ia volver                           vuelve a Gemini con los modelos de siempre
 lina ia modelos                          los modelos que ofrece el servicio ahora configurado
 lina ia probar                           hace una petición de prueba y dice si responde, si usa herramientas y si ve imágenes
-La clave de cada proveedor se guarda con:  lina clave gemini | anthropic | openai"""
+La clave de cada proveedor se guarda con:  lina clave gemini | anthropic | openai""")
 
 def _imagen_prueba():
     """Un JPEG pequeño en base64 (rojo liso), para comprobar que el modelo acepta imágenes. None si no hay Pillow."""

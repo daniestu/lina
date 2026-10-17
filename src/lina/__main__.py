@@ -7,8 +7,9 @@ import sys
 
 from lina import __version__
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import N_, T
 
-AYUDA = f"""Lina {__version__}: asistente de voz para el escritorio Linux.
+AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
 
   lina                       arranca a Lina (lo normal es que lo haga sola el servicio de usuario)
   lina pulsar                equivale a pulsar el atajo (hablar / terminar de hablar / callarla). Ponlo en el atajo de teclado
@@ -33,7 +34,7 @@ AYUDA = f"""Lina {__version__}: asistente de voz para el escritorio Linux.
   lina uninstall [--todo]    quita lo que instaló Lina; --todo también tus ajustes, claves y datos
   lina mcp [--config]        servidor MCP de Lina para otras IAs
   lina --version
-"""
+""")
 
 
 def _pulsar():
@@ -41,7 +42,7 @@ def _pulsar():
         pid = int(RUT.PID.read_text().strip())
         os.kill(pid, signal.SIGUSR1)
     except (OSError, ValueError):
-        print("Lina no está arrancada (no encuentro su proceso). Arráncala con:  systemctl --user start lina", file=sys.stderr)
+        print(T("Lina no está arrancada (no encuentro su proceso). Arráncala con:  systemctl --user start lina"), file=sys.stderr)
         return 1
     return 0
 
@@ -56,7 +57,7 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     orden, resto = (argv[0], argv[1:]) if argv else ("run", [])
     if orden in ("-h", "--help", "ayuda", "help"):
-        print(AYUDA)
+        print(T(AYUDA, version=__version__))
         return 0
     if orden in ("-V", "--version", "version"):
         print(__version__)
@@ -123,7 +124,7 @@ def main(argv=None):
     if orden == "interfaz":
         guion = RUT.PAQUETE / "escritorio" / "interfaz.sh"
         return subprocess.call(["bash", str(guion), *(resto or ["diagnostico"])])
-    print(AYUDA)
+    print(T(AYUDA, version=__version__))
     return 2
 
 

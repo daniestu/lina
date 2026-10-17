@@ -15,7 +15,7 @@ INTOCABLES = {("gasto", "tope_mensual_eur"), ("gasto", "eur_por_usd"), ("gasto",
 
 
 def manuales():
-    return sorted(p.stem for p in CARPETA.glob("*.md")) if CARPETA.is_dir() else []
+    return sorted(p.stem for p in CARPETA.glob("*.md") if "." not in p.stem) if CARPETA.is_dir() else []
 
 
 def _ajustes_con_valores(aj):

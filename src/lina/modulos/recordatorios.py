@@ -10,6 +10,7 @@ import re
 import threading
 import unicodedata
 from datetime import datetime, timedelta
+from lina.nucleo import idioma as IDI
 from lina.nucleo import rutas as RUT
 
 RUTA = RUT.DATOS / "recordatorios.json"
@@ -207,6 +208,240 @@ def _fecha(t, ref):
     return None
 
 
+# ======================= inglés =======================
+_DIAS_EN_TXT = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+_MESES_EN_TXT = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+_NUM_EN = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+           "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+           "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60}
+_N_EN = r"(\d{1,3}|" + "|".join(sorted(_NUM_EN, key=len, reverse=True)) + r")"
+_DIA_SEM_EN = {d.lower(): i for i, d in enumerate(_DIAS_EN_TXT)}
+_MES_EN = {m.lower(): i + 1 for i, m in enumerate(_MESES_EN_TXT)}
+_MES_EN.update({"jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12})
+_MES_EN_RE = "|".join(sorted(_MES_EN, key=len, reverse=True))
+
+
+def _n_en(s):
+    s = str(s)
+    return int(s) if s.isdigit() else _NUM_EN[s]
+
+
+def _hora12(dt):
+    h = dt.hour % 12 or 12
+    return f"{h}{'' if dt.minute == 0 else f':{dt.minute:02d}'} {'am' if dt.hour < 12 else 'pm'}"
+
+
+def _humano_en(dt, ref):
+    delta = dt - ref
+    if timedelta(0) <= delta < timedelta(minutes=90):
+        mins = max(1, round(delta.total_seconds() / 60))
+        return "in 1 minute" if mins == 1 else f"in {mins} minutes"
+    dias = (dt.date() - ref.date()).days
+    hora = "at " + _hora12(dt)
+    if dias == 0:
+        dia = "today"
+    elif dias == 1:
+        dia = "tomorrow"
+    elif dias == 2:
+        dia = "the day after tomorrow"
+    elif 0 < dias < 7:
+        dia = f"on {_DIAS_EN_TXT[dt.weekday()]}"
+    else:
+        dia = f"on {_MESES_EN_TXT[dt.month - 1]} {dt.day}" + (f", {dt.year}" if dt.year != ref.year else "")
+    return f"{dia} {hora}"
+
+
+def _relativo_en(t, ref):
+    """«in 20 minutes», «in half an hour», «in an hour and a half», «in 2 hours 30 minutes»... → datetime o None."""
+    m = re.search(r"\b(?:in|within)\s+(?:a\s+)?(half an hour|half hour|quarter of an hour|quarter hour)\b", t)
+    if m:
+        return ref + timedelta(minutes=30 if m.group(1).startswith("half") else 15)
+    m = re.search(r"\b(?:in|within)\s+(?:an?|one)\s+hour\s+and\s+(?:a\s+)?(half|quarter)\b", t)
+    if m:
+        return ref + timedelta(minutes=90 if m.group(1) == "half" else 75)
+    m = re.search(r"\b(?:in|within)\s+" + _N_EN + r"\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?)\b"
+                  r"(?:\s+(?:and\s+)?(?:a\s+)?(half|quarter|" + _N_EN + r"\s*(?:minutes?|mins?)))?", t)
+    if not m:
+        return None
+    cantidad, unidad, extra = _n_en(m.group(1)), m.group(2), m.group(3)
+    if unidad.startswith("sec"):
+        return ref + timedelta(seconds=cantidad)
+    if unidad.startswith("min"):
+        return ref + timedelta(minutes=cantidad)
+    if unidad.startswith(("hour", "hr")):
+        d = timedelta(hours=cantidad)
+        if extra:
+            d += timedelta(minutes=30 if extra == "half" else 15 if extra == "quarter" else _n_en(re.match(_N_EN, extra).group(1)))
+        return ref + d
+    if unidad.startswith("day"):
+        return ref + timedelta(days=cantidad)
+    if unidad.startswith("week"):
+        return ref + timedelta(weeks=cantidad)
+    return _sumar_meses(ref, cantidad)
+
+
+def _parte_en(t):
+    if re.search(r"\b(?:in the |this )?(?:evening)\b|\btonight\b|\bat night\b|\bin the night\b", t):
+        return "noche"
+    if re.search(r"\b(?:in the |this )?afternoon\b", t):
+        return "tarde"
+    if re.search(r"\b(?:in the |this )?morning\b", t):
+        return "manana"
+    return None
+
+
+def _hora_en(t):
+    """(hora, minuto, ambigua, parte, medianoche) o None, como _hora pero para inglés."""
+    parte = _parte_en(t)
+    if re.search(r"\bnoon\b|\bmidday\b", t):
+        return 12, 0, False, parte, False
+    if re.search(r"\bmidnight\b", t):
+        return 0, 0, False, parte, True
+    h = mi = None
+    ampm = None
+    m = re.search(r"\bhalf past " + _N_EN + r"\b", t)
+    if m:
+        h, mi = _n_en(m.group(1)), 30
+    m2 = re.search(r"\bquarter past " + _N_EN + r"\b", t)
+    if h is None and m2:
+        h, mi = _n_en(m2.group(1)), 15
+    m3 = re.search(r"\bquarter to " + _N_EN + r"\b", t)
+    if h is None and m3:
+        h, mi = _n_en(m3.group(1)) - 1, 45
+    if h is None:
+        m = re.search(r"\b(\d{1,2}):(\d{2})\s*(am|pm)?\b", t)
+        if m:
+            h, mi, ampm = int(m.group(1)), int(m.group(2)), m.group(3)
+    if h is None:
+        m = re.search(r"\b(?:at|around|by|for)\s+" + _N_EN + r"(?:\s+o\s?clock)?\s*(am|pm)?\b(?!\s*(?:minutes?|mins?|hours?|days?|weeks?))", t) \
+            or re.search(r"\b(\d{1,2})\s*(am|pm)\b", t)
+        if m:
+            h, mi, ampm = _n_en(m.group(1)), 0, m.group(2)
+    if h is None:
+        return None
+    pm = ampm == "pm" or parte in ("tarde", "noche")
+    am = ampm == "am" or parte in ("manana",)
+    if h < 0:
+        h += 24
+    if not (0 <= h <= 24 and 0 <= mi <= 59):
+        raise ValueError("Esa hora no existe.")
+    if h == 24:
+        h = 0
+    ambigua = h <= 12 and not pm and not am
+    if pm and h < 12:
+        h += 12
+    elif am and h == 12:
+        h = 0
+    medianoche = parte == "noche" and h == 12
+    if medianoche:
+        h = 0
+    return h, mi, ambigua, parte, medianoche
+
+
+def _fecha_en(t, ref):
+    """La fecha (date) que se nombra en inglés, o None; con día de la semana devuelve (fecha, día)."""
+    d0 = ref.date()
+    if re.search(r"\bday after tomorrow\b", t):
+        return d0 + timedelta(days=2)
+    if re.search(r"\btomorrow\b", t):
+        return d0 + timedelta(days=1)
+    if re.search(r"\btoday\b|\btonight\b|\bthis (?:morning|afternoon|evening)\b", t):
+        return d0
+    m = re.search(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b", t)
+    if m:
+        return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3))).date()
+    m = re.search(r"\b(?:(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(" + _MES_EN_RE + r")|(" + _MES_EN_RE + r")\s+(\d{1,2})(?:st|nd|rd|th)?)(?:\s+(\d{4}))?\b", t)
+    if m:
+        dia = int(m.group(1) or m.group(4))
+        mes = _MES_EN[m.group(2) or m.group(3)]
+        if m.group(5):
+            return datetime(int(m.group(5)), mes, dia).date()
+        for a in (d0.year, d0.year + 1):
+            try:
+                c = datetime(a, mes, dia).date()
+            except ValueError:
+                continue
+            if c >= d0:
+                return c
+        raise ValueError("Esa fecha no existe.")
+    m = re.search(r"\b(next |this |on )?(" + "|".join(_DIA_SEM_EN) + r")\b", t)
+    if m:
+        objetivo = _DIA_SEM_EN[m.group(2)]
+        dif = (objetivo - d0.weekday()) % 7
+        return d0 + timedelta(days=dif if dif else (7 if (m.group(1) or "").strip() == "next" else 0)), objetivo
+    m = re.search(r"\bthe (\d{1,2})(?:st|nd|rd|th)\b", t)
+    if m and 1 <= int(m.group(1)) <= 31:
+        dia = int(m.group(1))
+        c = d0
+        for _ in range(40):
+            if c.day == dia and c >= d0:
+                return c
+            c += timedelta(days=1)
+    return None
+
+
+def _cuando_en(t, ref, original):
+    """(datetime, ¿relativo?) de una hora dicha en inglés. ValueError con un mensaje para la IA si no se entiende."""
+    t = re.sub(r"p\.m\.?", "pm", re.sub(r"a\.m\.?", "am", t)).replace(",", " ")
+    t = re.sub(r"\s+", " ", t).strip()
+    dt = _relativo_en(t, ref)
+    if dt is not None:
+        return dt, True
+    fecha = _fecha_en(t, ref)
+    semana = None
+    if isinstance(fecha, tuple):
+        fecha, semana = fecha
+    hora = _hora_en(t)
+    parte = _parte_en(t)
+    partes = {"manana": (9, 0), "tarde": (17, 0), "noche": (21, 0)}
+    if fecha is None and hora is None:
+        if parte is None:
+            raise ValueError(f"No entiendo cuándo es «{original}».")
+        hora = (*partes[parte], False, parte, False)
+    if hora is None:
+        hh = partes.get(parte, (9, 0))
+        hora = (hh[0], hh[1], False, None, False)
+    h, mi, ambigua, _p, medianoche = hora
+    if fecha is None:                                              # solo hora: la próxima vez que sea
+        base = ref.replace(hour=0, minute=0, second=0)
+        candidatas = [(h, mi)] + ([(h + 12, mi)] if ambigua and h < 12 else [])
+        futuras = sorted(base.replace(hour=hh, minute=mm) for hh, mm in candidatas if base.replace(hour=hh, minute=mm) > ref)
+        dt = futuras[0] if futuras else base.replace(hour=candidatas[0][0], minute=candidatas[0][1]) + timedelta(days=1)
+    else:
+        if ambigua and 1 <= h <= 6:                                # «at 5» con fecha y sin más: la tarde
+            h += 12
+        dt = datetime(fecha.year, fecha.month, fecha.day, h, mi)
+        if medianoche:
+            dt += timedelta(days=1)
+        if semana is not None and dt <= ref and re.search(r"\b(?:this|on)\b", t) and not re.search(r"\bnext\b", t):
+            dt += timedelta(days=7)
+    return dt, False
+
+
+def _repetir_en(t, texto):
+    if not t or t in ("no", "none", "never", "once", "just once", "only once", "does not repeat", "do not repeat", "no repeat", "dont repeat", "don t repeat"):
+        return ""
+    m = re.search(r"\bevery\s+" + _N_EN + r"\s*(minutes?|mins?|hours?|hrs?)\b", t)
+    if m:
+        n = _n_en(m.group(1))
+        if m.group(2).startswith(("h")):
+            return f"cada:{n}:h" if n >= 1 else ""
+        if n < MIN_REPETICION_MIN:
+            raise ValueError(f"No repito cada menos de {MIN_REPETICION_MIN} minutos.")
+        return f"cada:{n}:min"
+    if re.search(r"\bhourly\b|\bevery hour\b", t):
+        return "cada:1:h"
+    if re.search(r"weekday|workday|monday (?:to|through) friday|business day", t):
+        return "laborables"
+    if re.search(r"\bdaily\b|\bevery day\b|\beach day\b|\bevery (?:morning|evening|night|afternoon)\b", t):
+        return "diario"
+    if re.search(r"\bweekly\b|\bevery week\b|\beach week\b|\bevery (?:" + "|".join(_DIA_SEM_EN) + r")\b", t):
+        return "semanal"
+    if re.search(r"\bmonthly\b|\bevery month\b|\beach month\b", t):
+        return "mensual"
+    raise ValueError(f"No entiendo cómo se repite «{texto}»: puede ser diario, laborables, semanal, mensual o «cada N minutos/horas».")
+
+
 def parse_cuando(texto, ref=None):
     """datetime (hora local, sin segundos) de lo que dice el usuario. ValueError con un mensaje para la IA si no se entiende o ya pasó."""
     ref = ref or ahora()
@@ -214,11 +449,15 @@ def parse_cuando(texto, ref=None):
     t = _plano(original)
     if not t:
         raise ValueError("Falta cuándo.")
-    if re.search(r"\b(ayer|anteayer|anoche|hace \d+|la semana pasada|el mes pasado)\b", t):
+    en = IDI.actual() == "en"
+    if re.search(r"\b(ayer|anteayer|anoche|hace \d+|la semana pasada|el mes pasado)\b", t) or (en and re.search(r"\b(yesterday|last night|last week|last month|\d+ (?:minutes?|hours?|days?|weeks?) ago)\b", t)):
         raise ValueError(f"«{original}» es del pasado. Ahora son las {ref:%H:%M} del {DIAS[ref.weekday()]} {ref.day} de {MESES[ref.month - 1]} de {ref.year}.")
     m = re.search(r"\b(\d{4})-(\d{1,2})-(\d{1,2})[ t]+(\d{1,2}):(\d{2})\b", t)
+    relativo = False
     if m:
         dt = datetime(*[int(x) for x in m.groups()])
+    elif en:
+        dt, relativo = _cuando_en(t, ref, original)
     else:
         dt = _relativo(t, ref)
         relativo = dt is not None
@@ -264,17 +503,23 @@ def parse_cuando(texto, ref=None):
 
 def completo(dt):
     """«viernes 9 de octubre a las 18:30» (para que el usuario compruebe lo que se ha entendido)."""
+    if IDI.actual() == "en":
+        return f"{_DIAS_EN_TXT[dt.weekday()]}, {_MESES_EN_TXT[dt.month - 1]} {dt.day} at {_hora12(dt)}"
     return f"{DIAS[dt.weekday()]} {dt.day} de {MESES[dt.month - 1]} a las {dt:%H:%M}"
 
 
 def ahora_texto(ref=None):
     ref = ref or ahora()
+    if IDI.actual() == "en":
+        return f"{_DIAS_EN_TXT[ref.weekday()]}, {_MESES_EN_TXT[ref.month - 1]} {ref.day}, {ref.year}, {ref:%H:%M}"
     return f"{DIAS[ref.weekday()]} {ref.day} de {MESES[ref.month - 1]} de {ref.year}, {ref:%H:%M}"
 
 
 def parse_repetir(texto):
     """'' (no se repite), 'diario', 'laborables', 'semanal', 'mensual' o 'cada:N:min|h'. ValueError si no se entiende."""
     t = _plano(texto)
+    if IDI.actual() == "en":
+        return _repetir_en(t, texto)
     if not t or t in ("no", "ninguno", "nunca", "una vez", "solo una vez", "no se repite"):
         return ""
     m = re.search(r"\bcada\s+" + _N + r"\s*(minutos?|min|horas?|h)\b", t)
@@ -324,6 +569,8 @@ def siguiente(dt, repetir, ref=None):
 def humano(dt, ref=None):
     """«dentro de 20 minutos», «hoy a las 18 y 30», «mañana a las 9», «el viernes a las 18», «el 15 de octubre a las 9»."""
     ref = ref or ahora()
+    if IDI.actual() == "en":
+        return _humano_en(dt, ref)
     delta = dt - ref
     if timedelta(0) <= delta < timedelta(minutes=90):
         mins = max(1, round(delta.total_seconds() / 60))

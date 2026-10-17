@@ -32,8 +32,11 @@ MODELOS_CONFIRMACION = ["gemini-flash-lite-latest", "gemini-flash-latest"]   # l
 INTERRUPCION_IA = True                       # True: lo que dices mientras piensa lo entiende una mini-consulta (solo «para», «cancela»… exactos se atajan sin ella)
 PANTALLA_SESION_SEG = 180                     # si hace menos de esto que se usó la pantalla, se sigue enviando (ayuda paso a paso con lo que ves)
 ARCHIVO_PRIVADO = RUT.DATOS / "modo_privado"
-NO_VE_PANTALLA = re.compile(r"no (?:puedo|logro|consigo) ver (?:tu |la )?pantalla|no veo (?:tu |la )?pantalla|no tengo acceso a (?:tu |la )?pantalla|sin ver la pantalla|"
+NO_VE_PANTALLA_ES = re.compile(r"no (?:puedo|logro|consigo) ver (?:tu |la )?pantalla|no veo (?:tu |la )?pantalla|no tengo acceso a (?:tu |la )?pantalla|sin ver la pantalla|"
                             r"no puedo ver lo que (?:ves|hay|tienes)")
+NO_VE_PANTALLA_EN = re.compile(r"i (?:can ?not|can ?t|am unable to|could ?n ?t|was unable to) see (?:your |the )?screen|i (?:do not|don ?t) have access to (?:your |the )?screen|"
+                               r"without seeing the screen|i (?:can ?not|can ?t) see what (?:you|is)")
+NO_VE_PANTALLA = IDI.PorIdioma({"es": NO_VE_PANTALLA_ES, "en": NO_VE_PANTALLA_EN})
 TIEMPO_PENSAR_A_FONDO = 180                  # pensar a fondo porque lo pides tú o lo pide la IA puede durar como mucho esto (s)…
 TIMEOUT_PENSAR_A_FONDO = 40                  # …cada respuesta de Gemini se espera como mucho esto (s)…
 PLAZO_PENSAR_A_FONDO = 90                    # …y entre reintentos y los dos modelos a fondo no se espera más que esto en total (s)

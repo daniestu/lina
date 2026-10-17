@@ -5,6 +5,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Fase 8, inglés completo: la terminal entera (`lina doctor`, `preparar`, `update`, `bienvenida`, `clave`, `privilegios`, `olvidar`, `voz`, `modelos`, `config`, `ia`…)
+  sale en inglés con `idioma = "en"`, con sus ayudas y preguntas (vale «yes»; las frases que se teclean para el acceso total y `--todo` también tienen versión inglesa).
+  Manual de privacidad y README en inglés, órdenes del manos libres y recordatorios en inglés, y redes de seguridad inglesas (promesas, incapacidad, destrucción total).
+  Marcador `N_()` para textos de constantes. El texto que lee la IA sigue en español a propósito; ver `docs/idiomas.md`.
 - Fase 9: guía de uso (`docs/uso.md`), README renovado, pasos para publicar una versión (`docs/publicacion.md`) y paquete del AUR (`packaging/aur/`): instala las
   dependencias del sistema y la orden `lina-instalar` (el instalador de siempre). Sin probar con `makepkg`.
 - Fase 8, paso 5: primer inglés, experimental (`idioma = "en"`). Traducciones de todas las frases envueltas, instrucciones inglesas para la IA, `comandos.en.txt`,

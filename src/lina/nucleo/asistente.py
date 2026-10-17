@@ -456,6 +456,11 @@ from lina.nucleo.asistente_organizacion import MixinOrganizacion
 
 
 # ======================= EL ASISTENTE =======================
+_ACCION_DESTRUCTIVA = IDI.PorIdioma({
+    "es": re.compile(r"\b(voy a|procedo a|he (formateado|borrado|eliminado)|ya (esta )?(formateado|borrado))\b"),
+    "en": re.compile(r"\b(i will|i ll|i am going to|i m going to|proceeding|i have (formatted|deleted|erased|wiped)|already (formatted|deleted|erased|wiped)|i formatted|i deleted|i erased|i wiped)\b"),
+})
+
 class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, MixinMCP):
     modo_privado = False          # «modo privado»: no se envía NINGUNA captura de tu pantalla (se recuerda aunque reinicies)
     ultima_pantalla_t = 0.0       # cuándo se usó la pantalla por última vez (para seguir una ayuda paso a paso)
@@ -652,7 +657,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                 log("No va dirigido a mí o no se entiende: lo anterior sigue")
                 return
             if decision == "sin_decision":                 # no he podido entenderte: lo seguro es no destruir lo que está en marcha
-                self._hablar("No he podido entenderte ahora mismo, lo anterior sigue. Si quieres que pare, di «para».")
+                self._hablar(T("No he podido entenderte ahora mismo, lo anterior sigue. Si quieres que pare, di «para»."))
                 return
             if decision == "ademas":                       # algo extra: se apunta para cuando termine lo de ahora
                 with self.cerrojo:
@@ -661,14 +666,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                         self._cola().append(texto)
                 if encolada:
                     log(f"Apunto para después: «{texto}»")
-                    self._hablar("Apuntado, lo hago en cuanto termine.")
+                    self._hablar(T("Apuntado, lo hago en cuanto termine."))
                     return
             log("Has pedido otra cosa: abandono lo anterior y atiendo esto")
             self.sustituida = True
             _abortar.set()
             if not self.fin_tarea.wait(ESPERA_PARAR_TAREA):              # lo anterior está dentro de una acción que no se puede cortar a medias
                 log("Lo anterior sigue dentro de una acción: espero a que termine para atender lo nuevo (no se pierde)")
-                self._hablar("Estoy terminando de parar lo anterior; enseguida te atiendo.")
+                self._hablar(T("Estoy terminando de parar lo anterior; enseguida te atiendo."))
                 if not self.fin_tarea.wait(ESPERA_PARAR_MAXIMA):
                     self.sustituida = False
                     log("La tarea anterior no ha terminado de parar: no atiendo lo nuevo")
@@ -911,15 +916,15 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         if modo == "profundo":
             log(f"Modo a fondo ({motivo_modo})")
             if not confirmado:  # que sepas que va a tardar un poco más
-                aviso_voz = threading.Thread(target=self._hablar, args=("Vale, lo pienso con calma.",), daemon=True)
+                aviso_voz = threading.Thread(target=self._hablar, args=(T("Vale, lo pienso con calma."),), daemon=True)
                 aviso_voz.start()
         respuesta, origen = self.responder(pregunta, imagen, modo)
         if aviso_voz:
             aviso_voz.join()
         if not self.ejecutor.pendientes and PIDE_CONFIRMACION.search(respuesta or ""):
             log("Aviso: la IA ha pedido confirmación sin dejar nada preparado")
-        if H.destruccion_total(respuesta) and (PIDE_CONFIRMACION.search(respuesta or "") or re.search(
-                r"\b(voy a|procedo a|he (formateado|borrado|eliminado)|ya (esta )?(formateado|borrado))\b", H._sin_acentos(str(respuesta).lower()))):
+        if H.destruccion_total(respuesta) and (PIDE_CONFIRMACION.search(respuesta or "") or _ACCION_DESTRUCTIVA.search(
+                H._sin_acentos(str(respuesta).lower()))):
             log(f"La IA ofrecía una destrucción total («{str(respuesta)[:100]}»): se sustituye por la negativa")
             H.anotar(f"[bloqueado] la IA ofreció una destrucción total: «{str(respuesta)[:120]}»")
             respuesta = T(H.AVISO_DESTRUCCION_TOTAL)
@@ -1348,11 +1353,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             return None
         partes = []
         if hechas:
-            partes.append("Gemini ha dejado de responder justo después de actuar, pero esto ya está hecho: "
-                          + "; ".join(hechas) + ".")
+            partes.append(T("Gemini ha dejado de responder justo después de actuar, pero esto ya está hecho: {hechas}.", hechas="; ".join(hechas)))
         if pendientes:
-            partes.append("Queda pendiente de tu confirmación: " + "; ".join(pendientes)
-                          + ". Si quieres que lo haga, dime que sí.")
+            partes.append(T("Queda pendiente de tu confirmación: {pendientes}. Si quieres que lo haga, dime que sí.", pendientes="; ".join(pendientes)))
         return " ".join(partes)
 
     def revisar_respuesta(self, texto):
@@ -1389,9 +1392,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             return texto.rstrip() + f" Concretamente: {motivos}. ¿Lo hago?"
         if afirma_hecho(texto):
             log("La respuesta daba por hecho algo que está pendiente: se corrige")
-            extra = f" Ojo, corrijo: eso todavía NO está hecho ({motivos}); espera tu confirmación. ¿Lo hago?"
+            extra = " " + T("Ojo, corrijo: eso todavía NO está hecho ({motivos}); espera tu confirmación. ¿Lo hago?", motivos=motivos)
         else:
-            extra = f" Queda pendiente de tu confirmación: {motivos}. ¿Lo hago?"
+            extra = " " + T("Queda pendiente de tu confirmación: {motivos}. ¿Lo hago?", motivos=motivos)
         return texto.rstrip() + extra
 
     # Verbos con los que empieza el «motivo» de un comando («activar la luz nocturna»): el nombre del ajuste es lo que viene después.
@@ -1410,11 +1413,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             return texto
         if self.ejecutor.duda:
             log("La respuesta daba por hecho algo sin comprobar: se corrige")
-            return texto.rstrip() + f" Ojo, corrijo: no he podido comprobar que eso funcione ({self.ejecutor.duda_corta()}); no lo des por hecho."
+            return texto.rstrip() + " " + T("Ojo, corrijo: no he podido comprobar que eso funcione ({duda}); no lo des por hecho.", duda=self.ejecutor.duda_corta())
         if self.ejecutor.efecto_sin_comprobar:
             log("La respuesta daba por hecho un cambio de configuración sin comprobar su efecto: se corrige")
-            return texto.rstrip() + (" Ojo: he cambiado un archivo de configuración, pero no he comprobado en pantalla que el cambio tenga "
-                                     "efecto; dímelo si no lo ves.")
+            return texto.rstrip() + " " + T("Ojo: he cambiado un archivo de configuración, pero no he comprobado en pantalla que el cambio tenga efecto; dímelo si no lo ves.")
         return texto
 
     def _avisar_voz(self, texto):
@@ -1503,11 +1505,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         if n:
             nombre, args, _ = self.acciones_turno[-1]
             ult = str(args.get("motivo") or args.get("comando") or args.get("consulta") or nombre)[:60]
-            msg = f"Sigo con «{pet}». Llevo {seg} segundos y {n} acción{'es' if n != 1 else ''}. Lo último: {ult}."
+            msg = (T("Sigo con «{pet}». Llevo {seg} segundos y {n} acción. Lo último: {ult}.", pet=pet, seg=seg, n=n, ult=ult) if n == 1
+                   else T("Sigo con «{pet}». Llevo {seg} segundos y {n} acciones. Lo último: {ult}.", pet=pet, seg=seg, n=n, ult=ult))
         else:
-            msg = f"Sigo con «{pet}». Llevo {seg} segundos y todavía estoy pensando cómo hacerlo."
+            msg = T("Sigo con «{pet}». Llevo {seg} segundos y todavía estoy pensando cómo hacerlo.", pet=pet, seg=seg)
         en_cola = len(self._cola())
-        return msg + (f" Tengo {en_cola} cosa{'s' if en_cola != 1 else ''} más apuntada{'s' if en_cola != 1 else ''} para después." if en_cola else "")
+        if not en_cola:
+            return msg
+        return msg + " " + (T("Tengo {n} cosa más apuntada para después.", n=en_cola) if en_cola == 1 else T("Tengo {n} cosas más apuntadas para después.", n=en_cola))
 
     def _tarea_de_ajustes(self):
         """¿Esta petición tiene que ver con ajustes de configuración (donde insistir a fondo sí compensa)?"""
@@ -1553,8 +1558,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             timeout_insistir = TIMEOUT_PENSAR_A_FONDO
             plazo = time.time() + PLAZO_PENSAR_A_FONDO
             log(f"Pienso a fondo ({pide[:120]})")
-            self._avisar_voz("Vale, lo pienso a fondo.")
-            espera = threading.Timer(AVISO_ESPERA_A_FONDO, lambda: self._avisar_voz("Google está tardando en responder; sigo esperando."))
+            self._avisar_voz(T("Vale, lo pienso a fondo."))
+            espera = threading.Timer(AVISO_ESPERA_A_FONDO, lambda: self._avisar_voz(T("Google está tardando en responder; sigo esperando.")))
             espera.daemon = True
             espera.start()
         else:
@@ -1562,7 +1567,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                 self.max_tiempo = TIEMPO_INSISTIR_SIN_AJUSTES
                 timeout_insistir = TIMEOUT_INSISTIR_SIN_AJUSTES
             log(f"El intento rápido no pudo comprobar el resultado ({self.ejecutor.duda[:120]}): insisto a fondo")
-            self._avisar_voz("No he podido comprobar que funcione. Sigo intentándolo a fondo; puede tardar un poco.")
+            self._avisar_voz(T("No he podido comprobar que funcione. Sigo intentándolo a fondo; puede tardar un poco."))
         hechas = []
         for nombre, args, resultado in self.acciones_turno[-6:]:
             if nombre == "pensar_a_fondo":                # su resultado dice «contesta con una frase corta»: el modelo a fondo lo OBEDECÍA (y no respondía)
@@ -1601,7 +1606,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                                      ejecutar_herramienta=self.ejecutar_herramienta, sistema=sistema,
                                      nivel=nivel_razonamiento(m, "profundo"), revisor=self.revisar_respuesta, max_pasos=MAX_PASOS_PROFUNDO,
                                      esperar_cuota=True, timeout=timeout_insistir, plazo=plazo,
-                                     al_esperar=lambda: self._avisar_voz("Google me pide esperar un momento por el límite de uso; sigo en cuanto pueda."))
+                                     al_esperar=lambda: self._avisar_voz(T("Google me pide esperar un momento por el límite de uso; sigo en cuanto pueda.")))
                 if r and pide and parece_promesa(r):
                     log(f"{m}: contestó con una promesa en vez de con la respuesta: la descarto")
                     continue
@@ -1632,7 +1637,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                 log(f"El modelo a fondo no respondió: contesto con {m}")
                 return "Google no me ha dejado pensarlo a fondo; te respondo con el modelo rápido. " + r, f"{m} (sin modo a fondo)"
         log("Ningún modelo ha respondido: no hay resultado que dar")
-        return "No he podido pensarlo a fondo: Google no responde ahora mismo. Vuelve a pedírmelo dentro de un rato.", "código (sin respuesta)"
+        return T("No he podido pensarlo a fondo: Google no responde ahora mismo. Vuelve a pedírmelo dentro de un rato."), "código (sin respuesta)"
 
     def responder(self, pregunta, imagen, modo="rapido"):
         self.ejecutor.solo_preparar = False

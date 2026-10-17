@@ -28,6 +28,7 @@ import time
 
 from lina.nucleo import plataforma as PL
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import T
 
 COLORES = {"azul": "#3b82f6", "rojo": "#ef4444", "verde": "#22c55e", "morado": "#a855f7", "violeta": "#a855f7", "naranja": "#f97316",
            "amarillo": "#eab308", "rosa": "#ec4899", "cian": "#06b6d4", "blanco": "#f1f5f9"}
@@ -374,10 +375,10 @@ def servir(entrada=None, salida=None):
         from gi.repository import Gtk, Gdk, GLib
         import cairo
     except Exception as e:                                    # sin GTK3 o sin cairo
-        decir(f"SIN GTK3/cairo ({e})")
+        decir(T("SIN GTK3/cairo ({e})", e=e))
         return 2
     if Gdk.Display.get_default() is None:
-        decir("SIN PANTALLA (no hay sesión gráfica accesible para este proceso)")
+        decir(T("SIN PANTALLA (no hay sesión gráfica accesible para este proceso)"))
         return 3
     capa = None
     try:
@@ -387,8 +388,8 @@ def servir(entrada=None, salida=None):
             capa = None
     except Exception:
         capa = None
-    decir("método: capa layer-shell (por encima de todo)" if capa else
-          "método: ventana normal transparente (poco fiable en Wayland: falta gtk-layer-shell)")
+    decir(T("método: capa layer-shell (por encima de todo)") if capa else
+          T("método: ventana normal transparente (poco fiable en Wayland: falta gtk-layer-shell)"))
 
     estado = {"modo": "off", "color": COLORES["azul"], "grosor": 40, "intensidad": 1.0, "t0": time.time(), "ventanas": []}
 
@@ -557,10 +558,10 @@ def probar():
             print("  " + l.rstrip())
     threading.Thread(target=lee, daemon=True).start()
     time.sleep(1.5)
-    for modo, texto in (("escucha", "te escucho (azul, pulsando)"), ("seguimiento", "ventana de seguimiento (azul tenue)"),
-                        ("pensando", "pensando (ámbar)"), ("habla", "hablando (verde)")):
+    for modo, texto in (("escucha", T("te escucho (azul, pulsando)")), ("seguimiento", T("ventana de seguimiento (azul tenue)")),
+                        ("pensando", T("pensando (ámbar)")), ("habla", T("hablando (verde)"))):
         if p.poll() is not None:
-            print(f"El dibujo se ha cerrado (código {p.returncode}); mira el mensaje de arriba.")
+            print(T("El dibujo se ha cerrado (código {v1}); mira el mensaje de arriba.", v1=p.returncode))
             return 1
         print(f"→ {texto}")
         p.stdin.write(f"modo {modo}\n")
@@ -569,7 +570,7 @@ def probar():
     p.stdin.write("modo off\nsalir\n")
     p.stdin.flush()
     time.sleep(0.5)
-    print("Hecho. ¿Has visto el resplandor en los bordes? Si no: mira el «método» de arriba.")
+    print(T("Hecho. ¿Has visto el resplandor en los bordes? Si no: mira el «método» de arriba."))
     return 0
 
 

@@ -18,17 +18,18 @@ from lina.escritorio import atajo as ATAJO
 from lina.nucleo import modelos as MOD
 from lina.nucleo import plataforma as PL
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import N_, T
 
 VERSION_MANIFIESTO = 1
 UNIDAD = "lina.service"
 REGLAS_ENTRADA = ["/etc/udev/rules.d/80-asistente-uinput.rules", "/etc/modules-load.d/asistente-uinput.conf"]   # las crea `lina interfaz preparar`
-AYUDA = """lina preparar [--simular] [--si] [--sin-modelos] [--sin-servicio] [--sin-atajo] [--atajo TECLA] [--entrada]
+AYUDA = N_("""lina preparar [--simular] [--si] [--sin-modelos] [--sin-servicio] [--sin-atajo] [--atajo TECLA] [--entrada]
     Deja Lina lista para usarse: enlace del comando, modelos (Whisper y voz), servicio de usuario y atajo global.
     --simular      dice lo que haría, sin tocar nada
     --si           responde «sí» a las preguntas (menos a las de permisos de administrador, que siempre se hacen a mano)
     --entrada      además prepara el control de programas con la pantalla (permisos de /dev/uinput; pide administrador)
 lina uninstall [--simular] [--si] [--todo]
-    Quita lo que instaló Lina (servicio, atajo, comando, permisos). --todo borra también tus ajustes, claves y datos."""
+    Quita lo que instaló Lina (servicio, atajo, comando, permisos). --todo borra también tus ajustes, claves y datos.""")
 
 
 class Manifiesto:
@@ -84,7 +85,7 @@ class Contexto:
         if not self.terminal:
             return por_defecto
         try:
-            r = self.entrada(f"{texto} [{'S/n' if por_defecto else 's/N'}] ").strip().lower()
+            r = self.entrada(f"{texto} [{T('S/n') if por_defecto else T('s/N')}] ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             return False
         return por_defecto if not r else r in ("s", "si", "sí", "y", "yes")
@@ -107,28 +108,28 @@ def paso_enlace(ctx):
         ctx.aviso("·", f"[simulación] enlazaría {destino} → {ctx.ejecutable}")
         return True
     if not ctx.ejecutable.exists():
-        ctx.aviso("!", f"No encuentro el programa lina de este entorno ({ctx.ejecutable}); no creo el enlace.")
+        ctx.aviso("!", T("No encuentro el programa lina de este entorno ({v1}); no creo el enlace.", v1=ctx.ejecutable))
         return False
     if destino.exists() and not destino.is_symlink():
-        ctx.aviso("!", f"{destino} ya existe y no es un enlace: no lo toco.")
+        ctx.aviso("!", T("{destino} ya existe y no es un enlace: no lo toco.", destino=destino))
         return False
     ctx.bin.mkdir(parents=True, exist_ok=True)
     if destino.is_symlink():
         destino.unlink()
     destino.symlink_to(ctx.ejecutable)
     ctx.manifiesto.anotar("enlace", ruta=str(destino))
-    ctx.aviso("✔", f"Comando «lina» en {destino}")
+    ctx.aviso("✔", T("Comando «lina» en {destino}", destino=destino))
     if str(ctx.bin) not in os.environ.get("PATH", "").split(":"):
-        ctx.aviso("!", f"{ctx.bin} no está en tu PATH: añádelo para escribir «lina» en la terminal.")
+        ctx.aviso("!", T("{v1} no está en tu PATH: añádelo para escribir «lina» en la terminal.", v1=ctx.bin))
     return True
 
 
 def paso_modelos(ctx):
     todo, problemas = MOD.asegurar_todo(log=lambda m: ctx.aviso("·", m), simular=ctx.simular)
     if not todo:
-        ctx.aviso("!", "Faltan " + ", ".join(problemas) + ": sin ellos Lina no puede oír o hablar. Repite luego con:  lina modelos")
+        ctx.aviso("!", T("Faltan ") + ", ".join(problemas) + T(": sin ellos Lina no puede oír o hablar. Repite luego con:  lina modelos"))
     elif not ctx.simular:
-        ctx.aviso("✔", "Modelos de voz listos")
+        ctx.aviso("✔", T("Modelos de voz listos"))
     return todo
 
 
@@ -151,13 +152,12 @@ def paso_servicio(ctx, arrancar=True):
         r = ctx.ejecutar(["systemctl", "--user", "enable"] + (["--now"] if arrancar else []) + [UNIDAD], capture_output=True, text=True)
         ctx.manifiesto.anotar("servicio", ruta=str(unidad))
         if r.returncode != 0:
-            ctx.aviso("!", "No he podido activar el servicio: " + (r.stderr or r.stdout or "sin detalle").strip()[:150])
+            ctx.aviso("!", T("No he podido activar el servicio: ") + (r.stderr or r.stdout or "sin detalle").strip()[:150])
             return False
-        ctx.aviso("✔", "Servicio de usuario lina.service " + ("activado y arrancado" if arrancar else "activado"))
+        ctx.aviso("✔", T("Servicio de usuario lina.service ") + (T("activado y arrancado") if arrancar else T("activado")))
         escr = ATAJO.escritorio()
         if escr in ("sway", "hyprland", "otro"):
-            ctx.aviso("!", "Tu sesión puede no activar graphical-session.target, y entonces el servicio no arranca al iniciar sesión. Si pasa, añade a la configuración de tu escritorio:  "
-                      f"exec {ctx.bin / 'lina'}   (comprueba con  lina doctor  tras reiniciar sesión)")
+            ctx.aviso("!", T("Tu sesión puede no activar graphical-session.target, y entonces el servicio no arranca al iniciar sesión. Si pasa, añade a la configuración de tu escritorio:  exec {v1}   (comprueba con  lina doctor  tras reiniciar sesión)", v1=ctx.bin / 'lina'))
         return True
     arranque = ctx.config / "autostart" / "lina.desktop"
     if ctx.simular:
@@ -166,21 +166,21 @@ def paso_servicio(ctx, arrancar=True):
     arranque.parent.mkdir(parents=True, exist_ok=True)
     arranque.write_text(f"[Desktop Entry]\nType=Application\nName=Lina\nExec={ctx.ejecutable}\nIcon=audio-input-microphone\nTerminal=false\n", encoding="utf-8")
     ctx.manifiesto.anotar("autostart", ruta=str(arranque))
-    ctx.aviso("✔", f"Sin systemd: Lina arrancará con tu sesión ({arranque}). Para arrancarla ya:  lina")
+    ctx.aviso("✔", T("Sin systemd: Lina arrancará con tu sesión ({arranque}). Para arrancarla ya:  lina", arranque=arranque))
     return True
 
 
 def paso_atajo(ctx, tecla=None):
     escr = ATAJO.escritorio()
     if ATAJO.ya_hay_atajo(escr, ctx.home, ctx.ejecutar, ctx.which):
-        ctx.aviso("✔", "Ya tienes un atajo para Lina: lo dejo como está.")
+        ctx.aviso("✔", T("Ya tienes un atajo para Lina: lo dejo como está."))
         return True
     tecla = tecla or ATAJO.TECLA_POR_DEFECTO.get(escr)
     if not tecla:
         ctx.aviso("!", ATAJO.a_mano(escr, ctx.bin / "lina"))
         return False
-    if not ctx.simular and not ctx.preguntar(f"¿Creo el atajo global {tecla} para hablar con Lina?"):
-        ctx.aviso("·", f"Vale. Cuando quieras, crea uno que ejecute:  {ctx.bin / 'lina'} pulsar")
+    if not ctx.simular and not ctx.preguntar(T("¿Creo el atajo global {tecla} para hablar con Lina?", tecla=tecla)):
+        ctx.aviso("·", T("Vale. Cuando quieras, crea uno que ejecute:  {v1} pulsar", v1=ctx.bin / 'lina'))
         return False
     hecho, mensaje, nota = ATAJO.registrar(escr, tecla, str(ctx.bin / "lina"), ctx.home, ctx.simular, ctx.ejecutar, ctx.which)
     ctx.aviso("✔" if hecho else "!", mensaje)
@@ -191,9 +191,9 @@ def paso_atajo(ctx, tecla=None):
 
 def paso_entrada(ctx):
     """Control de programas con la pantalla (ydotool): necesita permisos sobre /dev/uinput. Lo hace `lina interfaz preparar`, que pide la contraseña."""
-    ctx.salida("  Esto da a tu usuario permiso para crear teclado y ratón virtuales (/dev/uinput) y activa la accesibilidad; pide tu contraseña de administrador.")
-    if not ctx.simular and not ctx.preguntar("¿Preparo el control de programas con la pantalla ahora?", por_defecto=False):
-        ctx.aviso("·", "Lo dejo. Cuando quieras:  lina interfaz preparar")
+    ctx.salida(T("  Esto da a tu usuario permiso para crear teclado y ratón virtuales (/dev/uinput) y activa la accesibilidad; pide tu contraseña de administrador."))
+    if not ctx.simular and not ctx.preguntar(T("¿Preparo el control de programas con la pantalla ahora?"), por_defecto=False):
+        ctx.aviso("·", T("Lo dejo. Cuando quieras:  lina interfaz preparar"))
         return False
     if ctx.simular:
         ctx.aviso("·", "[simulación] ejecutaría:  lina interfaz preparar")
@@ -208,14 +208,14 @@ def paso_entrada(ctx):
 def preparar(argv, ctx=None):
     """lina preparar: ver AYUDA."""
     if "-h" in argv or "--help" in argv or "ayuda" in argv:
-        print(AYUDA)
+        print(T(AYUDA))
         return 0
     tecla = None
     if "--atajo" in argv:
         i = argv.index("--atajo")
         tecla = argv[i + 1] if i + 1 < len(argv) else None
     ctx = ctx or Contexto(simular="--simular" in argv or "--dry-run" in argv, si="--si" in argv or "-y" in argv)
-    ctx.salida("Preparando Lina" + (" (simulación: no se toca nada)" if ctx.simular else ""))
+    ctx.salida(T("Preparando Lina") + (T(" (simulación: no se toca nada)") if ctx.simular else ""))
     fallos = []
     if not paso_enlace(ctx):
         fallos.append("comando")
@@ -232,7 +232,7 @@ def preparar(argv, ctx=None):
         ctx.manifiesto.anotar("instalado", version=__version__, venv=sys.prefix, fuente=str(raiz) if (raiz / "pyproject.toml").exists() else "",
                               clonado=os.environ.get("LINA_CLONADO") == "1")
         ctx.manifiesto.guardar()
-    ctx.salida("\n" + ("Todo listo." if not fallos else "Hecho, salvo: " + ", ".join(fallos) + ". Mira arriba qué falta y cómo se arregla."))
+    ctx.salida("\n" + (T("Todo listo.") if not fallos else T("Hecho, salvo: ") + ", ".join(fallos) + T(". Mira arriba qué falta y cómo se arregla.")))
     return 0 if not fallos else 1
 
 
@@ -243,40 +243,40 @@ def plan_de_desinstalacion(ctx, todo=False):
     pasos = []
     if m.de("servicio"):
         ruta = Path(m.de("servicio")["ruta"])
-        pasos.append((f"servicio de usuario ({ruta})", lambda ruta=ruta: _quitar_servicio(ctx, ruta)))
+        pasos.append((T("servicio de usuario ({ruta})", ruta=ruta), lambda ruta=ruta: _quitar_servicio(ctx, ruta)))
     if m.de("autostart"):
         ruta = Path(m.de("autostart")["ruta"])
-        pasos.append((f"arranque automático ({ruta})", lambda ruta=ruta: _borrar(ruta)))
+        pasos.append((T("arranque automático ({ruta})", ruta=ruta), lambda ruta=ruta: _borrar(ruta)))
     if m.de("atajo"):
         nota = m.de("atajo")
-        pasos.append((f"atajo global {nota.get('tecla', '')}", lambda nota=nota: ATAJO.quitar(nota, ctx.home, ctx.simular, ctx.ejecutar, ctx.which)))
+        pasos.append((T("atajo global {v1}", v1=nota.get('tecla', '')), lambda nota=nota: ATAJO.quitar(nota, ctx.home, ctx.simular, ctx.ejecutar, ctx.which)))
     if m.de("enlace"):
         ruta = Path(m.de("enlace")["ruta"])
-        pasos.append((f"comando {ruta}", lambda ruta=ruta: _borrar(ruta, solo_enlace=True)))
+        pasos.append((T("comando {ruta}", ruta=ruta), lambda ruta=ruta: _borrar(ruta, solo_enlace=True)))
     if m.de("entrada"):
         e = m.de("entrada")
-        pasos.append(("permisos de /dev/uinput y servicio ydotoold (pide administrador)", lambda e=e: _quitar_entrada(ctx, e)))
+        pasos.append((T("permisos de /dev/uinput y servicio ydotoold (pide administrador)"), lambda e=e: _quitar_entrada(ctx, e)))
     if todo:
-        pasos.append((f"TUS AJUSTES Y CLAVES ({RUT.CONFIG}) y los llaveros de Lina", lambda: _borrar_arbol(RUT.CONFIG, ctx)))
-        pasos.append((f"TUS DATOS: recetas, diario, voces, modelos ({RUT.DATOS}, {RUT.ESTADO}, {RUT.CACHE})",
+        pasos.append((T("TUS AJUSTES Y CLAVES ({v1}) y los llaveros de Lina", v1=RUT.CONFIG), lambda: _borrar_arbol(RUT.CONFIG, ctx)))
+        pasos.append((T("TUS DATOS: recetas, diario, voces, modelos ({v1}, {v2}, {v3})", v1=RUT.DATOS, v2=RUT.ESTADO, v3=RUT.CACHE),
                       lambda: [_borrar_arbol(p, ctx) for p in (RUT.DATOS, RUT.ESTADO, RUT.CACHE)][-1]))
     v = m.de("instalado") or {}
     if v.get("clonado") and v.get("fuente") and Path(v["fuente"]).parent == RUT.DATOS:          # solo el código que bajó el instalador, nunca un clon tuyo
-        pasos.append((f"código descargado por el instalador ({v['fuente']})", lambda v=v: _borrar_arbol(Path(v["fuente"]), ctx)))
+        pasos.append((T("código descargado por el instalador ({v1})", v1=v['fuente']), lambda v=v: _borrar_arbol(Path(v["fuente"]), ctx)))
     if v.get("venv") and Path(v["venv"]).parent == RUT.DATOS and Path(v["venv"]).name == "venv":
-        pasos.append((f"entorno de Python ({v['venv']})", lambda v=v: _borrar_arbol(Path(v["venv"]), ctx)))
+        pasos.append((T("entorno de Python ({v1})", v1=v['venv']), lambda v=v: _borrar_arbol(Path(v["venv"]), ctx)))
     return pasos
 
 
 def _borrar(ruta, solo_enlace=False):
     ruta = Path(ruta)
     if solo_enlace and not ruta.is_symlink():
-        return f"{ruta} no es un enlace: no lo toco"
+        return T("{ruta} no es un enlace: no lo toco", ruta=ruta)
     try:
         ruta.unlink(missing_ok=True)
     except OSError as e:
-        return f"no he podido quitar {ruta} ({e})"
-    return f"quitado {ruta}"
+        return T("no he podido quitar {ruta} ({e})", ruta=ruta, e=e)
+    return T("quitado {ruta}", ruta=ruta)
 
 
 def _borrar_arbol(ruta, ctx):
@@ -285,7 +285,7 @@ def _borrar_arbol(ruta, ctx):
         return f"[simulación] borraría {ruta}"
     if ruta.is_dir() and ruta.resolve() != Path("/") and ruta != ctx.home:
         shutil.rmtree(ruta, ignore_errors=True)
-    return f"borrado {ruta}"
+    return T("borrado {ruta}", ruta=ruta)
 
 
 def _quitar_servicio(ctx, ruta):
@@ -306,32 +306,32 @@ def _quitar_entrada(ctx, nota):
         servicio.unlink(missing_ok=True)
     reglas = [r for r in nota.get("reglas", []) if r in REGLAS_ENTRADA]
     r = ctx.ejecutar(["sudo", "rm", "-f", *reglas])
-    return "permisos de /dev/uinput quitados" if r.returncode == 0 else "no he podido quitar los permisos de /dev/uinput (necesita administrador); quítalos tú: sudo rm " + " ".join(reglas)
+    return T("permisos de /dev/uinput quitados") if r.returncode == 0 else T("no he podido quitar los permisos de /dev/uinput (necesita administrador); quítalos tú: sudo rm ") + " ".join(reglas)
 
 
 def desinstalar(argv, ctx=None):
     if "-h" in argv or "--help" in argv:
-        print(AYUDA)
+        print(T(AYUDA))
         return 0
     todo = "--todo" in argv
     ctx = ctx or Contexto(simular="--simular" in argv or "--dry-run" in argv, si="--si" in argv or "-y" in argv)
     pasos = plan_de_desinstalacion(ctx, todo)
     if not pasos:
-        ctx.salida("No encuentro nada que quitar en el manifiesto de instalación (¿se instaló con install.sh?).")
+        ctx.salida(T("No encuentro nada que quitar en el manifiesto de instalación (¿se instaló con install.sh?)."))
     else:
-        ctx.salida("Voy a quitar:")
+        ctx.salida(T("Voy a quitar:"))
         for d, _ in pasos:
             ctx.salida(f"  · {d}")
     if todo and not ctx.simular:
-        ctx.salida("\n--todo borra también TUS AJUSTES, CLAVES y DATOS, y no se puede deshacer.")
+        ctx.salida(T("\n--todo borra también TUS AJUSTES, CLAVES y DATOS, y no se puede deshacer."))
         try:
-            if not ctx.terminal or ctx.entrada("Para continuar escribe exactamente «borrar todo»: ").strip() != "borrar todo":
-                ctx.salida("No se ha quitado nada.")
+            if not ctx.terminal or ctx.entrada(T("Para continuar escribe exactamente «borrar todo»: ")).strip().lower() not in ("borrar todo", T("borrar todo")):
+                ctx.salida(T("No se ha quitado nada."))
                 return 1
         except (EOFError, KeyboardInterrupt):
             return 1
-    elif pasos and not ctx.simular and not ctx.preguntar("¿Sigo?"):
-        ctx.salida("No se ha quitado nada.")
+    elif pasos and not ctx.simular and not ctx.preguntar(T("¿Sigo?")):
+        ctx.salida(T("No se ha quitado nada."))
         return 1
     for d, f in pasos:
         try:
@@ -342,10 +342,10 @@ def desinstalar(argv, ctx=None):
         ctx.manifiesto.acciones = [a for a in ctx.manifiesto.acciones if a["tipo"] == "instalado"] if not todo else []
         if not todo:
             ctx.manifiesto.guardar()
-        ctx.salida("\nSi diste a Lina permisos de administrador (sudoers), quítalos con:  lina privilegios quitar")
+        ctx.salida(T("\nSi diste a Lina permisos de administrador (sudoers), quítalos con:  lina privilegios quitar"))
         v = ctx.manifiesto.de("instalado")
         if v and Path(v.get("venv", "")).parent != RUT.DATOS:
-            ctx.salida(f"El entorno de Python ({v.get('venv')}) no lo creó el instalador: bórralo tú si ya no lo quieres.")
+            ctx.salida(T("El entorno de Python ({v1}) no lo creó el instalador: bórralo tú si ya no lo quieres.", v1=v.get('venv')))
     return 0
 
 

@@ -31,8 +31,10 @@ from pathlib import Path
 
 import numpy as np
 from lina.nucleo import ajustes as AJ
+from lina.nucleo import idioma as IDI
 from lina.nucleo import plataforma as PL
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import T
 
 FRECUENCIA = 16000
 BLOQUE = 480                      # 30 ms por bloque de audio
@@ -280,8 +282,57 @@ _NO_NOMBRE = {"ahora", "de", "la", "el", "un", "una", "que", "asi", "otra", "otr
               "siempre", "como", "cuando", "cual", "quien", "te", "me", "se", "lo", "a"}
 
 
+_TEMA_EN = re.compile(r"\b(hands ?free|continuous listening|voice activation|wake word|listening mode)\b")
+_NO_NOMBRE_EN = {"now", "the", "a", "an", "that", "so", "like", "as", "my", "your", "always", "when", "which", "who", "you", "me", "it", "to", "be",
+                 "called", "just", "really", "going"}
+
+
 def entender_orden(texto):
-    """Devuelve None o una tupla: ('activar',) ('desactivar',) ('juegos', True/False) ('nombre', X) ('pregunta_nombre',) ('estado',)."""
+    """Devuelve None o una tupla: ('activar',) ('desactivar',) ('juegos', True/False) ('nombre', X) ('pregunta_nombre',) ('estado',).
+    Las frases dependen del idioma de Lina."""
+    if IDI.actual() == "en":
+        return _entender_orden_en(texto)
+    return _entender_orden_es(texto)
+
+
+def _entender_orden_en(texto):
+    n = normalizar(texto)
+    n = re.sub(r"[^a-z0-9 ]", " ", n)
+    n = re.sub(r"\s+", " ", n).strip()
+    if re.search(r"\b(what s your name|what is your name|what do i call you|what should i call you|what is your wake word|how do i wake you|how do i activate you|"
+                 r"how do i call you)\b", n):
+        return ("pregunta_nombre",)
+    m = re.search(r"\b(?:your name is|your name will be|your name should be|change your name to|rename yourself to|call yourself|from now on you are called|"
+                  r"from now on your name is|i want you to be called|i will call you|i ll call you|you are called|your wake word is|your wake word will be)\s+"
+                  r"([a-z0-9]+(?: [a-z0-9]+)?)", n)
+    if m:
+        palabras = [p for p in m.group(1).split() if p]
+        while palabras and palabras[0] in _NO_NOMBRE_EN:
+            palabras.pop(0)
+        if palabras and len(palabras[0]) >= 3:
+            return ("nombre", palabras[0])
+        return ("nombre", "")
+    if re.search(r"\b(echo cancell?ation|echo canceller|echo cancel|echo)\b", n):
+        if re.search(r"\b(disable|turn off|switch off|remove|without|deactivate|stop)\b", n):
+            return ("eco", False)
+        if re.search(r"\b(enable|turn on|switch on|activate|install|set up|add)\b", n):
+            return ("eco", True)
+    if _TEMA_EN.search(n):
+        if re.search(r"\b(game|games|gaming|playing|play)\b", n):
+            if re.search(r"\b(disable|turn off|switch off|stop|don t|do not|not)\b", n):
+                return ("juegos", False)
+            if re.search(r"\b(enable|turn on|switch on|keep|leave|want|also)\b", n):
+                return ("juegos", True)
+        if re.search(r"\b(disable|turn off|switch off|deactivate|stop|cancel|i don t want|i do not want|without)\b", n):
+            return ("desactivar",)
+        if re.search(r"\b(enable|turn on|switch on|activate|resume|start|i want)\b", n):
+            return ("activar",)
+        if re.search(r"\b(is|are|working|active|enabled|status|on)\b", n):
+            return ("estado",)
+    return None
+
+
+def _entender_orden_es(texto):
     n = normalizar(texto)
     n = re.sub(r"[^a-z0-9ñ ]", " ", n)
     n = re.sub(r"\s+", " ", n).strip()
@@ -712,18 +763,18 @@ class ManosLibres:
 # ----------------------------------------------------------------------------------------------------------------------
 def _probar(frases):
     cfg = Config()
-    print(f"Nombre: «{cfg.nombre}» · variantes: {cfg.lista('alias') or '—'} · prefijos: {', '.join(cfg.lista('prefijos'))}")
+    print(T("Nombre: «{v1}» · variantes: {v2} · prefijos: {v3}", v1=cfg.nombre, v2=cfg.lista('alias') or '—', v3=', '.join(cfg.lista('prefijos'))))
     for f in frases:
         ok, resto = buscar_activacion(f, cfg)
-        print(("✔ ACTIVA " if ok else "✘ no activa") + f"  «{f}»" + (f"  → orden: «{resto}»" if ok and resto else ("  → esperaría tu orden" if ok else "")))
+        print((T("✔ ACTIVA ") if ok else T("✘ no activa")) + f"  «{f}»" + (T("  → orden: «{resto}»", resto=resto) if ok and resto else (T("  → esperaría tu orden") if ok else "")))
 
 
 def _nivel():
     import sounddevice as sd
-    print("Quédate en silencio 3 segundos…")
+    print(T("Quédate en silencio 3 segundos…"))
     ruido = sd.rec(int(3 * FRECUENCIA), samplerate=FRECUENCIA, channels=1, dtype="float32")
     sd.wait()
-    print("Ahora di en voz normal: «Oye Lina, ¿qué tiempo hace hoy?» (4 segundos)")
+    print(T("Ahora di en voz normal: «Oye Lina, ¿qué tiempo hace hoy?» (4 segundos)"))
     voz = sd.rec(int(4 * FRECUENCIA), samplerate=FRECUENCIA, channels=1, dtype="float32")
     sd.wait()
 
@@ -733,13 +784,13 @@ def _nivel():
         return np.array([float(np.sqrt(np.mean(x[i * BLOQUE:(i + 1) * BLOQUE] ** 2))) for i in range(n)])
     r, v = niveles(ruido), niveles(voz)
     suelo, habla = float(np.percentile(r, 95)), float(np.percentile(v, 90))
-    print(f"Ruido de fondo (casi el máximo): {suelo:.4f} · tu voz: {habla:.4f}")
+    print(T("Ruido de fondo (casi el máximo): {suelo:.4f} · tu voz: {habla:.4f}", suelo=suelo, habla=habla))
     if habla < suelo * 2.5:
-        print("Tu voz apenas se distingue del ruido: acércate al micrófono o súbele la ganancia en los ajustes de sonido.")
+        print(T("Tu voz apenas se distingue del ruido: acércate al micrófono o súbele la ganancia en los ajustes de sonido."))
         return
     recomendado = max(0.006, round(min(habla * 0.25, max(suelo * 3, 0.008)), 4))
-    print(f"Sensibilidad recomendada: {recomendado}")
-    print(f"Ponlo con:  lina config poner activacion.sensibilidad {recomendado}")
+    print(T("Sensibilidad recomendada: {recomendado}", recomendado=recomendado))
+    print(T("Ponlo con:  lina config poner activacion.sensibilidad {recomendado}", recomendado=recomendado))
 
 
 if __name__ == "__main__":

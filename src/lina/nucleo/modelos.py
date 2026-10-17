@@ -5,6 +5,7 @@ faster-whisper, que comprueba la integridad de cada archivo contra la huella que
 """
 from lina.nucleo import ajustes as AJ
 from lina.voz import voces as VOC
+from lina.nucleo.idioma import T
 
 MODELO_WHISPER = "small"                    # voz a texto, en la CPU
 
@@ -64,11 +65,11 @@ def principal(argv):
     lina modelos estado     dice qué hay"""
     if argv[:1] == ["estado"]:
         e = estado()
-        print(f"Whisper ({MODELO_WHISPER}): {'listo' if e['whisper'] else 'sin descargar'}")
-        print(f"Voz: {e['voz'] or 'sin descargar'}" + ("" if e["voz_integra"] in (True, None) or not e["voz"] else "  ¡ARCHIVO ALTERADO!"))
+        print(T("Whisper ({modelo}): {estado}", modelo=MODELO_WHISPER, estado=T("listo") if e["whisper"] else T("sin descargar")))
+        print(T("Voz: {v1}", v1=e['voz'] or T('sin descargar')) + ("" if e["voz_integra"] in (True, None) or not e["voz"] else T("  ¡ARCHIVO ALTERADO!")))
         return 0
     todo, problemas = asegurar_todo()
     if not todo:
-        print("Faltan: " + ", ".join(problemas) + ". Comprueba la conexión y repite:  lina modelos")
+        print(T("Faltan: ") + ", ".join(problemas) + T(". Comprueba la conexión y repite:  lina modelos"))
         return 1
     return 0

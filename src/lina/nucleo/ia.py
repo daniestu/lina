@@ -12,6 +12,7 @@ import requests
 from lina.nucleo import claves as CL
 from lina.nucleo import herramientas as H
 from lina.nucleo import ia_activa as IAC
+from lina.nucleo import idioma as IDI
 from lina.nucleo import plataforma as PL
 from lina.nucleo import proveedor_gemini as PG
 from lina.nucleo import proveedor_anthropic as PAN  # noqa: F401  (los proveedores se registran al importarse)
@@ -306,7 +307,9 @@ def verificar_cumplimiento(clave, peticion, acciones, respuesta, con_pantalla=Fa
     return bool(r and r["decision"] == "no_cumplido")
 
 
-_PROMESA = re.compile(r"\b(?:voy a pensar|voy a pensarlo|lo voy a pensar|lo pensare|lo pienso|dejame pensar|dejame que lo piense|dame un momento)")
+_PROMESA_ES = re.compile(r"\b(?:voy a pensar|voy a pensarlo|lo voy a pensar|lo pensare|lo pienso|dejame pensar|dejame que lo piense|dame un momento)")
+_PROMESA_EN = re.compile(r"\b(?:i will think|i ll think|i am going to think|i m going to think|let me think|let me ponder|give me a (?:moment|second|minute)|one moment|hold on while i think)")
+_PROMESA = IDI.PorIdioma({"es": _PROMESA_ES, "en": _PROMESA_EN})
 
 
 def parece_promesa(texto):
@@ -315,10 +318,18 @@ def parece_promesa(texto):
     return len(t) < 220 and bool(_PROMESA.search(t))
 
 
-_INCAPAZ_FUERTE = re.compile(r"\b(no puedo|no he podido|no he conseguido|no consigo|no tengo (acceso|forma|manera|ninguna herramienta|permiso)|no es posible|no se como|no sabria|"
+_INCAPAZ_FUERTE_ES = re.compile(r"\b(no puedo|no he podido|no he conseguido|no consigo|no tengo (acceso|forma|manera|ninguna herramienta|permiso)|no es posible|no se como|no sabria|"
                              r"no me deja|no me permite|no hay (forma|manera)|no esta disponible|no soy capaz)\b")
-_INCAPAZ_DEBIL = re.compile(r"\b(no se ha (podido|conectado|encontrado)|ha fallado|fallo|no funciona|falta(n)?\b|no esta instalad|comprueba que|asegurate de|"
+_INCAPAZ_DEBIL_ES = re.compile(r"\b(no se ha (podido|conectado|encontrado)|ha fallado|fallo|no funciona|falta(n)?\b|no esta instalad|comprueba que|asegurate de|"
                             r"intentalo de nuevo|vuelve a (intentar|pedir)|tendrias que|deberias (instalar|abrir|activar))")
+
+_INCAPAZ_FUERTE_EN = re.compile(r"\b(i (?:can ?not|can ?t|could ?n ?t|am unable|was unable|am not able|was not able|have not been able|haven ?t been able|did not manage|didn ?t manage|"
+                                r"do not know how|don ?t know how)|i (?:do not|don ?t) have (?:access|a way|any tool|permission)|(?:it is|it s) not possible|not possible|"
+                                r"there is no (?:way|option)|(?:is|it s) not available|unable to|i m unable|won t let me|does not let me|doesn t let me|not able to)\b")
+_INCAPAZ_DEBIL_EN = re.compile(r"\b(failed|has failed|did not work|didn ?t work|does not work|doesn ?t work|is not installed|isn ?t installed|is missing|are missing|"
+                               r"make sure|check that|try again|you (?:will )?need to|you(?:\s+ll)? have to|you should (?:install|open|enable|activate))")
+_INCAPAZ_FUERTE = IDI.PorIdioma({"es": _INCAPAZ_FUERTE_ES, "en": _INCAPAZ_FUERTE_EN})
+_INCAPAZ_DEBIL = IDI.PorIdioma({"es": _INCAPAZ_DEBIL_ES, "en": _INCAPAZ_DEBIL_EN})
 
 
 def fracaso_en_respuesta(texto, hizo_acciones):

@@ -11,6 +11,7 @@ Si ninguno funciona, el resultado es vacío y SE DICE (nunca se inventa una vent
 Todo recibe `ejecutar`, `which` y `entorno` para probarlo sin escritorio.
 """
 import json
+from lina.nucleo.idioma import N_, T
 import os
 import re
 import shutil
@@ -23,7 +24,7 @@ _ESCRITORIOS = (("kde", "kde"), ("plasma", "kde"), ("cinnamon", "cinnamon"), ("x
                 ("cosmic", "cosmic"), ("budgie", "gnome"), ("pantheon", "pantheon"), ("deepin", "deepin"), ("hyprland", "hyprland"),
                 ("sway", "sway"), ("gnome", "gnome"), ("ubuntu", "gnome"), ("unity", "gnome"))
 NOMBRES = {"kde": "KDE Plasma", "gnome": "GNOME", "xfce": "XFCE", "cinnamon": "Cinnamon", "mate": "MATE", "lxqt": "LXQt", "cosmic": "COSMIC",
-           "pantheon": "Pantheon", "deepin": "Deepin", "sway": "sway", "hyprland": "Hyprland", "otro": "un escritorio sin identificar"}
+           "pantheon": "Pantheon", "deepin": "Deepin", "sway": "sway", "hyprland": "Hyprland", "otro": N_("un escritorio sin identificar")}
 WLROOTS = {"sway", "hyprland"}
 
 
@@ -67,7 +68,7 @@ class Sesion:
         self.escritorio, self.tipo, self.xwayland = d["escritorio"], d["sesion"], d["xwayland"]
 
     def nombre(self):
-        return f"{NOMBRES.get(self.escritorio, self.escritorio)} ({self.tipo})"
+        return f"{T(NOMBRES.get(self.escritorio, self.escritorio))} ({self.tipo})"
 
     def _tiene(self, *programas):
         return all(self.which(p) for p in programas)
@@ -290,21 +291,21 @@ class Sesion:
         if met:
             nota = ""
             if self.escritorio == "gnome" and self.tipo == "wayland":
-                nota = "en GNOME con Wayland solo se ven las ventanas de programas X11/XWayland (juegos, Steam, Electron); GNOME no deja leer las demás, así que puede no coincidir con la que tienes delante"
+                nota = T("en GNOME con Wayland solo se ven las ventanas de programas X11/XWayland (juegos, Steam, Electron); GNOME no deja leer las demás, así que puede no coincidir con la que tienes delante")
             cap["ventana"] = (met[0], nota)
         else:
-            falta = "no encuentro swaymsg/hyprctl" if self.escritorio in WLROOTS else "instala kdotool" if self.escritorio == "kde" else "instala xdotool"
-            cap["ventana"] = (None, "no hay con qué leer la ventana activa: " + falta)
+            falta = T("no encuentro swaymsg/hyprctl") if self.escritorio in WLROOTS else T("instala kdotool") if self.escritorio == "kde" else T("instala xdotool")
+            cap["ventana"] = (None, T("no hay con qué leer la ventana activa: ") + falta)
         instal = [p for p in self.programas_captura() if self._tiene(p)]
-        cap["captura"] = (instal[0], "") if instal else (None, f"no hay programa de captura: instala {self.recomendado()['captura']}")
+        cap["captura"] = (instal[0], "") if instal else (None, T("no hay programa de captura: instala {v1}", v1=self.recomendado()['captura']))
         pp = self.programa_portapapeles()
-        cap["portapapeles"] = (pp, "") if pp else (None, f"no hay programa de portapapeles: instala {self.recomendado()['portapapeles']}")
+        cap["portapapeles"] = (pp, "") if pp else (None, T("no hay programa de portapapeles: instala {v1}", v1=self.recomendado()['portapapeles']))
         if self.tipo == "wayland" and self.escritorio == "gnome":
-            cap["indicador"] = ("ventana", "GNOME no deja dibujar encima de las ventanas: el resplandor puede no verse; te avisan los pitidos")
+            cap["indicador"] = ("ventana", T("GNOME no deja dibujar encima de las ventanas: el resplandor puede no verse; te avisan los pitidos"))
         elif self.tipo == "wayland":
             cap["indicador"] = ("capa", "")
         else:
-            cap["indicador"] = ("ventana", "necesita un compositor con transparencia" if self.tipo == "x11" else "")
+            cap["indicador"] = ("ventana", T("necesita un compositor con transparencia") if self.tipo == "x11" else "")
         return cap
 
     def paquetes_que_faltan(self):
@@ -323,8 +324,8 @@ class Sesion:
         if c["ventana"][0] and c["ventana"][1]:
             l.append("Aviso sobre ventanas: " + c["ventana"][1] + ".")
         if self.escritorio != "kde":
-            l.append("Las herramientas pensadas para KDE (ajustes de Plasma por kwriteconfig, D-Bus de KWin, acciones de menú de programas KDE) no valen aquí; "
-                     "para ventanas y programas usa solo lo que funcione en " + NOMBRES.get(self.escritorio, "este escritorio") + ".")
+            l.append(("Las herramientas pensadas para KDE (ajustes de Plasma por kwriteconfig, D-Bus de KWin, acciones de menú de programas KDE) no valen aquí; "
+                     "para ventanas y programas usa solo lo que funcione en ") + NOMBRES.get(self.escritorio, "este escritorio") + ".")
         return l
 
 
@@ -340,7 +341,7 @@ def actual():
 
 def principal(argv, sesion=None, salida=print):
     s = sesion or Sesion()
-    salida(f"Escritorio: {s.nombre()}")
+    salida(T("Escritorio: {v1}", v1=s.nombre()))
     for k, (m, nota) in s.capacidades().items():
         salida(f"  {'✔' if m else '✘'} {k}: {m or nota}" + (f" ({nota})" if m and nota else ""))
     return 0

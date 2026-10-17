@@ -5,6 +5,7 @@ enseña la línea exacta que hay que añadir. Nunca edita a escondidas archivos 
 Cada registro deja anotado qué ha creado, para que `lina uninstall` lo quite.
 """
 import ast
+from lina.nucleo.idioma import T
 import os
 import re
 import shutil
@@ -42,10 +43,10 @@ def tecla_valida(tecla, escr):
 def a_mano(escr, comando):
     """Qué hacer cuando no se puede registrar solo: la línea exacta para ese escritorio."""
     if escr == "sway":
-        return f"Añade a ~/.config/sway/config:  bindsym $mod+space exec {comando} pulsar   (y recarga con $mod+Shift+c)"
+        return T("Añade a ~/.config/sway/config:  bindsym $mod+space exec {comando} pulsar   (y recarga con $mod+Shift+c)", comando=comando)
     if escr == "hyprland":
-        return f"Añade a ~/.config/hypr/hyprland.conf:  bind = SUPER, SPACE, exec, {comando} pulsar"
-    return f"Crea tú un atajo de teclado global (en los ajustes de tu escritorio) que ejecute:  {comando} pulsar"
+        return T("Añade a ~/.config/hypr/hyprland.conf:  bind = SUPER, SPACE, exec, {comando} pulsar", comando=comando)
+    return T("Crea tú un atajo de teclado global (en los ajustes de tu escritorio) que ejecute:  {comando} pulsar", comando=comando)
 
 
 def ya_hay_atajo(escr, home, ejecutar=subprocess.run, which=shutil.which):
@@ -85,11 +86,11 @@ def _lista_gnome(texto):
 def registrar(escr, tecla, comando, home, simular=False, ejecutar=subprocess.run, which=shutil.which):
     """Registra el atajo. Devuelve (hecho, mensaje, anotacion), donde anotacion es lo que hay que guardar para poder quitarlo."""
     if not tecla_valida(tecla, escr):
-        return False, f"La tecla «{tecla}» no es válida para {escr.upper()}.", None
+        return False, T("La tecla «{tecla}» no es válida para {v1}.", tecla=tecla, v1=escr.upper()), None
     if escr == "kde":
         kwrite = which("kwriteconfig6") or which("kwriteconfig5")
         if not kwrite:
-            return False, "No encuentro kwriteconfig (herramientas de KDE).", None
+            return False, T("No encuentro kwriteconfig (herramientas de KDE)."), None
         desktop = _datos(home) / "applications" / NOMBRE_KDE
         contenido = ("[Desktop Entry]\nType=Application\nName=Lina: hablar\nComment=Pulsa para hablar con Lina (y otra vez para terminar)\n"
                      f"Exec={comando} pulsar\nIcon=audio-input-microphone\nNoDisplay=true\nTerminal=false\nX-KDE-GlobalAccel-CommandShortcut=true\n")
@@ -101,12 +102,11 @@ def registrar(escr, tecla, comando, home, simular=False, ejecutar=subprocess.run
         r = ejecutar(orden, capture_output=True, text=True)
         if r.returncode != 0:
             desktop.unlink(missing_ok=True)
-            return False, "kwriteconfig no ha podido guardar el atajo: " + (r.stderr or r.stdout or "sin detalle").strip()[:150], None
-        return True, (f"Atajo {tecla} registrado en KDE. Si no responde al momento, cierra y abre sesión (o mira Preferencias del sistema → "
-                      "Atajos de teclado)."), {"escritorio": "kde", "archivo": str(desktop), "tecla": tecla}
+            return False, T("kwriteconfig no ha podido guardar el atajo: ") + (r.stderr or r.stdout or "sin detalle").strip()[:150], None
+        return True, (T("Atajo {tecla} registrado en KDE. Si no responde al momento, cierra y abre sesión (o mira Preferencias del sistema → Atajos de teclado).", tecla=tecla)), {"escritorio": "kde", "archivo": str(desktop), "tecla": tecla}
     if escr == "gnome":
         if not which("gsettings"):
-            return False, "No encuentro gsettings.", None
+            return False, T("No encuentro gsettings."), None
         esquema = "org.gnome.settings-daemon.plugins.media-keys"
         if simular:
             return True, f"[simulación] pondría {tecla} → {comando} pulsar con gsettings", None
@@ -116,16 +116,16 @@ def registrar(escr, tecla, comando, home, simular=False, ejecutar=subprocess.run
             lista.append(RUTA_GNOME)
         clave = f"{esquema}.custom-keybinding:{RUTA_GNOME}"
         pasos = [["gsettings", "set", esquema, "custom-keybindings", repr(lista)],
-                 ["gsettings", "set", clave, "name", "Lina: hablar"], ["gsettings", "set", clave, "command", f"{comando} pulsar"],
+                 ["gsettings", "set", clave, "name", T("Lina: hablar")], ["gsettings", "set", clave, "command", f"{comando} pulsar"],
                  ["gsettings", "set", clave, "binding", tecla]]
         for p in pasos:
             r = ejecutar(p, capture_output=True, text=True)
             if r.returncode != 0:
-                return False, "gsettings ha fallado: " + (r.stderr or r.stdout or "sin detalle").strip()[:150], None
-        return True, f"Atajo {tecla} registrado en GNOME.", {"escritorio": "gnome", "ruta": RUTA_GNOME, "tecla": tecla}
+                return False, T("gsettings ha fallado: ") + (r.stderr or r.stdout or "sin detalle").strip()[:150], None
+        return True, T("Atajo {tecla} registrado en GNOME.", tecla=tecla), {"escritorio": "gnome", "ruta": RUTA_GNOME, "tecla": tecla}
     if escr == "cinnamon":
         if not which("gsettings"):
-            return False, "No encuentro gsettings.", None
+            return False, T("No encuentro gsettings."), None
         if simular:
             return True, f"[simulación] pondría {tecla} → {comando} pulsar en Cinnamon", None
         esquema = "org.cinnamon.desktop.keybindings"
@@ -134,35 +134,35 @@ def registrar(escr, tecla, comando, home, simular=False, ejecutar=subprocess.run
         if "lina" not in lista:
             lista.append("lina")
         clave = f"{esquema}.custom-keybinding:{RUTA_CINNAMON}"
-        pasos = [["gsettings", "set", clave, "name", "Lina: hablar"], ["gsettings", "set", clave, "command", f"{comando} pulsar"],
+        pasos = [["gsettings", "set", clave, "name", T("Lina: hablar")], ["gsettings", "set", clave, "command", f"{comando} pulsar"],
                  ["gsettings", "set", clave, "binding", repr([tecla])], ["gsettings", "set", esquema, "custom-list", repr(lista)]]
         for p in pasos:
             r = ejecutar(p, capture_output=True, text=True)
             if r.returncode != 0:
-                return False, "gsettings ha fallado: " + (r.stderr or r.stdout or "sin detalle").strip()[:150], None
-        return True, f"Atajo {tecla} registrado en Cinnamon.", {"escritorio": "cinnamon", "ruta": RUTA_CINNAMON, "tecla": tecla}
+                return False, T("gsettings ha fallado: ") + (r.stderr or r.stdout or "sin detalle").strip()[:150], None
+        return True, T("Atajo {tecla} registrado en Cinnamon.", tecla=tecla), {"escritorio": "cinnamon", "ruta": RUTA_CINNAMON, "tecla": tecla}
     if escr == "xfce":
         if not which("xfconf-query"):
-            return False, "No encuentro xfconf-query.", None
+            return False, T("No encuentro xfconf-query."), None
         propiedad = f"{RUTA_XFCE}{tecla}"
         if simular:
             return True, f"[simulación] pondría {tecla} → {comando} pulsar en XFCE", None
         r = ejecutar(["xfconf-query", "-c", "xfce4-keyboard-shortcuts", "-p", propiedad, "-n", "-t", "string", "-s", f"{comando} pulsar"], capture_output=True, text=True)
         if r.returncode != 0:
-            return False, "xfconf-query ha fallado: " + (r.stderr or r.stdout or "sin detalle").strip()[:150], None
-        return True, f"Atajo {tecla} registrado en XFCE.", {"escritorio": "xfce", "propiedad": propiedad, "tecla": tecla}
+            return False, T("xfconf-query ha fallado: ") + (r.stderr or r.stdout or "sin detalle").strip()[:150], None
+        return True, T("Atajo {tecla} registrado en XFCE.", tecla=tecla), {"escritorio": "xfce", "propiedad": propiedad, "tecla": tecla}
     return False, a_mano(escr, comando), None
 
 
 def quitar(anotacion, home, simular=False, ejecutar=subprocess.run, which=shutil.which):
     """Deshace `registrar`. Devuelve un mensaje."""
     if not isinstance(anotacion, dict):
-        return "nada que quitar"
+        return T("nada que quitar")
     escr = anotacion.get("escritorio")
     if escr == "kde":
         ruta = Path(anotacion.get("archivo", ""))
         if ruta.name != NOMBRE_KDE:
-            return "ruta del atajo no reconocida: lo dejo como está"
+            return T("ruta del atajo no reconocida: lo dejo como está")
         if simular:
             return f"[simulación] quitaría {ruta}"
         ruta.unlink(missing_ok=True)
@@ -170,7 +170,7 @@ def quitar(anotacion, home, simular=False, ejecutar=subprocess.run, which=shutil
         if kwrite:
             ejecutar([kwrite, "--file", "kglobalshortcutsrc", "--group", "services", "--group", NOMBRE_KDE, "--key", "_launch", "--delete"],
                      capture_output=True, text=True)
-        return "atajo de KDE quitado"
+        return T("atajo de KDE quitado")
     if escr == "gnome" and which("gsettings"):
         if simular:
             return "[simulación] quitaría el atajo de GNOME"
@@ -179,7 +179,7 @@ def quitar(anotacion, home, simular=False, ejecutar=subprocess.run, which=shutil
         lista = [x for x in _lista_gnome(actual.stdout) if x != RUTA_GNOME]
         ejecutar(["gsettings", "set", esquema, "custom-keybindings", repr(lista)], capture_output=True, text=True)
         ejecutar(["gsettings", "reset-recursively", f"{esquema}.custom-keybinding:{RUTA_GNOME}"], capture_output=True, text=True)
-        return "atajo de GNOME quitado"
+        return T("atajo de GNOME quitado")
     if escr == "cinnamon" and which("gsettings"):
         if simular:
             return "[simulación] quitaría el atajo de Cinnamon"
@@ -188,13 +188,13 @@ def quitar(anotacion, home, simular=False, ejecutar=subprocess.run, which=shutil
         lista = [x for x in _lista_gnome(actual.stdout) if x != "lina"]
         ejecutar(["gsettings", "set", esquema, "custom-list", repr(lista)], capture_output=True, text=True)
         ejecutar(["gsettings", "reset-recursively", f"{esquema}.custom-keybinding:{RUTA_CINNAMON}"], capture_output=True, text=True)
-        return "atajo de Cinnamon quitado"
+        return T("atajo de Cinnamon quitado")
     if escr == "xfce" and which("xfconf-query"):
         propiedad = str(anotacion.get("propiedad", ""))
         if not propiedad.startswith(RUTA_XFCE):
-            return "propiedad del atajo no reconocida: lo dejo como está"
+            return T("propiedad del atajo no reconocida: lo dejo como está")
         if simular:
             return "[simulación] quitaría el atajo de XFCE"
         ejecutar(["xfconf-query", "-c", "xfce4-keyboard-shortcuts", "-r", "-p", propiedad], capture_output=True, text=True)
-        return "atajo de XFCE quitado"
-    return "nada que quitar"
+        return T("atajo de XFCE quitado")
+    return T("nada que quitar")

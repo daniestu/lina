@@ -16,6 +16,7 @@ from pathlib import Path
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import idioma as IDI
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import T
 
 
 # Revisión fija del repositorio de voces, para que la descarga sea siempre el mismo archivo.
@@ -139,11 +140,11 @@ def _descargar(url, destino, abrir, sha256=None):
         if total == 0:
             raise OSError("descarga vacía")
         if anunciado and str(anunciado).isdigit() and int(anunciado) != total:
-            raise OSError(f"descarga incompleta ({total} de {anunciado} bytes)")
+            raise OSError(T("descarga incompleta ({total} de {anunciado} bytes)", total=total, anunciado=anunciado))
         if destino.suffix == ".json":
             json.loads(parcial.read_text(encoding="utf-8"))
         if sha256 and suma.hexdigest() != sha256.lower():
-            raise OSError("la huella no coincide con la del catálogo")
+            raise OSError(T("la huella no coincide con la del catálogo"))
     except (OSError, ValueError) as e:
         parcial.unlink(missing_ok=True)
         raise OSError(str(e)) from e
@@ -199,7 +200,7 @@ def verificar(nombre, carpeta=None):
     """(estado, detalle) de una voz instalada: True si sus archivos son los que se descargaron, False si cambiaron o faltan, None si no hay huella guardada."""
     base = Path(carpeta or RUT.VOCES)
     if not instalada(nombre, carpeta):
-        return False, "no está instalada"
+        return False, T("no está instalada")
     huellas = _leer_huellas(base)
     sin_huella = True
     for destino in archivos(nombre, base):
@@ -212,8 +213,8 @@ def verificar(nombre, carpeta=None):
             for trozo in iter(lambda: f.read(TROZO), b""):
                 suma.update(trozo)
         if suma.hexdigest() != esperada:
-            return False, f"{destino.name} no es el que se descargó (¿corrupto?): bórralo y vuelve a elegir la voz"
-    return (None, "sin huella guardada (se instaló antes de que se guardaran)") if sin_huella else (True, "íntegra")
+            return False, T("{v1} no es el que se descargó (¿corrupto?): bórralo y vuelve a elegir la voz", v1=destino.name)
+    return (None, T("sin huella guardada (se instaló antes de que se guardaran)")) if sin_huella else (True, "íntegra")
 
 
 def disponibles(carpeta=None):
@@ -239,21 +240,21 @@ def principal(argv, carpeta=None, carpeta_config=None, abrir=_abrir, salida=prin
     lina voz NOMBRE     elige esa voz (la descarga ahora si hace falta)"""
     actual = voz_elegida(carpeta_config)
     if not argv:
-        salida("Voces disponibles (la marcada con * es la que se usa; «instalada» = ya descargada):")
+        salida(T("Voces disponibles (la marcada con * es la que se usa; «instalada» = ya descargada):"))
         for nombre, ficha in catalogo().items():
             marca = "*" if nombre == actual else " "
-            estado = "instalada" if instalada(nombre, carpeta) else "se descarga al elegirla"
+            estado = "instalada" if instalada(nombre, carpeta) else T("se descarga al elegirla")
             salida(f" {marca} {nombre:26} {ficha['descripcion']}  [{estado}]")
-        salida("\nElige una con:  lina voz NOMBRE   (después reinicia a Lina: systemctl --user restart lina)")
+        salida(T("\nElige una con:  lina voz NOMBRE   (después reinicia a Lina: systemctl --user restart lina)"))
         return 0
     nombre = argv[0]
     if nombre not in catalogo():
-        salida(f"No conozco la voz «{nombre}». Mira las que hay con:  lina voz")
+        salida(T("No conozco la voz «{nombre}». Mira las que hay con:  lina voz", nombre=nombre))
         return 2
     if not asegurar(nombre, carpeta, salida, abrir):
         return 1
     fijar(nombre, carpeta_config)
-    salida(f"Voz elegida: {nombre}. Reinicia a Lina para oírla:  systemctl --user restart lina")
+    salida(T("Voz elegida: {nombre}. Reinicia a Lina para oírla:  systemctl --user restart lina", nombre=nombre))
     return 0
 
 

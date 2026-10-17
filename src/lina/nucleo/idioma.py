@@ -89,6 +89,11 @@ def catalogo(codigo):
     return _catalogos[codigo]
 
 
+def N_(texto):
+    """Marca un texto para traducir sin traducirlo todavía (constantes que se definen al importar): se usa luego con `T(CONSTANTE)`."""
+    return texto
+
+
 def _rellenar(plantilla, datos):
     return plantilla.format(**datos) if datos else plantilla
 

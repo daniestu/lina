@@ -19,6 +19,7 @@ from lina.nucleo import claves as CL
 from lina.nucleo import modelos as MOD
 from lina.nucleo import plataforma as PL
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import T
 
 OK, AVISO, MAL = "ok", "aviso", "mal"
 SIMBOLO = {OK: "✔", AVISO: "!", MAL: "✘"}
@@ -104,10 +105,10 @@ class Sondas:
         if not isinstance(r, P.ErrorIA):
             return True, "funciona"
         if r.tipo == "auth":
-            return False, "el servicio dice que esa clave no es válida"
+            return False, T("el servicio dice que esa clave no es válida")
         if r.tipo == "cuota":
-            return True, "es válida (ahora mismo has llegado al límite)"
-        return None, r.resumen or "no he podido probarla"
+            return True, T("es válida (ahora mismo has llegado al límite)")
+        return None, r.resumen or T("no he podido probarla")
 
 
 def _seguro(f, defecto=None):
@@ -127,104 +128,104 @@ def comprobar(s=None, red=False):
 
     sis = _seguro(s.sistema)
     if isinstance(sis, Exception):
-        a(AVISO, "Sistema", f"no he podido detectarlo ({sis})")
+        a(AVISO, T("Sistema"), T("no he podido detectarlo ({sis})", sis=sis))
         sis = {}
     else:
-        a(OK if sis.get("familia") else AVISO, "Sistema", f"{sis.get('distro')} · gestor {sis.get('gestor') or 'desconocido'} · escritorio {sis.get('escritorio') or '?'} ({sis.get('sesion') or '?'})",
-          "" if sis.get("familia") else "Distribución no reconocida: Lina funciona, pero no instalará paquetes sola. Mira  lina sistema")
+        a(OK if sis.get("familia") else AVISO, T("Sistema"), T("{v1} · gestor {v2} · escritorio {v3} ({v4})", v1=sis.get('distro'), v2=sis.get('gestor') or 'desconocido', v3=sis.get('escritorio') or '?', v4=sis.get('sesion') or '?'),
+          "" if sis.get("familia") else T("Distribución no reconocida: Lina funciona, pero no instalará paquetes sola. Mira  lina sistema"))
     py = _seguro(s.python, (0, 0, 0))
-    a(OK if py >= (3, 11) else MAL, "Python", ".".join(map(str, py)) + f" · Lina {__version__}", "" if py >= (3, 11) else "Hace falta Python 3.11 o más reciente")
+    a(OK if py >= (3, 11) else MAL, "Python", ".".join(map(str, py)) + T(" · Lina {__version__}", __version__=__version__), "" if py >= (3, 11) else T("Hace falta Python 3.11 o más reciente"))
     falta = _seguro(s.base_que_falta)
     if isinstance(falta, Exception):
-        a(AVISO, "Paquetes del sistema", f"no he podido comprobarlos ({falta})")
+        a(AVISO, T("Paquetes del sistema"), T("no he podido comprobarlos ({falta})", falta=falta))
     elif falta:
-        a(MAL, "Paquetes del sistema", "faltan: " + ", ".join(falta), _seguro(lambda: PL.orden_canonica_instalar(falta), "") or "")
+        a(MAL, T("Paquetes del sistema"), T("faltan: ") + ", ".join(falta), _seguro(lambda: PL.orden_canonica_instalar(falta), "") or "")
     else:
-        a(OK, "Paquetes del sistema", "los necesarios están instalados")
+        a(OK, T("Paquetes del sistema"), T("los necesarios están instalados"))
     esc = _seguro(s.escritorio)
     if isinstance(esc, Exception):
-        a(AVISO, "Escritorio", f"no he podido mirarlo ({esc})")
+        a(AVISO, T("Escritorio"), T("no he podido mirarlo ({esc})", esc=esc))
     else:
         nombre, caps, paquetes = esc
-        a(OK, "Escritorio", nombre)
-        etiqueta = {"ventana": "Ventana activa", "captura": "Captura de pantalla", "portapapeles": "Portapapeles", "indicador": "Resplandor de escucha"}
+        a(OK, T("Escritorio"), nombre)
+        etiqueta = {"ventana": T("Ventana activa"), "captura": T("Captura de pantalla"), "portapapeles": T("Portapapeles"), "indicador": T("Resplandor de escucha")}
         arreglo = _seguro(lambda: PL.orden_canonica_instalar(paquetes), "") if paquetes else ""
         for clave, (metodo, nota) in caps.items():
             if metodo:
-                a(AVISO if nota else OK, etiqueta[clave], f"con {metodo}" + (f" ({nota})" if nota else ""))
+                a(AVISO if nota else OK, etiqueta[clave], T("con {metodo}", metodo=metodo) + (f" ({nota})" if nota else ""))
             else:
                 a(AVISO if clave != "captura" else MAL, etiqueta[clave], nota, arreglo if isinstance(arreglo, str) else "")
     audio = _seguro(s.audio)
-    a(OK if audio and not isinstance(audio, Exception) else AVISO, "Sonido", audio if audio and not isinstance(audio, Exception) else "no detecto PipeWire ni PulseAudio",
-      "" if audio and not isinstance(audio, Exception) else "Sin servidor de sonido Lina no oye ni habla: instala pipewire (o pulseaudio) y arráncalo")
+    a(OK if audio and not isinstance(audio, Exception) else AVISO, T("Sonido"), audio if audio and not isinstance(audio, Exception) else T("no detecto PipeWire ni PulseAudio"),
+      "" if audio and not isinstance(audio, Exception) else T("Sin servidor de sonido Lina no oye ni habla: instala pipewire (o pulseaudio) y arráncalo"))
     mics = _seguro(s.microfonos)
     if isinstance(mics, Exception):
-        a(MAL, "Micrófono", f"no puedo consultar los dispositivos ({type(mics).__name__}: {str(mics)[:90]})", "Instala PortAudio (lina preparar o install.sh lo hace) y revisa el sonido")
+        a(MAL, T("Micrófono"), T("no puedo consultar los dispositivos ({v1}: {v2})", v1=type(mics).__name__, v2=str(mics)[:90]), T("Instala PortAudio (lina preparar o install.sh lo hace) y revisa el sonido"))
     elif not mics:
-        a(MAL, "Micrófono", "no hay ninguno de entrada", "Enchufa un micrófono o actívalo en los ajustes de sonido")
+        a(MAL, T("Micrófono"), T("no hay ninguno de entrada"), T("Enchufa un micrófono o actívalo en los ajustes de sonido"))
     else:
-        a(OK, "Micrófono", f"{len(mics)} dispositivo(s): {mics[0]}" + (" …" if len(mics) > 1 else ""))
+        a(OK, T("Micrófono"), T("{v1} dispositivo(s): {v2}", v1=len(mics), v2=mics[0]) + (" …" if len(mics) > 1 else ""))
     m = _seguro(s.modelos)
     if isinstance(m, Exception):
-        a(AVISO, "Modelos", f"no he podido mirarlos ({m})")
+        a(AVISO, T("Modelos"), T("no he podido mirarlos ({m})", m=m))
     else:
-        a(OK if m["whisper"] else MAL, "Whisper (voz a texto)", "listo" if m["whisper"] else "sin descargar", "" if m["whisper"] else "lina modelos")
+        a(OK if m["whisper"] else MAL, T("Whisper (voz a texto)"), "listo" if m["whisper"] else T("sin descargar"), "" if m["whisper"] else "lina modelos")
         if not m["voz"]:
-            a(MAL, "Voz de Lina", "la voz elegida no está instalada", "lina modelos")
+            a(MAL, T("Voz de Lina"), T("la voz elegida no está instalada"), "lina modelos")
         elif m["voz_integra"] is False:
-            a(MAL, "Voz de Lina", f"{m['voz']}: los archivos no son los que se descargaron", "Bórrala y vuelve a bajarla:  lina voz  y elige otra vez")
+            a(MAL, T("Voz de Lina"), T("{v1}: los archivos no son los que se descargaron", v1=m['voz']), T("Bórrala y vuelve a bajarla:  lina voz  y elige otra vez"))
         else:
-            a(OK, "Voz de Lina", m["voz"] + ("" if m["voz_integra"] else " (sin huella para verificar)"))
+            a(OK, T("Voz de Lina"), m["voz"] + ("" if m["voz_integra"] else T(" (sin huella para verificar)")))
     ia = _seguro(getattr(s, "ia", lambda: None))
     ia = None if isinstance(ia, Exception) else ia
     nombre = "Gemini" if ia is None or ia.nombre == "gemini" else ia.nombre
     proveedor = "gemini" if ia is None else ia.nombre
     if ia is not None and nombre != "Gemini":
         listo, falta = ia.listo()
-        a(OK if listo else MAL, "IA activa", f"{ia.nombre} con {', '.join(ia.rapido) or 'ningún modelo'}" + ("" if listo else f": {falta}"),
-          "" if listo else "lina ia   (o vuelve a Gemini, que es gratis:  lina ia volver)")
+        a(OK if listo else MAL, T("IA activa"), T("{v1} con {v2}", v1=ia.nombre, v2=', '.join(ia.rapido) or T('ningún modelo')) + ("" if listo else f": {falta}"),
+          "" if listo else T("lina ia   (o vuelve a Gemini, que es gratis:  lina ia volver)"))
     cl = _seguro(s.clave)
     if isinstance(cl, Exception):
-        a(AVISO, f"Clave de {nombre}", f"no he podido mirarla ({cl})")
+        a(AVISO, T("Clave de {nombre}", nombre=nombre), T("no he podido mirarla ({cl})", cl=cl))
     elif cl:
-        a(OK, f"Clave de {nombre}", f"guardada en {cl}")
+        a(OK, T("Clave de {nombre}", nombre=nombre), T("guardada en {cl}", cl=cl))
     elif ia is not None and ia.local:
-        a(OK, f"Clave de {nombre}", "no hace falta con un servidor propio")
+        a(OK, T("Clave de {nombre}", nombre=nombre), T("no hace falta con un servidor propio"))
         cl = "sin clave"
     else:
-        a(MAL, f"Clave de {nombre}", "no hay ninguna: Lina no puede responder", "lina bienvenida   (la clave es gratuita)" if nombre == "Gemini" else f"lina clave {proveedor}")
+        a(MAL, T("Clave de {nombre}", nombre=nombre), T("no hay ninguna: Lina no puede responder"), T("lina bienvenida   (la clave es gratuita)") if nombre == "Gemini" else f"lina clave {proveedor}")
     if not _seguro(s.llavero, False):
-        a(AVISO, "Llavero del sistema", "no disponible: las claves van a un archivo solo tuyo (600)", "Opcional: instala libsecret (secret-tool) y un llavero (GNOME Keyring o KWallet)")
+        a(AVISO, T("Llavero del sistema"), T("no disponible: las claves van a un archivo solo tuyo (600)"), T("Opcional: instala libsecret (secret-tool) y un llavero (GNOME Keyring o KWallet)"))
     serv = _seguro(s.servicio)
     if serv == "activo":
-        a(OK, "Servicio", "lina.service activo")
+        a(OK, T("Servicio"), T("lina.service activo"))
     elif serv == "sin_systemd":
-        a(OK if _seguro(s.proceso, False) else AVISO, "Servicio", "sin systemd: " + ("Lina está en marcha" if _seguro(s.proceso, False) else "Lina no está en marcha"),
-          "" if _seguro(s.proceso, False) else "Arráncala con:  lina  (o cierra y abre sesión si el arranque automático está puesto)")
+        a(OK if _seguro(s.proceso, False) else AVISO, T("Servicio"), T("sin systemd: ") + (T("Lina está en marcha") if _seguro(s.proceso, False) else T("Lina no está en marcha")),
+          "" if _seguro(s.proceso, False) else T("Arráncala con:  lina  (o cierra y abre sesión si el arranque automático está puesto)"))
     elif isinstance(serv, Exception):
-        a(AVISO, "Servicio", f"no he podido consultarlo ({serv})")
+        a(AVISO, T("Servicio"), T("no he podido consultarlo ({serv})", serv=serv))
     else:
-        a(MAL, "Servicio", f"lina.service está {serv}", "systemctl --user enable --now lina.service   (o  lina preparar)")
+        a(MAL, T("Servicio"), T("lina.service está {serv}", serv=serv), T("systemctl --user enable --now lina.service   (o  lina preparar)"))
     if serv != "sin_systemd":
-        a(OK if _seguro(s.proceso, False) else AVISO, "Proceso", "en marcha" if _seguro(s.proceso, False) else "no veo el proceso de Lina", "" if _seguro(s.proceso, False) else "systemctl --user restart lina")
-    a(OK if _seguro(s.atajo, False) else AVISO, "Atajo de teclado", "hay un atajo para Lina" if _seguro(s.atajo, False) else "no encuentro ningún atajo", "" if _seguro(s.atajo, False) else "lina atajo")
-    a(OK if _seguro(s.enlace, False) else AVISO, "Comando «lina»", "en ~/.local/bin" if _seguro(s.enlace, False) else "no está en ~/.local/bin", "" if _seguro(s.enlace, False) else "lina preparar")
+        a(OK if _seguro(s.proceso, False) else AVISO, T("Proceso"), T("en marcha") if _seguro(s.proceso, False) else T("no veo el proceso de Lina"), "" if _seguro(s.proceso, False) else "systemctl --user restart lina")
+    a(OK if _seguro(s.atajo, False) else AVISO, T("Atajo de teclado"), T("hay un atajo para Lina") if _seguro(s.atajo, False) else T("no encuentro ningún atajo"), "" if _seguro(s.atajo, False) else "lina atajo")
+    a(OK if _seguro(s.enlace, False) else AVISO, T("Comando «lina»"), T("en ~/.local/bin") if _seguro(s.enlace, False) else T("no está en ~/.local/bin"), "" if _seguro(s.enlace, False) else "lina preparar")
     aj = _seguro(s.ajustes)
     if isinstance(aj, Exception):
-        a(MAL, "Ajustes", f"no se pueden leer ({aj})", "lina config")
+        a(MAL, T("Ajustes"), T("no se pueden leer ({aj})", aj=aj), "lina config")
     else:
         cap = aj.get("privacidad", "capturas")
-        a(OK, "Ajustes", f"perfil {aj.get('autonomia', 'perfil')} · capturas de pantalla: {cap}", "" if cap != "preguntar" else "Aún no has decidido lo de las capturas:  lina privacidad")
+        a(OK, T("Ajustes"), T("perfil {v1} · capturas de pantalla: {cap}", v1=aj.get('autonomia', 'perfil'), cap=cap), "" if cap != "preguntar" else T("Aún no has decidido lo de las capturas:  lina privacidad"))
     if red:
         try:
             s.red()
         except Exception as e:
-            a(MAL, "Red", f"no llego a {'Google' if nombre == 'Gemini' else ia.servidor()[0]} ({type(e).__name__})", "Comprueba tu conexión, el cortafuegos o el proxy")
+            a(MAL, "Red", T("no llego a {v1} ({v2})", v1='Google' if nombre == 'Gemini' else ia.servidor()[0], v2=type(e).__name__), T("Comprueba tu conexión, el cortafuegos o el proxy"))
         else:
-            a(OK, "Red", "llego a Google" if nombre == "Gemini" else f"llego a {ia.servidor()[0]}")
+            a(OK, T("Red"), T("llego a Google") if nombre == "Gemini" else T("llego a {servidor}", servidor=ia.servidor()[0]))
             if cl and not isinstance(cl, Exception):
-                ok, det = _seguro(s.probar_clave, (None, "no he podido probarla"))
-                a(OK if ok else AVISO if ok is None else MAL, "Clave en uso", det, "" if ok is not False else f"lina clave {proveedor}")
+                ok, det = _seguro(s.probar_clave, (None, T("no he podido probarla")))
+                a(OK if ok else AVISO if ok is None else MAL, T("Clave en uso"), det, "" if ok is not False else f"lina clave {proveedor}")
     return r
 
 
@@ -237,7 +238,7 @@ def formatear(resultados, color=False):
     mal = sum(e == MAL for e, *_ in resultados)
     av = sum(e == AVISO for e, *_ in resultados)
     lineas.append("")
-    lineas.append("Todo en orden." if not mal and not av else f"{mal} problema(s) y {av} aviso(s)." + (" Empieza por los marcados con ✘." if mal else ""))
+    lineas.append(T("Todo en orden.") if not mal and not av else T("{mal} problema(s) y {av} aviso(s).", mal=mal, av=av) + (T(" Empieza por los marcados con ✘.") if mal else ""))
     return "\n".join(lineas)
 
 
@@ -266,8 +267,8 @@ def anonimizar(texto, home=None, usuario=None, equipo=None):
 
 def principal(argv, sondas=None, salida=print, **anon):
     if "-h" in argv or "--help" in argv:
-        salida("lina doctor [--red] [--informe]\n  Comprueba la instalación y dice cómo arreglar lo que falle. No cambia nada.\n"
-               "  --red       prueba también la conexión y la clave de Gemini\n  --informe   lo mismo sin datos personales, para pegar en una incidencia")
+        salida(T("lina doctor [--red] [--informe]\n  Comprueba la instalación y dice cómo arreglar lo que falle. No cambia nada.\n"
+                 "  --red       prueba también la conexión y la clave de Gemini\n  --informe   lo mismo sin datos personales, para pegar en una incidencia"))
         return 0
     res = comprobar(sondas, red="--red" in argv)
     texto = formatear(res)

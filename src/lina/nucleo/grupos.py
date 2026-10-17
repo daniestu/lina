@@ -47,7 +47,7 @@ DESCRIPCION = {
 }
 
 # ---- palabras que activan cada grupo (sobre el texto sin tildes y en minúsculas) ----
-_PALABRAS = {
+_PALABRAS: dict[str, str | dict[str, str]] = {
     "ajustes_kde": r"\b(ajust|configur|kde|plasma|panel|temas?\b|fuente|letra|tipograf|cursor|fondo de pantalla|wallpaper|animacion|efecto|atajo|"
                    r"raton|touchpad|teclado|idioma|barra|widget|salvapantalla|notificacion|luz nocturna|modo oscuro|oscur|color|transparen|"
                    r"sonido de|tamano de|escala|dpi|doble clic|bloqueo|inactiv|autoinicio|predeterminad)",
@@ -134,9 +134,8 @@ def regla_servidor_mcp(nombre):
 
 def _re(nombre):
     """Las palabras que activan el grupo, en el idioma activo. Cada grupo guarda un texto (español) o una tabla {idioma: texto}."""
-    patron = _PALABRAS[nombre]
-    if isinstance(patron, dict):
-        patron = IDI.segun(patron)
+    guardado = _PALABRAS[nombre]
+    patron: str = IDI.segun(guardado) if isinstance(guardado, dict) else guardado
     clave = (nombre, patron)
     if clave not in _REGEX:
         _REGEX[clave] = re.compile(patron)

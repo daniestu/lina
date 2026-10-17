@@ -1,5 +1,7 @@
 # Lina
 
+Español · [English](README.en.md)
+
 Asistente de voz para el escritorio Linux, pensado primero para hablar en español (el inglés es experimental). Le hablas («Oye Lina, …») o pulsas un atajo, y ella entiende lo que
 quieres, lo hace en tu equipo (abrir programas, ajustar el sistema, manejar ventanas, buscar, escribir documentos…) y te contesta con voz.
 

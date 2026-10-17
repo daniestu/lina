@@ -293,7 +293,7 @@ class MixinAjustes:
             return AUTO.ayuda(args.get("tema"))
         if accion == "cambiar":
             if (str(args.get("ajuste") or "").strip().lower() in ("privacidad.capturas", "capturas")
-                    and str(args.get("valor") or "").strip().lower() in ("si", "sí", "s", "true", "1")):
+                    and str(args.get("valor") or "").strip().lower() in ("si", "sí", "s", "y", "yes", "true", "1")):
                 # el consentimiento nunca lo cambia la IA: lo deja pendiente y lo confirma el usuario con el atajo
                 if self.modo_privado:
                     return "Está activado el modo privado: no envío capturas hasta que el usuario lo quite. Díselo."
@@ -312,7 +312,7 @@ class MixinAjustes:
                 VOC.fijar(nombre)
                 log(f"Voz cambiada por la IA: {nombre}")
                 return f"Hecho: ahora hablo con {nombre}. Se nota ya desde tu siguiente frase; esta respuesta aún sale con la voz de antes."
-            self._hablar(str(args.get("texto") or "Hola, así suena mi voz."), voz=nombre)
+            self._hablar(str(args.get("texto") or IDI.T("Hola, así suena mi voz.")), voz=nombre)
             return f"Dicho con la voz {nombre}. Si vas a probar varias, hazlo una a una en esta misma respuesta y no repitas el texto en tu contestación."
         return "Acción desconocida: usa ayuda, cambiar, elegir_voz o probar_voz."
 

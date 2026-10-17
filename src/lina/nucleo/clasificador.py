@@ -8,6 +8,7 @@ import unicodedata
 from pathlib import Path
 
 from lina.nucleo import comandos
+from lina.nucleo.idioma import N_
 from lina.nucleo import plataforma as PL
 from lina.nucleo import raiz as _RAIZ
 from lina.nucleo import rutas as RUT
@@ -386,13 +387,25 @@ _DESTRUCCION_TOTAL = re.compile(
     r"\b(?:resetea|resetear)\w*\s+(?:el\s+|mi\s+)?(?:ordenador|pc|equipo|sistema)\b|\bwipefs\b|\bmkfs\b")
 
 
+_DT_OBJ_EN = (r"(?:(?:the|my|your|this|that|whole|entire|all|of|main|primary|complete|full)\s+){0,4}"
+              r"(?:computer|computers|pc|machine|system(?:\s+drive|\s+disk)?|operating system|disks?|hard\s?drives?|hard\s?disks?|drives?|ssd|nvme|"
+              r"partitions?|windows|linux|cachyos|bootloader|boot\s+(?:drive|disk|partition))\b(?!\s+(?:tray|cache|logs?|settings|volume|sounds?|monitor|info|updates?|notifications?|clock|time))")
+_DESTRUCCION_TOTAL_EN = re.compile(
+    r"\bformat\w*\s+(?:\w+\s+){0,2}?" + _DT_OBJ_EN + r"|"
+    r"\b(?:delete|deleting|erase|erasing|destroy|destroying|wipe|wiping|nuke|nuking|obliterate)\s+(?:\w+\s+){0,3}?" + _DT_OBJ_EN + r"|"
+    r"\b(?:factory\s+reset|reset\s+(?:\w+\s+){0,3}?to\s+(?:factory|default)\s+(?:settings|state)?|restore\s+(?:\w+\s+){0,3}?to\s+factory)\b|"
+    r"\b(?:leave|leaves|return|restore)\s+(?:\w+\s+){0,4}?(?:like\s+new|as\s+new|from\s+scratch|to\s+factory)\b|"
+    r"\b(?:reinstall|reinstalling)\s+(?:\w+\s+){0,2}?(?:the\s+)?(?:system|windows|linux|cachyos|operating system)\b|\bwipefs\b|\bmkfs\b")
+
+
 def destruccion_total(texto):
-    """¿Se pide (o se ofrece) formatear el ordenador o un disco, borrar el sistema o las particiones, dejarlo de fábrica...?"""
+    """¿Se pide (o se ofrece) formatear el ordenador o un disco, borrar el sistema o las particiones, dejarlo de fábrica...?
+    Se miran las frases de TODOS los idiomas a la vez (es una red de seguridad: no depende del idioma activo)."""
     t = _sin_acentos(str(texto or "").lower())
-    return bool(_DESTRUCCION_TOTAL.search(t))
+    return bool(_DESTRUCCION_TOTAL.search(t) or _DESTRUCCION_TOTAL_EN.search(t))
 
 
-AVISO_DESTRUCCION_TOTAL = ("Eso no lo hago: formatear discos, borrar particiones o el sistema entero está bloqueado en mi código, ni siquiera con tu confirmación. "
+AVISO_DESTRUCCION_TOTAL = N_("Eso no lo hago: formatear discos, borrar particiones o el sistema entero está bloqueado en mi código, ni siquiera con tu confirmación. "
                            "Si de verdad quieres reinstalar o vaciar un disco, hazlo tú desde un USB de instalación o con el gestor de particiones. "
                            "Si lo que buscas es liberar espacio o volver a un punto anterior, dímelo y lo vemos con una copia o limpiando cachés.")
 

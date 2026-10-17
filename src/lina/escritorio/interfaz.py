@@ -152,7 +152,7 @@ _LANZADORES = ("alt+f2", "ctrl+alt+t", "super+r")
 _AFIRMATIVOS = re.compile(r"^(aceptar|ok|si|yes|continuar|continue|aplicar|apply|confirmar|confirm|adelante|proceder|estoy seguro|guardar|save|"
                           r"eliminar|borrar|delete|remove|instalar|install|reemplazar|replace|sobrescribir|overwrite|enviar|send|pagar|pay)\b")
 _FUERTES = re.compile(r"\b(borrar|eliminar\w*|suprimir|permanentemente|no se puede deshacer|irreversible|formatear|sobrescrib\w*|reemplazar|desinstalar|pagar|comprar|"
-                      r"cannot be undone|permanently|delete\w*|erase|overwrite|replace|uninstall|purchase|enviar|send|conceder|permitir|allow|grant)\b")
+                      r"cannot be undone|can.?t be undone|permanently|delete\w*|erase|overwrite|replace|uninstall|purchase|enviar|send|conceder|permitir|allow|grant)\b")
 
 
 def riesgo(args, titulo_ventana="", contexto=None):
