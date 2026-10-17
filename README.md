@@ -14,6 +14,7 @@ quieres, lo hace en tu equipo (abrir programas, ajustar el sistema, manejar vent
   confirma con el atajo de teclado, nunca por voz. Todo lo que cambia queda en un diario y se puede deshacer.
 - **Tus datos son tuyos.** Sin telemetría. Las capturas de pantalla solo se envían con tu consentimiento, y hay un modo privado.
 - **Barata.** Funciona con la clave gratuita de Gemini; una clave de pago es opcional y tiene un tope mensual.
+- **Sin atarte a una IA.** Gemini por defecto, y se puede cambiar a Anthropic, a OpenAI o a cualquier servicio compatible (OpenRouter, Groq, Ollama en tu equipo, un servidor de tu empresa) con `lina ia`. [Cómo](docs/proveedores-ia.md).
 
 ## Instalación (resumen)
 

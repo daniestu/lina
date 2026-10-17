@@ -51,7 +51,7 @@ no cuestan nada.
 2. (hecho) Proveedor `openai`.
 3. (hecho) Proveedor `anthropic`.
 4. (hecho) Configuración: `[ia]`, `lina ia`, claves por proveedor, asistente de bienvenida, doctor y presupuesto.
-5. Documentación y pruebas contra servidores simulados.
+5. (hecho) Documentación y pruebas contra servidores simulados.
 
 Los proveedores 2 y 3 se prueban aquí contra servidores simulados que siguen el formato publicado de cada API; **no contra los servicios
 reales**, así que las primeras pruebas con claves reales hay que hacerlas en el equipo de cada uno.
@@ -70,3 +70,15 @@ lina ia volver                            Gemini, como siempre
 
 Reinicia después de cambiar (`systemctl --user restart lina`). Si el proveedor no está listo (falta la clave o el modelo), Lina lo dice al arrancar y por
 notificación en vez de quedarse muda sin explicación.
+
+## Lo que no está comprobado (y lo que sabe y no sabe hacer cada proveedor)
+
+- **Servicios reales:** nada de esto se ha probado todavía contra OpenAI, Anthropic, OpenRouter, Groq u Ollama de verdad, solo contra simulaciones del formato
+  publicado. Empieza siempre con `lina ia probar`, que dice si el modelo responde, si usa herramientas y si ve imágenes.
+- **Herramientas:** Lina necesita que el modelo sepa llamar a herramientas (casi todo lo que hace pasa por ellas). Los modelos pequeños o locales a veces no
+  lo hacen bien; `lina ia probar` lo comprueba con una herramienta de prueba, pero un «sí» ahí no garantiza que lo haga bien con las cuarenta que tiene Lina.
+- **Imágenes:** mirar la pantalla exige un modelo con visión. Sin ella, esa función dirá que no ha podido.
+- **Gasto:** el tope en euros solo funciona con Gemini. Con los demás se cuentan tokens.
+- **Búsqueda de Google dentro del modelo:** es de Gemini; con otros proveedores la búsqueda web sigue siendo la de Tavily.
+- **Razonamiento:** el nivel de razonamiento solo se envía a modelos `openai` si activas `razonamiento`; con Anthropic todavía no se usa.
+- **Bienvenida:** `lina bienvenida` sigue guiando solo la clave de Gemini; los demás proveedores se configuran con `lina ia`.
