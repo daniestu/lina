@@ -11,13 +11,14 @@ import requests
 
 from lina.nucleo import claves as CL
 from lina.nucleo import herramientas as H
+from lina.nucleo import ia_activa as IAC
 from lina.nucleo import plataforma as PL
 from lina.nucleo import proveedor_gemini as PG
 from lina.nucleo import proveedor_anthropic as PAN  # noqa: F401  (los proveedores se registran al importarse)
 from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
 from lina.nucleo.constantes import (BUSQUEDA, ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCIONES, INSTRUCCION_LOCAL, MAX_ESPERAS_CUOTA, MAX_PASOS,
-                                    MODELO_LOCAL, MODELOS_CONFIRMACION, MODELOS_GEMINI, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, REINTENTOS_SERVIDOR,
+                                    MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, VRAM_NECESARIA_MB)
 from lina.nucleo.opcionales import PRES
 from lina.nucleo.registro import log
@@ -173,10 +174,11 @@ def _pedir_corto(proveedor, clave, modelo, sistema, mensajes, etiqueta, *, inten
     return None
 
 
-def _resumir_trozo(clave, texto, foco, etiqueta, proveedor=PG.GEMINI):
+def _resumir_trozo(clave, texto, foco, etiqueta, proveedor=None):
     """Resume un trozo de web con el modelo barato. Devuelve el resumen o None si no se pudo."""
     contenido = (f"<foco>{foco[:200]}</foco>\n" if foco else "") + f"<pagina>\n{texto}\n</pagina>"
-    for modelo in MODELOS_CONFIRMACION:
+    proveedor = proveedor or IAC.actual().proveedor
+    for modelo in IAC.modelos("mini"):
         if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
             continue
         r = _pedir_corto(proveedor, clave, modelo, PROMPT_RESUMEN_WEB, [{"rol": "user", "texto": contenido}], f"resumir {etiqueta}",
@@ -190,9 +192,10 @@ def _resumir_trozo(clave, texto, foco, etiqueta, proveedor=PG.GEMINI):
     return None
 
 
-def ver_imagen(clave, imagen, pregunta, sistema, json_salida=False, modelos=None, proveedor=PG.GEMINI):
+def ver_imagen(clave, imagen, pregunta, sistema, json_salida=False, modelos=None, proveedor=None):
     """Una imagen (JPEG en base64) y una pregunta a la visión de la IA con UNA clave. Devuelve (texto, None) o (None, motivo)."""
-    for modelo in (modelos or MODELOS_GEMINI):
+    proveedor = proveedor or IAC.actual().proveedor
+    for modelo in (modelos or IAC.modelos("rapido")):
         if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
             continue
         r = _pedir_corto(proveedor, clave, modelo, sistema, [{"rol": "user", "texto": pregunta, "imagen": imagen}], "mirar la pantalla",
@@ -236,10 +239,11 @@ PROMPT_INTERRUPCION = (
     "exige que el usuario lo haya dejado claro. Responde solo con el JSON pedido.")
 
 
-def _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, maximo=200, proveedor=PG.GEMINI):
+def _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, maximo=200, proveedor=None):
     """Una pregunta corta con respuesta JSON. `validar(objeto)` lanza ValueError/KeyError si no sirve. Devuelve (objeto, modelo) o None si ningún
     modelo respondió bien."""
-    for modelo in MODELOS_CONFIRMACION:
+    proveedor = proveedor or IAC.actual().proveedor
+    for modelo in IAC.modelos("mini"):
         if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
             log(f"{modelo}: en pausa por un fallo reciente, lo salto")
             continue

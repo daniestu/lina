@@ -12,6 +12,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
   los scripts y los recursos externos del HTML y las fotos locales se incrustan.
 
 ### Añadido
+- Fase 7, paso 4: ya se puede elegir con qué IA habla Lina. Sección `[ia]` en los ajustes (proveedor, modelos, dirección base), claves `openai` y `anthropic`
+  (`lina clave openai`), y `lina ia` para ver el estado, cambiar de proveedor (`lina ia usar anthropic`, `lina ia usar openai --modelo X --url http://localhost:11434/v1`),
+  volver a Gemini (`lina ia volver`), listar los modelos del servicio (`lina ia modelos`) y probarlo (`lina ia probar`: dice si responde, si usa herramientas y si ve
+  imágenes). Cambiar de proveedor por voz exige el atajo, porque decide a qué empresa se envía lo que dices. `lina doctor` mira el proveedor activo. Con un proveedor
+  que no es Gemini Lina cuenta los tokens pero no controla el gasto en euros.
 - Fase 7, pasos 2 y 3: proveedores `openai` (OpenAI y todo lo que copia su API: OpenRouter, Groq, Mistral, Ollama, LM Studio, vLLM, servidores de
   empresa, con dirección base propia y clave opcional) y `anthropic`. Probados contra servidores simulados con el formato publicado de cada API,
   todavía no contra los servicios reales, y sin activar: Lina sigue usando Gemini hasta el paso 4.

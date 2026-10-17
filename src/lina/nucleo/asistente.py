@@ -25,6 +25,7 @@ from pathlib import Path
 from lina.nucleo import ajustes as AJ
 from lina.nucleo.registro import log
 from lina.nucleo import claves as CL
+from lina.nucleo import ia_activa as IAC
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
@@ -432,7 +433,7 @@ from lina.nucleo.ia import (  # noqa: F401
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
-    parece_promesa, preguntar_gemini, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
+    parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
     vram_libre_mb,
 )
 
@@ -467,17 +468,28 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
     def __init__(self):
         log(f"Cargando Whisper ({MODELO_WHISPER})...")
         self.whisper = WhisperModel(MODELO_WHISPER, device="cpu", compute_type="int8")
-        gratis = CL.obtener("gemini")
-        pago = CL.obtener("gemini_pago")
+        ia = IAC.actual()
+        if ia.nombre == "gemini":
+            gratis = CL.obtener("gemini")
+            pago = CL.obtener("gemini_pago")
+        else:                                                           # otro proveedor: una sola clave, sin control de euros (solo se cuentan tokens)
+            gratis, pago = ia.clave(), ""
         self.modo_privado = ARCHIVO_PRIVADO.exists()
         if self.modo_privado:
             log("Modo privado ACTIVADO (se recuerda de antes): no envío capturas de tu pantalla hasta que lo quites")
         PRES.configurar_claves(gratis, pago)
         self.clave = gratis or (pago if PRESUPUESTO_OK else "")      # (si solo hay una, esa; sin presupuesto.py la de pago no se usa)
-        if not gratis:
-            log("Aviso: no encuentro la clave de Gemini. Guárdala con:  lina clave gemini   (o  lina bienvenida)")
+        if ia.nombre != "gemini":
+            listo, falta = ia.listo()
+            log(f"IA: {ia.nombre} ({', '.join(ia.rapido) or 'sin modelo'}). " + ("El gasto en euros no se controla con este proveedor: solo cuento tokens."
+                                                                              if listo else f"No puedo usarla todavía: {falta}."))
+            if not listo:
+                self.clave = ""
+        if not self.clave:
+            if ia.nombre == "gemini":
+                log("Aviso: no encuentro la clave de Gemini. Guárdala con:  lina clave gemini   (o  lina bienvenida)")
             if not pago:
-                threading.Thread(target=self._avisar_sin_clave, daemon=True).start()
+                threading.Thread(target=self._avisar_sin_clave, args=(ia,), daemon=True).start()
         if PRES.hay_clave_de_pago():
             log(f"Clave de pago: configurada. Tope de este mes: {PRES.estado()['tope_eur']:g} € ({PRES.resumen().split('. Estado')[0][:110]})")
         self.estado = "esperando"  # esperando | grabando | pensando | hablando
@@ -514,17 +526,21 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             log("AVISO: falta politica.py: el asistente funciona en modo prudente (pide confirmación para casi todo)")
         H.hechos_sistema()  # precalienta los datos del sistema para que la primera pregunta no espere
 
-    def _avisar_sin_clave(self):
+    def _avisar_sin_clave(self, ia=None):
         """Sin clave Lina no puede contestar y, si no se avisa, parece rota: notificación siempre, y por voz como mucho una vez al día."""
         from lina.nucleo import bienvenida as BIEN
+        if ia is None or ia.nombre == "gemini":
+            titulo, texto = "Lina necesita una clave de Gemini", BIEN.AVISO_SIN_CLAVE
+        else:
+            titulo = f"Lina no puede usar {ia.nombre} todavía"
+            texto = f"No puedo responderte: {ia.listo()[1]}. Lo ves con lina ia, o vuelve a Gemini (que es gratis) con lina ia usar gemini."
         try:
-            subprocess.Popen(["notify-send", "-a", "Lina", "Lina necesita una clave de Gemini", BIEN.AVISO_SIN_CLAVE],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(["notify-send", "-a", "Lina", titulo, texto], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError:
             pass
         if BIEN.toca_avisar():
             time.sleep(6)                                  # que termine de arrancar
-            self.avisar(BIEN.AVISO_SIN_CLAVE)
+            self.avisar(texto)
 
     # --- Qué hacer cada vez que se pulsa el atajo ---
     def pulsacion(self):
@@ -1413,11 +1429,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         return [self.clave] if self.clave else []
 
     def _gemini(self, modo_claves, modelo, *args, **kwargs):
-        """preguntar_gemini con las dos claves: si una no responde, se prueba con la otra (y lo que ya se hizo no se repite)."""
+        """preguntar_ia con el proveedor activo y, si hay dos claves, las dos: si una no responde, se prueba con la otra (y lo que ya se hizo no se repite)."""
         claves = self._claves(modo_claves)
+        proveedor = IAC.actual().proveedor
         for i, clave in enumerate(claves):
             self.paso_guion = 0
-            r = preguntar_gemini(clave, modelo, *args, **kwargs)
+            r = preguntar_ia(proveedor, clave, modelo, *args, **kwargs)
             if r:
                 return r
             if i + 1 < len(claves):
@@ -1560,7 +1577,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                     "petición: si la frase del usuario parece mal transcrita o no sabes qué quiere, NO sigas: di en una frase que no le has "
                     "entendido y pídele que lo repita.]")
         try:
-            for m in MODELOS_PROFUNDO:
+            for m in IAC.modelos("profundo"):
                 self.paso_guion = 0
                 r = self._gemini("profundo", m, pregunta + nota, imagen, self.historial, herramientas=herramientas,
                                      ejecutar_herramienta=self.ejecutar_herramienta, sistema=sistema,
@@ -1589,7 +1606,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         herr = [h for h in (herramientas or []) if h.get("name") != "pensar_a_fondo"]
         nota = ("\n[SISTEMA: el modelo con más razonamiento no ha respondido a tiempo. Responde AHORA, tú, lo mejor que puedas a lo que pidió el "
                 "usuario, con cosas concretas, y sin prometer que lo vas a pensar ni llamar a nada más para ello.]")
-        for m in MODELOS_GEMINI:
+        for m in IAC.modelos("rapido"):
             self.paso_guion = 0
             r = self._gemini("rapido", m, pregunta + nota, imagen, self.historial, herramientas=herr, ejecutar_herramienta=self.ejecutar_herramienta,
                                  sistema=sistema, nivel=nivel_razonamiento(m, "rapido"), revisor=self.revisar_respuesta)
@@ -1654,7 +1671,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             self.grupos_turno = set(grupos)
             sistema = G.sistema(INSTRUCCIONES, H.hechos_sistema(), G.ordenar(grupos))
             log(f"Herramientas: núcleo + {', '.join(G.ordenar(grupos)) or 'ningún grupo'} ({len(herramientas)} en total)")
-            for modelo in (MODELOS_PROFUNDO if modo == "profundo" else MODELOS_GEMINI):
+            for modelo in IAC.modelos("profundo" if modo == "profundo" else "rapido"):
                 self.paso_guion = 0   # cada modelo empieza su turno desde el principio
                 r = self._gemini("profundo" if modo == "profundo" else "rapido", modelo, pregunta, imagen, self.historial, herramientas=herramientas,
                                      ejecutar_herramienta=self.ejecutar_herramienta, sistema=sistema,

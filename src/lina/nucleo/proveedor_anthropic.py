@@ -62,6 +62,15 @@ def _espera(r):
 class Anthropic(P.Proveedor):
     nombre = "anthropic"
 
+    def modelos(self, clave, get=None, timeout=15):
+        try:
+            r = (get or requests.get)("https://api.anthropic.com/v1/models?limit=100", headers={"x-api-key": clave, "anthropic-version": VERSION}, timeout=timeout)
+            if not r.ok:
+                return None, _resumen(r)
+            return sorted(str(m["id"]) for m in r.json()["data"]), ""
+        except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError) as e:
+            return None, f"no he podido consultarlo ({e})"
+
     def turno(self, clave, modelo, sistema, mensajes, *, herramientas=None, nivel=None, busqueda_nativa=False, json_esquema=None,
               temperatura=None, max_salida=None, timeout=20, post=None):
         if json_esquema:                           # no hay modo JSON en la petición: se pide en las instrucciones (quien llama ya limpia ```json … ```)

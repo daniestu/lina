@@ -2,8 +2,7 @@
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import comandos as C
 from lina.nucleo import herramientas as H
-from lina.nucleo.constantes import MODELOS_GEMINI
-from lina.nucleo.constantes import MODELOS_PROFUNDO
+from lina.nucleo import ia_activa as IAC
 from lina.nucleo.constantes import NO_VE_PANTALLA
 from lina.nucleo.constantes import PANTALLA_SESION_SEG
 from lina.nucleo.ia import nivel_razonamiento
@@ -100,7 +99,7 @@ class MixinPantalla:
                 "con cosas concretas, sin prometer nada.]")
         herr = [h for h in (herramientas or []) if h.get("name") != "ver_pantalla"]
         grupo = "profundo" if modo == "profundo" else "rapido"
-        for m in (MODELOS_PROFUNDO if modo == "profundo" else MODELOS_GEMINI):
+        for m in IAC.modelos("profundo" if modo == "profundo" else "rapido"):
             self.paso_guion = 0
             r = self._gemini(grupo, m, pregunta + nota, self.captura_guardada, self.historial, herramientas=herr, ejecutar_herramienta=self.ejecutar_herramienta,
                              sistema=sistema, nivel=nivel_razonamiento(m, modo), revisor=self.revisar_respuesta)

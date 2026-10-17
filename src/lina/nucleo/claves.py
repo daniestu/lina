@@ -22,7 +22,8 @@ from lina.nucleo import ajustes as AJ
 from lina.nucleo import rutas as RUT
 
 CONOCIDAS = {"gemini": ("gemini.key", "clave gratuita de Gemini"), "gemini_pago": ("gemini_pago.key", "clave de pago de Gemini"),
-             "tavily": ("tavily.key", "clave de Tavily (búsqueda)")}
+             "tavily": ("tavily.key", "clave de Tavily (búsqueda)"),
+             "openai": ("openai.key", "clave de OpenAI (o del servicio compatible que uses)"), "anthropic": ("anthropic.key", "clave de Anthropic")}
 ALIAS = {"gemini-pago": "gemini_pago", "pago": "gemini_pago", "gratis": "gemini", "gratuita": "gemini"}
 SERVICIO = "lina"
 ARCHIVO_MCP = "mcp_claves.env"

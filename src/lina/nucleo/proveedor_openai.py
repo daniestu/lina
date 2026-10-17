@@ -83,6 +83,16 @@ class OpenAI(P.Proveedor):
         self.url_base = (url_base or URL_OPENAI).rstrip("/")
         self.razonamiento = razonamiento                # ¿enviar reasoning_effort? Solo lo admiten los modelos de razonamiento
 
+    def modelos(self, clave, get=None, timeout=15):
+        cabeceras = {"Authorization": f"Bearer {clave}"} if clave and clave != P.SIN_CLAVE else {}
+        try:
+            r = (get or requests.get)(f"{self.url_base}/models", headers=cabeceras, timeout=timeout)
+            if not r.ok:
+                return None, _resumen(r)
+            return sorted(str(m["id"]) for m in r.json()["data"]), ""
+        except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError) as e:
+            return None, f"no he podido consultarlo ({e})"
+
     def turno(self, clave, modelo, sistema, mensajes, *, herramientas=None, nivel=None, busqueda_nativa=False, json_esquema=None,
               temperatura=None, max_salida=None, timeout=20, post=None):
         cuerpo = {"model": modelo, "messages": _mensajes(sistema, mensajes)}
@@ -99,7 +109,7 @@ class OpenAI(P.Proveedor):
                                          if isinstance(json_esquema, dict) else {"type": "json_object"})
         if nivel and self.razonamiento:
             cuerpo["reasoning_effort"] = nivel
-        cabeceras = {"Authorization": f"Bearer {clave}"} if clave else {}
+        cabeceras = {"Authorization": f"Bearer {clave}"} if clave and clave != P.SIN_CLAVE else {}
         for _ in range(2):
             try:
                 r = (post or requests.post)(f"{self.url_base}/chat/completions", headers=cabeceras, json=cuerpo, timeout=timeout)

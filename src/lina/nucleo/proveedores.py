@@ -35,6 +35,9 @@ class ErrorIA:
     espera: float | None = None                    # segundos que el servicio pide esperar (solo si esperar sirve de algo)
 
 
+SIN_CLAVE = "sin-clave"        # marcador para los servidores locales o de empresa que no piden clave (nunca se envía)
+
+
 def tipo_de_estado(estado):
     if estado == 429:
         return "cuota"
@@ -56,6 +59,10 @@ class Proveedor:
               temperatura=None, max_salida=None, timeout=20, post=None):
         """json_esquema: None = texto libre; True = JSON; un dict = JSON con ese esquema. `nivel`: esfuerzo de razonamiento, si el modelo lo admite."""
         raise NotImplementedError
+
+    def modelos(self, clave, get=None, timeout=15):
+        """Los modelos que ofrece el servicio: (lista de nombres, '') o (None, motivo)."""
+        return None, "este proveedor no sabe listar modelos"
 
 
 _REGISTRO: dict = {}

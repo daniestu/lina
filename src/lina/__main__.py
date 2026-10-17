@@ -14,7 +14,8 @@ AYUDA = f"""Lina {__version__}: asistente de voz para el escritorio Linux.
   lina pulsar                equivale a pulsar el atajo (hablar / terminar de hablar / callarla). Ponlo en el atajo de teclado
   lina config [ORDEN]        ver y cambiar los ajustes (nombre, voz, perfil de autonomía, gasto…):  lina config ayuda
   lina voz [NOMBRE]          lista las voces o elige una (la descarga si hace falta)
-  lina clave [gemini|pago|NOMBRE]   guarda una clave (Gemini, de pago, de un servidor MCP…) en el llavero del sistema, sin que se vea ni se dicte
+  lina clave [gemini|pago|openai|anthropic|NOMBRE]   guarda una clave (de la IA, de pago, de un servidor MCP…) en el llavero del sistema, sin que se vea ni se dicte
+  lina ia [ORDEN]            con qué IA habla Lina (Gemini, Anthropic, OpenAI y compatibles) y cómo cambiarla:  lina ia ayuda
   lina privilegios [instalar|total|quitar]   qué permisos de administrador tiene Lina y cómo dárselos o quitárselos (siempre tras enseñarte lo que se escribe)
   lina privacidad [si|no]    qué se envía a la IA y qué no, y si permites enviar capturas de tu pantalla
   lina olvidar [QUÉ]         borra lo que Lina guarda de ti: diario, registro de acciones, recetas, registro del sistema (antes enseña qué y cuánto)
@@ -105,6 +106,9 @@ def main(argv=None):
     if orden in ("bienvenida", "welcome"):
         from lina.nucleo import bienvenida
         return bienvenida.principal(resto)
+    if orden == "ia":
+        from lina.nucleo import ia_cli
+        return ia_cli.principal(resto)
     if orden == "modelos":
         from lina.nucleo import modelos
         return modelos.principal(resto)

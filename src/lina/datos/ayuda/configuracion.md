@@ -81,6 +81,19 @@ que no se pueden desactivar. Los perfiles se aplican encima de `politica.txt`: p
 | `persistencia` | `"perfil"` | Crear servicios o tareas automáticas. |
 | `archivos_de_paquetes` | `"perfil"` | Modificar archivos de programas instalados (/usr…). |
 
+### [ia] Inteligencia artificial
+
+Con qué IA habla Lina. Por defecto es Gemini con tu clave gratuita y no hace falta tocar nada. Mira y cambia con `lina ia`. Cambiar de proveedor decide a qué empresa se envía lo que
+dices, así que por voz exige el atajo (o se hace en la terminal).
+
+| Ajuste | De fábrica | Qué hace |
+|---|---|---|
+| `proveedor` | `"gemini"` | `gemini`, `anthropic` u `openai` (OpenAI y todo lo compatible: OpenRouter, Groq, Mistral, Ollama, LM Studio, un servidor de tu empresa…). |
+| `modelo_rapido` | `""` | Modelo para el día a día. Vacío: el recomendado (con `openai` hay que indicarlo; los ves con `lina ia modelos`). |
+| `modelo_profundo` | `""` | Modelo para el modo «a fondo». Vacío: el recomendado, o el rápido si no hay recomendado. |
+| `url_base` | `""` | Solo con `openai`: dirección del servicio si no es OpenAI, p. ej. `http://localhost:11434/v1` (Ollama). En local no hace falta clave. |
+| `razonamiento` | `false` | Solo con `openai`: `true` si el modelo es de razonamiento y admite indicar cuánto pensar. |
+
 ### [gasto] Gasto con la clave de pago
 
 | Ajuste | De fábrica | Qué hace |

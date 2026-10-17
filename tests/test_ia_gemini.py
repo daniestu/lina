@@ -217,7 +217,7 @@ ESQUEMA = {"type": "OBJECT", "properties": {"decision": {"type": "STRING"}}, "re
 def test_mini_consulta_devuelve_la_decision_y_pide_json(ia):
     s = ia(texto('```json\n{"decision": "si"}\n```'))
     r = IA._mini_consulta_ia("K", "PROMPT", ESQUEMA, "dato", ("si", "no"), "prueba")
-    assert r == {"decision": "si", "modelo": IA.MODELOS_CONFIRMACION[0]}
+    assert r == {"decision": "si", "modelo": IA.IAC.modelos("mini")[0]}
     cfg = s.peticiones[0]["json"]["generationConfig"]
     assert cfg["responseMimeType"] == "application/json" and cfg["responseSchema"] == ESQUEMA and cfg["temperature"] == 0
     assert s.peticiones[0]["json"]["system_instruction"] == {"parts": [{"text": "PROMPT"}]}
@@ -234,7 +234,7 @@ def test_mini_consulta_quita_ajustes_de_uno_en_uno_al_dar_400(ia):
 def test_mini_consulta_con_decision_desconocida_prueba_el_siguiente_modelo(ia):
     s = ia(texto('{"decision": "quizá"}'), texto('{"decision": "si"}'))
     r = IA._mini_consulta_ia("K", "P", ESQUEMA, "d", ("si", "no"), "x")
-    assert r["modelo"] == IA.MODELOS_CONFIRMACION[1] and len(s.peticiones) == 2
+    assert r["modelo"] == IA.IAC.modelos("mini")[1] and len(s.peticiones) == 2
     ia2 = ia(texto("no es json"), texto("tampoco"))
     assert IA._mini_consulta_ia("K", "P", ESQUEMA, "d", ("si", "no"), "x") is None and len(ia2.peticiones) == 2
 
@@ -242,7 +242,7 @@ def test_mini_consulta_con_decision_desconocida_prueba_el_siguiente_modelo(ia):
 def test_confirmacion_devuelve_cantidad_y_modelo(ia):
     s = ia(texto('{"decision": "confirma", "menciona_cantidad": true}'))
     r = IA.clasificar_confirmacion_ia("K", "sí, hazlo", "instalar vlc")
-    assert r == {"decision": "confirma", "menciona_cantidad": True, "modelo": IA.MODELOS_CONFIRMACION[0]}
+    assert r == {"decision": "confirma", "menciona_cantidad": True, "modelo": IA.IAC.modelos("mini")[0]}
     contenido = s.peticiones[0]["json"]["contents"][0]["parts"][0]["text"]
     assert "instalar vlc" in contenido and "sí, hazlo" in contenido
     assert s.peticiones[0]["json"]["generationConfig"]["maxOutputTokens"] == 300

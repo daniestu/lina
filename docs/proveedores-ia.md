@@ -50,8 +50,23 @@ no cuestan nada.
 1. (hecho) Interfaz común y proveedor Gemini; el código actual pasa a usarlos (sin cambios de comportamiento: las mismas pruebas deben seguir pasando).
 2. (hecho) Proveedor `openai`.
 3. (hecho) Proveedor `anthropic`.
-4. Configuración: `[ia]`, `lina ia`, claves por proveedor, asistente de bienvenida, doctor y presupuesto.
+4. (hecho) Configuración: `[ia]`, `lina ia`, claves por proveedor, asistente de bienvenida, doctor y presupuesto.
 5. Documentación y pruebas contra servidores simulados.
 
 Los proveedores 2 y 3 se prueban aquí contra servidores simulados que siguen el formato publicado de cada API; **no contra los servicios
 reales**, así que las primeras pruebas con claves reales hay que hacerlas en el equipo de cada uno.
+
+## Uso
+
+```
+lina ia                                   estado
+lina clave anthropic                      guarda la clave (se pide sin mostrarla)
+lina ia usar anthropic                    usa los modelos recomendados
+lina ia usar openai --modelo NOMBRE       OpenAI (hay que indicar el modelo: míralos con `lina ia modelos`)
+lina ia usar openai --modelo llama3 --url http://localhost:11434/v1     Ollama en local, sin clave
+lina ia probar                            responde / usa herramientas / ve imágenes
+lina ia volver                            Gemini, como siempre
+```
+
+Reinicia después de cambiar (`systemctl --user restart lina`). Si el proveedor no está listo (falta la clave o el modelo), Lina lo dice al arrancar y por
+notificación en vez de quedarse muda sin explicación.

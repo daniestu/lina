@@ -66,6 +66,16 @@ class Gemini(P.Proveedor):
     nombre = "gemini"
     busqueda_nativa = True
 
+    def modelos(self, clave, get=None, timeout=15):
+        try:
+            r = (get or requests.get)("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", headers={"x-goog-api-key": clave}, timeout=timeout)
+            if not r.ok:
+                return None, resumen_error(r)
+            datos = r.json().get("models", [])
+        except (requests.RequestException, ValueError, AttributeError) as e:
+            return None, f"no he podido consultarlo ({e})"
+        return sorted(m["name"].split("/", 1)[-1] for m in datos if "generateContent" in m.get("supportedGenerationMethods", [])), ""
+
     def turno(self, clave, modelo, sistema, mensajes, *, herramientas=None, nivel=None, busqueda_nativa=False, json_esquema=None,
               temperatura=None, max_salida=None, timeout=20, post=None):
         cuerpo = {"system_instruction": {"parts": [{"text": sistema}]}, "contents": _contenidos(mensajes)}

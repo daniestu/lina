@@ -1,6 +1,6 @@
 """Los ajustes de Lina, en un único sitio: ~/.config/lina/config.toml
 
-Secciones: asistente, voz, activacion, autonomia, gasto, privacidad e interfaz. Cada ajuste tiene valor de fábrica y se valida: si algo
+Secciones: asistente, voz, activacion, autonomia, ia, gasto, privacidad e interfaz. Cada ajuste tiene valor de fábrica y se valida: si algo
 está mal escrito se usa el valor de fábrica y se avisa en el registro (nunca se cae). El archivo se relee solo cuando cambia.
 Las listas editables de política, comandos y vocabulario se mantienen aparte (politica.txt, comandos.txt, vocabulario.txt).
 
@@ -56,6 +56,14 @@ ESQUEMA: dict = {
         "persistencia": ("perfil", "opcion", MODOS_CATEGORIA, "Crear servicios o tareas automáticas."),
         "archivos_de_paquetes": ("perfil", "opcion", MODOS_CATEGORIA, "Modificar archivos de programas instalados (/usr…)."),
     },
+    "ia": {
+        "proveedor": ("gemini", "opcion", ("gemini", "openai", "anthropic"), "Con qué IA habla Lina: gemini (por defecto, con clave gratuita), anthropic, o openai "
+                      "(OpenAI y todo lo compatible: OpenRouter, Groq, Mistral, Ollama, LM Studio, un servidor de tu empresa…). Mira y cambia con:  lina ia"),
+        "modelo_rapido": ("", "texto", None, "Modelo para el día a día. Vacío: el que recomienda Lina (con «openai» hay que indicarlo; los ves con:  lina ia modelos)."),
+        "modelo_profundo": ("", "texto", None, "Modelo para el modo «a fondo». Vacío: el recomendado, o el rápido si no hay uno recomendado."),
+        "url_base": ("", "texto", None, "Solo con «openai»: dirección del servicio si no es OpenAI, p. ej. http://localhost:11434/v1 (Ollama). En local no hace falta clave."),
+        "razonamiento": (False, "bool", None, "Solo con «openai»: true si el modelo es de razonamiento (o3, gpt-5…) y admite indicar cuánto pensar."),
+    },
     "gasto": {
         "tope_mensual_eur": (10.0, "float", (0.0, 100000.0), "Lo máximo que gastas al mes con la clave de pago, en euros."),
         "eur_por_usd": (0.92, "float", (0.01, 100.0), "Cuántos euros vale un dólar (los precios de Google están en dólares)."),
@@ -78,7 +86,7 @@ ESQUEMA: dict = {
     },
 }
 TITULOS = {"asistente": "Identidad", "voz": "Voz", "activacion": "Manos libres", "autonomia": "Autonomía: qué hace solo y qué te pregunta",
-           "gasto": "Gasto con la clave de pago", "privacidad": "Privacidad", "interfaz": "Interfaz"}
+           "ia": "Inteligencia artificial", "gasto": "Gasto con la clave de pago", "privacidad": "Privacidad", "interfaz": "Interfaz"}
 
 # Nombres planos que usa el manos libres desde siempre (activacion.txt) → ajuste nuevo
 PLANAS = {
@@ -90,7 +98,7 @@ PLANAS = {
 }
 
 # Ajustes que dan más permisos o más gasto: solo se suben con el atajo (o a mano en el archivo / con `lina config` en la terminal)
-SENSIBLES = {("autonomia", "perfil"), ("gasto", "tope_mensual_eur")} | {("autonomia", c) for c in CATEGORIAS}
+SENSIBLES = {("autonomia", "perfil"), ("gasto", "tope_mensual_eur"), ("ia", "proveedor"), ("ia", "url_base")} | {("autonomia", c) for c in CATEGORIAS}
 
 _COLORES = ("azul", "rojo", "verde", "morado", "violeta", "naranja", "amarillo", "rosa", "cian", "blanco")
 
@@ -416,6 +424,8 @@ def cambio_sensible(seccion, clave, valor_nuevo, aj):
     if (seccion, clave) not in SENSIBLES:
         return False
     actual = aj.get(seccion, clave)
+    if seccion == "ia":                                   # cambiar de proveedor decide a qué empresa se envía lo que dices
+        return str(valor_nuevo) != str(actual)
     if (seccion, clave) == ("gasto", "tope_mensual_eur"):
         return float(valor_nuevo) > float(actual)
     if clave == "perfil":

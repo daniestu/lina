@@ -1,7 +1,6 @@
 """Control de programas por la interfaz (accesibilidad y visión) y las recetas que se aprenden de ello."""
 from lina.nucleo import herramientas as H
-from lina.nucleo.constantes import MODELOS_GEMINI
-from lina.nucleo.constantes import MODELOS_PROFUNDO
+from lina.nucleo import ia_activa as IAC
 from lina.nucleo.ia import _abortar
 from lina.nucleo.registro import log
 from lina.nucleo.turnos import peticion_de_receta
@@ -169,7 +168,7 @@ class MixinInterfaz:
         # Tres miradas por clic: la general (solo hace falta la zona) y la comprobación van con el modelo barato (Flash gratis solo da 20 al día);
         # el modelo más fuerte se reserva para la ampliación, que es donde se decide la precisión.
         visor = lambda imagen, texto, sistema: _A.visor_gemini(claves, imagen, texto, sistema, json_salida=True,
-                                                            modelos=MODELOS_PROFUNDO if sistema == _A.VIS.PROMPT_REFINAR else MODELOS_GEMINI)
+                                                            modelos=IAC.modelos("profundo" if sistema == _A.VIS.PROMPT_REFINAR else "rapido"))
         loc = _A.VIS.localizar(args, visor)
         if loc.get("error"):
             log("Interfaz (visión): " + loc["error"][:160])

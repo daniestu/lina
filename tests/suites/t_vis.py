@@ -130,7 +130,7 @@ def loc_falso(args,visor):
     return dict(resultado["loc"])
 AS.VIS.localizar=loc_falso; a.pasos_interfaz=0
 a.herramienta_interfaz({"accion":"senalar","descripcion":"botón"})
-ok(len(usados)==3 and usados[0][1] is AS.MODELOS_GEMINI and usados[1][1] is AS.MODELOS_PROFUNDO and usados[2][1] is AS.MODELOS_GEMINI,"modelos por mirada %s"%usados)
+ok(len(usados)==3 and usados[0][1] == AS.MODELOS_GEMINI and usados[1][1] == AS.MODELOS_PROFUNDO and usados[2][1] == AS.MODELOS_GEMINI,"modelos por mirada %s"%usados)
 AS.VIS.localizar=lambda args,visor:dict(resultado["loc"])
 d=[x for x in H.DECLARACIONES if x["name"]=="interfaz"][0]; ok("clic" in str(d) and "descripcion" in str(d),"declaración")
 ok("interfaz(clic" in G.REGLAS["interfaz"],"reglas")

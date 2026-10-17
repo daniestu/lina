@@ -57,8 +57,12 @@ class Sondas:
     def modelos(self):
         return MOD.estado()
 
+    def ia(self):
+        from lina.nucleo import ia_activa
+        return ia_activa.actual()
+
     def clave(self):
-        return CL.donde_esta("gemini")
+        return CL.donde_esta(self.ia().nombre)
 
     def llavero(self):
         return CL.llavero_disponible()
@@ -87,12 +91,23 @@ class Sondas:
         return (Path.home() / ".local" / "bin" / "lina").exists()
 
     def red(self):
-        socket.create_connection(("generativelanguage.googleapis.com", 443), timeout=6).close()
+        socket.create_connection(self.ia().servidor(), timeout=6).close()
         return True
 
     def probar_clave(self):
         from lina.nucleo import claves
-        return BIEN.validar_clave(claves.obtener("gemini"))
+        ia = self.ia()
+        if ia.nombre == "gemini":
+            return BIEN.validar_clave(claves.obtener("gemini"))
+        from lina.nucleo import proveedores as P
+        r = ia.proveedor.turno(ia.clave(), (ia.rapido or [""])[0], "Responde solo: ok", [{"rol": "user", "texto": "ok"}], max_salida=8, timeout=20)
+        if not isinstance(r, P.ErrorIA):
+            return True, "funciona"
+        if r.tipo == "auth":
+            return False, "el servicio dice que esa clave no es válida"
+        if r.tipo == "cuota":
+            return True, "es válida (ahora mismo has llegado al límite)"
+        return None, r.resumen or "no he podido probarla"
 
 
 def _seguro(f, defecto=None):
@@ -160,13 +175,24 @@ def comprobar(s=None, red=False):
             a(MAL, "Voz de Lina", f"{m['voz']}: los archivos no son los que se descargaron", "Bórrala y vuelve a bajarla:  lina voz  y elige otra vez")
         else:
             a(OK, "Voz de Lina", m["voz"] + ("" if m["voz_integra"] else " (sin huella para verificar)"))
+    ia = _seguro(getattr(s, "ia", lambda: None))
+    ia = None if isinstance(ia, Exception) else ia
+    nombre = "Gemini" if ia is None or ia.nombre == "gemini" else ia.nombre
+    proveedor = "gemini" if ia is None else ia.nombre
+    if ia is not None and nombre != "Gemini":
+        listo, falta = ia.listo()
+        a(OK if listo else MAL, "IA activa", f"{ia.nombre} con {', '.join(ia.rapido) or 'ningún modelo'}" + ("" if listo else f": {falta}"),
+          "" if listo else "lina ia   (o vuelve a Gemini, que es gratis:  lina ia volver)")
     cl = _seguro(s.clave)
     if isinstance(cl, Exception):
-        a(AVISO, "Clave de Gemini", f"no he podido mirarla ({cl})")
+        a(AVISO, f"Clave de {nombre}", f"no he podido mirarla ({cl})")
     elif cl:
-        a(OK, "Clave de Gemini", f"guardada en {cl}")
+        a(OK, f"Clave de {nombre}", f"guardada en {cl}")
+    elif ia is not None and ia.local:
+        a(OK, f"Clave de {nombre}", "no hace falta con un servidor propio")
+        cl = "sin clave"
     else:
-        a(MAL, "Clave de Gemini", "no hay ninguna: Lina no puede responder", "lina bienvenida   (la clave es gratuita)")
+        a(MAL, f"Clave de {nombre}", "no hay ninguna: Lina no puede responder", "lina bienvenida   (la clave es gratuita)" if nombre == "Gemini" else f"lina clave {proveedor}")
     if not _seguro(s.llavero, False):
         a(AVISO, "Llavero del sistema", "no disponible: las claves van a un archivo solo tuyo (600)", "Opcional: instala libsecret (secret-tool) y un llavero (GNOME Keyring o KWallet)")
     serv = _seguro(s.servicio)
@@ -193,12 +219,12 @@ def comprobar(s=None, red=False):
         try:
             s.red()
         except Exception as e:
-            a(MAL, "Red", f"no llego a Google ({type(e).__name__})", "Comprueba tu conexión, el cortafuegos o el proxy")
+            a(MAL, "Red", f"no llego a {'Google' if nombre == 'Gemini' else ia.servidor()[0]} ({type(e).__name__})", "Comprueba tu conexión, el cortafuegos o el proxy")
         else:
-            a(OK, "Red", "llego a Google")
+            a(OK, "Red", "llego a Google" if nombre == "Gemini" else f"llego a {ia.servidor()[0]}")
             if cl and not isinstance(cl, Exception):
                 ok, det = _seguro(s.probar_clave, (None, "no he podido probarla"))
-                a(OK if ok else AVISO if ok is None else MAL, "Clave en uso", det, "" if ok is not False else "lina clave gemini")
+                a(OK if ok else AVISO if ok is None else MAL, "Clave en uso", det, "" if ok is not False else f"lina clave {proveedor}")
     return r
 
 
