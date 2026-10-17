@@ -1,0 +1,12 @@
+post_install() {
+  echo "==> Para preparar Lina en tu usuario (sin sudo), ejecuta:  lina-instalar"
+  echo "==> Después:  lina doctor   ·   Actualizar:  lina update   ·   Quitar:  lina uninstall"
+}
+
+post_upgrade() {
+  echo "==> Lina se actualiza con  lina update  (no con pacman): el paquete solo trae el instalador y las dependencias del sistema."
+}
+
+pre_remove() {
+  echo "==> Tus datos y ajustes de Lina no se tocan. Para quitarlos:  lina uninstall --todo"
+}

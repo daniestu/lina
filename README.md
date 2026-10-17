@@ -1,6 +1,6 @@
 # Lina
 
-Asistente de voz en español para el escritorio Linux. Le hablas («Oye Lina, …») o pulsas un atajo, y ella entiende lo que
+Asistente de voz para el escritorio Linux, pensado primero para hablar en español (el inglés es experimental). Le hablas («Oye Lina, …») o pulsas un atajo, y ella entiende lo que
 quieres, lo hace en tu equipo (abrir programas, ajustar el sistema, manejar ventanas, buscar, escribir documentos…) y te contesta con voz.
 
 > **Estado: beta temprana (0.1).** Funciona de forma completa en Arch Linux y derivados con KDE Plasma (Wayland). El núcleo ya se prueba también en Debian/Ubuntu,
@@ -26,7 +26,8 @@ cd lina
 
 El instalador te enseña cada paso, crea el atajo de teclado y el servicio, y termina con `lina bienvenida`, que te guía para poner tu clave de Gemini
 (gratuita), probar el micrófono y decidir la libertad y la privacidad de Lina. Después: `lina doctor` para comprobar que todo está bien y `lina update`
-para actualizar. Más detalle en [instalación](docs/instalacion.md).
+para actualizar. Más detalle en [instalación](docs/instalacion.md). En Arch Linux y derivados habrá además un paquete del AUR (`lina-asistente`, orden `lina-instalar`)
+cuando se publique la primera versión; mientras tanto, usa el instalador. Para saber qué pedirle: [cómo se usa](docs/uso.md).
 
 ## Ajustes
 
@@ -54,12 +55,17 @@ Sin telemetría. Las capturas no se envían hasta que lo permites, y la contrase
 
 ## Documentación
 
+- [Cómo se usa](docs/uso.md)
 - [Instalación](docs/instalacion.md)
+- [Proveedores de IA](docs/proveedores-ia.md)
+- [Idiomas](docs/idiomas.md)
+- [Portabilidad entre distribuciones](docs/portabilidad.md)
 - [Escritorios compatibles](docs/escritorios.md)
 - [Configuración](docs/configuracion.md)
 - [Arquitectura](docs/arquitectura.md)
 - [Seguridad y confirmaciones](docs/seguridad.md)
 - [Hoja de ruta](docs/hoja-de-ruta.md)
+- [Publicar una versión](docs/publicacion.md) (para quien mantiene el proyecto)
 - [Créditos y licencias de terceros](docs/creditos.md)
 - [Cómo contribuir](CONTRIBUTING.md)
 

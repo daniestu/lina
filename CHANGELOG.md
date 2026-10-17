@@ -5,6 +5,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Fase 9: guía de uso (`docs/uso.md`), README renovado, pasos para publicar una versión (`docs/publicacion.md`) y paquete del AUR (`packaging/aur/`): instala las
+  dependencias del sistema y la orden `lina-instalar` (el instalador de siempre). Sin probar con `makepkg`.
 - Fase 8, paso 5: primer inglés, experimental (`idioma = "en"`). Traducciones de todas las frases envueltas, instrucciones inglesas para la IA, `comandos.en.txt`,
   reglas y redes de seguridad en inglés, y dos voces de Piper (la licencia de sus datos está sin comprobar: ver `docs/creditos.md`). Lo demás sigue en español; ver
   `docs/idiomas.md`. El manos libres acepta también «hey», «listen», «hi», «hello» y «okay» delante del nombre.

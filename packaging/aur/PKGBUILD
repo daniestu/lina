@@ -1,0 +1,31 @@
+# Maintainer: daniestu <99826907+daniestu@users.noreply.github.com>
+#
+# Paquete de Arch (AUR) de Lina. No instala el programa dentro de /usr: instala las dependencias del sistema y la orden `lina-instalar`
+# (el mismo install.sh del repositorio), que prepara Lina para TU usuario en ~/.local/share/lina, igual que en las demás distribuciones.
+# Así `lina update` sigue funcionando y las dependencias de Python que no están en los repositorios (piper-tts, faster-whisper) no se
+# descargan durante la construcción del paquete, donde Arch no permite red.
+#
+# Antes de subirlo: `updpkgsums` (rellena sha256sums) y `makepkg --printsrcinfo > .SRCINFO`.
+pkgname=lina-asistente
+pkgver=0.1.0b1
+_tag=v0.1.0-beta
+pkgrel=1
+pkgdesc="Asistente de voz en español para el escritorio Linux (Whisper, IA a elegir, Piper)"
+install=lina-asistente.install
+arch=('x86_64')
+url="https://github.com/daniestu/lina"
+license=('MIT')
+depends=('python>=3.11' 'git' 'gcc' 'portaudio' 'libnotify')
+optdepends=('ydotool: escribir y pulsar teclas en Wayland'
+            'chromium: convertir a PDF los documentos con diseño'
+            'ollama: usar un modelo de IA local')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/$_tag.tar.gz")
+sha256sums=('SKIP')   # ← sustituir con `updpkgsums` al publicar
+
+package() {
+  cd "$srcdir/lina-${_tag#v}"
+  install -Dm755 install.sh "$pkgdir/usr/bin/lina-instalar"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 docs/instalacion.md "$pkgdir/usr/share/doc/$pkgname/instalacion.md"
+}
