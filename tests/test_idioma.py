@@ -109,3 +109,46 @@ def test_con_los_ajustes_de_verdad(tmp_path):
     assert I.actual(lambda: ajustes) == "es"
     with pytest.raises(Exception):                                  # «en» todavía no se puede elegir: no está entregado
         ajustes.establecer("asistente", "idioma", "en")
+
+
+# --- voces y reconocimiento de voz según el idioma ---
+
+@pytest.fixture
+def voces_en(en, monkeypatch):
+    from lina.voz import voces as V
+    ficha = {"modelo": "en_US-prueba-medium", "carpeta": "en/en_US/prueba/medium", "locutor": None, "descripcion": "Prueba · inglés"}
+    monkeypatch.setattr(V, "CATALOGO", {**V.CATALOGO, "en": {"en_US-prueba-medium": ficha}})
+    monkeypatch.setattr(V, "POR_DEFECTO", {**V.POR_DEFECTO, "en": "en_US-prueba-medium"})
+    return V
+
+
+def test_las_voces_que_se_ofrecen_son_las_del_idioma_activo(voces_en):
+    V = voces_en
+    assert V.idioma() == "en" and list(V.catalogo()) == ["en_US-prueba-medium"] and V.por_defecto() == "en_US-prueba-medium"
+
+
+def test_sin_voces_en_ese_idioma_se_usan_las_espanolas(en):
+    from lina.voz import voces as V
+    assert V.idioma() == "es" and "es_MX-claude-high" in V.catalogo() and V.por_defecto() == V.VOZ_POR_DEFECTO
+
+
+def test_la_voz_elegida_de_otro_idioma_se_sustituye_por_la_de_este(voces_en, monkeypatch):
+    V = voces_en
+
+    def con_voz(nombre):
+        class Falsos:
+            def get(self, seccion, clave):
+                return nombre
+        monkeypatch.setattr(V.AJ, "actuales", lambda log=None: Falsos())
+    con_voz("es_MX-claude-high")                              # la de fábrica en español, con Lina en inglés
+    assert V.voz_elegida() == "en_US-prueba-medium"
+    con_voz("en_US-prueba-medium")
+    assert V.voz_elegida() == "en_US-prueba-medium"
+    con_voz("mi_voz_propia")                                  # una voz que el usuario instaló por su cuenta no se toca
+    assert V.voz_elegida() == "mi_voz_propia"
+
+
+def test_el_reconocimiento_de_voz_no_tiene_el_idioma_fijo():
+    from pathlib import Path
+    fuente = (Path(I.__file__).parent / "asistente.py").read_text(encoding="utf-8")
+    assert 'language="es"' not in fuente and "language=IDI.actual()" in fuente

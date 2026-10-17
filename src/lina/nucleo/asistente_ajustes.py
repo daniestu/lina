@@ -303,8 +303,8 @@ class MixinAjustes:
             return texto
         if accion in ("elegir_voz", "probar_voz"):
             nombre = str(args.get("voz") or "")
-            if nombre not in VOC.CATALOGO[VOC.IDIOMA]:
-                return f"No conozco la voz «{nombre}». Las que hay: {', '.join(VOC.CATALOGO[VOC.IDIOMA])}."
+            if nombre not in VOC.catalogo():
+                return f"No conozco la voz «{nombre}». Las que hay: {', '.join(VOC.catalogo())}."
             if not VOC.asegurar(nombre, log=log):
                 return f"No he podido descargar la voz {nombre}: mira el registro."
             if accion == "elegir_voz":

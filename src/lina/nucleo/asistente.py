@@ -26,6 +26,7 @@ from lina.nucleo import ajustes as AJ
 from lina.nucleo.registro import log
 from lina.nucleo import claves as CL
 from lina.nucleo import ia_activa as IAC
+from lina.nucleo import idioma as IDI
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
@@ -695,7 +696,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
     def _transcribir(self, audio, inicio):
         """De audio a texto con Whisper (con la pista de tu vocabulario y tus programas)."""
         with self.cerrojo_whisper:
-            segmentos, _ = self.whisper.transcribe(audio, language="es", vad_filter=True, initial_prompt=prompt_whisper())
+            segmentos, _ = self.whisper.transcribe(audio, language=IDI.actual(), vad_filter=True, initial_prompt=prompt_whisper())
             texto = " ".join(s.text for s in segmentos).strip()
         log(f"Pregunta: «{texto if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'}» ({time.time() - inicio:.1f} s)")
         return texto
@@ -705,7 +706,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         """Whisper para escuchar si te dirigen la palabra: rápido (sin búsqueda en haz) y con el nombre como pista."""
         nombre = self.manos_libres.cfg.nombre.capitalize() if self.manos_libres else "Lina"
         with self.cerrojo_whisper:
-            segmentos, _ = self.whisper.transcribe(audio, language="es", vad_filter=True, beam_size=1,
+            segmentos, _ = self.whisper.transcribe(audio, language=IDI.actual(), vad_filter=True, beam_size=1,
                                                    initial_prompt=f"Oye {nombre}. Escucha {nombre}. {prompt_whisper()}"[:PROMPT_WHISPER_CARACTERES])
             return " ".join(s.text for s in segmentos).strip()
 

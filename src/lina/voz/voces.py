@@ -14,9 +14,9 @@ import urllib.request
 from pathlib import Path
 
 from lina.nucleo import ajustes as AJ
+from lina.nucleo import idioma as IDI
 from lina.nucleo import rutas as RUT
 
-IDIOMA = "es"
 
 # Revisión fija del repositorio de voces, para que la descarga sea siempre el mismo archivo.
 REVISION = "9df7583dc899c8f5ecaaebf1120a9fd1911e8009"
@@ -35,9 +35,26 @@ CATALOGO = {
                                     "descripcion": "Sharvard, hablante 2 · España · calidad media"},
     },
 }
-VOZ_POR_DEFECTO = "es_MX-claude-high"
+POR_DEFECTO = {"es": "es_MX-claude-high"}     # la voz de cada idioma cuando no se ha elegido otra
+VOZ_POR_DEFECTO = POR_DEFECTO["es"]
 TIEMPO = 60
 TROZO = 1 << 20
+
+
+def idioma():
+    """El idioma de las voces que se ofrecen: el de Lina, si hay voces en él (si no, el español)."""
+    codigo = IDI.actual()
+    return codigo if codigo in CATALOGO else "es"
+
+
+def catalogo():
+    """Las voces del idioma activo."""
+    return CATALOGO[idioma()]
+
+
+def por_defecto():
+    """La voz de fábrica del idioma activo."""
+    return POR_DEFECTO.get(idioma(), VOZ_POR_DEFECTO)
 
 
 def entrada(nombre):
@@ -63,7 +80,10 @@ def locutor(nombre):
 def voz_elegida(carpeta_config=None):
     """Nombre de la voz elegida en config.toml ([voz]) o, si se da una carpeta suelta (pruebas), en su voz.txt; si no hay, la de por defecto."""
     if carpeta_config is None:
-        return AJ.actuales(log=lambda m: None).get("voz", "voz")
+        elegida = AJ.actuales(log=lambda m: None).get("voz", "voz")
+        if entrada(elegida) is not None and elegida not in catalogo():      # una voz de otro idioma (p. ej. la de fábrica en español): la de este
+            return por_defecto()
+        return elegida
     ruta = Path(carpeta_config or RUT.CONFIG) / "voz.txt"
     try:
         for linea in ruta.read_text(encoding="utf-8").splitlines():
@@ -72,7 +92,7 @@ def voz_elegida(carpeta_config=None):
                 return linea
     except OSError:
         pass
-    return VOZ_POR_DEFECTO
+    return por_defecto()
 
 
 def fijar(nombre, carpeta_config=None):
@@ -213,14 +233,14 @@ def principal(argv, carpeta=None, carpeta_config=None, abrir=_abrir, salida=prin
     actual = voz_elegida(carpeta_config)
     if not argv:
         salida("Voces disponibles (la marcada con * es la que se usa; «instalada» = ya descargada):")
-        for nombre, ficha in CATALOGO[IDIOMA].items():
+        for nombre, ficha in catalogo().items():
             marca = "*" if nombre == actual else " "
             estado = "instalada" if instalada(nombre, carpeta) else "se descarga al elegirla"
             salida(f" {marca} {nombre:26} {ficha['descripcion']}  [{estado}]")
         salida("\nElige una con:  lina voz NOMBRE   (después reinicia a Lina: systemctl --user restart lina)")
         return 0
     nombre = argv[0]
-    if nombre not in CATALOGO[IDIOMA]:
+    if nombre not in catalogo():
         salida(f"No conozco la voz «{nombre}». Mira las que hay con:  lina voz")
         return 2
     if not asegurar(nombre, carpeta, salida, abrir):

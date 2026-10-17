@@ -5,6 +5,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Fase 8, paso 2: el reconocimiento de voz (Whisper) y las voces de Piper siguen el idioma activo. El catálogo de voces es por idioma, cada idioma tiene su voz de fábrica
+  y, si la voz elegida es de otro idioma, se usa la de fábrica de este. Con `idioma = "es"` todo queda igual.
 - Fase 8, paso 1: capa de idioma. Ajuste `idioma` (por ahora solo `es`) y `T("texto en español")` para los textos que el usuario lee u oye: el texto en español es la
   clave, las traducciones viven en `datos/idiomas/<código>.toml` y, si falta una, sale el español. Sin cambios visibles todavía.
 - Documentos con diseño propio (`disenar_documento`): currículum, factura, cartel, menú, carta con membrete… Lina diseña el documento ella misma (HTML y CSS),

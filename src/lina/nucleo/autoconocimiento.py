@@ -32,7 +32,7 @@ def _voces():
     from lina.voz import voces
     actual = voces.voz_elegida()
     lineas = []
-    for nombre, ficha in voces.CATALOGO[voces.IDIOMA].items():
+    for nombre, ficha in voces.catalogo().items():
         lineas.append(f"  {'*' if nombre == actual else ' '} {nombre}: {ficha['descripcion']} "
                       f"[{'instalada' if voces.instalada(nombre) else 'se descarga al elegirla'}]")
     return ("Voces (* = la actual). Solo consta el género de las que lo dicen (femenina/masculina); de las demás no lo sabemos: no lo inventes, "
