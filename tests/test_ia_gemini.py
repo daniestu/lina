@@ -150,6 +150,22 @@ def test_error_con_herramientas_reintenta_sin_ellas(ia, estado):
     assert "tools" in s.peticiones[0]["json"] and "tools" not in s.peticiones[1]["json"]
 
 
+def test_sin_herramientas_se_avisa_a_la_ia_de_que_no_puede_actuar(ia):
+    """Un modelo sin herramientas que no lo sabe contesta «hecho» sin haber hecho nada (pasó con un modelo local)."""
+    s = ia(error(400), texto("ok"))
+    preguntar(sistema="SISTEMA", herramientas=[{"name": "a"}], ejecutar_herramienta=lambda n, a: "x")
+    antes = s.peticiones[0]["json"]["system_instruction"]["parts"][0]["text"]
+    despues = s.peticiones[1]["json"]["system_instruction"]["parts"][0]["text"]
+    assert antes == "SISTEMA" and despues.startswith("SISTEMA") and "NO tienes herramientas" in despues and "NUNCA digas que lo has hecho" in despues
+
+
+def test_si_no_cabe_en_el_contexto_no_se_reintenta_sin_herramientas(ia):
+    mensaje = "request (9839 tokens) exceeds the available context size (8192 tokens), try increasing it"
+    s = ia(error(400, mensaje), texto("Subiendo el volumen"))
+    assert preguntar(nivel="low", herramientas=[{"name": "a"}], ejecutar_herramienta=lambda n, a: "x") is None
+    assert len(s.peticiones) == 1                                   # ni sin nivel, ni sin herramientas: falla y lo dice el registro
+
+
 def test_servidor_ocupado_se_reintenta_con_espera_creciente(ia):
     s = ia(error(503), error(500), texto("ya"))
     assert preguntar() == "ya" and ia.esperas == [1.5, 3.0] and len(s.peticiones) == 3

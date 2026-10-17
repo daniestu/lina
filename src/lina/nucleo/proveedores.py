@@ -50,6 +50,15 @@ def tipo_de_estado(estado):
     return "otro"
 
 
+def contexto_desbordado(texto):
+    """¿El error dice que lo enviado no cabe en la ventana de contexto del modelo? Cada servicio lo escribe a su manera
+    («exceeds the available context size», «maximum context length», «prompt is too long»…)."""
+    t = (texto or "").lower()
+    if "prompt is too long" in t or "context window" in t:
+        return True
+    return "context" in t and any(p in t for p in ("exceed", "too long", "too large", "maximum", "overflow"))
+
+
 class Proveedor:
     """Lo que tiene que hacer cada proveedor. `turno` devuelve una Respuesta o un ErrorIA; no lanza por fallos de red ni de la API."""
     nombre = ""

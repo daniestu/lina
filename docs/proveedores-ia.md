@@ -68,8 +68,23 @@ lina ia probar                            responde / usa herramientas / ve imág
 lina ia volver                            Gemini, como siempre
 ```
 
-Reinicia después de cambiar (`systemctl --user restart lina`). Si el proveedor no está listo (falta la clave o el modelo), Lina lo dice al arrancar y por
-notificación en vez de quedarse muda sin explicación.
+El cambio se nota en la siguiente petición, sin reiniciar: Lina cambia también la clave (nunca se envía la de un proveedor a otro). Si el proveedor no
+está listo (falta la clave o el modelo), Lina lo dice y avisa por notificación en vez de quedarse muda sin explicación.
+
+## Servidores locales (Ollama, LM Studio, llama.cpp)
+
+Lina necesita un contexto grande: sus instrucciones y herramientas ocupan unos 6.000 tokens y una captura de pantalla añade varios miles más. Ollama
+arranca por defecto con 4096 u 8192, según la versión, y entonces el servidor rechaza la petición («exceeds the available context size»). Lina no quita las
+herramientas para salir del paso (sin ellas el modelo diría que hace cosas que no hace): falla y lo explica en el registro. Sube el contexto del servidor:
+
+```
+sudo systemctl edit ollama          # y añade:   [Service]
+                                    #            Environment="OLLAMA_CONTEXT_LENGTH=16384"
+sudo systemctl restart ollama
+```
+
+Un contexto mayor gasta más memoria de la tarjeta gráfica. Un modelo pequeño (8B) puede seguir fallando con las herramientas aunque el contexto sea suficiente:
+compruébalo con `lina ia probar`.
 
 ## Lo que no está comprobado (y lo que sabe y no sabe hacer cada proveedor)
 

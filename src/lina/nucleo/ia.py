@@ -420,6 +420,12 @@ def _post_cancelable(url, **kw):
     return resultado["r"]
 
 
+AVISO_SIN_HERRAMIENTAS = (
+    "\n\n[AVISO DEL SISTEMA: en esta respuesta NO tienes herramientas (han fallado). No puedes hacer nada en el PC ni consultar datos actuales. "
+    "Si lo que pide el usuario exige actuar o consultar algo, dile con claridad que ahora mismo no puedes hacerlo y que lo repita; "
+    "NUNCA digas que lo has hecho ni inventes datos.]")
+
+
 def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herramientas=None, ejecutar_herramienta=None,
                  sistema=None, nivel=None, revisor=None, max_pasos=None, esperar_cuota=False, al_esperar=None, timeout=20, plazo=None):
     """La pregunta con su bucle de herramientas, contra el proveedor dado: la IA pide herramientas, se ejecutan y se le devuelven los resultados
@@ -458,6 +464,10 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
             if r.tipo == "vacia":
                 log(f"{modelo}: {r.resumen}")
                 return None
+            if r.estado == 400 and PROV.contexto_desbordado(r.resumen):
+                log(f"{modelo}: lo que le envío no cabe en su ventana de contexto ({r.resumen}). No reintento quitando las herramientas, porque sin ellas "
+                    "no podría hacer nada y lo disimularía. Sube el contexto del servidor (docs/proveedores-ia.md, «Servidores locales»)")
+                return None
             if r.estado == 400 and nivel and pasos == 0:
                 log(f"{modelo}: no acepta el nivel de razonamiento «{nivel}» -> reintento sin indicarlo")
                 nivel = None
@@ -474,6 +484,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                 log(f"{modelo}: {r.resumen} -> reintento sin herramientas")
                 busqueda_dio_429 = nativa and r.estado == 429
                 con_herramientas = False
+                sistema = (sistema or INSTRUCCIONES) + AVISO_SIN_HERRAMIENTAS      # que no diga que ha hecho lo que no puede hacer
                 continue
             if r.tipo == "servidor" and reintentos < REINTENTOS_SERVIDOR:
                 reintentos += 1                       # un «ocupado» suele ser un pico de segundos: se vuelve a intentar

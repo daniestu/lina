@@ -194,3 +194,33 @@ def test_doctor_con_servidor_local_no_pide_clave(aj):
     res = {t: (e, d) for e, t, d, _ in D.comprobar(Sonda())}
     assert res["Clave de openai"][0] == D.OK and "servidor propio" in res["Clave de openai"][1] and res["IA activa"][0] == D.OK
     assert IAC.actual().servidor() == ("localhost", 11434)
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("request (9839 tokens) exceeds the available context size (8192 tokens), try increasing it", True),
+    ("This model's maximum context length is 8192 tokens", True),
+    ("prompt is too long: 250000 tokens > 200000 maximum", True),
+    ("The input token count exceeds the context window", True),
+    ("API key not valid. Please pass a valid API key.", False),
+    ("Invalid value for 'reasoning_effort'", False),
+    ("", False),
+])
+def test_reconoce_cuando_no_cabe_en_el_contexto(texto, esperado):
+    assert P.contexto_desbordado(texto) is esperado
+
+
+def test_la_firma_cambia_con_el_proveedor_y_con_la_direccion(aj):
+    gemini = IAC.actual().firma()
+    poner(aj, proveedor="openai", modelo_rapido="m", url_base="http://localhost:11434/v1")
+    local = IAC.actual().firma()
+    poner(aj, url_base="http://otro:8000/v1")
+    assert len({gemini, local, IAC.actual().firma()}) == 3
+
+
+def test_cada_proveedor_usa_su_clave_y_solo_gemini_tiene_dos(aj):
+    aj.claves.update({"gemini": "G", "gemini_pago": "GP", "anthropic": "A"})
+    assert IAC.claves_de(IAC.actual()) == ("G", "GP")
+    poner(aj, proveedor="anthropic")
+    assert IAC.claves_de(IAC.actual()) == ("A", "")                 # nunca la de Gemini
+    poner(aj, proveedor="openai", modelo_rapido="m", url_base="http://localhost:11434/v1")
+    assert IAC.claves_de(IAC.actual()) == (P.SIN_CLAVE, "")

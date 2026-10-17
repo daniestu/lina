@@ -48,6 +48,10 @@ class Activa:
             return CL.obtener("gemini") or ""
         return CL.obtener(self.nombre) or (P.SIN_CLAVE if self.local else "")
 
+    def firma(self):
+        """Lo que identifica a qué IA se habla: si cambia, la clave en uso ya no vale."""
+        return (self.nombre, self.url_base)
+
     def listo(self):
         """(True, '') o (False, qué falta)."""
         if not self.rapido:
@@ -55,6 +59,13 @@ class Activa:
         if not self.clave():
             return False, f"falta la clave: `lina clave {self.nombre}`"
         return True, ""
+
+
+def claves_de(ia):
+    """(gratuita, de pago) de esta IA. Solo Gemini tiene dos y control de euros; los demás, una sola clave y se cuentan tokens."""
+    if ia.nombre == "gemini":
+        return CL.obtener("gemini"), CL.obtener("gemini_pago")
+    return ia.clave(), ""
 
 
 _cache: dict = {"marca": None, "aj": None}

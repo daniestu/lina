@@ -82,6 +82,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - `scripts/probar_gemini.py` (diagnóstico antiguo, atado al archivo de clave de antes) y código sin uso.
 
 ### Corregido
+- Al cambiar de proveedor con Lina en marcha (`lina ia volver`, `lina ia usar …`) se seguía usando la clave del proveedor anterior: ahora la clave cambia con el
+  proveedor en la siguiente petición, sin reiniciar, y nunca se envía la clave de uno a otro.
+- Si un servidor rechazaba la petición, Lina la repetía sin herramientas y la IA podía decir que había hecho cosas que no había hecho. Ahora, si la causa es que no cabe en
+  el contexto del modelo, no se reintenta y el registro dice qué hacer; y cuando sí se quitan las herramientas, se avisa a la IA de que no puede actuar.
 - Bloqueo duro: la IA no puede ejecutar `lina config poner|perfil`, `lina clave` ni `lina voz NOMBRE` (cambiar sus propios permisos, gasto o claves es cosa del usuario).
 - Pruebas antiguas puestas al día (`t_abrir`, `t_abrir2`).
 

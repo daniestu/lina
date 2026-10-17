@@ -468,30 +468,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
     def __init__(self):
         log(f"Cargando Whisper ({MODELO_WHISPER})...")
         self.whisper = WhisperModel(MODELO_WHISPER, device="cpu", compute_type="int8")
-        ia = IAC.actual()
-        if ia.nombre == "gemini":
-            gratis = CL.obtener("gemini")
-            pago = CL.obtener("gemini_pago")
-        else:                                                           # otro proveedor: una sola clave, sin control de euros (solo se cuentan tokens)
-            gratis, pago = ia.clave(), ""
         self.modo_privado = ARCHIVO_PRIVADO.exists()
         if self.modo_privado:
             log("Modo privado ACTIVADO (se recuerda de antes): no envío capturas de tu pantalla hasta que lo quites")
-        PRES.configurar_claves(gratis, pago)
-        self.clave = gratis or (pago if PRESUPUESTO_OK else "")      # (si solo hay una, esa; sin presupuesto.py la de pago no se usa)
-        if ia.nombre != "gemini":
-            listo, falta = ia.listo()
-            log(f"IA: {ia.nombre} ({', '.join(ia.rapido) or 'sin modelo'}). " + ("El gasto en euros no se controla con este proveedor: solo cuento tokens."
-                                                                              if listo else f"No puedo usarla todavía: {falta}."))
-            if not listo:
-                self.clave = ""
-        if not self.clave:
-            if ia.nombre == "gemini":
-                log("Aviso: no encuentro la clave de Gemini. Guárdala con:  lina clave gemini   (o  lina bienvenida)")
-            if not pago:
-                threading.Thread(target=self._avisar_sin_clave, args=(ia,), daemon=True).start()
-        if PRES.hay_clave_de_pago():
-            log(f"Clave de pago: configurada. Tope de este mes: {PRES.estado()['tope_eur']:g} € ({PRES.resumen().split('. Estado')[0][:110]})")
+        self._configurar_ia(IAC.actual())
         self.estado = "esperando"  # esperando | grabando | pensando | hablando
         self.cerrojo = threading.Lock()
         self.cerrojo_whisper = threading.Lock()     # Whisper lo usan a la vez el atajo y el manos libres: de uno en uno
@@ -525,6 +505,34 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         else:
             log("AVISO: falta politica.py: el asistente funciona en modo prudente (pide confirmación para casi todo)")
         H.hechos_sistema()  # precalienta los datos del sistema para que la primera pregunta no espere
+
+    def _configurar_ia(self, ia):
+        """Las claves y el control de gasto de la IA activa. Se llama al arrancar y cada vez que cambia el proveedor (no hace falta reiniciar)."""
+        gratis, pago = IAC.claves_de(ia)
+        self._ia_firma = ia.firma()
+        PRES.configurar_claves(gratis, pago)
+        self.clave = gratis or (pago if PRESUPUESTO_OK else "")      # (si solo hay una, esa; sin presupuesto.py la de pago no se usa)
+        if ia.nombre != "gemini":
+            listo, falta = ia.listo()
+            log(f"IA: {ia.nombre} ({', '.join(ia.rapido) or 'sin modelo'}). " + ("El gasto en euros no se controla con este proveedor: solo cuento tokens."
+                                                                              if listo else f"No puedo usarla todavía: {falta}."))
+            if not listo:
+                self.clave = ""
+        if not self.clave:
+            if ia.nombre == "gemini":
+                log("Aviso: no encuentro la clave de Gemini. Guárdala con:  lina clave gemini   (o  lina bienvenida)")
+            if not pago:
+                threading.Thread(target=self._avisar_sin_clave, args=(ia,), daemon=True).start()
+        if PRES.hay_clave_de_pago():
+            log(f"Clave de pago: configurada. Tope de este mes: {PRES.estado()['tope_eur']:g} € ({PRES.resumen().split('. Estado')[0][:110]})")
+
+    def _sincronizar_ia(self):
+        """Si has cambiado de proveedor (lina ia usar…) con Lina en marcha, la clave tiene que cambiar con él: nunca se manda la clave
+        de un proveedor a otro. Se comprueba antes de cada petición y antes de cada consulta."""
+        ia = IAC.actual()
+        if getattr(self, "_ia_firma", None) != ia.firma():
+            log(f"La IA activa ha cambiado a {ia.nombre}: cargo su clave")
+            self._configurar_ia(ia)
 
     def _avisar_sin_clave(self, ia=None):
         """Sin clave Lina no puede contestar y, si no se avisa, parece rota: notificación siempre, y por voz como mucho una vez al día."""
@@ -1076,6 +1084,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
 
     def nueva_tarea(self):
         """Cada frase tuya es una tarea nueva: se reinician sus topes y lo que hubiera «manchado» a la anterior."""
+        self._sincronizar_ia()
         self.t_tarea = time.time()
         _abortar.clear()                                  # una tarea nueva no hereda un «para» de la anterior
         _gasto_tarea["tokens"] = 0
@@ -1424,6 +1433,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
 
     def _claves(self, modo):
         """Las claves a probar, por orden. «rapido» y «mini»: primero la gratuita; «profundo»: primero la de pago (si no se ha llegado al tope)."""
+        self._sincronizar_ia()
         if PRES.hay_clave_de_pago():
             return PRES.claves_para(modo)
         return [self.clave] if self.clave else []
