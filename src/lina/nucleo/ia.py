@@ -12,8 +12,10 @@ import requests
 from lina.nucleo import claves as CL
 from lina.nucleo import herramientas as H
 from lina.nucleo import plataforma as PL
+from lina.nucleo import proveedor_gemini as PG
+from lina.nucleo import proveedores as PROV
 from lina.nucleo.constantes import (BUSQUEDA, ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCIONES, INSTRUCCION_LOCAL, MAX_ESPERAS_CUOTA, MAX_PASOS,
-                                    MODELO_LOCAL, MODELOS_CONFIRMACION, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, REINTENTOS_SERVIDOR,
+                                    MODELO_LOCAL, MODELOS_CONFIRMACION, MODELOS_GEMINI, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, VRAM_NECESARIA_MB)
 from lina.nucleo.opcionales import PRES
 from lina.nucleo.registro import log
@@ -84,41 +86,8 @@ _gasto_tarea = {"tokens": 0}              # lo que lleva gastado la petición ac
 _pausa_busqueda = [0.0]   # hasta cuándo no se usa la búsqueda de Google
 
 
-def _espera_de_cuota(r):
-    """Segundos que Google pide esperar, SOLO si el límite agotado es el de por minuto (el diario no se arregla esperando)."""
-    try:
-        detalles = r.json()["error"].get("details", [])
-    except (ValueError, KeyError, TypeError, AttributeError):
-        return None
-    por_minuto, espera = False, None
-    for d in detalles:
-        tipo = d.get("@type", "")
-        if tipo.endswith("QuotaFailure"):
-            por_minuto = por_minuto or any("perminute" in str(v.get("quotaId", "")).lower() for v in d.get("violations", []))
-        elif tipo.endswith("RetryInfo"):
-            m = re.fullmatch(r"(\d+(?:\.\d+)?)s", str(d.get("retryDelay", "")).strip())
-            espera = float(m.group(1)) if m else None
-    return espera if por_minuto else None
-
-
-def resumen_error_gemini(r):
-    """Resume el error de Gemini en una línea, incluyendo qué cuota se ha agotado y cuándo reintentar."""
-    try:
-        e = r.json()["error"]
-    except (ValueError, KeyError, TypeError):
-        return f"error {r.status_code}: {r.text[:200]}"
-    partes = [f"error {e.get('code', r.status_code)} {e.get('status', '')}".strip()]
-    for d in e.get("details", []):
-        tipo = d.get("@type", "")
-        if tipo.endswith("QuotaFailure"):
-            for v in d.get("violations", []):
-                partes.append(f"cuota={v.get('quotaId') or v.get('quotaMetric', '?')} "
-                              f"límite={v.get('quotaValue', '?')}")
-        elif tipo.endswith("RetryInfo"):
-            partes.append(f"reintentar en {d.get('retryDelay', '?')}")
-    if len(partes) == 1:
-        partes.append(str(e.get("message", ""))[:200])
-    return " | ".join(partes)
+_espera_de_cuota = PG.espera_de_cuota                # (los nombres antiguos siguen valiendo para quien los importe)
+resumen_error_gemini = PG.resumen_error
 
 
 HERRAMIENTA_BUSCAR = {"functionDeclarations": [{
@@ -170,44 +139,69 @@ PROMPT_RESUMEN_WEB = (
     "(menús, avisos de cookies, publicidad) responde exactamente «(nada útil)».")
 
 
-def _resumir_trozo(clave, texto, foco, etiqueta):
+def _registrar_uso(clave, modelo, r):
+    """Apunta el gasto de una respuesta (presupuesto y contador de la petición en curso)."""
+    PRES.registrar(clave, modelo, r.uso, r.modelo_real)
+    for campo in ("promptTokenCount", "candidatesTokenCount", "thoughtsTokenCount"):
+        if isinstance(r.uso.get(campo), int):
+            _gasto_tarea["tokens"] += r.uso[campo]
+
+
+def _pedir_corto(proveedor, clave, modelo, sistema, mensajes, etiqueta, *, intentos, degradar=(), timeout, pausar_en_red=True, **ajustes):
+    """Una petición corta a UN modelo. Si da 400 se van quitando los ajustes opcionales de `degradar` (uno por intento).
+    Devuelve la Respuesta o None (con el motivo ya anotado en el registro; los fallos de cuota y de servidor dejan el modelo en pausa)."""
+    degradar = list(degradar)
+    for intento in range(intentos):
+        r = proveedor.turno(clave, modelo, sistema, mensajes, timeout=timeout, **ajustes)
+        if not isinstance(r, PROV.ErrorIA):
+            return r
+        if r.tipo == "red":
+            log(f"{modelo}: sin conexión o demasiado lento al {etiqueta} ({r.resumen})")
+            if pausar_en_red:
+                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
+            return None
+        if r.estado == 400 and degradar and intento < intentos - 1:
+            for ajuste in degradar.pop(0):
+                ajustes[ajuste] = None
+            continue
+        log(f"{modelo}: {r.resumen} (al {etiqueta})")
+        if r.tipo in ("cuota", "servidor"):
+            _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
+        return None
+    return None
+
+
+def _resumir_trozo(clave, texto, foco, etiqueta, proveedor=PG.GEMINI):
     """Resume un trozo de web con el modelo barato. Devuelve el resumen o None si no se pudo."""
     contenido = (f"<foco>{foco[:200]}</foco>\n" if foco else "") + f"<pagina>\n{texto}\n</pagina>"
     for modelo in MODELOS_CONFIRMACION:
         if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
             continue
-        cuerpo = {"system_instruction": {"parts": [{"text": PROMPT_RESUMEN_WEB}]},
-                  "contents": [{"role": "user", "parts": [{"text": contenido}]}],
-                  "generationConfig": {"temperature": 0.2, "maxOutputTokens": 500,
-                                       "thinkingConfig": {"thinkingLevel": nivel_razonamiento(modelo, "rapido")}}}
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-        for intento in range(2):
-            try:
-                r = requests.post(url, headers={"x-goog-api-key": clave}, json=cuerpo, timeout=25)
-            except requests.RequestException as e:
-                log(f"{modelo}: sin conexión al resumir {etiqueta} ({e})")
-                break
-            if r.status_code == 400 and intento == 0 and "thinkingConfig" in cuerpo["generationConfig"]:
-                cuerpo["generationConfig"].pop("thinkingConfig")
-                continue
-            if not r.ok:
-                log(f"{modelo}: {resumen_error_gemini(r)} (al resumir {etiqueta})")
-                if r.status_code in (429, 500, 502, 503, 504):
-                    _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
-                break
-            try:
-                datos = r.json()
-                texto_r = "".join(p.get("text", "") for p in datos["candidates"][0]["content"]["parts"] if not p.get("thought")).strip()
-            except (KeyError, IndexError, ValueError, TypeError, AttributeError):
-                break
-            PRES.registrar(clave, modelo, datos.get("usageMetadata"), datos.get("modelVersion"))
-            for campo in ("promptTokenCount", "candidatesTokenCount", "thoughtsTokenCount"):
-                if isinstance((datos.get("usageMetadata") or {}).get(campo), int):
-                    _gasto_tarea["tokens"] += datos["usageMetadata"][campo]
-            if texto_r:
-                return texto_r
-            break
+        r = _pedir_corto(proveedor, clave, modelo, PROMPT_RESUMEN_WEB, [{"rol": "user", "texto": contenido}], f"resumir {etiqueta}",
+                         intentos=2, degradar=[("nivel",)], timeout=25, pausar_en_red=False,
+                         temperatura=0.2, max_salida=500, nivel=nivel_razonamiento(modelo, "rapido"))
+        if r is None:
+            continue
+        _registrar_uso(clave, modelo, r)
+        if r.texto:
+            return r.texto
     return None
+
+
+def ver_imagen(clave, imagen, pregunta, sistema, json_salida=False, modelos=None, proveedor=PG.GEMINI):
+    """Una imagen (JPEG en base64) y una pregunta a la visión de la IA con UNA clave. Devuelve (texto, None) o (None, motivo)."""
+    for modelo in (modelos or MODELOS_GEMINI):
+        if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
+            continue
+        r = _pedir_corto(proveedor, clave, modelo, sistema, [{"rol": "user", "texto": pregunta, "imagen": imagen}], "mirar la pantalla",
+                         intentos=2, degradar=[("nivel", "json_esquema")], timeout=25, pausar_en_red=False,
+                         nivel=nivel_razonamiento(modelo, "rapido"), json_esquema=True if json_salida else None)
+        if r is None:
+            continue
+        _registrar_uso(clave, modelo, r)
+        if r.texto:
+            return r.texto, None
+    return None, "La IA no ha respondido a la imagen."
 
 
 def nivel_razonamiento(modelo, modo):
@@ -240,46 +234,38 @@ PROMPT_INTERRUPCION = (
     "exige que el usuario lo haya dejado claro. Responde solo con el JSON pedido.")
 
 
-def _mini_consulta_ia(clave, prompt, esquema, contenido, validas, etiqueta):
-    """Una pregunta corta a Gemini con respuesta JSON de las opciones dadas. Devuelve {'decision', 'modelo'} o None si ningún modelo respondió bien."""
+def _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, maximo=200, proveedor=PG.GEMINI):
+    """Una pregunta corta con respuesta JSON. `validar(objeto)` lanza ValueError/KeyError si no sirve. Devuelve (objeto, modelo) o None si ningún
+    modelo respondió bien."""
     for modelo in MODELOS_CONFIRMACION:
         if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
             log(f"{modelo}: en pausa por un fallo reciente, lo salto")
             continue
-        config = {"temperature": 0, "maxOutputTokens": 200, "responseMimeType": "application/json", "responseSchema": esquema,
-                  "thinkingConfig": {"thinkingLevel": nivel_razonamiento(modelo, "rapido")}}
-        cuerpo = {"system_instruction": {"parts": [{"text": prompt}]}, "contents": [{"role": "user", "parts": [{"text": contenido}]}],
-                  "generationConfig": config}
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-        for intento in range(3):
-            try:
-                r = requests.post(url, headers={"x-goog-api-key": clave}, json=cuerpo, timeout=TIMEOUT_CONFIRMACION)
-            except requests.RequestException as e:
-                log(f"{modelo}: sin conexión o demasiado lento al entender {etiqueta} ({e})")
-                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
-                break
-            if r.status_code == 400 and intento < 2:
-                config.pop("thinkingConfig", None) if "thinkingConfig" in config else config.pop("responseSchema", None)
-                continue
-            if not r.ok:
-                log(f"{modelo}: {resumen_error_gemini(r)} (al entender {etiqueta})")
-                if r.status_code in (429, 500, 502, 503, 504):
-                    _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
-                break
-            try:
-                datos = r.json()
-                bruto = "".join(p.get("text", "") for p in datos["candidates"][0]["content"]["parts"] if not p.get("thought"))
-                decision = json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", bruto.strip()))["decision"]
-                if decision not in validas:
-                    raise ValueError(f"decisión desconocida: {decision!r}")
-            except (KeyError, IndexError, ValueError, TypeError, AttributeError) as e:
-                log(f"{modelo}: respuesta ilegible al entender {etiqueta} ({e})")
-                break
-            uso = datos.get("usageMetadata") or {}
-            PRES.registrar(clave, modelo, uso, datos.get("modelVersion"))
-            log(f"{modelo}: tokens entrada={uso.get('promptTokenCount', '?')} salida={uso.get('candidatesTokenCount', '?')} ({etiqueta})")
-            return {"decision": decision, "modelo": modelo}
+        r = _pedir_corto(proveedor, clave, modelo, prompt, [{"rol": "user", "texto": contenido}], f"entender {etiqueta}",
+                         intentos=3, degradar=[("nivel",), ("json_esquema",)], timeout=TIMEOUT_CONFIRMACION,
+                         temperatura=0, max_salida=maximo, json_esquema=esquema, nivel=nivel_razonamiento(modelo, "rapido"))
+        if r is None:
+            continue
+        try:
+            obj = json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", r.texto.strip()))
+            validar(obj)
+        except (KeyError, IndexError, ValueError, TypeError, AttributeError) as e:
+            log(f"{modelo}: respuesta ilegible al entender {etiqueta} ({e})")
+            continue
+        PRES.registrar(clave, modelo, r.uso, r.modelo_real)
+        log(f"{modelo}: tokens entrada={r.uso.get('promptTokenCount', '?')} salida={r.uso.get('candidatesTokenCount', '?')} "
+            f"razonamiento={r.uso.get('thoughtsTokenCount', 0)} ({etiqueta})")
+        return obj, modelo
     return None
+
+
+def _mini_consulta_ia(clave, prompt, esquema, contenido, validas, etiqueta):
+    """Una pregunta corta a la IA con respuesta JSON de las opciones dadas. Devuelve {'decision', 'modelo'} o None si ningún modelo respondió bien."""
+    def validar(obj):
+        if obj["decision"] not in validas:
+            raise ValueError(f"decisión desconocida: {obj['decision']!r}")
+    hecho = _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar)
+    return {"decision": hecho[0]["decision"], "modelo": hecho[1]} if hecho else None
 
 
 DECISIONES_CUMPLIMIENTO = ("cumplido", "no_cumplido")
@@ -368,49 +354,15 @@ def clasificar_confirmacion_ia(clave, texto, descripcion):
     Devuelve {'decision', 'menciona_cantidad', 'modelo'}, o None si ningún modelo ha respondido bien (entonces se cancela)."""
     contenido = (f"<accion>\n{descripcion}\n</accion>\n"
                  f"<respuesta_del_usuario>\n{H._limpiar_para_ia(texto, 500)}\n</respuesta_del_usuario>")
-    for modelo in MODELOS_CONFIRMACION:
-        if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
-            log(f"{modelo}: en pausa por un fallo reciente, lo salto")
-            continue
-        config = {"temperature": 0, "maxOutputTokens": 300, "responseMimeType": "application/json",
-                  "responseSchema": ESQUEMA_CONFIRMACION, "thinkingConfig": {"thinkingLevel": nivel_razonamiento(modelo, "rapido")}}
-        cuerpo = {"system_instruction": {"parts": [{"text": PROMPT_CONFIRMACION}]},
-                  "contents": [{"role": "user", "parts": [{"text": contenido}]}], "generationConfig": config}
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-        for intento in range(3):
-            try:
-                r = requests.post(url, headers={"x-goog-api-key": clave}, json=cuerpo, timeout=TIMEOUT_CONFIRMACION)
-            except requests.RequestException as e:
-                log(f"{modelo}: sin conexión o demasiado lento al entender tu confirmación ({e})")
-                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
-                break
-            if r.status_code == 400 and intento < 2:      # el modelo no admite algún ajuste: se quitan de uno en uno
-                if "thinkingConfig" in config:
-                    config.pop("thinkingConfig")
-                elif "responseSchema" in config:
-                    config.pop("responseSchema")
-                continue
-            if not r.ok:
-                log(f"{modelo}: {resumen_error_gemini(r)} (al entender tu confirmación)")
-                if r.status_code in (429, 500, 502, 503, 504):
-                    _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
-                break
-            try:
-                datos = r.json()
-                bruto = "".join(p.get("text", "") for p in datos["candidates"][0]["content"]["parts"] if not p.get("thought"))
-                obj = json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", bruto.strip()))
-                decision = obj["decision"]
-                if decision not in DECISIONES_CONFIRMACION:
-                    raise ValueError(f"decisión desconocida: {decision!r}")
-            except (KeyError, IndexError, ValueError, TypeError, AttributeError) as e:
-                log(f"{modelo}: respuesta ilegible al entender tu confirmación ({e})")
-                break
-            uso = datos.get("usageMetadata") or {}
-            PRES.registrar(clave, modelo, uso, datos.get("modelVersion"))
-            log(f"{modelo}: tokens entrada={uso.get('promptTokenCount', '?')} salida={uso.get('candidatesTokenCount', '?')} "
-                f"razonamiento={uso.get('thoughtsTokenCount', 0)} (confirmación)")
-            return {"decision": decision, "menciona_cantidad": obj.get("menciona_cantidad") is True, "modelo": modelo}
-    return None
+
+    def validar(obj):
+        if obj["decision"] not in DECISIONES_CONFIRMACION:
+            raise ValueError(f"decisión desconocida: {obj['decision']!r}")
+    hecho = _mini_consulta_json(clave, PROMPT_CONFIRMACION, ESQUEMA_CONFIRMACION, contenido, "tu confirmación", validar, maximo=300)
+    if not hecho:
+        return None
+    obj, modelo = hecho
+    return {"decision": obj["decision"], "menciona_cantidad": obj.get("menciona_cantidad") is True, "modelo": modelo}
 
 
 class Cancelado(BaseException):
@@ -462,25 +414,19 @@ def _post_cancelable(url, **kw):
     return resultado["r"]
 
 
-def preguntar_gemini(clave, modelo, pregunta, imagen, historial=(), herramientas=None, ejecutar_herramienta=None,
-                     sistema=None, nivel=None, revisor=None, max_pasos=None, esperar_cuota=False, al_esperar=None, timeout=20, plazo=None):
+def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herramientas=None, ejecutar_herramienta=None,
+                 sistema=None, nivel=None, revisor=None, max_pasos=None, esperar_cuota=False, al_esperar=None, timeout=20, plazo=None):
+    """La pregunta con su bucle de herramientas, contra el proveedor dado: la IA pide herramientas, se ejecutan y se le devuelven los resultados
+    hasta que responde con texto. Devuelve el texto o None si no hubo respuesta (la causa queda en el registro)."""
     if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
         log(f"{modelo}: en pausa por un fallo reciente, lo salto")
         return None
-    partes = [{"text": pregunta}]
-    if imagen:
-        partes.insert(0, {"inline_data": {"mime_type": "image/jpeg", "data": imagen}})
-    contenidos = [{"role": h["rol"], "parts": [{"text": h["texto"]}]} for h in historial]
-    contenidos.append({"role": "user", "parts": partes})
-    cuerpo = {"system_instruction": {"parts": [{"text": sistema or INSTRUCCIONES}]}, "contents": contenidos}
-    if nivel:
-        cuerpo["generationConfig"] = {"thinkingConfig": {"thinkingLevel": nivel}}
-    if BUSQUEDA == "google" and time.time() >= _pausa_busqueda[0]:
-        cuerpo["tools"] = [{"google_search": {}}]    # la búsqueda de Google dentro de Gemini (cuenta de pago)
-        ejecutar_herramienta = None
-    elif herramientas and ejecutar_herramienta:
-        cuerpo["tools"] = [{"functionDeclarations": herramientas}]  # Gemini decide qué herramienta pedirnos
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+    mensajes = [{"rol": h["rol"], "texto": h["texto"]} for h in historial]
+    mensajes.append({"rol": "user", "texto": pregunta, "imagen": imagen})
+    nativa = bool(proveedor.busqueda_nativa and BUSQUEDA == "google" and time.time() >= _pausa_busqueda[0])
+    if nativa:
+        ejecutar_herramienta = None                  # la búsqueda va dentro del modelo (cuenta de pago): no hay herramientas nuestras
+    con_herramientas = bool(nativa or (herramientas and ejecutar_herramienta))
     pasos = 0
     busqueda_dio_429 = False
     corregido = False
@@ -496,40 +442,41 @@ def preguntar_gemini(clave, modelo, pregunta, imagen, historial=(), herramientas
                 log(f"{modelo}: se acabó el plazo para esta petición")
                 return None
             espera_max = min(timeout, restante)
-        try:
-            r = _post_cancelable(url, headers={"x-goog-api-key": clave}, json=cuerpo, timeout=espera_max)
-        except requests.RequestException as e:
-            log(f"{modelo}: sin conexión o demasiado lento ({e})")
-            _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
-            return None
-        if not r.ok:
-            if r.status_code == 400 and "generationConfig" in cuerpo and pasos == 0:
+        r = proveedor.turno(clave, modelo, sistema or INSTRUCCIONES, mensajes, herramientas=herramientas if con_herramientas and not nativa else None,
+                            nivel=nivel, busqueda_nativa=nativa and con_herramientas, timeout=espera_max, post=_post_cancelable)
+        if isinstance(r, PROV.ErrorIA):
+            if r.tipo == "red":
+                log(f"{modelo}: sin conexión o demasiado lento ({r.resumen})")
+                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
+                return None
+            if r.tipo == "vacia":
+                log(f"{modelo}: {r.resumen}")
+                return None
+            if r.estado == 400 and nivel and pasos == 0:
                 log(f"{modelo}: no acepta el nivel de razonamiento «{nivel}» -> reintento sin indicarlo")
-                cuerpo.pop("generationConfig")
                 nivel = None
                 continue
-            if r.status_code == 429 and esperar_cuota and esperas_cuota < MAX_ESPERAS_CUOTA:
-                espera = _espera_de_cuota(r)           # al insistir NO se salta a un modelo más flojo: se espera lo que pide Google
-                if espera is not None and espera <= ESPERA_CUOTA_MAX:
+            if r.tipo == "cuota" and esperar_cuota and esperas_cuota < MAX_ESPERAS_CUOTA:
+                if r.espera is not None and r.espera <= ESPERA_CUOTA_MAX:       # al insistir NO se salta a un modelo más flojo: se espera lo que pide el servicio
                     esperas_cuota += 1
-                    log(f"{modelo}: {resumen_error_gemini(r)} -> espero {espera:.0f} s y sigo con el mismo modelo")
+                    log(f"{modelo}: {r.resumen} -> espero {r.espera:.0f} s y sigo con el mismo modelo")
                     if esperas_cuota == 1 and al_esperar:
                         al_esperar()
-                    _dormir(espera + 1)
+                    _dormir(r.espera + 1)
                     continue
-            if r.status_code in (400, 429) and "tools" in cuerpo and pasos == 0:
-                log(f"{modelo}: {resumen_error_gemini(r)} -> reintento sin herramientas")
-                busqueda_dio_429 = BUSQUEDA == "google" and r.status_code == 429
-                cuerpo.pop("tools")
+            if r.estado in (400, 429) and con_herramientas and pasos == 0:
+                log(f"{modelo}: {r.resumen} -> reintento sin herramientas")
+                busqueda_dio_429 = nativa and r.estado == 429
+                con_herramientas = False
                 continue
-            if r.status_code in (500, 502, 503, 504) and reintentos < REINTENTOS_SERVIDOR:
+            if r.tipo == "servidor" and reintentos < REINTENTOS_SERVIDOR:
                 reintentos += 1                       # un «ocupado» suele ser un pico de segundos: se vuelve a intentar
                 espera = ESPERA_REINTENTO * reintentos
-                log(f"{modelo}: {resumen_error_gemini(r)} -> reintento {reintentos} de {REINTENTOS_SERVIDOR} en {espera:.1f} s")
+                log(f"{modelo}: {r.resumen} -> reintento {reintentos} de {REINTENTOS_SERVIDOR} en {espera:.1f} s")
                 _dormir(espera)
                 continue
-            log(f"{modelo}: {resumen_error_gemini(r)}")
-            if r.status_code in (429, 500, 502, 503, 504):
+            log(f"{modelo}: {r.resumen}")
+            if r.tipo in ("cuota", "servidor"):
                 _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
             return None
         reintentos = 0
@@ -537,52 +484,46 @@ def preguntar_gemini(clave, modelo, pregunta, imagen, historial=(), herramientas
             _pausa_busqueda[0] = time.time() + PAUSA_BUSQUEDA_SEG
             log("La búsqueda de Google da error de cuota: la desactivo unos minutos")
             busqueda_dio_429 = False
-        try:
-            datos = r.json()
-            contenido = dict(datos["candidates"][0]["content"])
-            partes_resp = contenido.get("parts", [])
-        except (KeyError, IndexError, ValueError, TypeError):
-            log(f"{modelo}: respuesta vacía o bloqueada")
-            return None
-        uso = datos.get("usageMetadata") or {}
-        PRES.registrar(clave, modelo, uso, datos.get("modelVersion"))
+        uso = r.uso
+        PRES.registrar(clave, modelo, uso, r.modelo_real)
         log(f"{modelo}{' [' + nivel + ']' if nivel else ''}: tokens entrada={uso.get('promptTokenCount', '?')} "
             f"(de ellos en caché={uso.get('cachedContentTokenCount', 0)}) "
             f"salida={uso.get('candidatesTokenCount', '?')} razonamiento={uso.get('thoughtsTokenCount', 0)}")
         for campo in ("promptTokenCount", "candidatesTokenCount", "thoughtsTokenCount"):
             if isinstance(uso.get(campo), int):
                 _gasto_tarea["tokens"] += uso[campo]
-        contenido.setdefault("role", "model")
-        llamadas = [p["functionCall"] for p in partes_resp if "functionCall" in p]
-        if not llamadas:
-            texto = " ".join(p.get("text", "") for p in partes_resp if not p.get("thought")).strip()
-            if revisor and ejecutar_herramienta and not corregido and texto:
-                correccion = revisor(texto)           # ¿pide confirmación sin haber dejado nada preparado?
+        if not r.llamadas:
+            if revisor and ejecutar_herramienta and not corregido and r.texto:
+                correccion = revisor(r.texto)         # ¿pide confirmación sin haber dejado nada preparado?
                 if correccion:
                     corregido = True                  # solo se corrige una vez, para no dar vueltas
-                    contenidos.append(contenido)
-                    contenidos.append({"role": "user", "parts": [{"text": correccion}]})
+                    mensajes.append({"rol": "model", "turno": r.turno})
+                    mensajes.append({"rol": "user", "texto": correccion})
                     continue
-            return texto or None
+            return r.texto or None
         if not ejecutar_herramienta:
             return None
-        # Gemini pide usar herramientas: las ejecutamos y le devolvemos los resultados. Su turno se devuelve
-        # tal cual lo envió, porque incluye firmas internas que Gemini 3 exige recibir de vuelta.
-        contenidos.append(contenido)
-        respuestas = []
-        for llamada in llamadas:
+        # La IA pide usar herramientas: las ejecutamos y le devolvemos los resultados. Su turno se devuelve tal cual lo envió
+        # (Gemini 3, por ejemplo, incluye firmas internas que exige recibir de vuelta).
+        mensajes.append({"rol": "model", "turno": r.turno})
+        resultados = []
+        for llamada in r.llamadas:
             _comprobar_cancelacion()                   # entre herramientas, nunca a mitad de una (podría dejar un ajuste a medias)
-            nombre = llamada.get("name", "")
             if pasos >= limite_pasos:
                 resultado = "Límite de pasos alcanzado: responde con lo que ya tienes."
             else:
                 pasos += 1
                 try:
-                    resultado = ejecutar_herramienta(nombre, llamada.get("args") or {})
+                    resultado = ejecutar_herramienta(llamada.nombre, llamada.args or {})
                 except Exception as e:  # una herramienta rota no debe tumbar al asistente
-                    log(f"Error en la herramienta {nombre}: {e!r}")
+                    log(f"Error en la herramienta {llamada.nombre}: {e!r}")
                     resultado = f"La herramienta ha fallado: {e!r}"
-            respuestas.append({"functionResponse": {"name": nombre, "response": {"resultado": str(resultado)}}})
-        contenidos.append({"role": "user", "parts": respuestas})
+            resultados.append({"nombre": llamada.nombre, "id": llamada.id, "texto": str(resultado)})
+        mensajes.append({"rol": "herramienta", "resultados": resultados})
     log(f"{modelo}: demasiadas vueltas con las herramientas")
     return None
+
+
+def preguntar_gemini(clave, modelo, *args, **kwargs):
+    """Como preguntar_ia, con Gemini (el nombre de siempre, para el código y las pruebas que ya lo usan)."""
+    return preguntar_ia(PG.GEMINI, clave, modelo, *args, **kwargs)

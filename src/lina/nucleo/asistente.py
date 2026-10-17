@@ -32,7 +32,6 @@ from lina.escritorio import sesion as SES
 from lina.voz import voces as VOC
 
 import numpy as np
-import requests
 import sounddevice as sd
 from faster_whisper import WhisperModel
 from PIL import Image
@@ -344,44 +343,8 @@ def _ver_pantalla(clave, pregunta, espera=2.0):
 
 
 def _gemini_imagen(clave, imagen, pregunta, sistema, json_salida=False, modelos=None):
-    """Una imagen + una pregunta a la visión de Gemini con UNA clave. Devuelve (texto, None) o (None, motivo)."""
-    for modelo in (modelos or MODELOS_GEMINI):
-        if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
-            continue
-        config = {"thinkingConfig": {"thinkingLevel": nivel_razonamiento(modelo, "rapido")}}
-        if json_salida:
-            config["responseMimeType"] = "application/json"
-        cuerpo = {"system_instruction": {"parts": [{"text": sistema}]},
-                  "contents": [{"role": "user", "parts": [{"inline_data": {"mime_type": "image/jpeg", "data": imagen}}, {"text": pregunta}]}],
-                  "generationConfig": config}
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-        for intento in range(2):
-            try:
-                r = requests.post(url, headers={"x-goog-api-key": clave}, json=cuerpo, timeout=25)
-            except requests.RequestException as e:
-                log(f"{modelo}: sin conexión al mirar la pantalla ({e})")
-                break
-            if r.status_code == 400 and intento == 0 and "generationConfig" in cuerpo:
-                cuerpo.pop("generationConfig")            # este modelo no admite el nivel de razonamiento
-                continue
-            if not r.ok:
-                log(f"{modelo}: {resumen_error_gemini(r)} (al mirar la pantalla)")
-                if r.status_code in (429, 500, 502, 503, 504):
-                    _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
-                break
-            try:
-                datos = r.json()
-                texto = "".join(p.get("text", "") for p in datos["candidates"][0]["content"]["parts"] if not p.get("thought")).strip()
-            except (KeyError, IndexError, ValueError, TypeError, AttributeError):
-                break
-            PRES.registrar(clave, modelo, datos.get("usageMetadata"), datos.get("modelVersion"))
-            for campo in ("promptTokenCount", "candidatesTokenCount", "thoughtsTokenCount"):
-                if isinstance((datos.get("usageMetadata") or {}).get(campo), int):
-                    _gasto_tarea["tokens"] += datos["usageMetadata"][campo]
-            if texto:
-                return texto, None
-            break
-    return None, "Gemini no ha respondido a la imagen."
+    """Una imagen + una pregunta a la visión de la IA con UNA clave. Devuelve (texto, None) o (None, motivo)."""
+    return ver_imagen(clave, imagen, pregunta, sistema, json_salida, modelos)
 
 
 def visor_gemini(claves, imagen, pregunta, sistema, json_salida=False, modelos=None):
@@ -467,7 +430,7 @@ from lina.nucleo.ia import (  # noqa: F401
     Cancelado, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
-    _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily,
+    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
     vram_libre_mb,

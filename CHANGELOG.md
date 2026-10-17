@@ -12,6 +12,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
   los scripts y los recursos externos del HTML y las fotos locales se incrustan.
 
 ### Cambiado
+- Fase 7, paso 1: la conversación con la IA pasa a una interfaz común (`proveedores.py`) y Gemini es el primer proveedor (`proveedor_gemini.py`).
+  El bucle de herramientas, los reintentos, la espera de cuota, la cancelación y las mini-consultas de seguridad se escriben una sola vez y valen para
+  cualquier proveedor. Para Gemini el comportamiento no cambia: antes de moverlo se añadieron 28 pruebas contra un servidor simulado que lo fijan.
+  Ver [proveedores de IA](docs/proveedores-ia.md).
 - Sustituye a `documento_en_columnas` (plantilla fija de currículum en Word, que no servía para otros documentos y no siempre cabía en una página).
 - Código más fácil de mantener: `herramientas.py` pasa de 4 300 a unas 2 000 líneas y `asistente.py` de 3 600 a unas 1 800 (la clase `Asistente` reparte parte de sus métodos en cinco módulos `asistente_*.py`), repartidos en módulos con una sola
   responsabilidad (`clasificador`, `papelera`, `documentos`, `resolver`, `ejecucion`, `registro`, `procesos`, `declaraciones`, `ia`, `constantes`, `texto`, `opcionales`).
