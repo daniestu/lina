@@ -17,7 +17,7 @@ from lina.nucleo import proveedor_gemini as PG
 from lina.nucleo import proveedor_anthropic as PAN  # noqa: F401  (los proveedores se registran al importarse)
 from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
-from lina.nucleo.constantes import (BUSQUEDA, ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCIONES, INSTRUCCION_LOCAL, MAX_ESPERAS_CUOTA, MAX_PASOS,
+from lina.nucleo.constantes import (BUSQUEDA, ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
                                     MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, VRAM_NECESARIA_MB)
 from lina.nucleo.opcionales import PRES
@@ -53,7 +53,7 @@ def puede_usar_local():
 
 
 def preguntar_local(pregunta, imagen, permitir_escalar, historial=(), datos_sistema=""):
-    sistema = INSTRUCCIONES + (INSTRUCCION_LOCAL if permitir_escalar else "")
+    sistema = instrucciones() + (INSTRUCCION_LOCAL if permitir_escalar else "")
     if datos_sistema:
         sistema += (f"\n\nDATOS DEL SISTEMA DEL USUARIO (es {PL.detectar()['distro']}: no recomiendes comandos, paquetes ni programas "
                     "de otras distribuciones):\n" + datos_sistema)
@@ -454,7 +454,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                 log(f"{modelo}: se acabó el plazo para esta petición")
                 return None
             espera_max = min(timeout, restante)
-        r = proveedor.turno(clave, modelo, sistema or INSTRUCCIONES, mensajes, herramientas=herramientas if con_herramientas and not nativa else None,
+        r = proveedor.turno(clave, modelo, sistema or instrucciones(), mensajes, herramientas=herramientas if con_herramientas and not nativa else None,
                             nivel=nivel, busqueda_nativa=nativa and con_herramientas, timeout=espera_max, post=_post_cancelable)
         if isinstance(r, PROV.ErrorIA):
             if r.tipo == "red":
@@ -484,7 +484,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                 log(f"{modelo}: {r.resumen} -> reintento sin herramientas")
                 busqueda_dio_429 = nativa and r.estado == 429
                 con_herramientas = False
-                sistema = (sistema or INSTRUCCIONES) + AVISO_SIN_HERRAMIENTAS      # que no diga que ha hecho lo que no puede hacer
+                sistema = (sistema or instrucciones()) + AVISO_SIN_HERRAMIENTAS      # que no diga que ha hecho lo que no puede hacer
                 continue
             if r.tipo == "servidor" and reintentos < REINTENTOS_SERVIDOR:
                 reintentos += 1                       # un «ocupado» suele ser un pico de segundos: se vuelve a intentar

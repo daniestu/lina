@@ -1,6 +1,7 @@
 """Ajustes fijos del asistente: modelos, tiempos, topes y el texto base que se le da a la IA."""
 import re
 
+from lina.nucleo import idioma as IDI
 from lina.nucleo import modelos as MOD
 from lina.nucleo import rutas as RUT
 from lina.voz import voces as VOC
@@ -85,6 +86,14 @@ INSTRUCCIONES = (
     "seguirle la corriente. Si lo que oyes no parece una pregunta o no se entiende (puede ser un error de transcripción), pide que lo repita en vez de "
     "adivinar. Escribe los números con cifras (15103, 162%), no con letras: el sistema de voz los convierte."
 )
+INSTRUCCIONES_POR_IDIOMA = {"es": INSTRUCCIONES}          # una por idioma; falta la inglesa (fase 8, paso 5)
+
+
+def instrucciones():
+    """Las instrucciones a la IA en el idioma activo (en ellas va también el idioma en el que debe contestar)."""
+    return IDI.segun(INSTRUCCIONES_POR_IDIOMA)
+
+
 # Solo para el modelo local: si no lo puede saber mirando la pantalla, que no se lo invente.
 INSTRUCCION_LOCAL = (
     " Si la respuesta no se puede saber a partir de lo que se ve en la captura, "

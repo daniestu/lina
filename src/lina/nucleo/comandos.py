@@ -10,9 +10,20 @@ import re
 import time
 import unicodedata
 from pathlib import Path
+from lina.nucleo import idioma as IDI
 from lina.nucleo import rutas as RUT
 
 ARCHIVO = RUT.editable("comandos.txt")
+
+
+def archivo():
+    """El archivo de palabras del idioma activo: comandos.txt (español) o comandos.<idioma>.txt. Si ese idioma aún no tiene el suyo, el español."""
+    codigo = IDI.actual()
+    if codigo != IDI.POR_DEFECTO:
+        propio = RUT.editable(f"comandos.{codigo}.txt")
+        if propio.exists():
+            return propio
+    return ARCHIVO
 
 # nombre de la sección -> (largo mínimo de cada entrada, para que no salten sin querer)
 SECCIONES = {
@@ -322,8 +333,9 @@ _cache = {"marca": "sin leer", "datos": None}
 
 def _datos():
     """Los datos actuales; vuelve a leer comandos.txt solo si ha cambiado."""
+    ruta = archivo()
     try:
-        marca = ARCHIVO.stat().st_mtime_ns
+        marca = (str(ruta), ruta.stat().st_mtime_ns)
     except OSError:
         marca = None
     if _cache["datos"] is not None and _cache["marca"] == marca:
@@ -331,21 +343,21 @@ def _datos():
     avisos = []
     leido = True
     if marca is None:
-        avisos.append(f"no encuentro {ARCHIVO.name}: uso los valores de fábrica")
+        avisos.append(f"no encuentro {ruta.name}: uso los valores de fábrica")
         secciones, leido = {}, False                  # un solo aviso: no tiene sentido avisar además de cada sección que «falta»
     else:
         try:
-            secciones, avisos = _parsear(ARCHIVO.read_text(encoding="utf-8"))
+            secciones, avisos = _parsear(ruta.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError) as e:
-            avisos.append(f"no he podido leer {ARCHIVO.name} ({e}): uso los valores de fábrica")
+            avisos.append(f"no he podido leer {ruta.name} ({e}): uso los valores de fábrica")
             secciones, leido = {}, False
     datos = _preparar(secciones, avisos, avisar_faltantes=leido)
     if _cache["datos"] is None:
-        log(f"Órdenes por voz cargadas de {ARCHIVO.name}")
+        log(f"Órdenes por voz cargadas de {ruta.name}")
     else:
-        log(f"{ARCHIVO.name} cambiado: órdenes por voz recargadas")
+        log(f"{ruta.name} cambiado: órdenes por voz recargadas")
     for aviso in avisos:
-        log(f"   Aviso en {ARCHIVO.name}: {aviso}")
+        log(f"   Aviso en {ruta.name}: {aviso}")
     _cache["marca"], _cache["datos"] = marca, datos
     return datos
 
@@ -868,6 +880,9 @@ _OLVIDAR = re.compile(r"^(?:olvida|borra|quita|elimina)\s+(?:el\s+)?alias\s+(?:d
                       re.IGNORECASE)
 
 
+_ALIAS_POR_IDIOMA = {"es": (_ENSENAR, _ENSENAR_POR, _APRENDE, _OLVIDAR)}          # las frases con las que se enseña o se quita un alias, por idioma
+
+
 def entender_alias(texto, apps=None):
     """¿Le estás enseñando o quitando un alias? → ('aprender', oído, significa) / ('olvidar', oído) / None.
     «Cuando oigas cait quiero decir Kate» enseña. «Aprende que cait es Kate» solo vale si Kate es un programa instalado (para no confundirlo
@@ -875,6 +890,7 @@ def entender_alias(texto, apps=None):
     frase = re.sub(r"\s+", " ", str(texto or "")).strip().rstrip(".!?¡¿ ")
     if not frase or len(frase.split()) > 16:
         return None
+    _ENSENAR, _ENSENAR_POR, _APRENDE, _OLVIDAR = IDI.segun(_ALIAS_POR_IDIOMA)
     m = _OLVIDAR.match(frase)
     if m:
         return ("olvidar", (m.group("oido") or m.group("oido2")).strip())

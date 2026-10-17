@@ -4,6 +4,7 @@ import unicodedata
 from datetime import datetime
 
 from lina.nucleo import comandos as C
+from lina.nucleo import idioma as IDI
 from lina.nucleo.registro import log
 
 
@@ -18,11 +19,17 @@ _DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domin
 _MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
 
 
-def texto_fecha_hora(ahora=None):
-    """La fecha y la hora de este momento, para que la IA no las invente ni reutilice una de antes."""
-    d = ahora or datetime.now()
+def _fecha_es(d):
     return (f"Ahora mismo son las {d.strftime('%H:%M')} del {_DIAS[d.weekday()]} {d.day} de {_MESES[d.month - 1]} de {d.year} (hora del equipo). "
             "Úsala tal cual para la hora, la fecha y los cálculos con ellas; no la inventes ni repitas una de antes.")
+
+
+_FECHA_POR_IDIOMA = {"es": _fecha_es}
+
+
+def texto_fecha_hora(ahora=None):
+    """La fecha y la hora de este momento, para que la IA no las invente ni reutilice una de antes."""
+    return IDI.segun(_FECHA_POR_IDIOMA)(ahora or datetime.now())
 
 
 def log_nueva_peticion():
@@ -102,7 +109,10 @@ _PATRON_NUMERO = re.compile(r"(?<![\w.,])(\d{1,3}(?:\.\d{3})+|\d+)(?:[.,](\d+))?
 
 
 def numeros_a_palabras(texto):
-    """Cambia las cifras por palabras: '162%' -> 'ciento sesenta y dos por ciento'. Deja igual lo que no sea un número solo."""
+    """Cambia las cifras por palabras: '162%' -> 'ciento sesenta y dos por ciento'. Deja igual lo que no sea un número solo.
+    Solo en español: la voz de otros idiomas lee las cifras sola."""
+    if IDI.actual() != "es":
+        return texto
     def convertir(m):
         entero, decimales, porcentaje = m.group(1), m.group(2), m.group(3)
         digitos = entero.replace(".", "")

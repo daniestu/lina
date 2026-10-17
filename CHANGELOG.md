@@ -5,6 +5,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Fase 8, paso 3: las reglas que dependen del idioma pasan a tablas por idioma (instrucciones a la IA, archivo de palabras `comandos.<código>.txt`, frases de «aprende que…»,
+  palabras que activan cada grupo de herramientas, fecha para la IA, palabras vacías de las notas). Las cifras solo se leen en palabras en español. Con
+  `idioma = "es"` todo es igual que antes; ver `docs/idiomas.md`.
 - Fase 8, paso 2: el reconocimiento de voz (Whisper) y las voces de Piper siguen el idioma activo. El catálogo de voces es por idioma, cada idioma tiene su voz de fábrica
   y, si la voz elegida es de otro idioma, se usa la de fábrica de este. Con `idioma = "es"` todo queda igual.
 - Fase 8, paso 1: capa de idioma. Ajuste `idioma` (por ahora solo `es`) y `T("texto en español")` para los textos que el usuario lee u oye: el texto en español es la

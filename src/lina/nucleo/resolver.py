@@ -11,6 +11,7 @@ from pathlib import Path
 
 from lina.nucleo import comandos
 from lina.nucleo import ejecucion as EJ
+from lina.nucleo import idioma as IDI
 from lina.nucleo import plataforma as PL
 from lina.nucleo import rutas as RUT
 from lina.nucleo.clasificador import _HOME, _PROGRAMAS_PANELES, _quitar_prefijos, _segmentos, _sin_acentos, _tokens
@@ -732,8 +733,9 @@ def buscar_ajuste_kde(consulta, valor=None):
 
 
 _LANZAMIENTO = re.compile(r"^\s*(?:abrir|abre|abriendo|lanzar|lanza|iniciar|inicia|arrancar|arranca)\b", re.I)
+_LANZAMIENTO_POR_IDIOMA = {"es": _LANZAMIENTO}          # cómo empieza el «motivo» de una orden de abrir un programa, por idioma
 
 
 def _motivo_es_abrir(motivo):
     """¿El «motivo» del comando es abrir un programa? Esos siguen en marcha hasta que el usuario los cierra, y eso no es «terminar una tarea»."""
-    return bool(_LANZAMIENTO.match(_sin_acentos(str(motivo or "")).strip()))
+    return bool(IDI.segun(_LANZAMIENTO_POR_IDIOMA).match(_sin_acentos(str(motivo or "")).strip()))

@@ -11,6 +11,7 @@ Cada grupo trae también sus reglas; las del núcleo van siempre. El orden es fi
 import re
 import unicodedata
 
+from lina.nucleo import idioma as IDI
 from lina.nucleo import plataforma as PL
 
 # ---- herramientas de cada grupo (el orden final lo manda el orden de herramientas.DECLARACIONES) ----
@@ -67,6 +68,7 @@ _PALABRAS = {
 }
 # Verbos de «cambiar algo»: si no ha saltado ningún otro grupo, lo más probable es un ajuste.
 _VERBOS = r"\b(cambia|cambiar|pon|ponme|poner|activa|activar|desactiva|desactivar|quita|quitar|sube|baja|habilita|deshabilita)\b"
+_VERBOS_POR_IDIOMA = {"es": _VERBOS}                    # los verbos de «cambia/pon/activa…» con los que se pide tocar un ajuste, por idioma
 # Si lo que se dice es corto («ahora desactívala», «sí»), se sigue hablando de lo mismo.
 PALABRAS_CORTO = 8
 
@@ -86,12 +88,15 @@ def registrar_grupo(nombre, herramientas, descripcion, palabras="", reglas=""):
         _PALABRAS[nombre] = palabras
     if reglas:
         REGLAS[nombre] = reglas
-    _REGEX.pop(nombre, None)
+    for clave in [c for c in _REGEX if c[0] == nombre]:
+        _REGEX.pop(clave, None)
 
 
 def quitar_grupo(nombre):
-    for d in (GRUPOS, DESCRIPCION, REGLAS, _PALABRAS, _REGEX):
+    for d in (GRUPOS, DESCRIPCION, REGLAS, _PALABRAS):
         d.pop(nombre, None)
+    for clave in [c for c in _REGEX if c[0] == nombre]:
+        _REGEX.pop(clave, None)
 
 
 def regla_servidor_mcp(nombre):
@@ -101,9 +106,14 @@ def regla_servidor_mcp(nombre):
 
 
 def _re(nombre):
-    if nombre not in _REGEX:
-        _REGEX[nombre] = re.compile(_PALABRAS[nombre])
-    return _REGEX[nombre]
+    """Las palabras que activan el grupo, en el idioma activo. Cada grupo guarda un texto (español) o una tabla {idioma: texto}."""
+    patron = _PALABRAS[nombre]
+    if isinstance(patron, dict):
+        patron = IDI.segun(patron)
+    clave = (nombre, patron)
+    if clave not in _REGEX:
+        _REGEX[clave] = re.compile(patron)
+    return _REGEX[clave]
 
 
 def elegir(pregunta, previos=(), de_recetas=()):
@@ -114,7 +124,7 @@ def elegir(pregunta, previos=(), de_recetas=()):
     if not grupos:
         if previos and len(t.split()) <= PALABRAS_CORTO:        # «sí», «ahora desactívala»: se sigue con lo mismo (solo si nada más ha encajado)
             grupos |= {g for g in previos if g in GRUPOS}
-        elif re.search(_VERBOS, t):
+        elif re.search(IDI.segun(_VERBOS_POR_IDIOMA), t):
             grupos.add("ajustes_kde")
     return grupos
 

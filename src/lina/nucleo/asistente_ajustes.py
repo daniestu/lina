@@ -2,6 +2,7 @@
 from lina.nucleo import autoconocimiento as AUTO
 from lina.nucleo import ejecucion as EJ
 from lina.nucleo import herramientas as H
+from lina.nucleo import idioma as IDI
 from lina.nucleo.registro import log
 from lina.voz import voces as VOC
 import os
@@ -270,7 +271,7 @@ class MixinAjustes:
         salida = " ".join(salida.splitlines()[1:])[:100] if salida.startswith("código") else salida[:100]
         if not salida.strip():
             return
-        ajuste = self._VERBO_INICIAL.sub("", motivo.strip()).strip(" .") if motivo else ""
+        ajuste = IDI.segun(self._VERBO_INICIAL_POR_IDIOMA).sub("", motivo.strip()).strip(" .") if motivo else ""
         if len(ajuste) < 4 or ajuste.lower() == "tarea":
             return
         try:

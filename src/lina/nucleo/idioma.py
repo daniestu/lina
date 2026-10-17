@@ -50,6 +50,12 @@ def actual(leer=None):
     return codigo if codigo in IDIOMAS else POR_DEFECTO
 
 
+def segun(tabla):
+    """El valor de una tabla {idioma: valor} para el idioma activo. Si no tiene el suyo, el del español (siempre debe tenerlo)."""
+    codigo = actual()
+    return tabla[codigo] if codigo in tabla else tabla[POR_DEFECTO]
+
+
 def catalogo(codigo):
     """Las traducciones de un idioma ({texto en español: traducción}). El español no necesita catálogo."""
     if codigo == POR_DEFECTO:

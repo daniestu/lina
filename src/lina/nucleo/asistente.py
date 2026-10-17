@@ -112,7 +112,7 @@ except ImportError:  # sin la librería evdev el asistente funciona igual, pero 
 from lina.nucleo.constantes import (  # noqa: F401
     ANCHO_MAX_CAPTURA, ARCHIVO_PID, ARCHIVO_PRIVADO, ARCHIVO_VOCABULARIO, AUDIO_RESPUESTA, AVISO_ESPERA_A_FONDO, BUSQUEDA,
     CAPTURA, CAPTURA_MIRAR, CONFIRMACION_IA, CONFIRMAR_ACCIONES, ESPERA_CUOTA_MAX, ESPERA_PARAR_MAXIMA, ESPERA_PARAR_TAREA,
-    ESPERA_REINTENTO, FRECUENCIA, INSTRUCCIONES, INSTRUCCION_LOCAL, INTERRUPCION_IA, MAX_BUSQUEDAS, MAX_BUSQUEDAS_PROFUNDO,
+    ESPERA_REINTENTO, FRECUENCIA, INSTRUCCIONES, INSTRUCCION_LOCAL, instrucciones, INTERRUPCION_IA, MAX_BUSQUEDAS, MAX_BUSQUEDAS_PROFUNDO,
     MAX_ESPERAS_CUOTA, MAX_MIRADAS, MAX_MIRADAS_PROFUNDO, MAX_PASOS, MAX_PASOS_PROFUNDO, MAX_TIEMPO_TAREA,
     MAX_TIEMPO_TAREA_PROFUNDO, MAX_TOKENS_TAREA, MAX_TOKENS_TAREA_PROFUNDO, MAX_TURNOS, MODELOS_CONFIRMACION, MODELOS_GEMINI,
     MODELOS_PROFUNDO, MODELO_LOCAL, MODELO_WHISPER, NO_VE_PANTALLA, OLLAMA, PANTALLA_SESION_SEG, PAUSA_BUSQUEDA_SEG,
@@ -1393,6 +1393,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
     # Verbos con los que empieza el «motivo» de un comando («activar la luz nocturna»): el nombre del ajuste es lo que viene después.
     _VERBO_INICIAL = re.compile(r"^(?:activar|desactivar|poner|pon|cambiar|ajustar|subir|bajar|quitar|apagar|encender|habilitar|deshabilitar|configurar|"
                                 r"establecer|modificar|dejar|fijar|probar)\s+(?:(?:el|la|los|las|un|una|lo|al|a|del|de)\s+)*", re.I)
+    _VERBO_INICIAL_POR_IDIOMA = {"es": _VERBO_INICIAL}
     _NO_AJUSTE = re.compile(r"^(?:rm|mv|cp|mkdir|rmdir|touch|tee|echo|git|python3?|bash|sh|zsh|fish|systemctl|kill|pkill|killall|xdg-open|notify-send|"
                             r"sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|curl|wget|ln|chmod|chown|kdotool|xdotool|spectacle|grim|scrot|steam|kcmshell[56])$")
 
@@ -1680,7 +1681,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                 herramientas = HERRAMIENTA_BUSCAR["functionDeclarations"] + herramientas
             self.herramientas_turno = herramientas        # la misma lista que usa Gemini: mas_herramientas la amplía en sitio
             self.grupos_turno = set(grupos)
-            sistema = G.sistema(INSTRUCCIONES, H.hechos_sistema(), G.ordenar(grupos))
+            sistema = G.sistema(instrucciones(), H.hechos_sistema(), G.ordenar(grupos))
             log(f"Herramientas: núcleo + {', '.join(G.ordenar(grupos)) or 'ningún grupo'} ({len(herramientas)} en total)")
             for modelo in IAC.modelos("profundo" if modo == "profundo" else "rapido"):
                 self.paso_guion = 0   # cada modelo empieza su turno desde el principio

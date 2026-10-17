@@ -11,6 +11,7 @@ import subprocess
 import unicodedata
 from datetime import datetime
 from pathlib import Path
+from lina.nucleo import idioma as IDI
 from lina.nucleo import rutas as RUT
 
 CARPETA = RUT.carpeta_usuario("DOCUMENTS", "Documents") / "Notas"
@@ -20,6 +21,7 @@ MAX_LEER = 4000            # lo que se devuelve a la IA al leer una nota entera
 EXTENSIONES = {".md", ".txt"}
 _PARAR = {"de", "la", "el", "los", "las", "un", "una", "unos", "unas", "que", "en", "y", "a", "mi", "mis", "me", "con", "por", "para", "del", "al",
           "nota", "notas", "sobre", "lo", "se", "es", "tengo", "tenia", "dime", "busca", "buscame", "donde", "apunte", "apuntes", "apuntado"}
+_PARAR_POR_IDIOMA = {"es": _PARAR}          # palabras que no cuentan al buscar en las notas, por idioma
 
 
 def _plano(texto):
@@ -28,7 +30,8 @@ def _plano(texto):
 
 
 def _palabras(texto):
-    return [p for p in re.findall(r"[a-z0-9ñ]{2,}", _plano(texto)) if p not in _PARAR]
+    parar = IDI.segun(_PARAR_POR_IDIOMA)
+    return [p for p in re.findall(r"[a-z0-9ñ]{2,}", _plano(texto)) if p not in parar]
 
 
 def slug(titulo):
