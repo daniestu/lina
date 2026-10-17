@@ -46,6 +46,7 @@ que no se pueden desactivar. Los perfiles se aplican encima de `politica.txt`: p
 | Ajuste | De fábrica | Qué hace |
 |---|---|---|
 | `nombre` | `"Lina"` | Cómo se llama el asistente. Es también la palabra de activación («Oye Lina»). |
+| `idioma` | `"es"` | Idioma de Lina: en el que te habla y te entiende. Por ahora solo español (el inglés llegará después de la beta). |
 
 ### [voz] Voz
 

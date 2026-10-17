@@ -21,6 +21,7 @@ NOMBRE_ARCHIVO = "config.toml"
 #   tipos: texto · bool · int (restricción = (mín, máx)) · float (mín, máx) · opcion (restricción = valores válidos) · lista · color
 # ----------------------------------------------------------------------------------------------------------------------
 PERFILES = ("autonomo", "equilibrado", "prudente")
+IDIOMAS = ("es",)          # los que se pueden elegir (fase 8); «en» se añade cuando su traducción esté entregada
 CATEGORIAS = ("borrado", "software_de_fuera", "red_expuesta", "sesion", "persistencia", "archivos_de_paquetes")
 MODOS_CATEGORIA = ("perfil", "confirmar", "libre")
 # Estas categorías se confirman siempre con el atajo, en todos los perfiles y sin interruptor: tocar discos, arranque, cuentas, dinero y gasto.
@@ -29,6 +30,7 @@ SIEMPRE_CONFIRMAN = ("discos_y_particiones", "arranque", "cuentas_y_credenciales
 ESQUEMA: dict = {
     "asistente": {
         "nombre": ("Lina", "texto", None, "Cómo se llama el asistente. Es también la palabra de activación («Oye Lina»)."),
+        "idioma": ("es", "opcion", IDIOMAS, "Idioma de Lina: en el que te habla y te entiende. Por ahora solo español (el inglés llegará después de la beta)."),
     },
     "voz": {
         "voz": ("es_MX-claude-high", "texto", None, "Voz de Piper. Mira las que hay con:  lina voz"),

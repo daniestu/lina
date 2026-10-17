@@ -5,6 +5,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Fase 8, paso 1: capa de idioma. Ajuste `idioma` (por ahora solo `es`) y `T("texto en español")` para los textos que el usuario lee u oye: el texto en español es la
+  clave, las traducciones viven en `datos/idiomas/<código>.toml` y, si falta una, sale el español. Sin cambios visibles todavía.
 - Documentos con diseño propio (`disenar_documento`): currículum, factura, cartel, menú, carta con membrete… Lina diseña el documento ella misma (HTML y CSS),
   lo convierte a PDF con el navegador que haya instalado (Chromium, Chrome, Brave, Edge, Vivaldi) o, si no hay, con WeasyPrint (lo instala bajo demanda),
   cuenta las páginas y, si no caben, se corrige una vez. No hay plantillas. El formato es el que pida el usuario: PDF (por defecto) o Word (.docx, pasando el mismo diseño por LibreOffice, que instala bajo demanda y con el que

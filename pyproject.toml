@@ -42,7 +42,7 @@ lina = "lina.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-lina = ["datos/*", "datos/ayuda/*", "datos/privilegios/*", "escritorio/interfaz.sh"]
+lina = ["datos/*", "datos/ayuda/*", "datos/privilegios/*", "datos/idiomas/*", "escritorio/interfaz.sh"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

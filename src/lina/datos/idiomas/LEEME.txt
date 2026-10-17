@@ -1,0 +1,2 @@
+# Traducciones de Lina. Una por línea:  "texto en español" = "traducción"   (los {huecos} tienen que ser los mismos).
+# El español no necesita archivo. Aquí irá en.toml cuando llegue el inglés.
