@@ -3,6 +3,7 @@ from datetime import datetime
 from lina.escritorio import sesion as SES
 from lina.modulos import organizacion as ORG
 from lina.nucleo import herramientas as H
+from lina.nucleo.idioma import T
 from lina.nucleo.registro import log
 from lina.nucleo.texto import _plano_simple
 from urllib.parse import urlparse
@@ -60,17 +61,19 @@ class MixinOrganizacion:
             if clave not in notificados:
                 notificados.add(clave)
                 try:
-                    subprocess.Popen(["notify-send", "-u", "critical", "-a", "Asistente", "Recordatorio", r["texto"]],
+                    subprocess.Popen(["notify-send", "-u", "critical", "-a", "Asistente", T("Recordatorio"), r["texto"]],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 except OSError:
                     pass
         if len(vencidos) == 1:
             r = vencidos[0]
-            frase = (f"Recordatorio atrasado, era {_A.RECORD.humano(datetime.fromisoformat(r['cuando']), ahora)}: {r['texto']}." if r in tarde
-                     else f"Recordatorio: {r['texto']}.")
+            frase = (T("Recordatorio atrasado, era {cuando}: {texto}.", cuando=_A.RECORD.humano(datetime.fromisoformat(r["cuando"]), ahora), texto=r["texto"]) if r in tarde
+                     else T("Recordatorio: {texto}.", texto=r["texto"]))
         else:
-            frase = (f"Tienes {len(vencidos)} recordatorios" + (" que se pasaron mientras no estaba" if tarde else "") + ": "
-                     + ". ".join(r["texto"] for r in vencidos[:5]) + ("." if len(vencidos) <= 5 else f" y {len(vencidos) - 5} más."))
+            lista = ". ".join(r["texto"] for r in vencidos[:5])
+            frase = (T("Tienes {n} recordatorios que se pasaron mientras no estaba: {lista}", n=len(vencidos), lista=lista) if tarde
+                     else T("Tienes {n} recordatorios: {lista}", n=len(vencidos), lista=lista))
+            frase += "." if len(vencidos) <= 5 else T(" y {resto} más.", resto=len(vencidos) - 5)
         log(f"Recordatorio(s) que tocan: {', '.join(r['id'] for r in vencidos)}")
         if self.avisar(frase):
             for r in vencidos:

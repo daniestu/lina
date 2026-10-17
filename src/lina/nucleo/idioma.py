@@ -74,7 +74,7 @@ def _rellenar(plantilla, datos):
     return plantilla.format(**datos) if datos else plantilla
 
 
-def T(texto, **datos):
+def T(texto, /, **datos):
     """El texto en el idioma activo, con sus huecos rellenos. Sin traducción (o con una mal escrita), el texto en español."""
     traducido = catalogo(actual()).get(texto, texto)
     try:

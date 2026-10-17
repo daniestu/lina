@@ -27,7 +27,10 @@ Las tablas se consultan con `idioma.segun(tabla)`: el valor del idioma activo o,
   contesta en el idioma de las instrucciones; con modelos pequeños puede no ser así (no comprobado).
 - Las consultas auxiliares a la IA (revisor, confirmaciones, resúmenes) siguen con instrucciones en español.
 - Los mensajes del registro (`journalctl`) siguen en español.
-- `T()` existe pero aún no envuelve los textos fijos (paso 4).
+- `T()` ya envuelve los textos fijos que Lina dice o muestra: sus frases, las notificaciones, los mensajes de las órdenes de voz y la salida de `lina ia`.
+  Todavía **no** están envueltos: `lina doctor`, los archivos de `ayuda/`, el README, las descripciones y resultados de las herramientas, los textos
+  auxiliares que se envían a la IA y los registros (logs). En español todo sale igual que antes.
+- El primer argumento de `T()` es solo posicional, así que un hueco puede llamarse `texto`.
 
 ## Cómo añadir un idioma
 

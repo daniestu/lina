@@ -5,6 +5,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- Fase 8, paso 4: los textos fijos que Lina dice o muestra (frases, notificaciones, mensajes de las órdenes de voz, salida de `lina ia`) pasan por `T()`. Sin
+  traducciones el español sale igual. `lina ia usar` ya no pide reiniciar siempre: el cambio se aplica en la siguiente petición. Quedan sin envolver `lina doctor`,
+  `ayuda/`, las descripciones de las herramientas y los textos auxiliares para la IA.
 - Fase 8, paso 3: las reglas que dependen del idioma pasan a tablas por idioma (instrucciones a la IA, archivo de palabras `comandos.<código>.txt`, frases de «aprende que…»,
   palabras que activan cada grupo de herramientas, fecha para la IA, palabras vacías de las notas). Las cifras solo se leen en palabras en español. Con
   `idioma = "es"` todo es igual que antes; ver `docs/idiomas.md`.

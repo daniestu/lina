@@ -31,6 +31,7 @@ from lina.escritorio import sesion as SES
 from lina.nucleo import comandos
 from lina.nucleo import dependencias as DEP
 from lina.nucleo import ejecucion as EJ
+from lina.nucleo.idioma import T
 from lina.nucleo.ejecucion import _abs, _codigo_de_salida, _privilegios  # noqa: F401
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
@@ -1246,8 +1247,8 @@ class Ejecutor:
             return "Hay demasiadas acciones pendientes. Pide confirmación de las que hay antes de preparar más."
         self.pendientes.append({"comando": comando, "motivo": motivo, "razon": razon, "categoria": categoria_de_motivo(razon)})
         self.t_pendiente = time.time()
-        con_sudo = " (con permisos de administrador)" if re.search(r"\bsudo\b", comando) else ""
-        notificar("Asistente: pendiente de tu confirmación" + con_sudo, f"{comando}\n(Motivo: {razon})")
+        con_sudo = T(" (con permisos de administrador)") if re.search(r"\bsudo\b", comando) else ""
+        notificar(T("Asistente: pendiente de tu confirmación") + con_sudo, f"{comando}\n" + T("(Motivo: {razon})", razon=razon))
         return MENSAJE_PREPARADO + f" Se pide confirmación porque {razon}. Explícaselo al usuario."
 
     # --- Red de seguridad (A2) ---
@@ -1519,7 +1520,7 @@ class Ejecutor:
                                     "razon": razon, "categoria": "interna"})
             self.t_pendiente = time.time()
             anotar(f"[confirmar] {descripcion}")
-            notificar("Asistente: pendiente de tu confirmación", descripcion)
+            notificar(T("Asistente: pendiente de tu confirmación"), descripcion)
         return MENSAJE_PREPARADO + f" Se pide confirmación porque {razon}. Explícaselo al usuario."
 
     def exige_cantidad(self):
@@ -1847,7 +1848,7 @@ class Ejecutor:
             except OSError:
                 pass
             anotar(f"[cortado por tiempo] {comando}")
-            self.avisar(f"Se me ha ido de las manos y he cortado una tarea: {motivo}.")
+            self.avisar(T("Se me ha ido de las manos y he cortado una tarea: {motivo}.", motivo=motivo))
             return
         anotar(f"[fin rc={proc.returncode}] {comando}")
         verificacion = None
@@ -1867,14 +1868,14 @@ class Ejecutor:
                     anotar(f"[verificacion] {verificacion}")
         if proc.returncode == 0:
             if verificacion and "✘" in verificacion:
-                self.avisar(f"Ha terminado {motivo}, pero al comprobarlo no ha quedado bien. Está el detalle en el registro de acciones.")
+                self.avisar(T("Ha terminado {motivo}, pero al comprobarlo no ha quedado bien. Está el detalle en el registro de acciones.", motivo=motivo))
             elif verificacion and "⚠" in verificacion:
-                self.avisar(f"Ha terminado {motivo}, pero no puedo asegurar que haya funcionado. Está el detalle en el registro de acciones.")
+                self.avisar(T("Ha terminado {motivo}, pero no puedo asegurar que haya funcionado. Está el detalle en el registro de acciones.", motivo=motivo))
             else:
-                self.avisar(f"Ya ha terminado: {motivo}." + (" Como se ha actualizado todo el sistema, conviene reiniciar el equipo cuando puedas."
-                                                              if _es_actualizacion_completa(comando) else ""))
+                self.avisar(T("Ya ha terminado: {motivo}.", motivo=motivo) + (T(" Como se ha actualizado todo el sistema, conviene reiniciar el equipo cuando puedas.")
+                                                                              if _es_actualizacion_completa(comando) else ""))
         else:
-            self.avisar(f"Ha fallado una tarea: {motivo}. Está el detalle en el registro de acciones.")
+            self.avisar(T("Ha fallado una tarea: {motivo}. Está el detalle en el registro de acciones.", motivo=motivo))
 
 
 
@@ -1912,7 +1913,7 @@ def copiar_portapapeles(texto):
     if not SES.actual().copiar(texto):
         return "No he podido copiar al portapapeles (el programa de portapapeles ha fallado)."
     anotar(f"[portapapeles] {len(texto)} caracteres")
-    notificar("Copiado al portapapeles", texto[:300])
+    notificar(T("Copiado al portapapeles"), texto[:300])
     return "Copiado al portapapeles."
 
 

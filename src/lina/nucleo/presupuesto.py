@@ -20,6 +20,7 @@ import time
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import comandos
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import T
 
 ARCHIVO = RUT.editable("presupuesto.txt")
 ARCHIVO_GASTO = RUT.DATOS / "gasto.json"
@@ -263,12 +264,12 @@ def _registrar(clave, modelo, uso, modelo_real=None):
                 d["avisos"] = sorted(set(d["avisos"]) | set(cruzados))
                 u = max(cruzados)
                 if u >= 100:
-                    _avisos_pendientes.append(f"He llegado al tope de gasto de este mes ({_euros(tope)}). A partir de ahora uso solo la clave "
-                                              f"gratuita. Si quieres seguir con la de pago, dime «sigue con el de pago hasta {math.ceil(tope) + 5} euros».")
+                    _avisos_pendientes.append(T("He llegado al tope de gasto de este mes ({tope}). A partir de ahora uso solo la clave gratuita. "
+                                                "Si quieres seguir con la de pago, dime «sigue con el de pago hasta {nuevo} euros».", tope=_euros(tope), nuevo=math.ceil(tope) + 5))
                 elif u >= 80:
-                    _avisos_pendientes.append(f"Aviso: llevas el {u} % del tope de gasto de este mes ({_euros(gasto)} de {_euros(tope)}).")
+                    _avisos_pendientes.append(T("Aviso: llevas el {u} % del tope de gasto de este mes ({gasto} de {tope}).", u=u, gasto=_euros(gasto), tope=_euros(tope)))
                 else:
-                    _avisos_pendientes.append(f"Ojo: llevas el {u} % del tope de gasto de este mes ({_euros(gasto)} de {_euros(tope)}).")
+                    _avisos_pendientes.append(T("Ojo: llevas el {u} % del tope de gasto de este mes ({gasto} de {tope}).", u=u, gasto=_euros(gasto), tope=_euros(tope)))
         _guardar(d)
 
 
@@ -282,7 +283,7 @@ def avisos_pendientes():
 def notificar(texto):
     """Una notificación de escritorio (si hay notify-send)."""
     try:
-        subprocess.Popen(["notify-send", "-a", "Asistente", "Gasto de Gemini", str(texto)[:300]],
+        subprocess.Popen(["notify-send", "-a", "Asistente", T("Gasto de Gemini"), str(texto)[:300]],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError:
         pass
@@ -314,12 +315,11 @@ def subir_tope(euros, voz_libre=False):
     """Cambia el tope de ESTE mes (solo lo llama el código ante una frase tuya, nunca la IA). Devuelve lo que se te dice.
     Con voz_libre=True (la orden llegó por «Oye Lina») solo se deja bajarlo: subirlo exige el atajo."""
     if not hay_clave_de_pago():
-        return "No hay clave de pago configurada (añádela con:  lina clave pago): no hay ningún gasto que topar."
+        return T("No hay clave de pago configurada (añádela con:  lina clave pago): no hay ningún gasto que topar.")
     if voz_libre and euros > estado()["tope_eur"]:
-        return ("Subir el tope de gasto solo lo hago si pulsas el atajo y me lo dices tú. "
-                "Con «Oye Lina» no, por si lo dijera otra voz.")
+        return T("Subir el tope de gasto solo lo hago si pulsas el atajo y me lo dices tú. Con «Oye Lina» no, por si lo dijera otra voz.")
     if not (1 <= euros <= TOPE_MAXIMO_POR_VOZ):
-        return (f"Por seguridad solo cambio el tope por voz entre 1 y {TOPE_MAXIMO_POR_VOZ} euros. Si quieres otra cifra, edita {ARCHIVO.name}.")
+        return T("Por seguridad solo cambio el tope por voz entre 1 y {maximo} euros. Si quieres otra cifra, edita {archivo}.", maximo=TOPE_MAXIMO_POR_VOZ, archivo=ARCHIVO.name)
     with _lock:
         d = _cargar()
         d["tope_eur"] = round(float(euros), 2)
@@ -328,9 +328,9 @@ def subir_tope(euros, voz_libre=False):
         _guardar(d)
     base = configuracion()["tope_eur"]
     if gasto >= tope:
-        return f"Vale, pero ya llevas {_euros(gasto)}: con un tope de {_euros(tope)} sigo usando solo la clave gratuita."
-    return (f"Vale: sigo con la clave de pago hasta {_euros(tope)} este mes (llevas {_euros(gasto)}). "
-            f"El mes que viene vuelve a ser de {_euros(base)}.")
+        return T("Vale, pero ya llevas {gasto}: con un tope de {tope} sigo usando solo la clave gratuita.", gasto=_euros(gasto), tope=_euros(tope))
+    return T("Vale: sigo con la clave de pago hasta {tope} este mes (llevas {gasto}). El mes que viene vuelve a ser de {base}.",
+             tope=_euros(tope), gasto=_euros(gasto), base=_euros(base))
 
 
 # ======================= entender «sigue con el de pago hasta 15 euros» =======================

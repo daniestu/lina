@@ -11,6 +11,7 @@ import time
 import unicodedata
 from pathlib import Path
 from lina.nucleo import idioma as IDI
+from lina.nucleo.idioma import T
 from lina.nucleo import rutas as RUT
 
 ARCHIVO = RUT.editable("comandos.txt")
@@ -786,15 +787,15 @@ def guardar_alias(oido, significa, ruta=None):
     ruta = Path(ruta or ARCHIVO_ALIAS)
     o, s = _limpiar_alias(oido, 30), _limpiar_alias(significa, 40)
     if not o or not s or len(o.split()) > 3 or len(s.split()) > 4:
-        return False, "No lo he apuntado: tiene que ser una palabra (o hasta tres) que se oye mal y lo que quieres decir, cortos y sin símbolos raros."
+        return False, T("No lo he apuntado: tiene que ser una palabra (o hasta tres) que se oye mal y lo que quieres decir, cortos y sin símbolos raros.")
     clave = normalizar(o)
     if len(clave.replace(" ", "")) < 3 or clave.replace(" ", "").isdigit() or all(w in _NO_ES_ALIAS for w in clave.split()):
-        return False, f"No lo he apuntado: «{o}» es una palabra demasiado corriente y se usaría sin querer en otras frases."
+        return False, T("No lo he apuntado: «{palabra}» es una palabra demasiado corriente y se usaría sin querer en otras frases.", palabra=o)
     if clave == normalizar(s):
-        return False, f"«{o}» y «{s}» ya suenan igual para mí: no hace falta apuntar nada."
+        return False, T("«{oido}» y «{significa}» ya suenan igual para mí: no hace falta apuntar nada.", oido=o, significa=s)
     alias = _leer_alias(ruta)
     if clave not in alias and len(alias) >= MAX_ALIAS:
-        return False, f"Ya hay {MAX_ALIAS} alias apuntados: borra alguno antes de añadir más."
+        return False, T("Ya hay {n} alias apuntados: borra alguno antes de añadir más.", n=MAX_ALIAS)
     lineas = []
     try:
         lineas = ruta.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -825,13 +826,13 @@ def borrar_alias(oido, ruta=None):
     ruta = Path(ruta or ARCHIVO_ALIAS)
     clave = normalizar(_limpiar_alias(oido, 30))
     if not clave or clave not in _leer_alias(ruta):
-        return False, f"No tengo apuntado ningún alias para «{str(oido).strip()}»."
+        return False, T("No tengo apuntado ningún alias para «{oido}».", oido=str(oido).strip())
     lineas = ruta.read_text(encoding="utf-8", errors="replace").splitlines()
     nuevas = [l for l in lineas if not ("=" in l and not l.strip().startswith("#") and normalizar(l.split("=", 1)[0]) == clave)]
     tmp = ruta.with_name(ruta.name + ".tmp")
     tmp.write_text("\n".join(nuevas) + "\n", encoding="utf-8")
     tmp.replace(ruta)
-    return True, f"Hecho: ya no entenderé «{str(oido).strip()}» como otra cosa."
+    return True, T("Hecho: ya no entenderé «{oido}» como otra cosa.", oido=str(oido).strip())
 
 
 def aplicar_alias(texto, ruta=None):

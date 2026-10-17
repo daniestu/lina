@@ -152,3 +152,8 @@ def test_el_reconocimiento_de_voz_no_tiene_el_idioma_fijo():
     from pathlib import Path
     fuente = (Path(I.__file__).parent / "asistente.py").read_text(encoding="utf-8")
     assert 'language="es"' not in fuente and "language=IDI.actual()" in fuente
+
+
+def test_un_hueco_puede_llamarse_texto(monkeypatch):
+    monkeypatch.setattr(I, "LECTOR", lambda: Ajustes("es"))
+    assert I.T("Recordatorio: {texto}.", texto="té") == "Recordatorio: té."

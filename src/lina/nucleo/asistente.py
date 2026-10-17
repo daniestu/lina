@@ -27,6 +27,7 @@ from lina.nucleo.registro import log
 from lina.nucleo import claves as CL
 from lina.nucleo import ia_activa as IAC
 from lina.nucleo import idioma as IDI
+from lina.nucleo.idioma import T
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
@@ -539,10 +540,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         """Sin clave Lina no puede contestar y, si no se avisa, parece rota: notificación siempre, y por voz como mucho una vez al día."""
         from lina.nucleo import bienvenida as BIEN
         if ia is None or ia.nombre == "gemini":
-            titulo, texto = "Lina necesita una clave de Gemini", BIEN.AVISO_SIN_CLAVE
+            titulo, texto = T("Lina necesita una clave de Gemini"), T(BIEN.AVISO_SIN_CLAVE)
         else:
-            titulo = f"Lina no puede usar {ia.nombre} todavía"
-            texto = f"No puedo responderte: {ia.listo()[1]}. Lo ves con lina ia, o vuelve a Gemini (que es gratis) con lina ia usar gemini."
+            titulo = T("Lina no puede usar {proveedor} todavía", proveedor=ia.nombre)
+            texto = T("No puedo responderte: {falta}. Lo ves con lina ia, o vuelve a Gemini (que es gratis) con lina ia usar gemini.", falta=ia.listo()[1])
         try:
             subprocess.Popen(["notify-send", "-a", "Lina", titulo, texto], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError:
@@ -639,7 +640,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             log(f"Lo que dijiste mientras trabajaba («{texto}») → {decision} ({via})")
             if decision == "cancela":
                 if self.fin_tarea.is_set():                # ya había terminado
-                    self.avisar("No estoy haciendo nada ahora mismo.")
+                    self.avisar(T("No estoy haciendo nada ahora mismo."))
                     return
                 log("Has dicho que pare: cancelo la tarea en curso")
                 _abortar.set()                             # lo demás (decir qué llegó a hacerse) lo hace la propia tarea al pararse
@@ -671,7 +672,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                 if not self.fin_tarea.wait(ESPERA_PARAR_MAXIMA):
                     self.sustituida = False
                     log("La tarea anterior no ha terminado de parar: no atiendo lo nuevo")
-                    self.avisar("Lo anterior no termina de parar. Pídemelo otra vez dentro de un momento.")
+                    self.avisar(T("Lo anterior no termina de parar. Pídemelo otra vez dentro de un momento."))
                     return
             with self.cerrojo:
                 if self.estado not in ("esperando", "pensando"):
@@ -742,34 +743,37 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
     def _gestionar_manos_libres(self, orden):
         """Órdenes sobre el propio manos libres (activar, desactivar, cambiar el nombre...). Devuelve lo que se dice."""
         if not ML or not self.manos_libres:
-            return "El manos libres no está instalado: falta manos_libres.py."
+            return T("El manos libres no está instalado: falta manos_libres.py.")
         cfg = self.manos_libres.cfg
         tipo = orden[0]
         nombre = cfg.nombre.capitalize()
         if tipo == "activar":
             cfg.guardar("activo", "si")
-            return f"Manos libres activado. Di «Oye {nombre}» y te escucho."
+            return T("Manos libres activado. Di «Oye {nombre}» y te escucho.", nombre=nombre)
         if tipo == "desactivar":
             cfg.guardar("activo", "no")
-            return "Manos libres desactivado. Pulsa el atajo para hablarme."
+            return T("Manos libres desactivado. Pulsa el atajo para hablarme.")
         if tipo == "juegos":
             cfg.guardar("en_juegos", "si" if orden[1] else "no")
-            return "Te escucharé también mientras juegas." if orden[1] else "Mientras juegues no te escucho; usa el atajo."
+            return T("Te escucharé también mientras juegas.") if orden[1] else T("Mientras juegues no te escucho; usa el atajo.")
         if tipo == "estado":
-            return (f"El manos libres está {'activado' if cfg.si('activo') else 'desactivado'}. Me llamo {nombre}"
-                    + (", y mientras juegas no escucho." if not cfg.si("en_juegos") else ", y te escucho también jugando."))
+            if cfg.si("activo"):
+                return (T("El manos libres está activado. Me llamo {nombre}, y mientras juegas no escucho.", nombre=nombre) if not cfg.si("en_juegos")
+                        else T("El manos libres está activado. Me llamo {nombre}, y te escucho también jugando.", nombre=nombre))
+            return (T("El manos libres está desactivado. Me llamo {nombre}, y mientras juegas no escucho.", nombre=nombre) if not cfg.si("en_juegos")
+                    else T("El manos libres está desactivado. Me llamo {nombre}, y te escucho también jugando.", nombre=nombre))
         if tipo == "pregunta_nombre":
-            return f"Me llamo {nombre}. Di «Oye {nombre}» o «Escucha {nombre}»."
+            return T("Me llamo {nombre}. Di «Oye {nombre}» o «Escucha {nombre}».", nombre=nombre)
         if tipo == "eco":
             self.manos_libres.cambiar_eco(orden[1])
-            return ("Vale, activo la cancelación de eco; el audio se cortará un par de segundos." if orden[1]
-                    else "Vale, quito la cancelación de eco; el audio se cortará un par de segundos. Ahora oiré también lo que suene en el ordenador.")
+            return (T("Vale, activo la cancelación de eco; el audio se cortará un par de segundos.") if orden[1]
+                    else T("Vale, quito la cancelación de eco; el audio se cortará un par de segundos. Ahora oiré también lo que suene en el ordenador."))
         if tipo == "nombre":
             nuevo = orden[1]
             if not nuevo:
-                return "No he entendido el nombre. Dime, por ejemplo: «te llamas Jarvis»."
+                return T("No he entendido el nombre. Dime, por ejemplo: «te llamas Jarvis».")
             cfg.guardar("nombre", nuevo)
-            return f"Vale, ahora me llamo {nuevo.capitalize()}. Di «Oye {nuevo.capitalize()}»."
+            return T("Vale, ahora me llamo {nombre}. Di «Oye {nombre}».", nombre=nuevo.capitalize())
         return ""
 
     def _cola(self):
@@ -790,7 +794,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             self._cancelada()
         except Exception as e:
             log(f"Error inesperado: {e!r}")
-            self.decir("Ha habido un error. Mira la terminal.")
+            self.decir(T("Ha habido un error. Mira la terminal."))
         finally:
             siguiente = None
             with self.cerrojo:
@@ -816,11 +820,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
     def _voz_a_respuesta(self, audio):
         inicio = time.time()
         if len(audio) < FRECUENCIA * 0.3:
-            self.decir("No te he oído.")
+            self.decir(T("No te he oído."))
             return
         pregunta = self._transcribir(audio, inicio)
         if not pregunta:
-            self.decir("No te he entendido.")
+            self.decir(T("No te he entendido."))
             return
         self._atender(pregunta, inicio)
 
@@ -832,7 +836,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         if H.destruccion_total(pregunta):                         # formatear el ordenador, borrar el sistema…: ni se ofrece ni se prepara
             log("Petición de destrucción total (formatear/borrar el sistema): bloqueada sin llamar a la IA")
             H.anotar(f"[bloqueado] petición de destrucción total: «{pregunta[:120]}»")
-            self.decir(H.AVISO_DESTRUCCION_TOTAL)
+            self.decir(T(H.AVISO_DESTRUCCION_TOTAL))
             return
         orden_ml = ML.entender_orden(pregunta) if ML else None
         if orden_ml:                                            # «activa el manos libres», «te llamas Jarvis»…: lo hace el código, sin IA
@@ -846,10 +850,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             self.historial.clear()
             self.ejecutor.cancelar()
             log("Conversación reiniciada por voz")
-            self.decir("Vale, empezamos de cero.")
+            self.decir(T("Vale, empezamos de cero."))
             return
         if C.quiere_cancelar(pregunta):                         # en reposo: si estuviera trabajando, lo habría cogido la interrupción
-            self.decir("No estoy haciendo nada ahora mismo.")
+            self.decir(T("No estoy haciendo nada ahora mismo."))
             return
         pregunta, cambios = C.aplicar_alias(pregunta)
         for oido, significa in cambios:
@@ -918,7 +922,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                 r"\b(voy a|procedo a|he (formateado|borrado|eliminado)|ya (esta )?(formateado|borrado))\b", H._sin_acentos(str(respuesta).lower()))):
             log(f"La IA ofrecía una destrucción total («{str(respuesta)[:100]}»): se sustituye por la negativa")
             H.anotar(f"[bloqueado] la IA ofreció una destrucción total: «{str(respuesta)[:120]}»")
-            respuesta = H.AVISO_DESTRUCCION_TOTAL
+            respuesta = T(H.AVISO_DESTRUCCION_TOTAL)
         log(f"Respuesta [{origen}]: {respuesta if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'} ({time.time() - inicio:.1f} s en total)")
         try:
             self._aprender_automatico()
@@ -981,13 +985,13 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             return                                                # estás hablando: no se te habla encima
         if self.sustituida and not (hecho or descartadas or en_cola):
             return                                                # pides otra cosa y lo anterior no había cambiado nada: se pasa a lo nuevo sin más
-        partes = ["Dejo lo anterior." if self.sustituida else "Vale, lo dejo."]
+        partes = [T("Dejo lo anterior.") if self.sustituida else T("Vale, lo dejo.")]
         if hecho:
-            partes.append("Ojo: antes de parar ya había hecho: " + "; ".join(hecho) + ".")
+            partes.append(T("Ojo: antes de parar ya había hecho: {cosas}.", cosas="; ".join(hecho)))
         if descartadas:
-            partes.append("Y descarto lo que esperaba tu confirmación.")
+            partes.append(T("Y descarto lo que esperaba tu confirmación."))
         if en_cola:
-            partes.append("Y descarto lo que me pediste para después.")
+            partes.append(T("Y descarto lo que me pediste para después."))
         self.decir(" ".join(partes))
 
     @staticmethod
@@ -1757,7 +1761,7 @@ def main():
         log("Capturas de pantalla: aún no has decidido si las envío a la IA, así que no envío ninguna. Decídelo con:  lina privacidad")
         aviso = RUT.DATOS / "aviso_privacidad"
         if not aviso.exists():                                  # una sola vez: que no se quede en el registro sin que lo veas
-            H.notificar("Lina: capturas de pantalla sin decidir", "No enviaré ninguna captura a la IA hasta que lo decidas. En una terminal:  lina privacidad")
+            H.notificar(T("Lina: capturas de pantalla sin decidir"), T("No enviaré ninguna captura a la IA hasta que lo decidas. En una terminal:  lina privacidad"))
             try:
                 aviso.parent.mkdir(parents=True, exist_ok=True)
                 aviso.write_text("1", encoding="utf-8")

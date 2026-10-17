@@ -12,6 +12,7 @@ from lina.nucleo import proveedor_gemini as PG
 from lina.nucleo import proveedor_openai as POA
 from lina.nucleo import proveedores as P
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import T
 from lina.nucleo.constantes import MODELOS_CONFIRMACION, MODELOS_GEMINI, MODELOS_PROFUNDO
 
 # Modelos recomendados por proveedor. Con «openai» no hay recomendación: depende del servicio (se piden con `lina ia modelos`).
@@ -55,9 +56,9 @@ class Activa:
     def listo(self):
         """(True, '') o (False, qué falta)."""
         if not self.rapido:
-            return False, f"falta indicar el modelo: `lina ia usar {self.nombre} --modelo NOMBRE` (los que ofrece el servicio: `lina ia modelos`)"
+            return False, T("falta indicar el modelo: `lina ia usar {nombre} --modelo NOMBRE` (los que ofrece el servicio: `lina ia modelos`)", nombre=self.nombre)
         if not self.clave():
-            return False, f"falta la clave: `lina clave {self.nombre}`"
+            return False, T("falta la clave: `lina clave {nombre}`", nombre=self.nombre)
         return True, ""
 
 
