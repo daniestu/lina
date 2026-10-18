@@ -90,7 +90,9 @@ _PALABRAS_EN = {
     "memoria": r"\b(spend|spent|budget|euros|dollars|cap|diary|changelog|you changed|you did|you misheard|i meant|i mean|learned|recipes|forget how|alias)",
 }
 for _g, _p in _PALABRAS_EN.items():
-    _PALABRAS[_g] = {"es": _PALABRAS[_g], "en": _p}
+    _es = _PALABRAS[_g]
+    assert isinstance(_es, str)                       # aquí todavía son todas de un solo idioma (español)
+    _PALABRAS[_g] = {"es": _es, "en": _p}
 
 # Verbos de «cambiar algo»: si no ha saltado ningún otro grupo, lo más probable es un ajuste.
 _VERBOS = r"\b(cambia|cambiar|pon|ponme|poner|activa|activar|desactiva|desactivar|quita|quitar|sube|baja|habilita|deshabilita)\b"
