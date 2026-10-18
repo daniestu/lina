@@ -4,7 +4,7 @@ Para quien mantiene el proyecto. Nada de esto lo hace Lina sola: etiquetar, publ
 
 ## Antes de etiquetar (`v0.1.0-beta`)
 
-1. **Licencias de las voces inglesas** (`docs/creditos.md`): leer la licencia de los datos de `lessac` y `amy`. Si no permiten el uso, quitar la voz de
+1. **Licencias de las voces inglesas** (`docs/creditos.md`): comprobadas para `ljspeech` y `bryce`. Si no permiten el uso, quitar la voz de
    `src/lina/voz/voces.py` o dejar el inglés fuera de la beta (`IDIOMAS = ("es",)` en `ajustes.py`).
 2. CI en verde en `main` (Ruff, rastros, pruebas con cobertura ≥ 63 % en Python 3.11, 3.12 y 3.13, y las cuatro familias de distribución).
 3. `python scripts/comprobar_rastros.py` sin avisos.

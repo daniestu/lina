@@ -135,3 +135,19 @@ def test_la_destruccion_total_se_detecta_en_cualquier_idioma(es, texto):
 
 def test_lo_normal_no_es_destruccion_total(es):
     assert not CLA.destruccion_total("delete the temporary file") and not CLA.destruccion_total("borra el archivo temporal")
+
+
+# --- voces ---
+
+def test_toda_voz_del_catalogo_es_de_calidad_media_o_alta():
+    from lina.voz import voces as V
+    for idioma, voces in V.CATALOGO.items():
+        assert V.POR_DEFECTO[idioma] in voces
+        for nombre, ficha in voces.items():
+            assert ficha["modelo"].rsplit("-", 1)[-1] in ("medium", "high"), nombre
+
+
+def test_las_voces_inglesas_no_son_las_descartadas_por_licencia():
+    from lina.voz import voces as V
+    for nombre in V.CATALOGO["en"]:
+        assert not any(x in nombre for x in ("lessac", "amy", "hfc", "ryan", "arctic", "libritts", "joe")), nombre

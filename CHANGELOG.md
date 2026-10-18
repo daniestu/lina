@@ -12,7 +12,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - Fase 9: guía de uso (`docs/uso.md`), README renovado, pasos para publicar una versión (`docs/publicacion.md`) y paquete del AUR (`packaging/aur/`): instala las
   dependencias del sistema y la orden `lina-instalar` (el instalador de siempre). Sin probar con `makepkg`.
 - Fase 8, paso 5: primer inglés, experimental (`idioma = "en"`). Traducciones de todas las frases envueltas, instrucciones inglesas para la IA, `comandos.en.txt`,
-  reglas y redes de seguridad en inglés, y dos voces de Piper (la licencia de sus datos está sin comprobar: ver `docs/creditos.md`). Lo demás sigue en español; ver
+  reglas y redes de seguridad en inglés, y dos voces de Piper. Lo demás sigue en español; ver
   `docs/idiomas.md`. El manos libres acepta también «hey», «listen», «hi», «hello» y «okay» delante del nombre.
 - Fase 8, paso 4: los textos fijos que Lina dice o muestra (frases, notificaciones, mensajes de las órdenes de voz, salida de `lina ia`) pasan por `T()`. Sin
   traducciones el español sale igual. `lina ia usar` ya no pide reiniciar siempre: el cambio se aplica en la siguiente petición. Quedan sin envolver `lina doctor`,

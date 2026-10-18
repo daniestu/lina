@@ -67,5 +67,6 @@ Pendiente o limitado:
 1. Añadir su código a `ajustes.IDIOMAS`.
 2. Escribir su `datos/idiomas/<código>.toml` y comprobarlo (`idioma.comprobar("<código>")`: los huecos `{…}` tienen que coincidir).
 3. Añadir su entrada a cada tabla de arriba y su `comandos.<código>.txt`.
-4. Añadir sus voces a `voz/voces.py` con la licencia de cada una comprobada.
+4. Añadir sus voces a `voz/voces.py`: calidad media como mínimo (alta si existe), entrenadas desde cero o desde una base de licencia abierta, y con la licencia de los datos
+   comprobada en la ficha (ver la regla y las voces descartadas en `docs/creditos.md`).
 5. Probar con voz real: ni el reconocimiento ni las voces se pueden probar sin oírlas.

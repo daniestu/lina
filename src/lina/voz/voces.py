@@ -35,15 +35,15 @@ CATALOGO = {
         "es_ES-sharvard-medium-2": {"modelo": "es_ES-sharvard-medium", "carpeta": "es/es_ES/sharvard/medium", "locutor": 1,
                                     "descripcion": "Sharvard, hablante 2 · España · calidad media"},
     },
-    # Inglés (experimental): modelos del mismo repositorio de voces. La licencia de sus datos NO está comprobada (ver docs/creditos.md).
+    # Inglés (experimental): modelos del mismo repositorio de voces, entrenados desde cero con datos de licencia comprobada (ver docs/creditos.md).
     "en": {
-        "en_US-lessac-medium": {"modelo": "en_US-lessac-medium", "carpeta": "en/en_US/lessac/medium", "locutor": None,
-                                "descripcion": "Lessac · United States · medium quality · female (default)"},
-        "en_US-amy-medium": {"modelo": "en_US-amy-medium", "carpeta": "en/en_US/amy/medium", "locutor": None,
-                             "descripcion": "Amy · United States · medium quality · female"},
+        "en_US-ljspeech-high": {"modelo": "en_US-ljspeech-high", "carpeta": "en/en_US/ljspeech/high", "locutor": None,
+                                "descripcion": "LJ Speech · United States · high quality · female (default)"},
+        "en_US-bryce-medium": {"modelo": "en_US-bryce-medium", "carpeta": "en/en_US/bryce/medium", "locutor": None,
+                               "descripcion": "Bryce · United States · medium quality · male"},
     },
 }
-POR_DEFECTO = {"es": "es_MX-claude-high", "en": "en_US-lessac-medium"}     # la voz de cada idioma cuando no se ha elegido otra
+POR_DEFECTO = {"es": "es_MX-claude-high", "en": "en_US-ljspeech-high"}     # la voz de cada idioma cuando no se ha elegido otra
 VOZ_POR_DEFECTO = POR_DEFECTO["es"]
 TIEMPO = 60
 TROZO = 1 << 20

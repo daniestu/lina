@@ -21,13 +21,20 @@ la que se elige a `~/.local/share/lina/voces/` la primera vez que la necesita.
 
 ### Voces inglesas (experimental)
 
-| Voz | Datos de entrenamiento | Licencia de los datos |
-|---|---|---|
-| `en_US-lessac-medium` (por defecto en inglés) | Blizzard 2013 Lessac, Universidad de Edimburgo (CSTR) | **Sin comprobar**: la ficha remite a la página de licencia del conjunto de datos |
-| `en_US-amy-medium` | [mycroft-ai/mimic3-voices](https://github.com/MycroftAI/mimic3-voices) | **Sin comprobar**: la ficha no la indica |
+| Voz | Datos de entrenamiento | Licencia de los datos | Entrenamiento |
+|---|---|---|---|
+| `en_US-ljspeech-high` (por defecto en inglés) | [LJ Speech](https://keithito.com/LJ-Speech-Dataset/), Keith Ito | Dominio público | Desde cero |
+| `en_US-bryce-medium` | Voz grabada por su autor, Bryce Beattie ([detalles](https://brycebeattie.com/files/tts/)) | Dominio público | Afinada a partir de una voz suya no publicada |
 
-La ficha de cada modelo declara MIT para el modelo, pero eso no dice nada de los datos con los que se entrenó. **Antes de publicar `v0.1.0-beta` hay que leer
-esas licencias y, si no permiten el uso, quitar la voz del catálogo** (`src/lina/voz/voces.py`). Las voces no viajan en el repositorio: se descargan al elegirlas.
+Comprobado el 2026-10-18 en las fichas (`MODEL_CARD`) de cada voz y en la página del dataset. El modelo de `bryce` parte de una voz del propio autor que no se ha
+publicado, así que su origen exacto no se puede verificar; la ficha no la relaciona con ningún corpus con restricciones.
+
+**Voces descartadas, y por qué.** La licencia de los datos de *Lessac* (Blizzard 2013, CSTR) es solo para investigación, sin uso comercial ni redistribución. Muchas voces
+de Piper se afinaron a partir de ella: `amy`, `hfc_female`, `hfc_male` (además CC BY-NC-SA), `arctic`, `libritts_r` y `joe`. No sabemos si la restricción pasa a las voces
+derivadas y no es asesoramiento legal, así que no se incluyen. `ryan` se descarta por ser CC BY-NC-SA. Regla para añadir una voz de cualquier idioma: **calidad media como
+mínimo (alta si existe), entrenada desde cero o a partir de una base de licencia abierta, con la licencia de los datos comprobada en su ficha**.
+
+La ficha de cada modelo declara MIT para el modelo, pero eso no dice nada de los datos con los que se entrenó. Las voces no viajan en el repositorio: se descargan al elegirlas.
 
 Cómo elegir voz: `lina voz` lista las que hay y `lina voz NOMBRE` cambia de voz.
 Si publicas una versión que incluya alguna voz, mantén estas atribuciones.
