@@ -42,7 +42,7 @@ aj.establecer("autonomia", "borrado", "confirmar")
 ok(nivel("rm /home/x/algo.txt") == "critico", "borrado = confirmar recupera las reglas de fábrica")
 # la IA no puede cambiar sus propios permisos, gasto ni claves por el terminal
 for c in ("lina config poner autonomia.perfil autonomo", "lina config perfil autonomo", "lina config poner gasto.tope_mensual_eur 5000",
-          "python -m lina config poner autonomia.borrado libre", "cd ~ && lina config poner voz.velocidad 2", "lina clave GITHUB_TOKEN", "lina voz es_ES-davefx-medium"):
+          "python -m lina config poner autonomia.borrado libre", "cd ~ && lina config poner voz.velocidad 2", "lina clave GITHUB_TOKEN", "lina voz es_ES-sharvard-medium-1"):
     ok(H.clasificar(c)[0] == "bloqueado", "bloqueado para la IA: " + c)
 for c in ("lina config", "lina config ver voz.velocidad", "lina config comprobar", "lina voz", "lina pulsar"):
     ok(H.clasificar(c)[0] != "bloqueado", "permitido (solo mira): " + c)
@@ -70,9 +70,9 @@ ok(aj.get("gasto", "tope_mensual_eur") == 10, "el tope de gasto no lo toca la IA
 a = asistente(False); dichas = []
 a._hablar = lambda texto, voz=None: dichas.append((voz, texto))
 VOC.asegurar = lambda nombre, *x, **k: True
-a._mis_ajustes({"accion": "probar_voz", "voz": "es_ES-davefx-medium", "texto": "hola"})
-ok(dichas == [("es_ES-davefx-medium", "hola")] and VOC.voz_elegida() != "es_ES-davefx-medium", "probar_voz habla con esa voz sin cambiarla")
-a._mis_ajustes({"accion": "elegir_voz", "voz": "es_ES-davefx-medium"})
-ok(VOC.voz_elegida() == "es_ES-davefx-medium", "elegir_voz la cambia al instante")
+a._mis_ajustes({"accion": "probar_voz", "voz": "es_ES-sharvard-medium-1", "texto": "hola"})
+ok(dichas == [("es_ES-sharvard-medium-1", "hola")] and VOC.voz_elegida() != "es_ES-sharvard-medium-1", "probar_voz habla con esa voz sin cambiarla")
+a._mis_ajustes({"accion": "elegir_voz", "voz": "es_ES-sharvard-medium-1"})
+ok(VOC.voz_elegida() == "es_ES-sharvard-medium-1", "elegir_voz la cambia al instante")
 ok("No conozco" in a._mis_ajustes({"accion": "elegir_voz", "voz": "inventada"}), "voz que no existe: lo dice")
 print("fallos", f); sys.exit(1 if f else 0)

@@ -79,7 +79,7 @@ def test_nombres_planos_del_manos_libres(aj):
 
 def test_migracion_desde_los_archivos_de_antes(tmp_path):
     (tmp_path / "activacion.txt").write_text("nombre = jarvis\nen_juegos = si   # jugando\nindicador_color = rojo\nseguimiento = 12\n", encoding="utf-8")
-    (tmp_path / "voz.txt").write_text("es_ES-davefx-medium\n", encoding="utf-8")
+    (tmp_path / "voz.txt").write_text("es_ES-sharvard-medium-1\n", encoding="utf-8")
     (tmp_path / "presupuesto.txt").write_text("tope_mensual_eur = 25\neur_por_usd = 0.9\navisos_porcentaje = 60, 100\n[precios]\nx = 1, 2\n", encoding="utf-8")
     (tmp_path / "politica.txt").write_text("[modo]\nautonomia prudente\n", encoding="utf-8")
     destino, migrado = AJ.migrar(tmp_path, log=lambda m: None)
@@ -87,7 +87,7 @@ def test_migracion_desde_los_archivos_de_antes(tmp_path):
     assert a.avisos == []
     assert (a.get("asistente", "nombre"), a.get("activacion", "en_juegos"), a.get("interfaz", "indicador_color"), a.get("activacion", "seguimiento")) == \
         ("jarvis", True, "rojo", 12)
-    assert a.get("voz", "voz") == "es_ES-davefx-medium" and a.get("gasto", "tope_mensual_eur") == 25 and a.get("gasto", "avisos_porcentaje") == [60, 100]
+    assert a.get("voz", "voz") == "es_ES-sharvard-medium-1" and a.get("gasto", "tope_mensual_eur") == 25 and a.get("gasto", "avisos_porcentaje") == [60, 100]
     assert a.get("autonomia", "perfil") == "prudente" and len(migrado) >= 8
     assert (tmp_path / "activacion.txt.antiguo").exists() and not (tmp_path / "activacion.txt").exists()
     assert (tmp_path / "presupuesto.txt").exists() and (tmp_path / "politica.txt").exists()      # estos siguen mandando (precios y reglas)

@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Cambiado
+- Voces: en inglés `ljspeech-high` (de fábrica) y `bryce-medium`, con licencia comprobada; se quitan `lessac` y `amy` (datos de Lessac solo para investigación). En español se
+  quita `davefx`; quedan `claude` (de fábrica) y los dos hablantes de `sharvard` (derivada de Lessac, mantenida como excepción de la beta). Si ya tenías instalada una voz
+  retirada, sigue funcionando. Ver `docs/creditos.md`.
+
 ### Añadido
 - Fase 8, inglés completo: la terminal entera (`lina doctor`, `preparar`, `update`, `bienvenida`, `clave`, `privilegios`, `olvidar`, `voz`, `modelos`, `config`, `ia`…)
   sale en inglés con `idioma = "en"`, con sus ayudas y preguntas (vale «yes»; las frases que se teclean para el acceso total y `--todo` también tienen versión inglesa).

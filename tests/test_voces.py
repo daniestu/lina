@@ -24,8 +24,8 @@ def falso(contenidos, pedidas=None):
 
 def test_voz_por_defecto_y_elegida(tmp_path):
     assert V.voz_elegida(tmp_path) == "es_MX-claude-high"
-    (tmp_path / "voz.txt").write_text("# mi voz\nes_ES-davefx-medium  # la de siempre\n", encoding="utf-8")
-    assert V.voz_elegida(tmp_path) == "es_ES-davefx-medium"
+    (tmp_path / "voz.txt").write_text("# mi voz\nes_ES-sharvard-medium-1  # la de siempre\n", encoding="utf-8")
+    assert V.voz_elegida(tmp_path) == "es_ES-sharvard-medium-1"
 
 
 def test_descarga_una_sola_vez(tmp_path):
@@ -95,12 +95,12 @@ def test_lina_voz_lista_y_elige(tmp_path):
     assert V.principal([], tmp_path / "v", tmp_path / "cfg", abrir, salida.append) == 0
     assert any("*" in l and "es_MX-claude-high" in l for l in salida)
     salida.clear()
-    assert V.principal(["es_ES-davefx-medium"], tmp_path / "v", tmp_path / "cfg", abrir, salida.append) == 0
-    assert V.voz_elegida(tmp_path / "cfg") == "es_ES-davefx-medium" and V.instalada("es_ES-davefx-medium", tmp_path / "v")
+    assert V.principal(["es_ES-sharvard-medium-1"], tmp_path / "v", tmp_path / "cfg", abrir, salida.append) == 0
+    assert V.voz_elegida(tmp_path / "cfg") == "es_ES-sharvard-medium-1" and V.instalada("es_ES-sharvard-medium-1", tmp_path / "v")
     assert V.principal(["no_existe"], tmp_path / "v", tmp_path / "cfg", abrir, salida.append) == 2
-    assert V.voz_elegida(tmp_path / "cfg") == "es_ES-davefx-medium"
+    assert V.voz_elegida(tmp_path / "cfg") == "es_ES-sharvard-medium-1"
 
 
 def test_lina_voz_sin_red_no_cambia_la_elegida(tmp_path):
-    assert V.principal(["es_ES-davefx-medium"], tmp_path / "v", tmp_path / "cfg", falso({}), lambda m: None) == 1
+    assert V.principal(["es_ES-sharvard-medium-1"], tmp_path / "v", tmp_path / "cfg", falso({}), lambda m: None) == 1
     assert V.voz_elegida(tmp_path / "cfg") == V.VOZ_POR_DEFECTO
