@@ -282,6 +282,81 @@ def describir_pendientes(pendientes):
     return "\n".join(lineas)
 
 
+_VERBOS_ENERGIA = {"poweroff": "apagar", "halt": "apagar", "reboot": "reiniciar", "suspend": "suspender", "hibernate": "hibernar"}
+
+
+def _energia_ahora(verbo):
+    return {"apagar": T("apagar el equipo ahora mismo"), "reiniciar": T("reiniciar el equipo ahora mismo"),
+            "suspender": T("suspender el equipo ahora mismo"), "hibernar": T("hibernar el equipo ahora mismo")}[verbo]
+
+
+def describir_energia(comando):
+    """Lo que hará un comando de energía (apagar, reiniciar, suspender, hibernar, programar o cancelar un apagado), dicho en una frase
+    escrita POR EL CÓDIGO a partir del comando real. None si no es uno de esos o no se entiende del todo (no se adivina)."""
+    try:
+        t = shlex.split(str(comando))
+    except ValueError:
+        return None
+    if t and os.path.basename(t[0]) == "sudo":
+        t = t[1:]
+        while t and t[0].startswith("-"):
+            t = t[1:]
+    if not t:
+        return None
+    base, args = os.path.basename(t[0]), t[1:]
+    if base in ("systemctl", "loginctl"):
+        if any(a.startswith("--when") for a in args):
+            return None                                           # systemctl poweroff --when=…: no se adivina cuándo
+        verbo = next((a for a in args if not a.startswith("-")), "")
+        return _energia_ahora(_VERBOS_ENERGIA[verbo]) if verbo in _VERBOS_ENERGIA else None
+    if base in _VERBOS_ENERGIA:
+        return _energia_ahora(_VERBOS_ENERGIA[base])
+    if base != "shutdown":
+        return None
+    accion, cuando = "apagar", "now"
+    for a in args:
+        if a in ("-c", "--cancel"):
+            return T("cancelar el apagado programado")
+        if a in ("-r", "--reboot"):
+            accion = "reiniciar"
+        elif a in ("-h", "-P", "-H", "--poweroff", "--halt"):
+            accion = "apagar"
+        elif a == "-k":
+            return None                                           # solo avisa, no apaga
+        elif a.startswith("-"):
+            return None
+        elif re.fullmatch(r"now|\+\d+|\d{1,2}:\d{2}", a):
+            cuando = a
+            break
+        else:
+            return None
+    if cuando == "now" or cuando == "+0":
+        return _energia_ahora(accion)
+    if cuando.startswith("+"):
+        minutos = int(cuando[1:])
+        if minutos == 1:
+            return T("apagar el equipo dentro de un minuto") if accion == "apagar" else T("reiniciar el equipo dentro de un minuto")
+        return (T("apagar el equipo dentro de {minutos} minutos", minutos=minutos) if accion == "apagar"
+                else T("reiniciar el equipo dentro de {minutos} minutos", minutos=minutos))
+    return (T("apagar el equipo a las {hora}", hora=cuando) if accion == "apagar" else T("reiniciar el equipo a las {hora}", hora=cuando))
+
+
+def confirmacion_de_energia(pendientes):
+    """(frase, solo_energia) para lo que espera tu «sí» si incluye órdenes de energía; (None, False) si no hay ninguna.
+    La frase la escribe el código desde el comando real, para que lo que oyes antes de decir «sí» no pueda contradecir lo que se va a ejecutar
+    (la IA puede decir «dentro de una hora» sobre un comando que apaga ya)."""
+    frases, otras = [], 0
+    for p in pendientes:
+        f = None if p.get("funcion") else describir_energia(p.get("comando", ""))
+        if f:
+            frases.append(f)
+        else:
+            otras += 1
+    if not frases:
+        return None, False
+    return T("Voy a {que}, ¿lo hago?", que=T(" y ").join(frases)), not otras
+
+
 def evaluar_paquetes(paquetes):
     """Para 'sudo pacman -S ...': ('critico', motivo) si alguno está en una sección crítica; si no, ('autonomo', '')."""
     datos = _politica()

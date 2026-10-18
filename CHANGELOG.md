@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Corregido
+- Apagar y reiniciar: la herramienta `energia` solo sabía hacerlo AHORA, y la IA podía decirte «dentro de una hora y media, ¿lo hago?» sobre un `systemctl poweroff`: tu «sí»
+  confirmaba la frase y el equipo se apagaba al momento. Ahora `apagar` y `reiniciar` aceptan `valor` (minutos u hora del día) y programan con `shutdown`, hay
+  `cancelar_apagado`, y la pregunta de confirmación de las órdenes de energía la escribe el código a partir del comando real («Voy a apagar el equipo dentro de 90 minutos,
+  ¿lo hago?»), de modo que no puede contradecir lo que se va a ejecutar. `estado` avisa si hay un apagado programado.
+
 ### Cambiado
 - Licencia: de MIT a **GNU AGPL-3.0 o posterior** (aún no se había publicado ninguna versión). Cabecera `SPDX-License-Identifier` en todos los archivos, licencia de contribuciones
   en `CONTRIBUTING.md` (`Signed-off-by` y cesión al mantenedor, para poder ofrecer licencias comerciales) y política de la marca «Lina» en `TRADEMARKS.md`.

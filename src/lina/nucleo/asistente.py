@@ -930,6 +930,13 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             log(f"La IA ofrecía una destrucción total («{str(respuesta)[:100]}»): se sustituye por la negativa")
             H.anotar(f"[bloqueado] la IA ofreció una destrucción total: «{str(respuesta)[:120]}»")
             respuesta = T(H.AVISO_DESTRUCCION_TOTAL)
+        frase_energia, solo_energia = H.confirmacion_de_energia(self.ejecutor.pendientes)
+        if frase_energia:                                          # apagar, reiniciar…: lo que oyes lo escribe el código desde el comando real, no la IA
+            if not solo_energia:
+                frase_energia = (str(respuesta).rstrip() + " " if respuesta else "") + T("Y, para que no haya dudas: {frase}", frase=frase_energia)
+            if frase_energia != respuesta:
+                log(f"Confirmación de energía escrita por el código (la IA había dicho: «{str(respuesta)[:100]}»)")
+            respuesta = frase_energia
         log(f"Respuesta [{origen}]: {respuesta if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'} ({time.time() - inicio:.1f} s en total)")
         try:
             self._aprender_automatico()

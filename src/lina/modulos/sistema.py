@@ -653,10 +653,42 @@ def planificar_red(args):
 # ----------------------------------------------------------------------------------------------------------------------
 #  ENERGÍA
 # ----------------------------------------------------------------------------------------------------------------------
-ACCIONES_ENERGIA = ["estado", "perfil", "bloquear", "apagar_pantalla", "suspender", "hibernar", "reiniciar", "apagar", "cerrar_sesion"]
+ACCIONES_ENERGIA = ["estado", "perfil", "bloquear", "apagar_pantalla", "suspender", "hibernar", "reiniciar", "apagar", "cancelar_apagado", "cerrar_sesion"]
+_APAGADO_PROGRAMADO = "/run/systemd/shutdown/scheduled"          # systemd lo crea al programar un apagado o reinicio y lo borra al cancelarlo
 _PERFILES = {"ahorro": "power-saver", "ahorrar": "power-saver", "power saver": "power-saver", "power-saver": "power-saver",
              "equilibrado": "balanced", "balanced": "balanced", "normal": "balanced",
              "rendimiento": "performance", "performance": "performance", "maximo": "performance", "máximo": "performance"}
+
+
+def _momento_apagado(valor):
+    """«90», «90 minutos», «+90», «1,5 horas» o «23:30» → («+90», 90) o («23:30», None); None si no se entiende o no es razonable (1 min a 7 días)."""
+    t = "".join(c for c in unicodedata.normalize("NFKD", str(valor or "").lower()) if not unicodedata.combining(c)).strip()
+    m = re.fullmatch(r"(?:a las )?(\d{1,2}):(\d{2})", t)
+    if m:
+        h, mi = int(m.group(1)), int(m.group(2))
+        return (f"{h:02d}:{mi:02d}", None) if h < 24 and mi < 60 else None
+    m = re.fullmatch(r"(?:dentro de )?\+?(\d+(?:[.,]\d+)?)\s*(h|hr|hrs|hora|horas|m|min|mins|minuto|minutos)?", t)
+    if not m:
+        return None
+    n = float(m.group(1).replace(",", "."))
+    if m.group(2) in ("h", "hr", "hrs", "hora", "horas"):
+        n *= 60
+    minutos = int(round(n))
+    return (f"+{minutos}", minutos) if 1 <= minutos <= 7 * 24 * 60 else None
+
+
+def _apagado_programado(leer=None):
+    """(modo, hora) del apagado o reinicio que haya programado, o None. `leer` devuelve el texto del archivo de systemd (en las pruebas, uno falso)."""
+    try:
+        texto = leer() if leer else open(_APAGADO_PROGRAMADO, encoding="utf-8").read()
+    except OSError:
+        return None
+    datos = dict(l.split("=", 1) for l in texto.splitlines() if "=" in l)
+    try:
+        hora = time.strftime("%H:%M", time.localtime(int(datos["USEC"]) / 1_000_000))
+    except (KeyError, ValueError, OverflowError, OSError):
+        return None
+    return datos.get("MODE", "poweroff"), hora
 
 
 def planificar_energia(args):
@@ -664,6 +696,8 @@ def planificar_energia(args):
     if accion not in ACCIONES_ENERGIA:
         return {"error": f"Acción de energía desconocida «{accion}». Las hay: {', '.join(ACCIONES_ENERGIA)}."}
     valor = str(args.get("valor", "") or "").strip()
+    if valor and accion not in ("estado", "perfil", "apagar", "reiniciar"):         # «bloquea en diez minutos» no existe: se haría YA, y el usuario esperaría otra cosa
+        return {"error": f"«{accion}» actúa siempre ahora mismo y no se puede programar (solo apagar y reiniciar). Dile al usuario que te lo pida cuando quiera hacerlo, o que lo programe él."}
     if accion == "estado":
         partes = []
         rc, perfil = ej(["powerprofilesctl", "get"])
@@ -684,6 +718,9 @@ def planificar_energia(args):
             partes.append("No hay batería (equipo de sobremesa).")
         rc, up = ej(["uptime", "-p"])
         partes.append("Encendido: " + (up if rc == 0 else "?"))
+        prog = _apagado_programado()
+        if prog:
+            partes.append(f"Hay un {'reinicio' if prog[0] == 'reboot' else 'apagado'} programado para las {prog[1]} (se cancela con cancelar_apagado).")
         rc, inh = ej(["systemd-inhibit", "--list", "--no-pager", "--no-legend"])
         if rc == 0 and inh:
             partes.append("Programas que impiden suspender/apagar:\n" + "\n".join(inh.splitlines()[:6]))
@@ -704,8 +741,20 @@ def planificar_energia(args):
                 "comprobar": lambda: "Pantallas apagadas; se encienden al mover el ratón o pulsar una tecla."}
     if accion == "cerrar_sesion":
         return {"comando": "qdbus6 org.kde.LogoutPrompt /LogoutPrompt promptLogout", "motivo": "cerrar la sesión", "comprobar": lambda: ""}
+    if accion == "cancelar_apagado":
+        return {"comando": "shutdown -c", "motivo": "cancelar el apagado programado", "espera": 0.5,
+                "comprobar": lambda: "No queda ningún apagado programado." if _apagado_programado() is None else "Sigue constando un apagado programado."}
+    if valor and accion in ("apagar", "reiniciar"):
+        momento = _momento_apagado(valor)
+        if momento is None:
+            return {"error": f"No entiendo cuándo («{valor}»). Dime los minutos (por ejemplo 90) o una hora del día (por ejemplo 23:30), de 1 minuto a 7 días."}
+        cuando, minutos = momento
+        texto = f"dentro de {minutos} minutos" if minutos else f"a las {cuando}"
+        return {"comando": f"shutdown {'-h' if accion == 'apagar' else '-r'} {cuando}", "motivo": f"{accion} el equipo {texto}", "espera": 0.5,
+                "comprobar": lambda: "Programado: " + ("reinicio" if accion == "reiniciar" else "apagado") + " a las "
+                + (_apagado_programado() or ("", "?"))[1]}
     verbo = {"suspender": "suspend", "hibernar": "hibernate", "reiniciar": "reboot", "apagar": "poweroff"}[accion]
-    return {"comando": f"systemctl {verbo}", "motivo": f"{accion} el equipo", "comprobar": lambda: ""}
+    return {"comando": f"systemctl {verbo}", "motivo": f"{accion} el equipo AHORA MISMO", "comprobar": lambda: ""}
 
 
 # ----------------------------------------------------------------------------------------------------------------------
