@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Ayudante de accesibilidad (AT-SPI) del control de programas. Se ejecuta APARTE (con el python del sistema, que trae PyGObject) para que un
 programa que no responda no pueda colgar al asistente: quien lo llama pone un tiempo máximo.
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Documentos: rehacer uno que Lina acaba de crear lo sustituye; lo del usuario nunca se sobrescribe."""
 import time
 

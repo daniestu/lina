@@ -24,6 +24,18 @@ Necesitas Python 3.11 o superior.
 - Cualquier cosa que ejecute comandos o toque el sistema pasa por las capas de seguridad (`nucleo/herramientas.py`, `nucleo/politica.py`):
   no las saltes ni las debilites sin discutirlo antes en un issue.
 
+## Licencia de tus contribuciones
+
+Lina es **AGPL-3.0 o posterior** (ver `LICENSE`). Al enviar una contribución (código, documentación, traducciones…) confirmas que:
+
+1. **Es tuya o tienes derecho a enviarla** (certificado de origen del desarrollador, <https://developercertificate.org>). Añade `Signed-off-by: Tu Nombre <correo>` a tus commits
+   (`git commit -s`).
+2. **Concedes al mantenedor del proyecto** una licencia perpetua, mundial, gratuita y no exclusiva para usar, modificar, distribuir y **sublicenciar tu contribución bajo
+   cualquier licencia**, incluidas licencias comerciales o propietarias. Conservas el copyright de lo que escribes y puedes usarlo como quieras. Esto permite al
+   proyecto ofrecer licencias comerciales o cambiar de licencia en el futuro; la versión que ya se publicó con la AGPL sigue siéndolo.
+
+Si no estás de acuerdo, no envíes la contribución. *(Este texto es un borrador sin revisión legal.)*
+
 ## Dónde está cada cosa
 
 Mira [docs/arquitectura.md](docs/arquitectura.md).

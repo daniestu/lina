@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """`lina update`: actualiza Lina sin romper nada y permite volver atrás.
 
 Si Lina se instaló desde un clon de git (lo normal con install.sh), actualiza con `git pull --ff-only`: nunca pisa cambios tuyos (si hay,

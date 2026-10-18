@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Claves de acceso (Gemini, Tavily, servidores MCP…).
 
 Se guardan en el llavero del sistema (Secret Service: GNOME Keyring, KWallet…) cuando lo hay, usando `secret-tool`; si no, en un archivo que solo

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 from lina.nucleo import herramientas as H
 from lina.nucleo.turnos import es_seguimiento, peticion_de_receta, solo_herramientas_meta
 

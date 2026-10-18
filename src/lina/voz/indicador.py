@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Indicador visual: un resplandor en los bordes de la pantalla que dice qué está haciendo el asistente.
 
   azul (o el color que elijas)  → te escucha (grabando con el atajo, o esperando tu orden tras «Oye Lina»)

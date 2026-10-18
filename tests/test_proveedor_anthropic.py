@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Proveedor «anthropic» (API de mensajes) contra un servidor simulado con el formato publicado de esa API."""
 import json
 

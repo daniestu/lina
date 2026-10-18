@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """La capa de idioma (fase 8): el ajuste, T() y los catálogos de traducción, sin tocar el sistema."""
 import pytest
 

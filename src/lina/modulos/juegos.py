@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """
 Biblioteca única de juegos: los instalados en Steam, Heroic (Epic, GOG, Amazon, propios) y Lutris, para poder decir «abre Skyrim» sin que la IA tenga que
 adivinar comandos, para que Whisper conozca sus nombres y para saber QUÉ juego tienes delante mirando el proceso (no la clase de la ventana, que en

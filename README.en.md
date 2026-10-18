@@ -65,4 +65,6 @@ No telemetry. Screenshots aren't sent until you allow it, and your administrator
 
 ## License
 
-[MIT](LICENSE).
+[GNU AGPL-3.0 or later](LICENSE). It is open source: you can use, study, modify and share it. If you share a modified version, or offer it as a service over the
+Internet, you must publish your code under the same license and keep the copyright notices. The name «Lina» and its logo are not covered by the license: see
+[TRADEMARKS.md](TRADEMARKS.md).

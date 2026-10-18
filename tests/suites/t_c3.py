@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import tempfile
 import sys, os, tempfile, types
 from pathlib import Path

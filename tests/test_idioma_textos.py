@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Los textos fijos que Lina muestra (fase 8, paso 4): en español salen como siempre y con un catálogo cambian. Sin red ni sistema."""
 import pytest
 

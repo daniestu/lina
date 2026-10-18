@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Pruebas contra la distribución REAL en la que se ejecutan. Se activan con LINA_FAMILIA_ESPERADA=arch|debian|fedora|suse
 (la CI las lanza dentro de contenedores de cada familia; en tu equipo, `scripts/probar_en_contenedores.sh`)."""
 import os

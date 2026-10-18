@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """`lina olvidar`: borra lo que Lina guarda sobre ti. Siempre enseña antes qué y cuánto, y pide confirmación. No toca tus ajustes, claves, voces ni el gasto."""
 import shutil
 import subprocess

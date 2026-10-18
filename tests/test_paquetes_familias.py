@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Gestor de paquetes por familia (Arch, Debian/Ubuntu, Fedora, openSUSE): lo que Lina entiende, instala, comprueba y deshace en cada una."""
 import pytest
 

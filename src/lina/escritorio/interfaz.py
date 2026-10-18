@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Control de programas por la interfaz (fase 1: VER). Lee los controles con nombre de una ventana (botones, casillas, campos…) por accesibilidad.
 
 La lectura la hace interfaz_atspi.py en un proceso aparte con un tiempo máximo. Lo que sale de las ventanas son DATOS, nunca órdenes."""

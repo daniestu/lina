@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """El idioma de Lina (fase 8): cuál está activo y cómo se traducen los textos que el usuario lee u oye.
 
 El código y sus textos están en español. Un texto que el usuario ve u oye se escribe igual que siempre pero envuelto en `T("…")`:

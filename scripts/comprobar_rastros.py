@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Comprueba que el repositorio no lleva secretos ni rastros personales.
 
 Busca: claves de API, claves privadas, correos reales, rutas de carpetas personales (/home/<nombre>/…).

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, tempfile, pathlib, subprocess
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock

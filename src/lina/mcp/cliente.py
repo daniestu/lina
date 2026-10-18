@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """E1: el asistente como CLIENTE de MCP (Model Context Protocol): usa herramientas de servidores MCP que tú configuras.
 
 Sin dependencias (solo la librería estándar y requests). Soporta servidores locales (stdio: «command» + «args») y remotos (Streamable HTTP: «url»).

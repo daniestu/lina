@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Herramientas externas (servidores MCP): conectarlas, publicarlas a la IA y gestionarlas por voz."""
 from lina.nucleo import grupos as G
 from lina.nucleo import herramientas as H

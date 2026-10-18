@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 from lina.escritorio import sesion as SES
 from lina.modulos import sistema as S
 

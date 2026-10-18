@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, threading, http.server, socketserver
 from unittest.mock import MagicMock
 for m in ("sounddevice","faster_whisper"): sys.modules[m]=MagicMock()

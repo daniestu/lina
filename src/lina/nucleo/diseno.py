@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Documentos con diseño propio: la IA escribe el HTML y el CSS y Lina lo convierte en PDF.
 
 No hay plantillas: un currículum, una factura, un cartel o un menú los diseña la IA cada vez, como lo haría un diseñador web. Aquí solo está

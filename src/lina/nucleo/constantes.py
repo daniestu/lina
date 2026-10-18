@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Ajustes fijos del asistente: modelos, tiempos, topes y el texto base que se le da a la IA."""
 import re
 

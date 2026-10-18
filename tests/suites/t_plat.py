@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, os, tempfile, pathlib, types
 from lina.nucleo import plataforma as P
 f=0

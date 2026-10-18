@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Hablar con la IA: Gemini (con reintentos, pausas por cuota y topes de gasto), el modelo local de Ollama, la búsqueda web y las
 mini-consultas que entienden si dices «sí» o interrumpes. Aquí no hay nada de audio ni de ejecución de herramientas."""
 import json

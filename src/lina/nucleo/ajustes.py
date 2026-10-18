@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Los ajustes de Lina, en un único sitio: ~/.config/lina/config.toml
 
 Secciones: asistente, voz, activacion, autonomia, ia, gasto, privacidad e interfaz. Cada ajuste tiene valor de fábrica y se valida: si algo

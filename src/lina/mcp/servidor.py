@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """E1: el asistente como SERVIDOR MCP (stdio). Otras IAs (Claude Desktop, Codex, Claude Code...) pueden usar estas herramientas de tu PC.
 
 No es el servicio de voz: es un programa aparte que cada IA arranca cuando lo necesita. Solo ofrece herramientas seguras de organización y oficina

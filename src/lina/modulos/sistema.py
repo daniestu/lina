@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """B3. Control del sistema: ventanas, procesos, servicios, red y Bluetooth, energía, pantalla, audio y D-Bus de KDE.
 
 Este módulo NO ejecuta los cambios: los PLANIFICA. Cada función `planificar_*` devuelve un diccionario:

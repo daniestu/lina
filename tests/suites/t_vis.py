@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, os, json, types, tempfile, pathlib, math
 from unittest.mock import MagicMock
 casa = pathlib.Path(tempfile.mkdtemp()); os.environ["HOME"] = str(casa)

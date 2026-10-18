@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Crear y editar documentos de Word, hojas de cálculo y presentaciones en la carpeta de Documentos del usuario."""
 import re
 import shutil

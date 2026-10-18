@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Plataforma: en qué Linux estamos y cómo se gestionan sus paquetes.
 
 Es el ÚNICO sitio que conoce pacman, apt, dnf y zypper. El resto del asistente pide cosas por un nombre LÓGICO («gtk-layer-shell», «ydotool»…) o

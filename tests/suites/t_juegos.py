@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, os, json, sqlite3, tempfile, pathlib
 from lina.modulos import juegos as J
 H = pathlib.Path(tempfile.mkdtemp()); J._HOME = H

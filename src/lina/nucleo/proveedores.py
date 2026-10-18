@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Hablar con una IA sin saber cuál es: el formato común y el registro de proveedores (fase 7).
 
 Un proveedor traduce UNA petición de Lina a la API de su servicio y la respuesta de vuelta. Lo demás (el bucle de herramientas, los

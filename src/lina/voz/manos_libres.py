@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Manos libres (E2): decir «Oye Lina, …» y que te atienda sin pulsar nada.
 
 Cómo funciona (todo en tu ordenador):

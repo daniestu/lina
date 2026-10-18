@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 from lina.nucleo import dependencias as D
 from lina.nucleo import herramientas as H
 from lina.escritorio import sesion as SES

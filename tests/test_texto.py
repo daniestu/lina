@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Texto del asistente: números a palabras, limpieza para la voz y fecha para la IA."""
 from datetime import datetime
 

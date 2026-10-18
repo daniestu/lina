@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Probar y aprender ajustes de configuración (sobre todo de KDE): comprobar que surten efecto y guardarlos como receta."""
 from lina.nucleo import autoconocimiento as AUTO
 from lina.nucleo import ejecucion as EJ

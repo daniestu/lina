@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, os, json, tempfile, time, threading, subprocess
 from pathlib import Path
 casa = Path(tempfile.mkdtemp()); os.environ["HOME"] = str(casa)

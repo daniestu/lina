@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """C2: recordatorios guardados en disco (sobreviven a reiniciar el equipo). Aquí solo está la lógica: entender la hora, guardar y decir cuáles tocan.
 Quien los hace sonar por voz es el asistente (un hilo que mira cada pocos segundos y, al arrancar, avisa de los que se pasaron mientras estaba apagado).
 

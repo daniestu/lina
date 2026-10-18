@@ -14,7 +14,7 @@ pkgdesc="Asistente de voz en español para el escritorio Linux (Whisper, IA a el
 install=lina-asistente.install
 arch=('x86_64')
 url="https://github.com/daniestu/lina"
-license=('MIT')
+license=('AGPL-3.0-or-later')
 depends=('python>=3.11' 'git' 'gcc' 'portaudio' 'libnotify')
 optdepends=('ydotool: escribir y pulsar teclas en Wayland'
             'chromium: convertir a PDF los documentos con diseño'

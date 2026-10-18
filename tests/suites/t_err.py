@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, types
 from lina.nucleo import asistente as A
 a = A.Asistente.__new__(A.Asistente); a.ejecutor = object(); a.modo_privado = False

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Privilegios de Lina: qué puede hacer como administrador y cómo se le da (o se le quita) ese permiso.
 
 Tres niveles, de menos a más:

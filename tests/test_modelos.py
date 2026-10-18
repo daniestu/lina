@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Modelos en el disco: Whisper y la voz. Nada se descarga de verdad (se pasa un descargador falso)."""
 from lina.nucleo import modelos as MOD
 

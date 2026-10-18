@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 # Fase 0 del control de programas con la pantalla (pulsar botones, escribir, mover ventanas…) en KDE Plasma 6 + Wayland.
 #   lina interfaz diagnostico   → solo mira qué piezas funcionan (no cambia nada, salvo una prueba de ratón de 0 píxeles)
 #   lina interfaz preparar      → instala/arregla lo que falte (pide tu contraseña con sudo) y vuelve a diagnosticar

@@ -1,4 +1,6 @@
 #!/usr/bin/python3 -I
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """lina-instalar: el ÚNICO programa que Lina puede ejecutar como administrador sin pedir contraseña.
 
 Hace una sola cosa: instalar paquetes de los repositorios que el administrador ya tiene configurados en el sistema.

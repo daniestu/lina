@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """`lina bienvenida`: la primera conversación con Lina, en la terminal y en español.
 
 Deja lista la parte que solo puede hacer el usuario: la clave de Gemini (gratuita), comprobar que el micrófono funciona, cómo se llama el

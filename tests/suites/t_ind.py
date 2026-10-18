@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, os, io, types, tempfile, pathlib, subprocess
 os.environ["HOME"]=tempfile.mkdtemp()
 from unittest.mock import MagicMock

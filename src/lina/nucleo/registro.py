@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Registro de acciones (acciones.log) y avisos del escritorio. Todo lo que hace el asistente queda anotado aquí, con las claves tapadas."""
 import os
 import shutil

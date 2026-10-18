@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """lina ia: ver con qué IA habla Lina, cambiarla, ver los modelos que ofrece el servicio y comprobar que funciona."""
 import base64
 

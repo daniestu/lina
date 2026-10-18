@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """El repositorio no debe llevar secretos ni datos personales, y el comprobador tiene que detectarlos."""
 import importlib.util
 import re

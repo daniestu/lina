@@ -5,6 +5,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Cambiado
+- Licencia: de MIT a **GNU AGPL-3.0 o posterior** (aún no se había publicado ninguna versión). Cabecera `SPDX-License-Identifier` en todos los archivos, licencia de contribuciones
+  en `CONTRIBUTING.md` (`Signed-off-by` y cesión al mantenedor, para poder ofrecer licencias comerciales) y política de la marca «Lina» en `TRADEMARKS.md`.
 - Voces: en inglés `ljspeech-high` (de fábrica) y `bryce-medium`, con licencia comprobada; se quitan `lessac` y `amy` (datos de Lessac solo para investigación). En español se
   quita `davefx`; quedan `claude` (de fábrica) y los dos hablantes de `sharvard` (derivada de Lessac, mantenida como excepción de la beta). Si ya tenías instalada una voz
   retirada, sigue funcionando. Ver `docs/creditos.md`.

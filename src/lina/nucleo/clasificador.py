@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Clasificación de comandos: qué es de solo lectura, qué lanza un programa, qué es hostil y qué se debe bloquear siempre.
 
 Todo son funciones puras sobre texto; la decisión final de ejecutar o pedir confirmación se toma en herramientas.py."""

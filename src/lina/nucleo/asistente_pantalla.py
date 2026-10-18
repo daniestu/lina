@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Cuándo se puede mirar la pantalla: permiso de capturas, decisión de la IA y motivo si no se ve."""
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import comandos as C

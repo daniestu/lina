@@ -73,4 +73,6 @@ Sin telemetría. Las capturas no se envían hasta que lo permites, y la contrase
 
 ## Licencia
 
-[MIT](LICENSE).
+[GNU AGPL-3.0 o posterior](LICENSE). Es código abierto: puedes usarlo, estudiarlo, modificarlo y compartirlo. Si compartes una versión modificada, o la ofreces como servicio
+por Internet, tienes que publicar tu código con la misma licencia y conservar los avisos de copyright. El nombre «Lina» y su logotipo no van con la licencia: ver
+[TRADEMARKS.md](TRADEMARKS.md).

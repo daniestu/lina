@@ -8,12 +8,12 @@ version = "0.1.0.dev0"
 description = "Lina: asistente de voz en español para el escritorio Linux"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "AGPL-3.0-or-later" }
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: X11 Applications",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Natural Language :: Spanish",

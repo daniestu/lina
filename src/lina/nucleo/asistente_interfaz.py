@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Control de programas por la interfaz (accesibilidad y visión) y las recetas que se aprenden de ello."""
 from lina.nucleo import herramientas as H
 from lina.nucleo import ia_activa as IAC

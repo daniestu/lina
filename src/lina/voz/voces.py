@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Voces de Lina: cuáles hay, cuál se usa, dónde se guardan y cómo se descargan la primera vez.
 
 Las voces son modelos de Piper (https://github.com/rhasspy/piper). No viajan dentro del repositorio: Lina descarga la que necesita

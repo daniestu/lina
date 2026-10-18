@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Fase 3 del control de programas: cuando un control NO sale por accesibilidad (Electron, Chromium, juegos de launcher, programas raros),
 se mira la ventana con la visión de Gemini, se localiza lo que hay que pulsar y se hace clic.
 

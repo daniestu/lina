@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Las reglas que dependen del idioma (fase 8, paso 3): en español se comportan exactamente como antes; con otro idioma usan su tabla
 y, si no la tiene, la española. Sin red ni sistema."""
 import re

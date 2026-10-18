@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """B4. MangoHud, Proton y opciones de lanzamiento de Steam, por voz.
 
  · MangoHud: es un archivo de texto (~/.config/MangoHud/MangoHud.conf). Se edita al momento, pero SIEMPRE con copia previa

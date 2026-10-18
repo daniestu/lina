@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Los modelos que Lina necesita en el disco: el de voz a texto (Whisper) y la voz de Piper.
 
 Se descargan una vez (con `lina modelos`, que ejecuta el instalador) y después todo funciona sin internet. Whisper se baja con la librería

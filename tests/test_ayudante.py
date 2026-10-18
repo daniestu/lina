@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Pruebas de ataque al ayudante de root (lina-instalar): lo que se le puede mandar y lo que nunca debe llegar al gestor de paquetes."""
 import importlib.machinery
 import importlib.util

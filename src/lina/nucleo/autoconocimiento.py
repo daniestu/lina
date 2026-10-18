@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Lina se conoce a sí misma: su documentación, sus comandos y sus ajustes, a mano para consultar y para cambiar sin gastar búsquedas.
 
 La IA decide qué hacer con esto (nada de frases fijas). Este módulo solo le da:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, tempfile, pathlib
 from datetime import datetime
 from lina.modulos import recordatorios as R

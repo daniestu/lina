@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """La papelera: los borrados de tus archivos se convierten en «gio trash» y lo borrado se puede ver y vaciar."""
 import pytest
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Qué IA está activa (sección [ia]), `lina ia` y la elección de proveedor, sin red ni llavero."""
 import json
 

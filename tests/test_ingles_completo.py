@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """El inglés de punta a punta (fase 8, opción B): lo que Lina dice en la terminal, las órdenes del manos libres, los recordatorios, las redes de
 seguridad y los manuales. Sin red ni sistema."""
 from datetime import datetime

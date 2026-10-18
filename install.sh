@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 # Instalador de Lina: un solo comando, en Arch, Debian/Ubuntu, Fedora u openSUSE (y derivadas).
 #
 #   curl -fsSL https://raw.githubusercontent.com/daniestu/lina/main/install.sh | bash      desde cero

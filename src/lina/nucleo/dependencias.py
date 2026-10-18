@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Programas que solo hacen falta para una función concreta (copiar al portapapeles, buscar en YouTube…).
 
 Lina no los exige al instalar: los pide cuando se usan por primera vez. Si el usuario eligió el perfil «prudente», no instala nada sola y

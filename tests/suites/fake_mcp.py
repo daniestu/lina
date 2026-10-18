@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, json, os, time
 # Servidor MCP falso e independiente (para probar el cliente). Modo según argv[1].
 modo = sys.argv[1] if len(sys.argv) > 1 else "normal"

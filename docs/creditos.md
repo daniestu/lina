@@ -1,5 +1,9 @@
 # Créditos y licencias de terceros
 
+Lina se publica con la licencia **GNU AGPL-3.0 o posterior** (ver `LICENSE`). Las dependencias que instala son compatibles con ella: la mayoría son MIT, BSD o Apache-2.0
+(`numpy`, `requests`, `faster-whisper`…). **Piper** se ejecuta como programa aparte (`python -m piper`), no se importa ni se incluye en este repositorio. Las voces y los
+modelos tienen sus propias licencias y no se distribuyen con Lina (ver más abajo).
+
 ## Voces
 
 Lina usa el motor de voz [Piper](https://github.com/rhasspy/piper) y las voces del repositorio

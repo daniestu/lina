@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """A5: qué herramientas y qué reglas se mandan a Gemini en cada petición.
 
 Idea: siempre va un NÚCLEO pequeño (ejecutar_comando, abrir_app, pantalla, recetas...) y el resto de herramientas van en GRUPOS que se cargan

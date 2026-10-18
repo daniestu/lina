@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys
 exec(open("t_sis.py").read().split("# ventanas")[0].replace("fallos = 0","fallos = 0"))  # reutiliza el simulador (S.EJ ya puesto)
 from lina.nucleo import herramientas as H

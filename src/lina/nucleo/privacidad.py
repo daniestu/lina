@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """`lina privacidad`: qué sale del equipo y el consentimiento para enviar capturas de pantalla. Solo lo decide el usuario, en una terminal."""
 import sys
 

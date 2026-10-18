@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Ejecución sencilla de órdenes (sin shell) y utilidades de rutas; lo comparten la red de seguridad y las herramientas."""
 import os
 import re

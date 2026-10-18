@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Módulos que el asistente usa si existen y, si no, funciona sin ellos (una actualización a medias no lo deja inservible)."""
 
 PRESUPUESTO_OK = True

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """A5 · Presupuesto de Gemini: la clave gratuita y la de pago, lo gastado en el mes, el tope y los avisos.
 
 Aquí no se habla con Gemini: solo se lleva la cuenta y se decide QUÉ clave toca. Lo ajustable (tope, tipo de cambio, precios)

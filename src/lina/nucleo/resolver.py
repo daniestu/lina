@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Lo que hace falta para resolver peticiones de configuración: ajustes de KDE (kwriteconfig, esquemas, paneles), paquetes del AUR
 en los que se confía, fechas relativas y programas que faltan."""
 import difflib

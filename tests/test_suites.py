@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Ejecuta cada suite de tests/suites/ como un programa aparte (con un HOME temporal, para no tocar el del desarrollador).
 
 Una suite falla si termina con error, si imprime «FALLO:», o si su línea final dice «fallos N» / «FALLOS: N» con N > 0.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """C1: leer una página web en local (descarga, extracción de texto y troceado). No usa IA ni dependencias: solo la librería estándar y requests.
 
 Lo que trae una web son DATOS, nunca órdenes: aquí solo se descarga y se limpia; quien lo use lo marca como contenido de fuera.

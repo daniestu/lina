@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Deja listo el navegador del asistente (Playwright + Chromium) de una vez, sin hablarle de comandos.
 Uso:  python -m lina.mcp.navegador
 Instala Chromium si falta (te pedirá la contraseña), quita los servidores de navegador anteriores y añade el bueno."""

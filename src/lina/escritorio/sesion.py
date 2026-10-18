@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Qué escritorio y qué tipo de sesión hay, y cómo se hacen en cada uno las cosas que Lina necesita del escritorio:
 
   · saber qué ventana tienes delante (título, clase, proceso)

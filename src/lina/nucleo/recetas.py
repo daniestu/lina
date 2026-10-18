@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Recetas aprendidas: cómo se consiguió algo que FUNCIONÓ en este equipo, para probarlo primero la próxima vez (y no gastar minutos y
 tokens descubriéndolo otra vez).
 

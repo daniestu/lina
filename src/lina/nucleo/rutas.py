@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Dónde guarda Lina sus cosas.
 
 Sigue la convención XDG (la de cualquier programa de escritorio en Linux):

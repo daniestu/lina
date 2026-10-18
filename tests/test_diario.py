@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Diario de cambios: anotar, marcar como deshecho, copias de seguridad, restaurarlas y limpiar lo viejo."""
 import os
 import time

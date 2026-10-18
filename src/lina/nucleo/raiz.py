@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """La parte de `lina privilegios` que se ejecuta COMO ADMINISTRADOR. Es corta a propósito, para que se pueda leer entera antes de dar permiso.
 
 Cómo se lanza: el usuario ve primero la vista previa de todo lo que se va a escribir y, solo si acepta, Lina ejecuta

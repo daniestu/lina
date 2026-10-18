@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Instalación de Lina en el equipo del usuario: lo que hace `lina preparar` (lo llama install.sh) y lo que deshace `lina uninstall`.
 
 `install.sh` solo prepara el terreno (paquetes del sistema, entorno de Python); todo lo demás está aquí, en Python, para poder probarlo:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """C2: notas en Markdown en ~/Documentos/Notas, con búsqueda. Una nota = un archivo .md (también se encuentran los .md y .txt que pongas tú a mano).
 
 Seguridad: el nombre del archivo sale solo del título (letras, números y guiones), nunca se sale de la carpeta de notas, nunca se sobrescribe una nota

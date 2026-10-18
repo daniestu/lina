@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Qué IA está en uso: el proveedor, sus modelos y su clave, según la sección [ia] de los ajustes (fase 7).
 
 Si no se toca nada, es Gemini con los modelos de siempre. Los demás proveedores se activan con `lina ia usar …` o editando config.toml.

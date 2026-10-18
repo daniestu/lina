@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Notas, recordatorios, ofimática y lectura de la web."""
 from datetime import datetime
 from lina.escritorio import sesion as SES

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Notas y recordatorios como funciones sueltas: las usan el asistente (por voz) y el servidor MCP (desde otras IAs).
 
 `frenar(descripcion, funcion, motivo)` devuelve None si se puede hacer ya o un texto si queda pendiente de confirmación (el asistente lo pone cuando ha leído

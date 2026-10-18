@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """El instalador que corre como administrador, probado contra una raíz falsa (una carpeta temporal): nunca toca el sistema real."""
 import hashlib
 import os

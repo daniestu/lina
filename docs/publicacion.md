@@ -6,12 +6,14 @@ Para quien mantiene el proyecto. Nada de esto lo hace Lina sola: etiquetar, publ
 
 1. **Licencias de las voces inglesas** (`docs/creditos.md`): comprobadas para `ljspeech` y `bryce`. Si no permiten el uso, quitar la voz de
    `src/lina/voz/voces.py` o dejar el inglés fuera de la beta (`IDIOMAS = ("es",)` en `ajustes.py`).
-2. CI en verde en `main` (Ruff, rastros, pruebas con cobertura ≥ 63 % en Python 3.11, 3.12 y 3.13, y las cuatro familias de distribución).
-3. `python scripts/comprobar_rastros.py` sin avisos.
-4. Probado a mano en un equipo real: `./install.sh`, `lina bienvenida`, `lina doctor --red`, hablar con el atajo, una confirmación por atajo, `lina update`,
+2. **Licencia y marca:** el repositorio es AGPL-3.0 o posterior. Antes de hacerlo público, comprobar que «Lina» no esté registrada como marca de software (y decidir si
+   registrarla), y que `CONTRIBUTING.md` y `TRADEMARKS.md` dicen lo que quieres (son borradores sin revisión legal).
+3. CI en verde en `main` (Ruff, rastros, pruebas con cobertura ≥ 63 % en Python 3.11, 3.12 y 3.13, y las cuatro familias de distribución).
+4. `python scripts/comprobar_rastros.py` sin avisos.
+5. Probado a mano en un equipo real: `./install.sh`, `lina bienvenida`, `lina doctor --red`, hablar con el atajo, una confirmación por atajo, `lina update`,
    `lina uninstall`. Anotar en la hoja de ruta lo que falle.
-5. Versión en `pyproject.toml`: `0.1.0b1` (PEP 440) y en `CHANGELOG.md` pasar «Sin publicar» a `[0.1.0-beta] - AAAA-MM-DD`, dejando un «Sin publicar» vacío encima.
-6. Cambiar el clasificador `Development Status` si procede (hoy «3 - Alpha»).
+6. Versión en `pyproject.toml`: `0.1.0b1` (PEP 440) y en `CHANGELOG.md` pasar «Sin publicar» a `[0.1.0-beta] - AAAA-MM-DD`, dejando un «Sin publicar» vacío encima.
+7. Cambiar el clasificador `Development Status` si procede (hoy «3 - Alpha»).
 
 ## Etiquetar
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """`lina doctor`: comprueba que todo lo que Lina necesita está en su sitio y, si no, dice qué falta y el comando que lo arregla.
 
 Solo lee: no cambia nada ni instala nada. `--red` además prueba la conexión y la clave de Gemini. `--informe` imprime lo mismo sin datos

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Punto de entrada:  lina [orden]   (o  python -m lina [orden])"""
 import os
 import runpy

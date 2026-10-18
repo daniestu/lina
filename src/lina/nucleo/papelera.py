@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Papelera de Lina: los borrados se convierten en un movimiento a la papelera (recuperable) en vez de borrar de verdad."""
 import os
 import re

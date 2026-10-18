@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """El atajo de teclado global que ejecuta `lina pulsar`.
 
 Lo registra en el escritorio que haya (KDE Plasma, GNOME, Cinnamon o XFCE) sin pisar uno que el usuario ya tenga; en los demás (sway, Hyprland, MATE…)

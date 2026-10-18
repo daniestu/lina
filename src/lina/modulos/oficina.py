@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """C3: crear, leer y editar hojas de cálculo (.xlsx) y presentaciones (.pptx), como ya se hace con Word.
 
 Solo toca archivos de la carpeta personal (sin carpetas ocultas). Antes de editar uno que ya existe se guarda una copia en

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 import sys, os, tempfile, pathlib, json
 from lina.modulos import juegoconf as J; from lina.modulos import juegos as JU
 f=0

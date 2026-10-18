@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Presupuesto de Gemini: qué clave toca, cuánto se lleva gastado, avisos y subida del tope."""
 import pytest
 

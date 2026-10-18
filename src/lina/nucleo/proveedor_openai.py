@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Proveedor «openai»: cualquier servicio con la API de chat de OpenAI (/chat/completions).
 
 Sirve para OpenAI, OpenRouter, Groq, Mistral, DeepSeek… y para los servidores locales o de empresa que copian esa API (Ollama, LM Studio, llama.cpp,

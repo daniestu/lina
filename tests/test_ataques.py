@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Pruebas de ataque al filtro de comandos: lo que una IA engañada (o un error suyo) podría intentar. Ninguno de estos puede ir sin freno.
 
 «bloqueado» = nunca, ni con confirmación (borrar el sistema, formatear discos, leer claves, ejecutar lo que llega de internet).

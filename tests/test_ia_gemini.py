@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """El bucle de Gemini y las mini-consultas, contra un servidor simulado (sin red). Fijan el comportamiento de cara a la fase 7."""
 import json
 

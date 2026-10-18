@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
 """Declaraciones de las herramientas que se le ofrecen a la IA (nombre, descripción y parámetros).
 
 Son solo datos: lo que hace cada herramienta está en herramientas.py y asistente.py."""
