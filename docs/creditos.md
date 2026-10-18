@@ -12,7 +12,7 @@ la que se elige a `~/.local/share/lina/voces/` la primera vez que la necesita.
 | `es_ES-sharvard-medium-1`, `-2` | Corpus Sharvard, Universidad de Edimburgo ([DataShare](https://datashare.ed.ac.uk/handle/10283/574)) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 
 - **Sharvard** exige atribución: *Corpus Sharvard, Universidad de Edimburgo; artículo de referencia:
-  [doi:10.3109/14992027.2014.907507](https://www.tandfonline.com/doi/abs/10.3109/14992027.2014.907507)*. Es un modelo de dos hablantes.
+  [doi:10.3109/14992027.2014.907507](https://www.tandfonline.com/doi/abs/10.3109/14992027.2014.907507)*. Es un modelo de dos hablantes: el 1 es masculino y el 2 femenino (según el `speaker_id_map` del modelo, `M: 0` y `F: 1`).
 - **Claude**: se mantiene el aviso de Apache-2.0 y se reconoce a HirCoir como origen de los datos.
 - `sharvard` se afinó a partir de la voz inglesa *lessac* (calidad media), cuyos datos son solo para investigación. No sabemos si esa restricción pasa a la voz derivada ni es asesoramiento legal: se mantiene como excepción consciente de la beta (es de las pocas voces de España con calidad media) y se sustituirá por una entrenada desde cero cuando exista. `davefx` se retiró por la misma razón y porque no gustó.
 - Cada voz tiene su ficha (`MODEL_CARD`) en su carpeta del repositorio de voces.

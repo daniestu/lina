@@ -29,9 +29,9 @@ CATALOGO = {
         "es_MX-claude-high": {"modelo": "es_MX-claude-high", "carpeta": "es/es_MX/claude/high", "locutor": None,
                               "descripcion": "Claude · México · calidad alta · femenina (por defecto)"},
         "es_ES-sharvard-medium-1": {"modelo": "es_ES-sharvard-medium", "carpeta": "es/es_ES/sharvard/medium", "locutor": 0,
-                                    "descripcion": "Sharvard, hablante 1 · España · calidad media"},
+                                    "descripcion": "Sharvard, hablante 1 · España · calidad media · masculina"},
         "es_ES-sharvard-medium-2": {"modelo": "es_ES-sharvard-medium", "carpeta": "es/es_ES/sharvard/medium", "locutor": 1,
-                                    "descripcion": "Sharvard, hablante 2 · España · calidad media"},
+                                    "descripcion": "Sharvard, hablante 2 · España · calidad media · femenina"},
     },
     # Inglés (experimental): modelos del mismo repositorio de voces, entrenados desde cero con datos de licencia comprobada (ver docs/creditos.md).
     "en": {
