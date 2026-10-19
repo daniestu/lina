@@ -132,6 +132,7 @@ def test_atajo_kde_se_registra_y_se_quita(tmp_path):
     desktop = Path(nota["archivo"])
     assert "Exec=/u/lina pulsar" in desktop.read_text()
     assert ordenes[0][-2:] == ["_launch", "Meta+Space"]
+    assert ["systemctl", "--user", "restart", "plasma-kglobalaccel.service"] in ordenes and "activado" in msg       # KDE lo coge sin cerrar sesión
     A.quitar(nota, tmp_path, ejecutar=ej, which=lambda n: "/bin/kwriteconfig6")
     assert not desktop.exists()
 
@@ -292,3 +293,10 @@ def test_al_desinstalar_por_defecto_se_conservan_los_datos(tmp_path, monkeypatch
     c.manifiesto.anotar("enlace", ruta=str(tmp_path / "x"))
     assert I.desinstalar([], c) == 0 and p.exists()
     assert any("he dejado TUS AJUSTES" in t for t in c.texto)
+
+
+def test_atajo_kde_si_no_se_puede_recargar_avisa_de_cerrar_sesion(tmp_path):
+    def ej(o, **k):
+        return SimpleNamespace(returncode=3 if o[:3] == ["systemctl", "--user", "is-active"] else 0, stdout="", stderr="")
+    hecho, msg, nota = A.registrar("kde", "Meta+Space", "/u/lina", tmp_path, ejecutar=ej, which=lambda n: "/bin/kwriteconfig6")
+    assert hecho and "cierres sesión" in msg

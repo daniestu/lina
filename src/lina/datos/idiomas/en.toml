@@ -127,7 +127,6 @@
 "atajo de Cinnamon quitado" = "Cinnamon shortcut removed"
 "atajo de XFCE quitado" = "XFCE shortcut removed"
 "La tecla «{tecla}» no es válida para {v1}." = "The key «{tecla}» is not valid for {v1}."
-"Atajo {tecla} registrado en KDE. Si no responde al momento, cierra y abre sesión (o mira Preferencias del sistema → Atajos de teclado)." = "Shortcut {tecla} registered in KDE. If it doesn't respond right away, log out and back in (or check System Settings → Keyboard shortcuts)."
 "Atajo {tecla} registrado en GNOME." = "Shortcut {tecla} registered in GNOME."
 "Atajo {tecla} registrado en Cinnamon." = "Shortcut {tecla} registered in Cinnamon."
 "Atajo {tecla} registrado en XFCE." = "Shortcut {tecla} registered in XFCE."
@@ -576,3 +575,5 @@
 "ninguna" = "none"
 "\nDe momento he dejado TUS AJUSTES, CLAVES y DATOS ({v1}, {v2}, {v3}) por si vuelves a instalar a Lina." = "\nFor now I have left YOUR SETTINGS, KEYS and DATA ({v1}, {v2}, {v3}) in case you install Lina again."
 "¿Los borro también? Se pierden tus claves, ajustes, voces y modelos, y no se puede deshacer." = "Delete them as well? Your keys, settings, voices and models are lost, and this cannot be undone."
+"Atajo {tecla} registrado en KDE y activado." = "Shortcut {tecla} registered in KDE and active."
+"Atajo {tecla} registrado en KDE, pero KDE no lo activa hasta que cierres sesión y vuelvas a entrar (o lo mires en Preferencias del sistema → Atajos)." = "Shortcut {tecla} registered in KDE, but KDE will not activate it until you log out and back in (or check System Settings → Shortcuts)."

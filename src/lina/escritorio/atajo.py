@@ -85,6 +85,16 @@ def _lista_gnome(texto):
         return []
 
 
+def _recargar_atajos_kde(ejecutar):
+    """kglobalaccel solo lee kglobalshortcutsrc al arrancar: reiniciarlo hace que KDE coja el atajo nuevo sin cerrar sesión. True si lo ha reiniciado."""
+    try:
+        if ejecutar(["systemctl", "--user", "is-active", "--quiet", "plasma-kglobalaccel.service"], capture_output=True, text=True, timeout=10).returncode != 0:
+            return False
+        return ejecutar(["systemctl", "--user", "restart", "plasma-kglobalaccel.service"], capture_output=True, text=True, timeout=30).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def registrar(escr, tecla, comando, home, simular=False, ejecutar=subprocess.run, which=shutil.which):
     """Registra el atajo. Devuelve (hecho, mensaje, anotacion), donde anotacion es lo que hay que guardar para poder quitarlo."""
     if not tecla_valida(tecla, escr):
@@ -105,7 +115,10 @@ def registrar(escr, tecla, comando, home, simular=False, ejecutar=subprocess.run
         if r.returncode != 0:
             desktop.unlink(missing_ok=True)
             return False, T("kwriteconfig no ha podido guardar el atajo: ") + (r.stderr or r.stdout or "sin detalle").strip()[:150], None
-        return True, (T("Atajo {tecla} registrado en KDE. Si no responde al momento, cierra y abre sesión (o mira Preferencias del sistema → Atajos de teclado).", tecla=tecla)), {"escritorio": "kde", "archivo": str(desktop), "tecla": tecla}
+        nota = {"escritorio": "kde", "archivo": str(desktop), "tecla": tecla}
+        if _recargar_atajos_kde(ejecutar):
+            return True, T("Atajo {tecla} registrado en KDE y activado.", tecla=tecla), nota
+        return True, T("Atajo {tecla} registrado en KDE, pero KDE no lo activa hasta que cierres sesión y vuelvas a entrar (o lo mires en Preferencias del sistema → Atajos).", tecla=tecla), nota
     if escr == "gnome":
         if not which("gsettings"):
             return False, T("No encuentro gsettings."), None
