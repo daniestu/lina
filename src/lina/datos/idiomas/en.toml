@@ -580,3 +580,5 @@
 "Atajo {tecla} registrado en KDE. KDE lo activa cuando cierres sesión y vuelvas a entrar." = "Shortcut {tecla} registered in KDE. KDE activates it when you log out and back in."
 "  Tu atajo {tecla} se activa cuando cierres sesión y vuelvas a entrar (KDE no lo carga antes). Hasta entonces, di «Oye {v1}»." = "  Your {tecla} shortcut is activated when you log out and back in (KDE does not load it earlier). Until then, say «Hey {v1}»."
 "  Si algo no va:  lina doctor" = "  If something is wrong:  lina doctor"
+"Tu atajo {tecla} todavía no funciona: KDE lo activa cuando cierres sesión y vuelvas a entrar. Hasta entonces, dime «Oye {nombre}»." = "Your {tecla} shortcut doesn't work yet: KDE activates it when you log out and back in. Until then, just say «Hey {nombre}»."
+"Cierra sesión para activar el atajo" = "Log out to activate the shortcut"

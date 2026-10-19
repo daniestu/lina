@@ -218,3 +218,12 @@ def test_si_el_atajo_de_kde_aun_no_esta_activo_se_dice_al_final(tmp_path, monkey
     assert B.atajo_pendiente()["tecla"] == "Meta+Space"
     monkeypatch.setenv("XDG_SESSION_ID", "8")                                  # ya se ha cerrado sesión desde entonces
     assert B.atajo_pendiente() is None
+
+
+def test_el_aviso_por_voz_del_atajo_sale_una_vez_por_sesion(tmp_path):
+    ruta = tmp_path / "aviso"
+    atajo = {"tecla": "Meta+Space", "sesion": "7"}
+    assert B.toca_avisar_atajo(atajo, ruta) is True
+    assert B.toca_avisar_atajo(atajo, ruta) is False                         # reinicios del servicio en la misma sesión: callada
+    assert B.toca_avisar_atajo({"tecla": "Meta+Space", "sesion": "8"}, ruta) is True
+    assert "Meta+Space" in B.texto_atajo_pendiente(atajo) and "cierres sesión" in B.texto_atajo_pendiente(atajo)

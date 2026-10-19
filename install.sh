@@ -145,10 +145,22 @@ elif [ "$SIN_BIENVENIDA" = 1 ] || [ "$CON_TTY" = 0 ] || [ "$SI" = 1 ]; then
   aviso "Cuando quieras, termina de configurarla con:  lina bienvenida"
 else PYTHONUNBUFFERED=1 "$LINA" bienvenida < /dev/tty || aviso "La configuración guiada no ha terminado: repítela con  lina bienvenida"; fi
 
+# si KDE aún no carga el atajo recién creado, se dice lo último y bien visible (lo importante no se pierde entre los textos largos)
+AVISO_FINAL=""
+if [ "$SIMULAR" != 1 ]; then
+  AVISO="$("$VENV/bin/python" -c "from lina.nucleo import bienvenida as B; a = B.atajo_pendiente(); print(B.texto_atajo_pendiente(a) if a else '')" 2>/dev/null || true)"
+  [ -n "$AVISO" ] && AVISO_FINAL="
+  ┌─────────────────────────────────────────────────────────────────────
+  │  ¡IMPORTANTE!  $AVISO
+  └─────────────────────────────────────────────────────────────────────
+
+"
+fi
+
 cat <<TEXTO
 
 Listo.
-  · Configuración guiada (clave, micrófono, voz, permisos):   lina bienvenida
+${AVISO_FINAL}  · Configuración guiada (clave, micrófono, voz, permisos):   lina bienvenida
   · Si algo falla:                                            lina doctor
   · Actualizar / desinstalar:                                 lina update   ·   lina uninstall
   · Registro de la instalación:                               ${LOG:-$ESTADO/instalacion.log}

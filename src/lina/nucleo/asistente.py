@@ -543,6 +543,21 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             log(f"La IA activa ha cambiado a {ia.nombre}: cargo su clave")
             self._configurar_ia(ia)
 
+    def _avisar_atajo_pendiente(self):
+        """En KDE el atajo recién creado no responde hasta cerrar sesión: si no se avisa parece que Lina está rota. Notificación y, una vez, voz."""
+        from lina.nucleo import bienvenida as BIEN
+        atajo = BIEN.atajo_pendiente()
+        if not atajo:
+            return
+        texto = BIEN.texto_atajo_pendiente(atajo, self.manos_libres.cfg.nombre.capitalize() if self.manos_libres else "Lina")
+        try:
+            subprocess.Popen(["notify-send", "-a", "Lina", T("Cierra sesión para activar el atajo"), texto], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            pass
+        if BIEN.toca_avisar_atajo(atajo):
+            time.sleep(8)                                  # que termine de arrancar (y no pise el aviso de la clave, si lo hay)
+            self.avisar(texto)
+
     def _avisar_sin_clave(self, ia=None):
         """Sin clave Lina no puede contestar y, si no se avisa, parece rota: notificación siempre, y por voz como mucho una vez al día."""
         from lina.nucleo import bienvenida as BIEN
@@ -1815,6 +1830,7 @@ def main():
         except Exception as e:
             log(f"Indicador visual: no he podido arrancar ({e!r}); el asistente sigue sin él")
     log("Listo. Pulsa el atajo para hablar (Ctrl+C para salir).")
+    threading.Thread(target=asistente._avisar_atajo_pendiente, daemon=True).start()
     try:
         while True:
             if evento.wait(timeout=0.5):

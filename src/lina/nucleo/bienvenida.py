@@ -242,6 +242,26 @@ def atajo_pendiente():
     return a if a and a.get("escritorio") == "kde" and a.get("sesion") and a["sesion"] == sesion else None
 
 
+def texto_atajo_pendiente(atajo, nombre="Lina"):
+    return T("Tu atajo {tecla} todavía no funciona: KDE lo activa cuando cierres sesión y vuelvas a entrar. Hasta entonces, dime «Oye {nombre}».", tecla=atajo["tecla"], nombre=nombre)
+
+
+def toca_avisar_atajo(atajo, ruta=None):
+    """Por voz, una sola vez por sesión (la notificación sí sale siempre): True si toca hablar ahora."""
+    ruta = ruta or RUT.ESTADO / "aviso_atajo"
+    try:
+        if ruta.read_text().strip() == atajo.get("sesion", ""):
+            return False
+    except OSError:
+        pass
+    try:
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(atajo.get("sesion", ""))
+    except OSError:
+        pass
+    return True
+
+
 def marcar_hecha(ruta=None):
     ruta = ruta or RUT.ESTADO / MARCA
     try:
