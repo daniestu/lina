@@ -295,8 +295,35 @@ def test_al_desinstalar_por_defecto_se_conservan_los_datos(tmp_path, monkeypatch
     assert any("he dejado TUS AJUSTES" in t for t in c.texto)
 
 
-def test_atajo_kde_si_no_se_puede_recargar_avisa_de_cerrar_sesion(tmp_path):
+def test_atajo_kde_si_no_se_puede_recargar_avisa_de_cerrar_sesion(tmp_path, monkeypatch):
+    monkeypatch.setattr(A.time, "sleep", lambda s: None)
     def ej(o, **k):
-        return SimpleNamespace(returncode=3 if o[:3] == ["systemctl", "--user", "is-active"] else 0, stdout="", stderr="")
+        return SimpleNamespace(returncode=3 if o[:3] == ["systemctl", "--user", "is-active"] or o[0] == "pgrep" else 0, stdout="", stderr="")
     hecho, msg, nota = A.registrar("kde", "Meta+Space", "/u/lina", tmp_path, ejecutar=ej, which=lambda n: "/bin/kwriteconfig6")
     assert hecho and "cierres sesión" in msg
+
+
+def test_atajo_kde_sin_servicio_de_systemd_reinicia_el_proceso_y_lo_vuelve_a_llamar(tmp_path):
+    vivo = [True]
+    ordenes = []
+
+    def ej(o, **k):
+        ordenes.append(o)
+        if o[:3] == ["systemctl", "--user", "is-active"]:
+            return SimpleNamespace(returncode=3, stdout="", stderr="")
+        if o[0] == "pgrep":
+            return SimpleNamespace(returncode=0 if vivo[0] else 1, stdout="", stderr="")
+        if o[0] == "pkill":
+            vivo[0] = False
+        if o[0] == "busctl":
+            vivo[0] = True                                                  # la llamada por D-Bus lo arranca
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    assert A._recargar_atajos_kde(ej, dormir=lambda s: None) is True
+    nombres = [o[0] for o in ordenes]
+    assert nombres.index("pkill") < nombres.index("busctl")
+
+
+def test_atajo_kde_si_no_vuelve_a_arrancar_se_dice_que_falta_cerrar_sesion():
+    def ej(o, **k):
+        return SimpleNamespace(returncode=1 if o[0] in ("pgrep", "systemctl") else 0, stdout="", stderr="")
+    assert A._recargar_atajos_kde(ej, dormir=lambda s: None) is False

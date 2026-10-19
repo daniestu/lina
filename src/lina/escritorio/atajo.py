@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 NOMBRE_KDE = "lina-pulsar.desktop"
@@ -85,14 +86,30 @@ def _lista_gnome(texto):
         return []
 
 
-def _recargar_atajos_kde(ejecutar):
-    """kglobalaccel solo lee kglobalshortcutsrc al arrancar: reiniciarlo hace que KDE coja el atajo nuevo sin cerrar sesión. True si lo ha reiniciado."""
-    try:
-        if ejecutar(["systemctl", "--user", "is-active", "--quiet", "plasma-kglobalaccel.service"], capture_output=True, text=True, timeout=10).returncode != 0:
-            return False
-        return ejecutar(["systemctl", "--user", "restart", "plasma-kglobalaccel.service"], capture_output=True, text=True, timeout=30).returncode == 0
-    except (OSError, subprocess.SubprocessError):
-        return False
+def _recargar_atajos_kde(ejecutar, dormir=time.sleep):
+    """kglobalaccel solo lee kglobalshortcutsrc al arrancar: se reinicia para que KDE coja el atajo nuevo sin cerrar sesión. True si ha quedado en marcha.
+    Si es un servicio de systemd se reinicia con systemctl; si no (en Plasma 6 suele arrancarlo D-Bus), se cierra el proceso y se le llama por D-Bus para que
+    vuelva a arrancar; KWin y Plasma le vuelven a dar sus atajos solos al reaparecer."""
+    def corre(orden, tiempo=10):
+        try:
+            return ejecutar(orden, capture_output=True, text=True, timeout=tiempo).returncode
+        except (OSError, subprocess.SubprocessError):
+            return None
+    if corre(["systemctl", "--user", "is-active", "--quiet", "plasma-kglobalaccel.service"]) == 0:
+        return corre(["systemctl", "--user", "restart", "plasma-kglobalaccel.service"], 30) == 0
+    vivo = ["pgrep", "-x", "kglobalacceld"]
+    if corre(vivo) == 0:
+        corre(["pkill", "-x", "kglobalacceld"])
+        for _ in range(10):
+            if corre(vivo) != 0:
+                break
+            dormir(0.3)
+    corre(["busctl", "--user", "call", "org.kde.kglobalaccel", "/kglobalaccel", "org.freedesktop.DBus.Peer", "Ping"], 15)       # lo arranca (activación D-Bus)
+    for _ in range(10):
+        if corre(vivo) == 0:
+            return True
+        dormir(0.3)
+    return False
 
 
 def registrar(escr, tecla, comando, home, simular=False, ejecutar=subprocess.run, which=shutil.which):
