@@ -207,3 +207,14 @@ def test_se_avisa_si_lo_pegado_no_parece_una_clave_de_gemini(tmp_path, monkeypat
     c.paso_clave()
     assert any("no parece una clave" in t for t in c.texto)
     assert g == {"gemini": "otra-cosa-que-no-es"}                              # se comprueba igualmente y, si Google la acepta, vale
+
+
+def test_si_el_atajo_de_kde_aun_no_esta_activo_se_dice_al_final(tmp_path, monkeypatch):
+    from lina.nucleo import instalador as INS
+    m = INS.Manifiesto(tmp_path / "m.json")
+    m.anotar("atajo", escritorio="kde", tecla="Meta+Space", sesion="7")
+    monkeypatch.setattr(INS, "Manifiesto", lambda *a, **k: m)
+    monkeypatch.setenv("XDG_SESSION_ID", "7")
+    assert B.atajo_pendiente()["tecla"] == "Meta+Space"
+    monkeypatch.setenv("XDG_SESSION_ID", "8")                                  # ya se ha cerrado sesión desde entonces
+    assert B.atajo_pendiente() is None

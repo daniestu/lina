@@ -7,6 +7,7 @@ asistente, cuánta libertad tiene y si puede enviar capturas de pantalla. Cada p
 Nada se decide por el usuario: lo que da permisos (autonomía, capturas) se pregunta con su explicación.
 """
 import json
+import os
 import re
 import subprocess
 import time
@@ -222,7 +223,23 @@ class Charla:
         self.salida(T("  Clave de Gemini: {v1} · Micrófono: {v2} · Perfil: {v3} · Capturas: {v4}", v1=s.get('clave', '-'), v2=s.get('microfono', '-'), v3=s.get('perfil', '-'), v4=s.get('capturas', '-')))
         if s.get("clave") in ("saltado", "fallida"):
             self.salida(T("  Falta la clave de Gemini: sin ella no puedo responder.  →  lina clave gemini"))
-        self.salida(T("  Para hablarme: pulsa tu atajo o di «Oye {v1}».  Si algo no va:  lina doctor", v1=s.get('nombre', 'Lina')))
+        atajo = atajo_pendiente()
+        if atajo:
+            self.salida(T("  Tu atajo {tecla} se activa cuando cierres sesión y vuelvas a entrar (KDE no lo carga antes). Hasta entonces, di «Oye {v1}».", tecla=atajo["tecla"], v1=s.get('nombre', 'Lina')))
+            self.salida(T("  Si algo no va:  lina doctor"))
+        else:
+            self.salida(T("  Para hablarme: pulsa tu atajo o di «Oye {v1}».  Si algo no va:  lina doctor", v1=s.get('nombre', 'Lina')))
+
+
+def atajo_pendiente():
+    """El atajo recién creado en KDE, si todavía no se ha cerrado sesión desde entonces (KDE no lo carga antes); si no, None."""
+    try:
+        from lina.nucleo.instalador import Manifiesto
+        a = Manifiesto().de("atajo")
+    except Exception:
+        return None
+    sesion = os.environ.get("XDG_SESSION_ID", "")
+    return a if a and a.get("escritorio") == "kde" and a.get("sesion") and a["sesion"] == sesion else None
 
 
 def marcar_hecha(ruta=None):
