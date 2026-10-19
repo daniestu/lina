@@ -5,6 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Corregido
+- El micrófono sin eco que crea Lina ahora pide expresamente a PipeWire supresión de ruido, filtro de graves y control automático de volumen (se aplica al instalarlo de nuevo o con `lina manos-libres eco`), y `lina uninstall` quita esa configuración de audio, que antes se quedaba.
 - En KDE, el atajo recién creado no respondía hasta cerrar sesión: ahora el instalador reinicia `plasma-kglobalaccel` para que KDE lo coja al momento, y si no puede, lo dice claramente.
 - `lina uninstall` dejaba tus ajustes, claves y datos sin avisar. Ahora dice que los conserva y, en una terminal, pregunta si quieres borrarlos también; con `--todo` también quita las claves del llavero del sistema.
 - En Wayland (KDE, sway…) el instalador pedía los paquetes del sistema sin incluir `gtk-layer-shell`, GTK3 ni PyGObject: el resplandor salía como ventanas con barra de título y `lina doctor` decía «con capa». Ahora se comprueba de verdad, el instalador ofrece instalarlos (con tu contraseña) y Doctor avisa y da la orden si faltan.

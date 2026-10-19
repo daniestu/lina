@@ -306,6 +306,9 @@ def plan_de_desinstalacion(ctx, todo=False):
     if m.de("atajo"):
         nota = m.de("atajo")
         pasos.append((T("atajo global {v1}", v1=nota.get('tecla', '')), lambda nota=nota: ATAJO.quitar(nota, ctx.home, ctx.simular, ctx.ejecutar, ctx.which)))
+    eco = ctx.home / ".config" / "pipewire" / "pipewire.conf.d" / "60-lina-eco.conf"            # el que crea voz/manos_libres.py
+    if eco.exists():
+        pasos.append((T("cancelación de eco y limpieza del micrófono ({v1})", v1=eco), lambda: _quitar_eco(ctx)))
     if m.de("path"):
         p = m.de("path")
         pasos.append((T("línea de PATH en {archivo}", archivo=p["archivo"]), lambda p=p: _quitar_de_path(p["archivo"], p.get("propio", False))))
@@ -337,6 +340,14 @@ def _borrar(ruta, solo_enlace=False):
     except OSError as e:
         return T("no he podido quitar {ruta} ({e})", ruta=ruta, e=e)
     return T("quitado {ruta}", ruta=ruta)
+
+
+def _quitar_eco(ctx):
+    from lina.voz import manos_libres as ML
+    if ctx.simular:
+        return f"[simulación] quitaría {ML.FICHERO_ECO} y reiniciaría el audio"
+    ML.configurar_eco("quitar", lambda *_: None)
+    return T("quitada la configuración de audio de Lina (el audio se reinicia un momento)")
 
 
 def _borrar_claves(ctx):

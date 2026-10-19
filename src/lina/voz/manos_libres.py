@@ -378,10 +378,18 @@ def _entender_orden_es(texto):
 FUENTE_ECO = "lina_eco_source"
 FICHERO_ECO = Path.home() / ".config/pipewire/pipewire.conf.d/60-lina-eco.conf"
 CONF_ECO = """# Creado por el asistente (lina manos-libres eco). Para quitarlo: lina manos-libres eco quitar
+# Además de quitar el eco, limpia el micrófono: supresión de ruido, filtro de graves (zumbidos) y control automático de volumen.
 context.modules = [
   { name = libpipewire-module-echo-cancel
     args = {
       library.name = aec/libspa-aec-webrtc
+      aec.args = {
+        webrtc.noise_suppression = true
+        webrtc.high_pass_filter = true
+        webrtc.gain_control = true
+        webrtc.extended_filter = true
+        webrtc.delay_agnostic = true
+      }
       monitor.mode = true
       capture.props = { node.name = "lina_eco_capture" }
       source.props = { node.name = "%s" node.description = "Microfono sin eco (asistente)" }

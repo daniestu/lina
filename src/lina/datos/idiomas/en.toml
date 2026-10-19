@@ -577,3 +577,5 @@
 "¿Los borro también? Se pierden tus claves, ajustes, voces y modelos, y no se puede deshacer." = "Delete them as well? Your keys, settings, voices and models are lost, and this cannot be undone."
 "Atajo {tecla} registrado en KDE y activado." = "Shortcut {tecla} registered in KDE and active."
 "Atajo {tecla} registrado en KDE, pero KDE no lo activa hasta que cierres sesión y vuelvas a entrar (o lo mires en Preferencias del sistema → Atajos)." = "Shortcut {tecla} registered in KDE, but KDE will not activate it until you log out and back in (or check System Settings → Shortcuts)."
+"cancelación de eco y limpieza del micrófono ({v1})" = "echo cancellation and microphone clean-up ({v1})"
+"quitada la configuración de audio de Lina (el audio se reinicia un momento)" = "removed Lina's audio configuration (audio restarts for a moment)"
