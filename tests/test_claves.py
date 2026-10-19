@@ -179,3 +179,13 @@ def test_sin_secret_tool_instalado_se_dice(mundo):
     salida.clear()
     C.principal([], salida=salida.append, ejecutar=ll)
     assert any("disponible" in l and "no" not in l.split("disponible")[0][-3:] for l in salida)
+
+
+def test_lina_clave_gemini_explica_que_clave_es_y_donde_se_crea(mundo):
+    C, ll, R = mundo
+    salida, prompts = [], []
+    cod = C.principal(["gemini"], secreto=lambda p: prompts.append(p) or GOOGLE, salida=salida.append, ejecutar=ll)
+    assert cod == 0
+    explicacion = " ".join(salida)
+    assert "aistudio.google.com/apikey" in explicacion and "AIza" in explicacion and "Crear clave de API" in explicacion
+    assert "clave gratuita de Gemini" in prompts[0]                         # el prompt dice QUÉ se pega, no un nombre interno

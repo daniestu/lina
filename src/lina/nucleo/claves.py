@@ -316,7 +316,11 @@ def principal(argv, entrada=input, secreto=getpass.getpass, salida=print, ejecut
     if nombre == "gemini_pago" and _pedir_tope(entrada, salida) is None:
         salida(T("Sin tope mensual no guardo la clave de pago."))
         return 1
-    valor = secreto(T("Pega aquí {nombre} (no se ve al escribir): ", nombre=nombre)).strip()
+    if nombre == "gemini":
+        salida(T("La clave gratuita de Gemini se crea en https://aistudio.google.com/apikey: entra con tu cuenta de Google y pulsa «Crear clave de API» "
+                 "(en inglés «Create API key»). Es un texto largo que empieza por «AIza»."))
+    etiqueta = T(CONOCIDAS[nombre][1]) if nombre in CONOCIDAS else nombre
+    valor = secreto(T("Pega aquí la {nombre} (no se ve nada al pegar; pulsa Intro): ", nombre=etiqueta)).strip()
     if not valor or "\n" in valor:
         salida(T("No has escrito nada; no se ha guardado."))
         return 1

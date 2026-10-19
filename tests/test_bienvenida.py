@@ -148,3 +148,38 @@ def test_aviso_sin_clave_una_vez_al_dia(tmp_path):
     assert B.toca_avisar(r, ahora=1000)
     assert not B.toca_avisar(r, ahora=1000 + 3600)
     assert B.toca_avisar(r, ahora=1000 + 25 * 3600)
+
+
+def charla_con_prompts(tmp_path, secretos, enviar=None):
+    c = charla(tmp_path, Teclas(), [], enviar=enviar)
+    c.prompts = []
+    pendientes = list(secretos)
+    c.secreto = lambda texto="": c.prompts.append(texto) or pendientes.pop(0)
+    return c
+
+
+def test_se_explica_que_clave_es_como_se_consigue_y_como_pegarla(tmp_path, monkeypatch):
+    claves_falsas(monkeypatch)
+    c = charla_con_prompts(tmp_path, [""])
+    c.paso_clave()
+    texto = "\n".join(c.texto)
+    assert "clave de API" in texto and "gratuita" in texto and "aistudio.google.com/apikey" in texto
+    assert "Crear clave de API" in texto and "Create API key" in texto
+    assert "AIza" in texto and "Ctrl+Mayús+V" in texto and "no se ve nada" in texto
+    assert "AIza" in c.prompts[0] and "Gemini" in c.prompts[0]                 # la propia línea del prompt dice qué se espera
+
+
+def test_se_acusa_recibo_de_lo_pegado_porque_no_se_ve(tmp_path, monkeypatch):
+    claves_falsas(monkeypatch)
+    c = charla_con_prompts(tmp_path, ["AIza" + "x" * 35])
+    c.paso_clave()
+    assert any("Recibida (39 caracteres)" in t for t in c.texto)
+    assert not any("No empieza por" in t for t in c.texto)
+
+
+def test_se_avisa_si_lo_pegado_no_parece_una_clave_de_gemini(tmp_path, monkeypatch):
+    g = claves_falsas(monkeypatch)
+    c = charla_con_prompts(tmp_path, ["otra-cosa-que-no-es"])
+    c.paso_clave()
+    assert any("No empieza por" in t and "AIza" in t for t in c.texto)
+    assert g == {"gemini": "otra-cosa-que-no-es"}                              # se comprueba igualmente y, si Google la acepta, vale

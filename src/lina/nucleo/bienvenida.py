@@ -19,6 +19,16 @@ from lina.nucleo.idioma import N_, T
 
 ENLACE_CLAVE = "https://aistudio.google.com/apikey"
 MODELO_PRUEBA = "gemini-flash-lite-latest"
+TEXTO_PEDIR_CLAVE = N_(
+    "  Lina necesita una «clave de API» de Gemini. Es como una contraseña que le deja usar la inteligencia artificial de Google para entenderte\n"
+    "  y responderte. Es gratuita (no pide tarjeta) y la creas tú ahora mismo:\n\n"
+    "    1) Abre esta página:  {ENLACE_CLAVE}\n"
+    "       (en la mayoría de terminales, Ctrl+clic sobre el enlace la abre)\n"
+    "    2) Entra con tu cuenta de Google.\n"
+    "    3) Pulsa el botón para crear la clave («Crear clave de API», en inglés «Create API key»).\n"
+    "       Si te pide elegir un proyecto, vale cualquiera.\n"
+    "    4) Te sale un texto largo que empieza por «AIza». Cópialo y pégalo aquí abajo con Ctrl+Mayús+V.\n"
+    "       Al pegarlo no se ve nada: es normal. Pulsa Intro.")
 MARCA = "bienvenida.json"
 AVISO_SIN_CLAVE = (N_("Todavía no tengo clave de Gemini, así que no puedo responderte. Es gratis: abre una terminal y escribe lina bienvenida, "
                    "o directamente lina clave gemini."))
@@ -105,13 +115,16 @@ class Charla:
             self.salida(f"  {'✔' if ok else '!' if ok is None else '✘'} {detalle}")
             self.resultado["clave"] = "ya estaba"
             return
-        self.salida(T("  Lina usa Gemini para entenderte. La clave es gratuita (no hace falta tarjeta):\n    1) abre  {ENLACE_CLAVE}\n    2) entra con tu cuenta de Google y pulsa «Crear clave de API»\n    3) copia la clave y pégala aquí (no se ve al escribir).", ENLACE_CLAVE=ENLACE_CLAVE))
+        self.salida(T(TEXTO_PEDIR_CLAVE, ENLACE_CLAVE=ENLACE_CLAVE))
         for intento in range(3):
-            clave = self.secreto(T("  Clave (Intro para saltar este paso): ")).strip()
+            clave = self.secreto(T("  Clave de Gemini (empieza por «AIza»; Intro para saltar este paso): ")).strip()
             if not clave:
                 self.salida(T("  Vale. Sin clave Lina no puede responder; cuando la tengas:  lina clave gemini"))
                 self.resultado["clave"] = "saltado"
                 return
+            self.salida(T("  Recibida ({n} caracteres). Compruebo que funciona…", n=len(clave)))
+            if not clave.startswith("AIza"):
+                self.salida(T("  ! No empieza por «AIza», como las claves de Gemini: ¿has copiado la clave entera? La compruebo igualmente."))
             ok, detalle = validar_clave(clave, self.enviar)
             if ok is False:
                 self.salida(T("  ✘ {detalle}. Prueba otra vez (quedan {v1}).", detalle=detalle, v1=2 - intento))

@@ -14,6 +14,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
   ¿lo hago?»), de modo que no puede contradecir lo que se va a ejecutar. `estado` avisa si hay un apagado programado.
 
 ### Cambiado
+- Primera configuración (`lina bienvenida`) y `lina clave gemini`: ahora explican qué es la clave de Gemini («una contraseña que deja a Lina usar la IA de Google», gratuita,
+  sin tarjeta), dónde y cómo se crea, qué aspecto tiene (empieza por «AIza») y cómo pegarla en la terminal (Ctrl+Mayús+V, sin que se vea nada). La línea que pide la clave
+  dice qué se espera, se acusa recibo de lo pegado («Recibida (39 caracteres)») y se avisa si no parece una clave de Gemini.
 - Licencia: de MIT a **GNU AGPL-3.0 o posterior** (aún no se había publicado ninguna versión). Cabecera `SPDX-License-Identifier` en todos los archivos, licencia de contribuciones
   en `CONTRIBUTING.md` (`Signed-off-by` y cesión al mantenedor, para poder ofrecer licencias comerciales) y política de la marca «Lina» en `TRADEMARKS.md`.
 - Voces: en inglés `ljspeech-high` (de fábrica) y `bryce-medium`, con licencia comprobada; se quitan `lessac` y `amy` (datos de Lessac solo para investigación). En español se
