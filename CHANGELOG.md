@@ -5,6 +5,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Corregido
+- Resplandor de escucha: dejaba de salir tras suspender el equipo (o apagar la pantalla o cambiar un monitor) hasta reiniciar a Lina. El proceso de dibujo creaba las
+  capas una vez al arrancar y las escondía y mostraba después; KDE las cierra al suspender y las viejas no se recuperan («Compositor closed layer surface before sending
+  initial .configure»). Ahora se crean al hacer falta, con los monitores de ese momento, y se destruyen al apagarse el resplandor.
 - Apagar y reiniciar: la herramienta `energia` solo sabía hacerlo AHORA, y la IA podía decirte «dentro de una hora y media, ¿lo hago?» sobre un `systemctl poweroff`: tu «sí»
   confirmaba la frase y el equipo se apagaba al momento. Ahora `apagar` y `reiniciar` aceptan `valor` (minutos u hora del día) y programan con `shutdown`, hay
   `cancelar_apagado`, y la pregunta de confirmación de las órdenes de energía la escribe el código a partir del comando real («Voy a apagar el equipo dentro de 90 minutos,

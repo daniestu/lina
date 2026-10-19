@@ -110,6 +110,20 @@ def degradado_de(lado, ancho, alto):
             "izquierda": (0, 0, ancho, 0), "derecha": (ancho, 0, 0, 0)}[lado]
 
 
+def accion_capas(visible, hay_ventanas, firma_montada, firma_actual):
+    """Qué hacer con las ventanas de dibujo: «montar», «remontar», «destruir» o «nada».
+
+    Las ventanas se crean al hacer falta, con los monitores que haya en ese momento, y se destruyen al apagarse el resplandor. Una capa creada
+    antes y guardada (para esconderla y volver a mostrarla) se rompe en cuanto la pantalla se apaga, el equipo se suspende o cambia un monitor:
+    el compositor cierra la capa («Compositor closed layer surface before sending initial .configure») y el resplandor ya no sale hasta reiniciar.
+    `firma_*` es la lista de monitores (posición y tamaño) con que se montaron y con los que se cuenta ahora."""
+    if not visible:
+        return "destruir" if hay_ventanas else "nada"
+    if not hay_ventanas:
+        return "montar"
+    return "nada" if firma_montada == firma_actual else "remontar"
+
+
 def estilo_de(modo, color_escucha):
     """(color_hex, alfa_máximo, velocidad_de_pulso) de cada modo. Velocidad 0 = fijo."""
     return {"escucha": (color_escucha, 0.36, 2.0), "seguimiento": (color_escucha, 0.16, 0.0),
@@ -472,7 +486,16 @@ def servir(entrada=None, salida=None):
         v.connect("map-event", lambda w, e: sin_ratón(w) or False)
         return v
 
+    def firma_monitores():
+        try:
+            pantalla = Gdk.Display.get_default()
+            return tuple((g.x, g.y, g.width, g.height) for g in (pantalla.get_monitor(i).get_geometry() for i in range(pantalla.get_n_monitors())))
+        except Exception:
+            return ()
+
     def montar():
+        estado["firma"] = firma_monitores()
+        estado["grosor_aplicado"] = None
         pantalla = Gdk.Display.get_default()
         vistos = set()
         for i in range(pantalla.get_n_monitors()):
@@ -495,17 +518,28 @@ def servir(entrada=None, salida=None):
             ancho, alto = (-1, e) if v.lado_lina in ("arriba", "abajo") else (e, -1)
             v.set_size_request(ancho, alto)
 
+    def destruir():
+        for v in estado["ventanas"]:
+            try:
+                v.destroy()
+            except Exception:
+                pass
+        estado["ventanas"] = []
+        estado["grosor_aplicado"] = None
+
     def refrescar():
         visible = estado["modo"] != "off"
+        accion = accion_capas(visible, bool(estado["ventanas"]), estado.get("firma"), firma_monitores() if visible else None)
+        if accion in ("destruir", "remontar"):
+            destruir()
+        if accion in ("montar", "remontar"):
+            montar()
         ajustar_tamano()
         for v in estado["ventanas"]:
-            if visible:
-                if not v.get_visible():
-                    v.show_all()
-                    GLib.idle_add(lambda ventana=v: sin_ratón(ventana) and False)      # y otra vez ya mostrada
-                v.queue_draw()
-            elif v.get_visible():
-                v.hide()
+            if not v.get_visible():
+                v.show_all()
+                GLib.idle_add(lambda ventana=v: sin_ratón(ventana) and False)      # y otra vez ya mostrada
+            v.queue_draw()
         return True
 
     def orden(linea):
@@ -542,7 +576,6 @@ def servir(entrada=None, salida=None):
             orden(linea.decode("utf-8", "replace"))
         return True
 
-    montar()
     GLib.io_add_watch(entrada.fileno(), GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, leer)
     GLib.timeout_add(33, refrescar)
     decir("listo")
