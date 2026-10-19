@@ -7,6 +7,7 @@ asistente, cuánta libertad tiene y si puede enviar capturas de pantalla. Cada p
 Nada se decide por el usuario: lo que da permisos (autonomía, capturas) se pregunta con su explicación.
 """
 import json
+import re
 import time
 
 import requests
@@ -27,7 +28,7 @@ TEXTO_PEDIR_CLAVE = N_(
     "    2) Entra con tu cuenta de Google.\n"
     "    3) Pulsa el botón para crear la clave («Crear clave de API», en inglés «Create API key»).\n"
     "       Si te pide elegir un proyecto, vale cualquiera.\n"
-    "    4) Te sale un texto largo que empieza por «AIza». Cópialo y pégalo aquí abajo con Ctrl+Mayús+V.\n"
+    "    4) Te sale un texto largo de letras y números (suele empezar por «AIza» o «AQ.»). Cópialo y pégalo aquí abajo con Ctrl+Mayús+V.\n"
     "       Al pegarlo no se ve nada: es normal. Pulsa Intro.")
 MARCA = "bienvenida.json"
 AVISO_SIN_CLAVE = (N_("Todavía no tengo clave de Gemini, así que no puedo responderte. Es gratis: abre una terminal y escribe lina bienvenida, "
@@ -38,6 +39,22 @@ PERFILES = {"1": ("autonomo", N_("Autónoma: hace sola casi todo y te pregunta s
 
 
 # ---------------------------------------------------------------- comprobaciones (inyectables para probarlas sin red ni micrófono)
+def motivo_de_google(respuesta):
+    """El motivo que da Google en un error («API key not valid…»), en una línea y sin ninguna clave; "" si no lo trae."""
+    try:
+        mensaje = str(respuesta.json().get("error", {}).get("message", "")).strip().splitlines()[0]
+    except Exception:                                       # sin cuerpo, o no es JSON
+        return ""
+    return CL.limpiar(mensaje)[:160]
+
+
+def limpiar_pegado(texto):
+    """Lo pegado en la terminal, sin restos: secuencias de escape del «pegado entre corchetes», comillas y espacios de alrededor."""
+    t = re.sub(r"\x1b\[[0-9;?]*[~A-Za-z]", "", str(texto or ""))
+    t = re.sub(r"[\x00-\x1f\x7f]", "", t)
+    return t.strip().strip("\"'").strip()
+
+
 def validar_clave(clave, enviar=requests.post):
     """(True|False|None, detalle). None: no se ha podido comprobar (sin red); la clave se guarda igualmente."""
     try:
@@ -48,7 +65,10 @@ def validar_clave(clave, enviar=requests.post):
     if r.status_code == 200:
         return True, "funciona"
     if r.status_code in (400, 401, 403):
-        return False, T("Google dice que esa clave no es válida")
+        motivo = motivo_de_google(r)
+        if motivo:
+            return False, T("Google dice que esa clave no es válida (código {codigo}: {motivo})", codigo=r.status_code, motivo=motivo)
+        return False, T("Google dice que esa clave no es válida (código {codigo})", codigo=r.status_code)
     if r.status_code == 429:
         return True, T("es válida (ahora mismo has llegado al límite gratuito)")
     return None, T("Google ha contestado {v1}; la guardo y se comprobará al usarla", v1=r.status_code)
@@ -117,14 +137,15 @@ class Charla:
             return
         self.salida(T(TEXTO_PEDIR_CLAVE, ENLACE_CLAVE=ENLACE_CLAVE))
         for intento in range(3):
-            clave = self.secreto(T("  Clave de Gemini (empieza por «AIza»; Intro para saltar este paso): ")).strip()
+            clave = self.secreto(T("  Clave de Gemini (el texto largo que has copiado; Intro para saltar este paso): "))
+            clave = limpiar_pegado(clave)
             if not clave:
                 self.salida(T("  Vale. Sin clave Lina no puede responder; cuando la tengas:  lina clave gemini"))
                 self.resultado["clave"] = "saltado"
                 return
             self.salida(T("  Recibida ({n} caracteres). Compruebo que funciona…", n=len(clave)))
-            if not clave.startswith("AIza"):
-                self.salida(T("  ! No empieza por «AIza», como las claves de Gemini: ¿has copiado la clave entera? La compruebo igualmente."))
+            if len(clave) < 20 or re.search(r"\s", clave):
+                self.salida(T("  ! Eso no parece una clave de Gemini (es un texto largo, sin espacios): ¿has copiado la clave entera? La compruebo igualmente."))
             ok, detalle = validar_clave(clave, self.enviar)
             if ok is False:
                 self.salida(T("  ✘ {detalle}. Prueba otra vez (quedan {v1}).", detalle=detalle, v1=2 - intento))
@@ -137,6 +158,7 @@ class Charla:
             self.salida(T("  ✔ Clave guardada en {donde} ({detalle}).", donde=donde, detalle=detalle))
             self.resultado["clave"] = "guardada"
             return
+        self.salida(T("  No he conseguido guardar una clave que funcione. Cuando la tengas:  lina clave gemini"))
         self.resultado["clave"] = "fallida"
 
     # 2

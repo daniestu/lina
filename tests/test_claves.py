@@ -187,5 +187,11 @@ def test_lina_clave_gemini_explica_que_clave_es_y_donde_se_crea(mundo):
     cod = C.principal(["gemini"], secreto=lambda p: prompts.append(p) or GOOGLE, salida=salida.append, ejecutar=ll)
     assert cod == 0
     explicacion = " ".join(salida)
-    assert "aistudio.google.com/apikey" in explicacion and "AIza" in explicacion and "Crear clave de API" in explicacion
+    assert "aistudio.google.com/apikey" in explicacion and "AIza" in explicacion and "AQ." in explicacion and "Crear clave de API" in explicacion
     assert "clave gratuita de Gemini" in prompts[0]                         # el prompt dice QUÉ se pega, no un nombre interno
+
+
+def test_las_claves_de_google_con_formato_aq_tambien_se_tapan(mundo):
+    C, _, _ = mundo
+    clave = "AQ." + "Ab1_-" * 8
+    assert clave not in C.limpiar(f"fallo con {clave} al llamar")

@@ -5,6 +5,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Corregido
+- El asistente de bienvenida decía que la clave de Gemini «empieza por AIza», pero Google ya da claves que empiezan por `AQ.`: ahora no se afirma un prefijo, se quita el aviso falso y esas claves también se tapan en registros e informes.
+- Al rechazar Google una clave se muestra su motivo (código y mensaje), y la clave pegada se limpia de comillas y de las marcas del «pegado entre corchetes» de la terminal, que podían invalidarla.
 - Resplandor de escucha: dejaba de salir tras suspender el equipo (o apagar la pantalla o cambiar un monitor) hasta reiniciar a Lina. El proceso de dibujo creaba las
   capas una vez al arrancar y las escondía y mostraba después; KDE las cierra al suspender y las viejas no se recuperan («Compositor closed layer surface before sending
   initial .configure»). Ahora se crean al hacer falta, con los monitores de ese momento, y se destruyen al apagarse el resplandor.

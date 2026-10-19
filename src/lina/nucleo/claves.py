@@ -225,7 +225,7 @@ def valor_mcp(nombre, ejecutar=subprocess.run):
 # ----------------------------------------------------------------------------------------------------------------------
 # Que no salgan en el registro
 # ----------------------------------------------------------------------------------------------------------------------
-_PATRONES = [re.compile(p) for p in (r"AIza[0-9A-Za-z_\-]{30,}", r"\bsk-[A-Za-z0-9_\-]{20,}", r"\bgh[pousr]_[A-Za-z0-9]{30,}", r"\bgithub_pat_[A-Za-z0-9_]{30,}",
+_PATRONES = [re.compile(p) for p in (r"AIza[0-9A-Za-z_\-]{30,}", r"\bAQ\.[0-9A-Za-z_\-]{30,}", r"\bsk-[A-Za-z0-9_\-]{20,}", r"\bgh[pousr]_[A-Za-z0-9]{30,}", r"\bgithub_pat_[A-Za-z0-9_]{30,}",
                                       r"\btvly-[A-Za-z0-9_\-]{16,}", r"\bxox[abpr]-[A-Za-z0-9\-]{20,}")]
 _CON_PREFIJO = re.compile(r"(?i)((?:bearer\s+|x-goog-api-key['\"]?\s*[:=]\s*['\"]?|api[_-]?key['\"]?\s*[:=]\s*['\"]?))([A-Za-z0-9._\-]{16,})")
 TAPADA = "«clave»"
@@ -318,7 +318,7 @@ def principal(argv, entrada=input, secreto=getpass.getpass, salida=print, ejecut
         return 1
     if nombre == "gemini":
         salida(T("La clave gratuita de Gemini se crea en https://aistudio.google.com/apikey: entra con tu cuenta de Google y pulsa «Crear clave de API» "
-                 "(en inglés «Create API key»). Es un texto largo que empieza por «AIza»."))
+                 "(en inglés «Create API key»). Es un texto largo de letras y números (suele empezar por «AIza» o «AQ.»)."))
     etiqueta = T(CONOCIDAS[nombre][1]) if nombre in CONOCIDAS else nombre
     valor = secreto(T("Pega aquí la {nombre} (no se ve nada al pegar; pulsa Intro): ", nombre=etiqueta)).strip()
     if not valor or "\n" in valor:

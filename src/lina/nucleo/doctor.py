@@ -246,7 +246,7 @@ def formatear(resultados, color=False):
 
 _IP4 = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _CORREO = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-_CLAVE = re.compile(r"\b(?:AIza[\w-]{20,}|sk-[\w-]{20,}|gh[pousr]_\w{20,}|[A-Za-z0-9_-]{32,})\b")
+_CLAVE = re.compile(r"\b(?:AIza[\w-]{20,}|AQ\.[\w-]{20,}|sk-[\w-]{20,}|gh[pousr]_\w{20,}|[A-Za-z0-9_-]{32,})\b")
 _MAC = re.compile(r"\b(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b")
 
 

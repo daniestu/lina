@@ -22,6 +22,7 @@ EXT_BINARIAS = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".docx", ".pptx
 
 PATRONES = [
     ("clave de API de Google", re.compile(r"AIza[0-9A-Za-z_\-]{30,}")),
+    ("clave de API de Google (formato AQ.)", re.compile(r"\bAQ\.[0-9A-Za-z_\-]{30,}")),
     ("token de GitHub", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}")),
     ("clave tipo sk-", re.compile(r"\bsk-[A-Za-z0-9_\-]{20,}")),
     ("clave privada", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
