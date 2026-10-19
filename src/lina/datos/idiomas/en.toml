@@ -571,3 +571,8 @@
 "Guardada {nombre} en {detalle}. He reiniciado a Lina para que la use." = "Saved {nombre} in {detalle}. I restarted Lina so she uses it."
 "  ✔ He reiniciado a Lina para que use la clave." = "  ✔ I restarted Lina so she uses the key."
 "falta gtk-layer-shell (o GTK3): sin él el resplandor sale como ventanas normales" = "gtk-layer-shell (or GTK3) is missing: without it the glow shows up as ordinary windows"
+"TUS CLAVES guardadas en el llavero del sistema" = "YOUR KEYS stored in the system keyring"
+"claves quitadas del llavero: {v1}" = "keys removed from the keyring: {v1}"
+"ninguna" = "none"
+"\nDe momento he dejado TUS AJUSTES, CLAVES y DATOS ({v1}, {v2}, {v3}) por si vuelves a instalar a Lina." = "\nFor now I have left YOUR SETTINGS, KEYS and DATA ({v1}, {v2}, {v3}) in case you install Lina again."
+"¿Los borro también? Se pierden tus claves, ajustes, voces y modelos, y no se puede deshacer." = "Delete them as well? Your keys, settings, voices and models are lost, and this cannot be undone."

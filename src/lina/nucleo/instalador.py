@@ -17,6 +17,7 @@ from pathlib import Path
 
 from lina import __version__
 from lina.escritorio import atajo as ATAJO
+from lina.nucleo import claves as CL
 from lina.nucleo import modelos as MOD
 from lina.nucleo import plataforma as PL
 from lina.nucleo import rutas as RUT
@@ -315,6 +316,7 @@ def plan_de_desinstalacion(ctx, todo=False):
         e = m.de("entrada")
         pasos.append((T("permisos de /dev/uinput y servicio ydotoold (pide administrador)"), lambda e=e: _quitar_entrada(ctx, e)))
     if todo:
+        pasos.append((T("TUS CLAVES guardadas en el llavero del sistema"), lambda: _borrar_claves(ctx)))
         pasos.append((T("TUS AJUSTES Y CLAVES ({v1}) y los llaveros de Lina", v1=RUT.CONFIG), lambda: _borrar_arbol(RUT.CONFIG, ctx)))
         pasos.append((T("TUS DATOS: recetas, diario, voces, modelos ({v1}, {v2}, {v3})", v1=RUT.DATOS, v2=RUT.ESTADO, v3=RUT.CACHE),
                       lambda: [_borrar_arbol(p, ctx) for p in (RUT.DATOS, RUT.ESTADO, RUT.CACHE)][-1]))
@@ -335,6 +337,13 @@ def _borrar(ruta, solo_enlace=False):
     except OSError as e:
         return T("no he podido quitar {ruta} ({e})", ruta=ruta, e=e)
     return T("quitado {ruta}", ruta=ruta)
+
+
+def _borrar_claves(ctx):
+    if ctx.simular:
+        return "[simulación] borraría las claves del llavero"
+    quitadas = [n for n in CL.CONOCIDAS if CL.borrar(n, ctx.ejecutar)]
+    return T("claves quitadas del llavero: {v1}", v1=", ".join(quitadas) or T("ninguna"))
 
 
 def _borrar_arbol(ruta, ctx):
@@ -391,6 +400,11 @@ def desinstalar(argv, ctx=None):
     elif pasos and not ctx.simular and not ctx.preguntar(T("¿Sigo?")):
         ctx.salida(T("No se ha quitado nada."))
         return 1
+    elif pasos and not ctx.simular and not ctx.si and ctx.terminal:
+        ctx.salida(T("\nDe momento he dejado TUS AJUSTES, CLAVES y DATOS ({v1}, {v2}, {v3}) por si vuelves a instalar a Lina.", v1=RUT.CONFIG, v2=RUT.DATOS, v3=RUT.ESTADO))
+        if ctx.preguntar(T("¿Los borro también? Se pierden tus claves, ajustes, voces y modelos, y no se puede deshacer."), False):
+            todo = True
+            pasos += [p for p in plan_de_desinstalacion(ctx, True) if p[0] not in [q[0] for q in pasos]]
     for d, f in pasos:
         try:
             ctx.salida(f"  ✔ {f()}")

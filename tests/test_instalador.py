@@ -263,3 +263,32 @@ def test_si_ya_esta_en_el_path_no_se_toca_ningun_shell(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", f"/usr/bin:{c.bin}")
     assert I.paso_enlace(c)
     assert not (tmp_path / ".bashrc").exists() and c.manifiesto.de("path") is None
+
+
+def test_al_desinstalar_se_ofrece_borrar_tambien_ajustes_claves_y_datos(tmp_path, monkeypatch):
+    carpetas = {n: tmp_path / "mundo" / n for n in ("CONFIG", "DATOS", "ESTADO", "CACHE")}
+    for n, p in carpetas.items():
+        p.mkdir(parents=True)
+        (p / "algo").write_text("x")
+        monkeypatch.setattr(I.RUT, n, p)
+    borradas = []
+    monkeypatch.setattr(I.CL, "borrar", lambda nombre, ejecutar=None: borradas.append(nombre) or nombre == "gemini")
+    respuestas = iter(["s", "s"])                                  # ¿Sigo? sí · ¿Los borro también? sí
+    c = ctx_en(tmp_path, entrada=lambda _: next(respuestas))
+    c.terminal = True
+    c.manifiesto.anotar("enlace", ruta=str(tmp_path / "x"))
+    assert I.desinstalar([], c) == 0
+    assert not any(p.exists() for p in carpetas.values())
+    assert "gemini" in borradas and any("llavero: gemini" in t for t in c.texto)
+
+
+def test_al_desinstalar_por_defecto_se_conservan_los_datos(tmp_path, monkeypatch):
+    p = tmp_path / "mundo" / "CONFIG"
+    p.mkdir(parents=True)
+    monkeypatch.setattr(I.RUT, "CONFIG", p)
+    respuestas = iter(["s", ""])                                   # ¿Sigo? sí · ¿Los borro también? (Intro = no)
+    c = ctx_en(tmp_path, entrada=lambda _: next(respuestas))
+    c.terminal = True
+    c.manifiesto.anotar("enlace", ruta=str(tmp_path / "x"))
+    assert I.desinstalar([], c) == 0 and p.exists()
+    assert any("he dejado TUS AJUSTES" in t for t in c.texto)
