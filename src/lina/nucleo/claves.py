@@ -182,6 +182,16 @@ def guardar(nombre, valor, ejecutar=subprocess.run):
     return "archivo", T("{ruta} (solo lo puedes leer tú; no he encontrado un llavero del sistema que funcione)", ruta=ruta)
 
 
+def reiniciar_servicio(ejecutar=subprocess.run):
+    """Si Lina está en marcha como servicio, la reinicia para que lea la clave nueva (la lee al arrancar). True si la ha reiniciado."""
+    try:
+        if ejecutar(["systemctl", "--user", "is-active", "--quiet", "lina.service"], capture_output=True, text=True, timeout=10).returncode != 0:
+            return False
+        return ejecutar(["systemctl", "--user", "restart", "lina.service"], capture_output=True, text=True, timeout=60).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def borrar(nombre, ejecutar=subprocess.run):
     nombre = normalizar(nombre)
     _cache.pop(nombre, None)
@@ -329,7 +339,10 @@ def principal(argv, entrada=input, secreto=getpass.getpass, salida=print, ejecut
     except ValueError as e:
         salida(T("No se ha guardado: {e}.", e=e))
         return 1
-    salida(T("Guardada {nombre} en {detalle}. Reinicia a Lina para que la use:  systemctl --user restart lina", nombre=nombre, detalle=detalle))
+    if reiniciar_servicio(ejecutar):
+        salida(T("Guardada {nombre} en {detalle}. He reiniciado a Lina para que la use.", nombre=nombre, detalle=detalle))
+    else:
+        salida(T("Guardada {nombre} en {detalle}. Reinicia a Lina para que la use:  systemctl --user restart lina", nombre=nombre, detalle=detalle))
     return 0
 
 

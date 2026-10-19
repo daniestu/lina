@@ -207,6 +207,8 @@ def paso_servicio(ctx, arrancar=True):
         if r.returncode != 0:
             ctx.aviso("!", T("No he podido activar el servicio: ") + (r.stderr or r.stdout or "sin detalle").strip()[:150])
             return False
+        if arrancar:
+            ctx.ejecutar(["systemctl", "--user", "try-restart", UNIDAD], capture_output=True, text=True)      # si ya corría, que use lo recién instalado
         ctx.aviso("✔", T("Servicio de usuario lina.service ") + (T("activado y arrancado") if arrancar else T("activado")))
         escr = ATAJO.escritorio()
         if escr in ("sway", "hyprland", "otro"):

@@ -568,3 +568,5 @@
 "línea de PATH en {archivo}" = "PATH line in {archivo}"
 "{ruta} ya no existe" = "{ruta} no longer exists"
 "quitada la línea de PATH de {ruta}" = "removed the PATH line from {ruta}"
+"Guardada {nombre} en {detalle}. He reiniciado a Lina para que la use." = "Saved {nombre} in {detalle}. I restarted Lina so she uses it."
+"  ✔ He reiniciado a Lina para que use la clave." = "  ✔ I restarted Lina so she uses the key."

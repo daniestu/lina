@@ -33,6 +33,8 @@ def mundo(tmp_path, monkeypatch):
         def __call__(self, orden, input=None, **k):
             if self.roto:
                 raise FileNotFoundError("secret-tool")
+            if orden[0] == "systemctl":                                   # el servicio de Lina: aquí no hay ninguno en marcha
+                return subprocess.CompletedProcess(orden, 3, "", "")
             a = orden[1:]
             if a[0] == "--version":                                   # el secret-tool de verdad no la admite
                 return subprocess.CompletedProcess(orden, 2, "", "Usage: secret-tool...")
@@ -195,3 +197,21 @@ def test_las_claves_de_google_con_formato_aq_tambien_se_tapan(mundo):
     C, _, _ = mundo
     clave = "AQ." + "Ab1_-" * 8
     assert clave not in C.limpiar(f"fallo con {clave} al llamar")
+
+
+def test_reiniciar_servicio_solo_si_esta_en_marcha(mundo):
+    C, _, _ = mundo
+    llamadas = []
+
+    def activo(orden, **k):
+        llamadas.append(orden[2])
+        return subprocess.CompletedProcess(orden, 0, "", "")
+
+    def parado(orden, **k):
+        llamadas.append(orden[2])
+        return subprocess.CompletedProcess(orden, 3 if orden[2] == "is-active" else 0, "", "")
+
+    assert C.reiniciar_servicio(activo) is True and llamadas == ["is-active", "restart"]
+    llamadas.clear()
+    assert C.reiniciar_servicio(parado) is False and llamadas == ["is-active"]
+    assert C.reiniciar_servicio(lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError())) is False

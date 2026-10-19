@@ -8,6 +8,7 @@ Nada se decide por el usuario: lo que da permisos (autonomía, capturas) se preg
 """
 import json
 import re
+import subprocess
 import time
 
 import requests
@@ -156,6 +157,8 @@ class Charla:
                 self.salida(T("  ✘ No la he guardado: {e}.", e=e))
                 continue
             self.salida(T("  ✔ Clave guardada en {donde} ({detalle}).", donde=donde, detalle=detalle))
+            if self.ejecutar and CL.reiniciar_servicio(self.ejecutar):
+                self.salida(T("  ✔ He reiniciado a Lina para que use la clave."))
             self.resultado["clave"] = "guardada"
             return
         self.salida(T("  No he conseguido guardar una clave que funcione. Cuando la tengas:  lina clave gemini"))
@@ -243,7 +246,7 @@ def principal(argv, charla=None, ruta_marca=None):
         print(T("lina bienvenida   te acompaña para dejar Lina lista: clave de Gemini, micrófono, nombre, autonomía y privacidad. Se puede repetir."))
         return 0
     import sys
-    c = charla or Charla(terminal=sys.stdin.isatty())
+    c = charla or Charla(terminal=sys.stdin.isatty(), ejecutar=subprocess.run)
     if not c.terminal:
         c.salida(T("La bienvenida es una conversación: ábrela en una terminal con  lina bienvenida"))
         return 2
