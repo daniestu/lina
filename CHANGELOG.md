@@ -5,6 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Corregido
+- El instalador ya no se limita a avisar de que `~/.local/bin` no está en el PATH: lo añade él al shell del usuario (fish, zsh o bash), lo anota y `lina uninstall` lo quita.
 - Al instalar, la configuración guiada pedía la clave sin haber mostrado antes la explicación (el texto quedaba retenido porque el instalador guarda su registro): ahora todo se muestra al momento.
 - El asistente de bienvenida decía que la clave de Gemini «empieza por AIza», pero Google ya da claves que empiezan por `AQ.`: ahora no se afirma un prefijo, se quita el aviso falso y esas claves también se tapan en registros e informes.
 - Al rechazar Google una clave se muestra su motivo (código y mensaje), y la clave pegada se limpia de comillas y de las marcas del «pegado entre corchetes» de la terminal, que podían invalidarla.

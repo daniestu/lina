@@ -564,3 +564,7 @@
 "  No he conseguido guardar una clave que funcione. Cuando la tengas:  lina clave gemini" = "  I couldn't save a working key. When you have one:  lina clave gemini"
 "Google dice que esa clave no es válida (código {codigo}: {motivo})" = "Google says that key is not valid (code {codigo}: {motivo})"
 "Google dice que esa clave no es válida (código {codigo})" = "Google says that key is not valid (code {codigo})"
+"He añadido {v1} al PATH en {archivo}: vale en las terminales nuevas (en esta, escribe  {v2}  o ábrela otra vez)." = "I added {v1} to your PATH in {archivo}: it works in new terminals (in this one, type  {v2}  or reopen it)."
+"línea de PATH en {archivo}" = "PATH line in {archivo}"
+"{ruta} ya no existe" = "{ruta} no longer exists"
+"quitada la línea de PATH de {ruta}" = "removed the PATH line from {ruta}"

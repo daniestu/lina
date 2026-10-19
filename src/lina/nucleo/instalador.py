@@ -122,8 +122,59 @@ def paso_enlace(ctx):
     ctx.manifiesto.anotar("enlace", ruta=str(destino))
     ctx.aviso("✔", T("Comando «lina» en {destino}", destino=destino))
     if str(ctx.bin) not in os.environ.get("PATH", "").split(":"):
-        ctx.aviso("!", T("{v1} no está en tu PATH: añádelo para escribir «lina» en la terminal.", v1=ctx.bin))
+        _poner_en_path(ctx)
     return True
+
+
+MARCA_PATH = "# lina: añade ~/.local/bin al PATH"
+
+
+def _poner_en_path(ctx):
+    """Añade ~/.local/bin al PATH del shell del usuario (fish, zsh o bash) para que «lina» funcione en terminales nuevas; se anota para deshacerlo."""
+    shell = Path(os.environ.get("SHELL", "")).name
+    if shell == "fish":
+        archivo, texto, propio = ctx.config / "fish" / "conf.d" / "lina.fish", f"{MARCA_PATH}\nfish_add_path -g $HOME/.local/bin\n", True
+    elif shell in ("zsh", "bash"):
+        archivo = ctx.home / (".zshrc" if shell == "zsh" else ".bashrc")
+        texto, propio = f'\n{MARCA_PATH}\ncase ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac\n', False
+    else:
+        ctx.aviso("!", T("{v1} no está en tu PATH: añádelo para escribir «lina» en la terminal.", v1=ctx.bin))
+        return
+    try:
+        if propio:
+            archivo.parent.mkdir(parents=True, exist_ok=True)
+            archivo.write_text(texto, encoding="utf-8")
+        elif MARCA_PATH not in (archivo.read_text(encoding="utf-8") if archivo.exists() else ""):
+            with archivo.open("a", encoding="utf-8") as f:
+                f.write(texto)
+    except OSError:
+        ctx.aviso("!", T("{v1} no está en tu PATH: añádelo para escribir «lina» en la terminal.", v1=ctx.bin))
+        return
+    ctx.manifiesto.anotar("path", archivo=str(archivo), propio=propio)
+    ctx.aviso("✔", T("He añadido {v1} al PATH en {archivo}: vale en las terminales nuevas (en esta, escribe  {v2}  o ábrela otra vez).",
+                     v1=ctx.bin, archivo=archivo, v2=f"{ctx.bin}/lina"))
+
+
+def _quitar_de_path(archivo, propio):
+    archivo = Path(archivo)
+    if propio:
+        return _borrar(archivo)
+    if not archivo.exists():
+        return T("{ruta} ya no existe", ruta=archivo)
+    lineas = archivo.read_text(encoding="utf-8").split("\n")
+    salida, saltar = [], 0
+    for linea in lineas:
+        if linea == MARCA_PATH:
+            saltar = 2                                           # la marca y la línea de export
+            if salida and salida[-1] == "":
+                salida.pop()
+            continue
+        if saltar:
+            saltar -= 1
+            continue
+        salida.append(linea)
+    archivo.write_text("\n".join(salida), encoding="utf-8")
+    return T("quitada la línea de PATH de {ruta}", ruta=archivo)
 
 
 def paso_modelos(ctx):
@@ -252,6 +303,9 @@ def plan_de_desinstalacion(ctx, todo=False):
     if m.de("atajo"):
         nota = m.de("atajo")
         pasos.append((T("atajo global {v1}", v1=nota.get('tecla', '')), lambda nota=nota: ATAJO.quitar(nota, ctx.home, ctx.simular, ctx.ejecutar, ctx.which)))
+    if m.de("path"):
+        p = m.de("path")
+        pasos.append((T("línea de PATH en {archivo}", archivo=p["archivo"]), lambda p=p: _quitar_de_path(p["archivo"], p.get("propio", False))))
     if m.de("enlace"):
         ruta = Path(m.de("enlace")["ruta"])
         pasos.append((T("comando {ruta}", ruta=ruta), lambda ruta=ruta: _borrar(ruta, solo_enlace=True)))

@@ -235,3 +235,31 @@ def test_en_kde_no_hay_ese_aviso(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CURRENT_DESKTOP", "KDE")
     c = ctx_en(tmp_path, which=lambda n: "/bin/" + n)
     assert I.paso_servicio(c) and not any("graphical-session.target" in t for t in c.texto)
+
+
+@pytest.mark.parametrize("shell, donde, contiene", [
+    ("/usr/bin/fish", ".config/fish/conf.d/lina.fish", "fish_add_path"), ("/bin/bash", ".bashrc", "export PATH"), ("/usr/bin/zsh", ".zshrc", "export PATH"),
+])
+def test_si_el_bin_no_esta_en_el_path_se_añade_al_shell_y_se_deshace(tmp_path, monkeypatch, shell, donde, contiene):
+    monkeypatch.setenv("SHELL", shell)
+    monkeypatch.setenv("PATH", "/usr/bin")
+    c = ctx_en(tmp_path)
+    c.config = tmp_path / ".config"
+    (tmp_path / ".bashrc").write_text("alias a=b\n", encoding="utf-8")
+    (tmp_path / ".zshrc").write_text("alias a=b\n", encoding="utf-8")
+    assert I.paso_enlace(c) and I.paso_enlace(c)                       # repetir no duplica
+    archivo = tmp_path / donde
+    texto = archivo.read_text(encoding="utf-8")
+    assert contiene in texto and texto.count(I.MARCA_PATH) == 1
+    assert c.manifiesto.de("path")["archivo"] == str(archivo)
+    p = c.manifiesto.de("path")
+    I._quitar_de_path(p["archivo"], p["propio"])
+    assert not archivo.exists() or (I.MARCA_PATH not in archivo.read_text(encoding="utf-8") and "alias a=b" in archivo.read_text(encoding="utf-8"))
+
+
+def test_si_ya_esta_en_el_path_no_se_toca_ningun_shell(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHELL", "/bin/bash")
+    c = ctx_en(tmp_path)
+    monkeypatch.setenv("PATH", f"/usr/bin:{c.bin}")
+    assert I.paso_enlace(c)
+    assert not (tmp_path / ".bashrc").exists() and c.manifiesto.de("path") is None
