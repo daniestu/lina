@@ -96,7 +96,7 @@ def barra(nivel, ancho=30):
 
 # ---------------------------------------------------------------- pasos
 class Charla:
-    def __init__(self, entrada=input, secreto=None, salida=print, terminal=True, ajustes=None, enviar=requests.post, grabar=None, ejecutar=None):
+    def __init__(self, entrada=input, secreto=None, salida=lambda *a: print(*a, flush=True), terminal=True, ajustes=None, enviar=requests.post, grabar=None, ejecutar=None):
         import getpass
         self.entrada, self.secreto, self.salida = entrada, secreto or getpass.getpass, salida
         self.terminal, self.enviar, self.grabar = terminal, enviar, grabar

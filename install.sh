@@ -143,7 +143,7 @@ paso "6/6 Primera configuración"
 if [ "$SIMULAR" = 1 ]; then printf '  [simulación] abriría la configuración guiada:  lina bienvenida\n'
 elif [ "$SIN_BIENVENIDA" = 1 ] || [ "$CON_TTY" = 0 ] || [ "$SI" = 1 ]; then
   aviso "Cuando quieras, termina de configurarla con:  lina bienvenida"
-else "$LINA" bienvenida < /dev/tty || aviso "La configuración guiada no ha terminado: repítela con  lina bienvenida"; fi
+else PYTHONUNBUFFERED=1 "$LINA" bienvenida < /dev/tty || aviso "La configuración guiada no ha terminado: repítela con  lina bienvenida"; fi
 
 cat <<TEXTO
 
