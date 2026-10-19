@@ -28,6 +28,8 @@ _ESCRITORIOS = (("kde", "kde"), ("plasma", "kde"), ("cinnamon", "cinnamon"), ("x
 NOMBRES = {"kde": "KDE Plasma", "gnome": "GNOME", "xfce": "XFCE", "cinnamon": "Cinnamon", "mate": "MATE", "lxqt": "LXQt", "cosmic": "COSMIC",
            "pantheon": "Pantheon", "deepin": "Deepin", "sway": "sway", "hyprland": "Hyprland", "otro": N_("un escritorio sin identificar")}
 WLROOTS = {"sway", "hyprland"}
+PYTHON_RESPLANDOR = "/usr/bin/python3"          # el que dibuja el resplandor (voz/indicador.py): el del sistema, donde está PyGObject
+SONDA_CAPA = "import gi; gi.require_version('Gtk','3.0'); gi.require_version('GtkLayerShell','0.1'); from gi.repository import Gtk, GtkLayerShell"
 
 
 def detectar(entorno=None):
@@ -66,6 +68,7 @@ class Sesion:
         self.entorno = os.environ if entorno is None else entorno
         self.ejecutar, self.which = ejecutar, which
         self._ultima = (0.0, None)                       # (cuándo, ventana): el contexto pregunta tres veces seguidas
+        self._capa = (0.0, None)                         # (cuándo, ¿hay gtk-layer-shell en el Python del resplandor?)
         d = detectar(self.entorno)
         self.escritorio, self.tipo, self.xwayland = d["escritorio"], d["sesion"], d["xwayland"]
 
@@ -286,6 +289,18 @@ class Sesion:
             vent = "xdotool"
         return {"captura": capt, "portapapeles": "wl-clipboard" if self.tipo == "wayland" else "xclip", "ventanas": vent}
 
+    def _hay_capa(self):
+        """¿Puede el Python del sistema (el que dibuja el resplandor) usar gtk-layer-shell? Se recuerda un minuto si no, para no sondear a cada paso."""
+        cuando, valor = self._capa
+        if valor or (valor is not None and time.time() - cuando < 60):
+            return valor
+        rc, _ = self._ej([PYTHON_RESPLANDOR, "-c", SONDA_CAPA], tiempo=15)
+        self._capa = (time.time(), rc == 0)
+        return rc == 0
+
+    def _necesita_capa(self):
+        return self.tipo == "wayland" and self.escritorio != "gnome"
+
     def capacidades(self):
         """{'ventana': (método|None, nota), 'captura': …, 'portapapeles': …}: lo que funciona AHORA y, si no, por qué."""
         cap = {}
@@ -304,8 +319,8 @@ class Sesion:
         cap["portapapeles"] = (pp, "") if pp else (None, T("no hay programa de portapapeles: instala {v1}", v1=self.recomendado()['portapapeles']))
         if self.tipo == "wayland" and self.escritorio == "gnome":
             cap["indicador"] = ("ventana", T("GNOME no deja dibujar encima de las ventanas: el resplandor puede no verse; te avisan los pitidos"))
-        elif self.tipo == "wayland":
-            cap["indicador"] = ("capa", "")
+        elif self._necesita_capa():
+            cap["indicador"] = ("capa", "") if self._hay_capa() else ("ventana", T("falta gtk-layer-shell (o GTK3): sin él el resplandor sale como ventanas normales"))
         else:
             cap["indicador"] = ("ventana", T("necesita un compositor con transparencia") if self.tipo == "x11" else "")
         return cap
@@ -313,7 +328,10 @@ class Sesion:
     def paquetes_que_faltan(self):
         """Nombres lógicos de los paquetes que darían lo que falta HOY (captura, portapapeles, ventanas). Vacío si todo está cubierto."""
         c, r = self.capacidades(), self.recomendado()
-        return [r[k] for k in ("captura", "portapapeles", "ventanas") if r.get(k) and not c["ventana" if k == "ventanas" else k][0]]
+        falta = [r[k] for k in ("captura", "portapapeles", "ventanas") if r.get(k) and not c["ventana" if k == "ventanas" else k][0]]
+        if self._necesita_capa() and c["indicador"][0] != "capa":
+            falta += ["gtk3", "gtk-layer-shell", "pygobject", "pycairo"]                  # lo que dibuja el resplandor
+        return falta
 
     def describir(self):
         """Líneas para la IA: qué escritorio es y qué puede y qué no puede hacer Lina en él (sin suponer)."""

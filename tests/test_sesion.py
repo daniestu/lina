@@ -26,7 +26,8 @@ def falso(respuestas, registro=None):
 
 def sesion(desktop, tipo, programas=(), respuestas=None, registro=None, extra=None):
     env = {"XDG_CURRENT_DESKTOP": desktop, "XDG_SESSION_TYPE": tipo, **(extra or {})}
-    return S.Sesion(env, ejecutar=falso(respuestas or {}, registro), which=hay(*programas))
+    respuestas = {("/usr/bin/python3",): "", **(respuestas or {})}                 # por defecto, el resplandor tiene gtk-layer-shell
+    return S.Sesion(env, ejecutar=falso(respuestas, registro), which=hay(*programas))
 
 
 # ---------------------------------------------------------------- detección
@@ -224,3 +225,12 @@ def test_el_resplandor_avisa_de_sus_limites():
     assert sesion("KDE", "wayland", []).capacidades()["indicador"] == ("capa", "")
     assert sesion("sway", "wayland", []).capacidades()["indicador"] == ("capa", "")
     assert "compositor" in sesion("XFCE", "x11", []).capacidades()["indicador"][1]
+
+
+def test_sin_gtk_layer_shell_el_resplandor_lo_dice_y_se_pide_instalarlo():
+    falta = {("/usr/bin/python3",): lambda orden: SimpleNamespace(returncode=1, stdout="", stderr="no")}
+    s = sesion("KDE", "wayland", ["spectacle", "wl-copy"], respuestas=falta)
+    assert s.capacidades()["indicador"][0] == "ventana" and "gtk-layer-shell" in s.capacidades()["indicador"][1]
+    assert s.paquetes_que_faltan() == ["gtk3", "gtk-layer-shell", "pygobject", "pycairo"]
+    assert sesion("KDE", "wayland", ["spectacle", "wl-copy"]).paquetes_que_faltan() == []         # con la capa, no se pide nada
+    assert sesion("XFCE", "x11", [], respuestas=falta).paquetes_que_faltan() == ["xfce4-screenshooter", "xclip", "xdotool"]   # en X11 no hace falta la capa

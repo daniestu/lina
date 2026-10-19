@@ -570,3 +570,4 @@
 "quitada la línea de PATH de {ruta}" = "removed the PATH line from {ruta}"
 "Guardada {nombre} en {detalle}. He reiniciado a Lina para que la use." = "Saved {nombre} in {detalle}. I restarted Lina so she uses it."
 "  ✔ He reiniciado a Lina para que use la clave." = "  ✔ I restarted Lina so she uses the key."
+"falta gtk-layer-shell (o GTK3): sin él el resplandor sale como ventanas normales" = "gtk-layer-shell (or GTK3) is missing: without it the glow shows up as ordinary windows"
