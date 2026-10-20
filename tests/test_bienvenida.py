@@ -227,3 +227,42 @@ def test_el_aviso_por_voz_del_atajo_sale_una_vez_por_sesion(tmp_path):
     assert B.toca_avisar_atajo(atajo, ruta) is False                         # reinicios del servicio en la misma sesión: callada
     assert B.toca_avisar_atajo({"tecla": "Meta+Space", "sesion": "8"}, ruta) is True
     assert "Meta+Space" in B.texto_atajo_pendiente(atajo) and "cierres sesión" in B.texto_atajo_pendiente(atajo)
+
+
+def _charla_con_micro(tmp_path, niveles, volumen=100, entrada=None):
+    """Una charla cuyo micrófono va dando estos niveles y cuyo «pactl» recuerda el volumen que se le pone."""
+    estado = {"volumen": volumen, "puestos": []}
+    cola = iter(niveles)
+
+    def pactl(orden, **k):
+        if orden[1] == "get-source-volume":
+            return SimpleNamespace(returncode=0, stdout=f"Volume: front-left: 65536 / {estado['volumen']}% / 0,00 dB", stderr="")
+        estado["volumen"] = int(orden[3].rstrip("%"))
+        estado["puestos"].append(estado["volumen"])
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    aj = AJ.Ajustes(tmp_path / "config.toml", log=lambda m: None)
+    c = B.Charla(entrada=entrada or (lambda _: "s"), secreto=Teclas(), salida=[].append, ajustes=aj, grabar=lambda s: next(cola), ejecutar=pactl)
+    c.texto = []
+    c.salida = c.texto.append
+    return c, estado
+
+
+def test_un_microfono_saturado_se_baja_solo_hasta_que_se_oye_bien(tmp_path):
+    c, estado = _charla_con_micro(tmp_path, [1.0, 1.0, 0.6])
+    c.paso_microfono()
+    assert c.resultado["microfono"] == "ajustado"
+    assert estado["puestos"] == [60, 40] and estado["volumen"] == 40
+    assert any("llega al máximo" in t for t in c.texto) and any("ganancia al 40 %" in t for t in c.texto)
+
+
+def test_si_sigue_saturando_se_deja_el_volumen_como_estaba_y_se_aconsejan_auriculares(tmp_path):
+    c, estado = _charla_con_micro(tmp_path, [1.0, 1.0, 1.0, 1.0])
+    c.paso_microfono()
+    assert c.resultado["microfono"] == "saturado" and estado["volumen"] == 100
+    assert any("auriculares" in t for t in c.texto)
+
+
+def test_un_microfono_normal_no_se_toca(tmp_path):
+    c, estado = _charla_con_micro(tmp_path, [0.5])
+    c.paso_microfono()
+    assert c.resultado["microfono"] == "bien" and estado["puestos"] == []

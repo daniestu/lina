@@ -76,6 +76,27 @@ def validar_clave(clave, enviar=requests.post):
     return None, T("Google ha contestado {v1}; la guardo y se comprobará al usarla", v1=r.status_code)
 
 
+SATURADO = 0.98                      # el pico de la grabación llega al máximo: el micrófono «se satura» (suena alto, distorsionado y con ruido)
+MIC_PREDETERMINADO = "@DEFAULT_SOURCE@"
+
+
+def volumen_entrada(ejecutar):
+    """El volumen (%) de la entrada de sonido predeterminada, o None si no se puede leer."""
+    try:
+        r = ejecutar(["pactl", "get-source-volume", MIC_PREDETERMINADO], capture_output=True, text=True, timeout=5)
+        m = re.search(r"(\d+)%", r.stdout or "") if r.returncode == 0 else None
+        return int(m.group(1)) if m else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def poner_volumen_entrada(ejecutar, porcentaje):
+    try:
+        return ejecutar(["pactl", "set-source-volume", MIC_PREDETERMINADO, f"{int(porcentaje)}%"], capture_output=True, text=True, timeout=5).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def medir_microfono(segundos=2.0, grabar=None):
     """(nivel 0-1 aproximado, mensaje de error). Mide el volumen máximo de unos segundos de micrófono."""
     try:
@@ -178,9 +199,35 @@ class Charla:
         elif nivel < 0.01:
             self.salida(T("  ! No oigo nada ({v1}). Revisa que no esté silenciado ni sea otro dispositivo (ajustes de sonido).", v1=barra(nivel)))
             self.resultado["microfono"] = "silencio"
+        elif nivel >= SATURADO:
+            self._microfono_saturado(nivel)
         else:
             self.salida(T("  ✔ Te oigo: {barra}", barra=barra(nivel)))
             self.resultado["microfono"] = "bien"
+
+    def _microfono_saturado(self, nivel):
+        """El pico llega al máximo: la ganancia del micrófono es demasiado alta y se oye alto, distorsionado y con ruido (Whisper no entiende). Se baja sola."""
+        self.salida(T("  ! Tu micrófono llega al máximo ({barra}): se satura, suena demasiado alto y con ruido, y así no te entiendo bien.", barra=barra(nivel)))
+        inicial = volumen_entrada(self.ejecutar) if self.ejecutar else None
+        if not inicial or inicial < 15:
+            self.salida(T("  Bájale el volumen de entrada en los ajustes de sonido, o usa unos auriculares con micrófono; y repite luego con:  lina bienvenida"))
+            self.resultado["microfono"] = "saturado"
+            return
+        for factor in (0.6, 0.4, 0.25):
+            porcentaje = max(5, int(inicial * factor))
+            if not poner_volumen_entrada(self.ejecutar, porcentaje):
+                break
+            self.salida(T("  Le bajo la ganancia al {porcentaje} %. Di otra frase en voz normal (2 segundos)…", porcentaje=porcentaje))
+            nuevo, error = medir_microfono(2.0, self.grabar)
+            if error or nuevo is None:
+                break
+            if SATURADO > nuevo >= 0.01:
+                self.salida(T("  ✔ Ahora se oye bien: {barra}. He dejado la ganancia al {porcentaje} %.", barra=barra(nuevo), porcentaje=porcentaje))
+                self.resultado["microfono"] = "ajustado"
+                return
+        poner_volumen_entrada(self.ejecutar, inicial)
+        self.salida(T("  Sigue saturando aunque lo bajo: he dejado la ganancia como estaba. Prueba unos auriculares con micrófono o un micrófono USB, y repite con:  lina bienvenida"))
+        self.resultado["microfono"] = "saturado"
 
     # 3
     def paso_nombre(self):

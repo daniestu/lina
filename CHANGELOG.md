@@ -5,6 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Corregido
+- La prueba del micrófono de `lina bienvenida` detecta cuando el micrófono se satura (llega al máximo: suena alto, distorsionado y con ruido, y Whisper no entiende) y baja solo su ganancia hasta que se oye bien; si no basta, lo deja como estaba y aconseja unos auriculares o un micrófono USB.
 - El micrófono sin eco que crea Lina ahora pide expresamente a PipeWire supresión de ruido, filtro de graves y control automático de volumen (se aplica al instalarlo de nuevo o con `lina manos-libres eco`), y `lina uninstall` quita esa configuración de audio, que antes se quedaba.
 - En KDE el atajo recién creado no responde hasta cerrar sesión (los atajos van dentro de KWin y no hay forma fiable de recargarlos): ahora el instalador lo dice con un recuadro al final, el resumen lo recuerda y Lina lo avisa con una notificación y, una vez por sesión, por voz, hasta que se cierre sesión.
 - `lina uninstall` dejaba tus ajustes, claves y datos sin avisar. Ahora dice que los conserva y, en una terminal, pregunta si quieres borrarlos también; con `--todo` también quita las claves del llavero del sistema.

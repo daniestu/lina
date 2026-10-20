@@ -582,3 +582,8 @@
 "  Si algo no va:  lina doctor" = "  If something is wrong:  lina doctor"
 "Tu atajo {tecla} todavía no funciona: KDE lo activa cuando cierres sesión y vuelvas a entrar. Hasta entonces, dime «Oye {nombre}»." = "Your {tecla} shortcut doesn't work yet: KDE activates it when you log out and back in. Until then, just say «Hey {nombre}»."
 "Cierra sesión para activar el atajo" = "Log out to activate the shortcut"
+"  ! Tu micrófono llega al máximo ({barra}): se satura, suena demasiado alto y con ruido, y así no te entiendo bien." = "  ! Your microphone hits the maximum ({barra}): it clips, sounds too loud and noisy, and I can't understand you well like that."
+"  Bájale el volumen de entrada en los ajustes de sonido, o usa unos auriculares con micrófono; y repite luego con:  lina bienvenida" = "  Turn its input volume down in the sound settings, or use a headset with a microphone; then repeat with:  lina bienvenida"
+"  Le bajo la ganancia al {porcentaje} %. Di otra frase en voz normal (2 segundos)…" = "  I'm lowering the gain to {porcentaje} %. Say another sentence in a normal voice (2 seconds)…"
+"  ✔ Ahora se oye bien: {barra}. He dejado la ganancia al {porcentaje} %." = "  ✔ It sounds fine now: {barra}. I left the gain at {porcentaje} %."
+"  Sigue saturando aunque lo bajo: he dejado la ganancia como estaba. Prueba unos auriculares con micrófono o un micrófono USB, y repite con:  lina bienvenida" = "  It still clips even when I lower it: I left the gain as it was. Try a headset with a microphone or a USB microphone, then repeat with:  lina bienvenida"
