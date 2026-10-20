@@ -142,7 +142,7 @@ NORMALES = r'''
 ls -la ~/Documentos
 cat /etc/os-release
 grep -r "def main" ~/proyectos/lina/src
-curl -s https://wttr.in/Madrid?format=3
+curl -s https://wttr.in/Londres?format=3
 curl -s https://api.example.com/datos.json | jq .nombre
 curl -o /tmp/foto.png https://example.com/foto.png
 curl -L -o /tmp/foto.png https://example.com/foto.png && xdg-open /tmp/foto.png
