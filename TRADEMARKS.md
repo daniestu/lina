@@ -13,4 +13,6 @@ El código de Lina es libre (AGPL-3.0 o posterior), pero **el nombre «Lina» y 
 
 El proyecto oficial es el de <https://github.com/daniestu/lina>. Para pedir permiso o preguntar, abre un issue.
 
-*(Este texto es un borrador sin revisión legal. El registro de la marca está pendiente.)*
+«Lina» es el nombre con el que este proyecto se da a conocer; no está registrado como marca y no se reclama exclusividad sobre una palabra tan común: existen otros usos de «Lina» en otros ámbitos. Lo que se pide arriba es solo no confundir a los usuarios con una versión modificada o un servicio que parezca el oficial.
+
+*(Este texto es un borrador sin revisión legal.)*

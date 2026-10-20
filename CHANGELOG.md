@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+## [0.1.0-beta] - 2026-10-20
+
 ### Corregido
 - La prueba del micrófono de `lina bienvenida` detecta cuando el micrófono se satura (llega al máximo: suena alto, distorsionado y con ruido, y Whisper no entiende) y baja solo su ganancia hasta que se oye bien; si no basta, lo deja como estaba y aconseja unos auriculares o un micrófono USB.
 - El micrófono sin eco que crea Lina ahora pide expresamente a PipeWire supresión de ruido, filtro de graves y control automático de volumen (se aplica al instalarlo de nuevo o con `lina manos-libres eco`), y `lina uninstall` quita esa configuración de audio, que antes se quedaba.

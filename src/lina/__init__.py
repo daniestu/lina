@@ -2,4 +2,4 @@
 # Copyright (C) 2026 Lina contributors
 """Lina: asistente de voz en español para el escritorio Linux."""
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.1.0b1"
