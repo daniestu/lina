@@ -666,3 +666,6 @@
 "sin mensaje" = "no message"
 "Sonando: {consulta}." = "Playing: {consulta}."
 "mpv no ha llegado a empezar a tiempo. No suena nada." = "mpv did not start in time. Nothing is playing."
+"Sonido mientras te escucha" = "Sound while listening"
+"true: mientras te escucha (atajo u «Oye Lina») baja lo que suena en el ordenador (música, series, juegos) para oírte bien, como el coche, y lo devuelve a como estaba al terminar. No toca el volumen general." = "true: while it listens (hotkey or «Hey Lina») it turns down what is playing on the computer (music, shows, games) so it can hear you, like a car, and puts it back when done. It does not touch the master volume."
+"A qué porcentaje de su volumen baja lo que suena mientras te escucha (20 = a una quinta parte; 0 = lo deja en silencio)." = "The percentage of its volume that what is playing is turned down to while it listens (20 = one fifth; 0 = silent)."

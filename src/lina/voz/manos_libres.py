@@ -703,10 +703,22 @@ class ManosLibres:
             self.seguimiento_hasta = 0.0                     # se está atendiendo algo pedido con el atajo: cualquier ventana anterior se cierra
         self.estado_previo = est
 
+    def _sonido_en_espera_de_orden(self):
+        """Te ha oído el nombre y espera la orden: baja lo que suena para oírte bien; cuando la orden llega (o se cansa de esperar) lo devuelve."""
+        espera = self.modo == "orden"
+        if espera == getattr(self, "_sonido_bajado", False):
+            return
+        self._sonido_bajado = espera
+        try:
+            (self.a._bajar_sonido if espera else self.a._subir_sonido)("manos libres")
+        except AttributeError:
+            pass
+
     def procesar_bloque(self, bloque):
         """Un bloque de audio (30 ms). Si completa una frase, la trata. Devuelve el texto tratado (solo para pruebas)."""
         self.tic()
         self._seguir_estado()
+        self._sonido_en_espera_de_orden()
         motivo = self.pausa()
         if motivo:
             self.seg.reiniciar()

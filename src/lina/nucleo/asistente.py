@@ -12,6 +12,7 @@ Cómo se usa:
 
 Dónde guarda las cosas: ver nucleo/rutas.py (carpetas estándar XDG: ~/.config/lina, ~/.local/share/lina…).
 """
+import atexit
 import base64
 import io
 import json
@@ -40,6 +41,7 @@ from lina.nucleo import directas as DIR
 from lina.nucleo import cache_voz as CV
 from lina.escritorio import sesion as SES
 from lina.nucleo import reproductor as REPRO
+from lina.voz import atenuador as ATE
 from lina.voz import piper_residente as PIPER_RES
 from lina.voz import voces as VOC
 
@@ -478,6 +480,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     pantalla_adjunta = False      # ¿la captura ya va con esta petición?
     captura_guardada = None       # la captura de cuando preguntaste (solo se envía si se permite)
     interrumpiendo = False        # ¿estás grabando una frase mientras sigue trabajando en la anterior?
+    atenuador = None              # quien baja lo que suena mientras te escucha (se crea la primera vez que hace falta)
     origen_voz_libre = False      # la petición en curso viene del manos libres: NO puede confirmar acciones (solo el atajo)
     manos_libres = None           # el oyente de «Oye Lina» (manos_libres.py)
     sustituida = False            # la tarea en curso se abandona porque has pedido otra cosa (no hace falta que diga «lo dejo»)
@@ -616,8 +619,30 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             callback=lambda datos, *_: self.bloques.append(datos.copy()))
         self.microfono.start()
 
+    def _bajar_sonido(self, dueno="atajo"):
+        """Mientras te escucha, baja lo que suena en el ordenador (como el coche) para oírte bien. Nunca estorba: si falla, sigue todo igual."""
+        try:
+            ajustes = AJ.actuales(log=lambda m: None)
+            if not ajustes.get("sonido", "bajar_al_escuchar"):
+                return
+            if self.atenuador is None:
+                self.atenuador = ATE.Atenuador(log=log)
+                atexit.register(self.atenuador.subir, todos=True)
+            self.atenuador.nivel = max(0, min(100, int(ajustes.get("sonido", "volumen_al_escuchar"))))
+            self.atenuador.bajar(dueno)
+        except Exception as e:
+            log(f"Sonido: no he podido bajarlo ({e!r})")
+
+    def _subir_sonido(self, dueno="atajo"):
+        try:
+            if self.atenuador is not None:
+                self.atenuador.subir(dueno)
+        except Exception as e:
+            log(f"Sonido: no he podido devolverlo ({e!r})")
+
     def empezar_grabacion(self):
         log_nueva_peticion()
+        self._bajar_sonido()                               # antes del pitido: así el pitido no se baja
         pitido(880)
         self.estado = "grabando"
         self._iniciar_grabacion()
@@ -626,6 +651,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def terminar_grabacion(self):
         self.microfono.stop()
         self.microfono.close()
+        self._subir_sonido()
         pitido(520)
         self.estado = "pensando"
         self.interrumpiendo = False
@@ -636,6 +662,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _empezar_interrupcion(self):
         """Has pulsado el atajo mientras piensa. Te escucha sin dejar lo que hace: si dices solo «para», lo cancela; si pides otra cosa,
         abandona lo anterior y atiende lo nuevo; si no dices nada, lo anterior sigue."""
+        self._bajar_sonido()
         pitido(880)
         self.interrumpiendo = True
         self._iniciar_grabacion()
@@ -644,6 +671,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _terminar_interrupcion(self):
         self.microfono.stop()
         self.microfono.close()
+        self._subir_sonido()
         pitido(520)
         self.interrumpiendo = False
         audio = np.concatenate(self.bloques)[:, 0] if self.bloques else np.zeros(0, np.float32)
@@ -2056,6 +2084,7 @@ def main():
         threading.Thread(target=asistente.vigilar_mcp, daemon=True).start()
     if INT:
         threading.Thread(target=INT.activar_accesibilidad, args=(log,), daemon=True).start()   # los programas que se abran ya publicarán sus botones
+    threading.Thread(target=lambda: ATE.Atenuador(log=log).recuperar(), daemon=True).start()   # si la vez anterior se cerró con el sonido bajado, se devuelve
     if ML:
         try:
             asistente.manos_libres = ML.ManosLibres(asistente, asistente.transcribir_activacion, log=log, pitido=pitido)

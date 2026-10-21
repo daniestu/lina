@@ -56,6 +56,13 @@ que no se pueden desactivar. Los perfiles se aplican encima de `politica.txt`: p
 | `velocidad` | `1.0` | Velocidad al hablar: 1 normal, 1.2 más rápida, 0.8 más lenta. |
 | `residente` | `true` | true: la voz de Piper se mantiene cargada en un proceso aparte (se cierra sola tras 10 minutos sin hablar) y las frases salen sin la espera de cargarla cada vez; si falla, se usa el método de siempre. Ocupa algo de memoria mientras está cargada. |
 
+### [sonido] Sonido mientras te escucha
+
+| Ajuste | De fábrica | Qué hace |
+|---|---|---|
+| `bajar_al_escuchar` | `true` | true: mientras te escucha (atajo u «Oye Lina») baja lo que suena en el ordenador (música, series, juegos) para oírte bien, como el coche, y lo devuelve a como estaba al terminar. No toca el volumen general. |
+| `volumen_al_escuchar` | `20` | A qué porcentaje de su volumen baja lo que suena mientras te escucha (20 = a una quinta parte; 0 = lo deja en silencio). |
+
 ### [activacion] Manos libres
 
 | Ajuste | De fábrica | Qué hace |
