@@ -73,16 +73,20 @@ class MixinPantalla:
             self.captura_guardada = None
             log(f"Captura de pantalla: NO enviada ({motivo_no})")
             return None
+        renovar = True
         if (self.contexto or {}).get("tipo") == "juego":
             motivo = "estás en un juego"
         elif C.pide_mirar(pregunta):
             motivo = "hablas de lo que ves"
         elif time.time() - self.ultima_pantalla_t < PANTALLA_SESION_SEG:
             motivo = "seguías pidiendo ayuda con la pantalla"
+            renovar = False                                  # seguir una ayuda no la alarga: si no, cada pregunta (la hora, una receta…) la mandaría para siempre
         else:
             log("Captura de pantalla: no enviada (no hace falta; la IA la pedirá si la necesita)")
             return None
-        self.pantalla_adjunta, self.ultima_pantalla_t = True, time.time()
+        self.pantalla_adjunta = True
+        if renovar:
+            self.ultima_pantalla_t = time.time()
         log(f"Captura de pantalla: enviada ({motivo})")
         return imagen
 

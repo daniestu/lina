@@ -8,8 +8,9 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 
 | Fase | Qué | Tamaño | Depende de |
 |---|---|---|---|
-| 11 | Medir dónde se va el tiempo | S | — |
-| 12 | Camino rápido: órdenes simples sin pasar por la IA | L | 11 |
+| 11 | Medir dónde se va el tiempo *(hecha)* | S | — |
+| 11b | No olvidar la petición tras un paso previo *(hecha)* | S | — |
+| 12 | Camino rápido: órdenes simples sin pasar por la IA, y voz sin esperas | L | 11 |
 | 13 | Memoria de preferencias | M | — |
 | 14 | Bluetooth completo y más diagnóstico de juegos | S | 12 (para sus órdenes directas) |
 | 15 | GPU y energía (módulo opcional) | M | — |
@@ -35,6 +36,32 @@ confirmaciones por atajo (es una decisión de seguridad, no una carencia).
 
 **Hecho cuando:** sabes, con datos de tu propio equipo, qué fase domina en una orden simple y en una compleja, y fijamos el objetivo de la fase 12
 (propuesta: **menos de 1 s** desde el fin de la frase hasta que la acción empieza).
+
+**Resultados de la primera medición (equipo de Dani, 20 órdenes con el atajo):**
+
+| Tipo de orden | Hasta que suena | Dónde se va |
+|---|---|---|
+| Abrir aplicación, volumen, ventanas | 3,3 – 5,0 s | Whisper 0,6–0,8 · IA 1,3–3,0 (2 llamadas) · acción 0,3–0,7 · síntesis 0,7–0,8 |
+| Pregunta sin herramientas | 2,7 – 3,1 s | Whisper 0,7 · IA 1,2–1,5 · síntesis 0,7–0,9 |
+| Consulta con herramientas (RAM, CPU, red, batería) | 6,7 – 19 s | La IA (5–17 s); la herramienta tarda ~0 s |
+| Búsqueda web | 49,9 s | IA 45 s (esperas de red) |
+| Instalar un programa (a fondo) | 30,4 s | IA 17,9 · instalación en segundo plano |
+
+Qué sale de ahí: **1)** cada orden simple cuesta DOS llamadas a la IA (decidir y luego decir «Abierto»); **2)** tras actuar hay una TERCERA, el revisor «¿se cumplió lo pedido?», con espera de hasta 8 s y se prueba con dos modelos: cuando Google va lento, una orden de 3 s pasa a 14 s;
+**3)** tras un fallo de red la clave gratuita queda «en pausa» 3 minutos y todo va a la de pago (en un mes: 3,50 € y 466 llamadas); **4)** Piper arranca un proceso por frase (0,7–0,9 s antes de oír nada); **5)** la captura de pantalla se enviaba en todas las peticiones (ya corregido, ver 11b).
+
+---
+
+## Fase 11b — No olvidar la petición (hecha)
+
+**El fallo:** «Abre Stremio» → no está instalado → Lina lo instala (más de 10 s: pasa a segundo plano) → avisa «ya ha terminado» → y nunca lo abre. Se olvidaba de lo que de verdad se pidió.
+
+**Qué se hizo**
+1. Al pasar un comando a segundo plano se guarda la petición del usuario. Al terminar bien, Lina **retoma sola esa petición** (espera a no estar hablando contigo), le dice a la IA qué acaba de terminar y que haga lo que falta, sin repetir el paso previo.
+2. Tope de 3 vueltas seguidas, para que no dé vueltas sin fin; si falla la tarea o nadie puede retomar, el aviso de siempre.
+3. Las instrucciones de la IA dicen que su trabajo es cumplir la petición COMPLETA, no el primer paso, y el mensaje de «sigue en segundo plano» ya no le deja dar la petición por cumplida.
+
+**Pendiente de probar a mano:** «Abre Stremio» con Stremio desinstalado: debe instalarlo y abrirlo sin pedírselo otra vez.
 
 ---
 
@@ -73,7 +100,14 @@ captura de pantalla y de la IA. Ahí ya hay un patrón: «lo hace el código, si
 - En el perfil **Prudente** las acciones directas piden la confirmación que ya pedirían; en Equilibrada y Autónoma van directas.
 - Interruptor `directas.activo` y orden `lina directas`: lista lo que sabe hacer y **`lina directas probar "ábreme stremio"`** dice qué haría **sin ejecutarlo**.
 
-### 12.5 Pruebas y despliegue
+### 12.5 Menos esperas en lo que sigue pasando por la IA
+- **Revisor solo cuando hace falta:** no se llama tras acciones inocuas (abrir un programa, volumen, leer el estado) ni cuando ya hay una comprobación del código; con plazo corto (3 s) y **sin probar un segundo modelo** si el primero no contesta (ante la duda, se da por cumplido, como ya hace).
+- **Pausas de modelo más finas:** un fallo de red (timeout) pausa 30 s, no 3 minutos; los 503/429 siguen igual. Si por una pausa se usa la clave de pago, se anota en el registro y en `lina tiempos`.
+- **Medir cada llamada a la IA** (duración y resultado) dentro de `lina tiempos`, para saber cuánto cuesta cada vuelta.
+- **Voz sin esperas:** caché de las frases fijas («Abierto.», «Hecho.», «Volumen al 40 %») ya sintetizadas por voz, para que suenen al instante, y Piper persistente (no un proceso por frase) para el resto.
+- **Objetivo:** orden directa ≤ 1,2 s hasta que suena; con IA, mediana ≤ 3 s y sin picos de más de 10 s por esperas de red.
+
+### 12.6 Pruebas y despliegue
 - Tabla de frases → acción (positivas), frases que **no** deben activarse (preguntas, negaciones, frases largas que contienen «abre» por casualidad), ambigüedades,
   parámetros fuera de rango y ejecutor falso de principio a fin.
 - Registro «Directa: …» con su tiempo para comparar durante una semana con lo que habría hecho la IA.

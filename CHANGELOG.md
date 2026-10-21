@@ -4,6 +4,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Corregido
+- Una petición que necesita un paso previo largo ya no se olvida: si Lina tenía que instalar algo para abrirlo («abre Stremio») y la instalación pasaba a segundo plano, al terminar solo avisaba de que «ya ha terminado» y no abría nada. Ahora retoma sola la petición original cuando acaba la tarea (hasta 3 vueltas seguidas), le cuenta a la IA qué terminó y qué falta, y las instrucciones de la IA dicen expresamente que su trabajo es cumplir la petición completa, no el primer paso.
+- La captura de pantalla se enviaba a la IA en todas las peticiones durante minutos después de pedir algo como «maximiza esta ventana» (incluso para «¿qué hora es?» o una receta), porque cada petición alargaba el plazo de «seguir con la ayuda de pantalla». Ahora seguir una ayuda no la alarga, y el plazo baja de 180 a 90 segundos.
+
 ### Añadido
 - `lina tiempos [N]`: en qué fase se va el tiempo de tus últimas N peticiones (Whisper, decisiones previas del código, IA, herramientas, síntesis de la voz y reproducción), por separado con y sin herramientas, con media, mediana y la fase más lenta. Es la base para decidir qué acelerar (fase 11 del [plan de mejoras](docs/plan-mejoras.md)).
 - Cada petición deja una línea `Tiempos […]` en el registro y una entrada en `~/.local/state/lina/tiempos.jsonl` con **solo números** (nunca lo que dijiste ni lo que contestó Lina); el archivo se recorta solo al llegar a ~200 KB. Se desactiva con `lina config poner privacidad.registrar_tiempos no` y se borra con `lina olvidar tiempos` (también incluido en `lina olvidar todo`).

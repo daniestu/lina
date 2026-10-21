@@ -1173,6 +1173,8 @@ class Ejecutor:
         self._ctx_fondo = None               # (id del diario, intenciones, deshacer) del comando que se está ejecutando
         self.paneles_abiertos = []           # ventanas de ajustes abiertas por el asistente
         self.pregunta_pura = ""              # lo que ha pedido el usuario (lo pone el asistente): las recetas automáticas guardan sus palabras
+        self.continuar = None                # lo pone el asistente: callable(peticion, motivo, profundidad, aviso) -> bool; retoma la petición al acabar un segundo plano
+        self.profundidad = 0                 # cuántas veces seguidas se ha retomado la misma petición (0 = la petición original)
         self.nueva_tarea()
         if diario:
             try:
@@ -1871,10 +1873,12 @@ class Ejecutor:
                 anotar(f"[abierto, sigue en marcha] {comando}")
                 return ("El programa se ha abierto y sigue en marcha, que es lo normal en una aplicación con ventana. Ya está abierto: no hay nada "
                         "que esperar ni que avisar cuando se cierre.")
-            threading.Thread(target=self._vigilar, args=(proc, comando, motivo, self._ctx_fondo), daemon=True).start()
+            threading.Thread(target=self._vigilar, args=(proc, comando, motivo, self._ctx_fondo, self.pregunta_pura, self.profundidad), daemon=True).start()
             anotar(f"[segundo plano] {comando}")
-            return (f"SIGUE EN SEGUNDO PLANO (lleva más de {TIMEOUT_ESPERA} s). El asistente avisará por voz al terminar. "
-                    f"Dile al usuario que lo estás haciendo y que le avisarás. Todavía NO ha terminado: no digas que ya está hecho.")
+            retomar = (" Cuando termine, el asistente RETOMARÁ SOLO la petición del usuario (no hace falta que la repita): dile en una frase qué estás "
+                       "haciendo ahora y que después seguirás con lo que pidió." if self.continuar and self.pregunta_pura else "")
+            return (f"SIGUE EN SEGUNDO PLANO (lleva más de {TIMEOUT_ESPERA} s). El asistente avisará por voz al terminar.{retomar} "
+                    f"Todavía NO ha terminado: no digas que ya está hecho, ni que has cumplido la petición.")
         return self._resultado(proc.returncode, salida, time.time() - inicio, comando)
 
     def _resultado(self, rc, salida, segundos, comando):
@@ -1916,7 +1920,7 @@ class Ejecutor:
         proc.wait()
         anotar(f"[fin rc={proc.returncode}] {comando}")
 
-    def _vigilar(self, proc, comando, motivo, ctx=None):
+    def _vigilar(self, proc, comando, motivo, ctx=None, peticion="", profundidad=0):
         try:
             salida, _ = proc.communicate(timeout=TIMEOUT_MAXIMO)
         except subprocess.TimeoutExpired:
@@ -1949,8 +1953,15 @@ class Ejecutor:
             elif verificacion and "⚠" in verificacion:
                 self.avisar(T("Ha terminado {motivo}, pero no puedo asegurar que haya funcionado. Está el detalle en el registro de acciones.", motivo=motivo))
             else:
+                reiniciar = _es_actualizacion_completa(comando)
+                if peticion and self.continuar:               # lo que pidió el usuario no era «instalar», sino lo que viene después: se retoma
+                    try:
+                        if self.continuar(peticion, motivo, profundidad, reiniciar):
+                            return
+                    except Exception as e:
+                        log(f"No he podido retomar la petición tras «{motivo}»: {e!r}")
                 self.avisar(T("Ya ha terminado: {motivo}.", motivo=motivo) + (T(" Como se ha actualizado todo el sistema, conviene reiniciar el equipo cuando puedas.")
-                                                                              if _es_actualizacion_completa(comando) else ""))
+                                                                              if reiniciar else ""))
         else:
             self.avisar(T("Ha fallado una tarea: {motivo}. Está el detalle en el registro de acciones.", motivo=motivo))
 

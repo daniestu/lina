@@ -118,7 +118,7 @@ from lina.nucleo.constantes import (  # noqa: F401
     ANCHO_MAX_CAPTURA, ARCHIVO_PID, ARCHIVO_PRIVADO, ARCHIVO_VOCABULARIO, AUDIO_RESPUESTA, AVISO_ESPERA_A_FONDO, BUSQUEDA,
     CAPTURA, CAPTURA_MIRAR, CONFIRMACION_IA, CONFIRMAR_ACCIONES, ESPERA_CUOTA_MAX, ESPERA_PARAR_MAXIMA, ESPERA_PARAR_TAREA,
     ESPERA_REINTENTO, FRECUENCIA, INSTRUCCIONES, INSTRUCCION_LOCAL, instrucciones, INTERRUPCION_IA, MAX_BUSQUEDAS, MAX_BUSQUEDAS_PROFUNDO,
-    MAX_ESPERAS_CUOTA, MAX_MIRADAS, MAX_MIRADAS_PROFUNDO, MAX_PASOS, MAX_PASOS_PROFUNDO, MAX_TIEMPO_TAREA,
+    MAX_CONTINUACIONES, MAX_ESPERAS_CUOTA, MAX_MIRADAS, MAX_MIRADAS_PROFUNDO, MAX_PASOS, MAX_PASOS_PROFUNDO, MAX_TIEMPO_TAREA,
     MAX_TIEMPO_TAREA_PROFUNDO, MAX_TOKENS_TAREA, MAX_TOKENS_TAREA_PROFUNDO, MAX_TURNOS, MODELOS_CONFIRMACION, MODELOS_GEMINI,
     MODELOS_PROFUNDO, MODELO_LOCAL, MODELO_WHISPER, NO_VE_PANTALLA, OLLAMA, PANTALLA_SESION_SEG, PAUSA_BUSQUEDA_SEG,
     PAUSA_MODELO_SEG, PLAZO_PENSAR_A_FONDO, PRIORIDAD, PROMPT_WHISPER_CARACTERES, REINTENTOS_SERVIDOR, SESION_MINUTOS,
@@ -498,6 +498,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         self.ultima_pregunta = 0.0
         self.pregunta_pura = ""
         self.ejecutor = H.Ejecutor(avisar=self.avisar, confirmar=CONFIRMAR_ACCIONES)
+        self.ejecutor.continuar = self._continuar_peticion
         self.busquedas_turno = 0
         self.acciones_turno = []       # todo lo que se ha ejecutado de verdad en esta pregunta: (herramienta, datos, resultado)
         self.acciones_confirmadas = []  # lo que se ejecutó al decir «sí», para contarlo aunque Gemini falle
@@ -854,8 +855,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             return
         self._atender(pregunta, inicio, crono)
 
-    def _atender(self, pregunta, inicio, crono=None):
+    def _atender(self, pregunta, inicio, crono=None, nota_sistema="", profundidad=0):
         crono = crono or TIE.Cronometro()
+        self.ejecutor.profundidad = profundidad                     # >0: esta vuelta retoma una petición que esperó a una tarea en segundo plano
         euros = PRES.entender_tope(pregunta)
         if euros is not None:                                   # solo TÚ cambias el tope de gasto: lo hace el código ante una frase tuya, nunca la IA
             self.decir(PRES.subir_tope(euros, voz_libre=self.origen_voz_libre))
@@ -906,7 +908,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         etiqueta = etiqueta_contexto(self.contexto, self.titulo)
         if etiqueta:
             pregunta = f"{etiqueta} Pregunta: {pregunta}"
-        pregunta += nota
+        pregunta += nota + nota_sistema
         pista = self.pista_de_voz(self.pregunta_pura)
         if pista:
             pregunta += f"\n[SISTEMA: {pista}]"
@@ -978,6 +980,29 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             crono.sumar("sintesis", self.ultima_habla[0])
             crono.sumar("voz", self.ultima_habla[1])
             self._anotar_tiempos(crono, origen, modo)
+
+    def _continuar_peticion(self, peticion, motivo, profundidad, reiniciar=False):
+        """Una tarea en segundo plano (instalar, descargar…) ha terminado y la petición del usuario seguía sin cumplir: se retoma SOLA, sin que la repita.
+        Espera a que no estés hablando con Lina; devuelve True si se hace cargo (entonces no hace falta el aviso de «ya ha terminado»)."""
+        if profundidad >= MAX_CONTINUACIONES:
+            log(f"Petición «{peticion[:60]}»: ya la he retomado {profundidad} veces, no sigo")
+            return False
+        for _ in range(240):
+            with self.cerrojo:
+                if self.estado == "esperando":
+                    self.estado, self.interrumpiendo = "pensando", False
+                    self.fin_tarea.clear()
+                    break
+            time.sleep(0.5)
+        else:
+            return False
+        log(f"Retomo la petición «{peticion if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'}» ahora que ha terminado: {motivo}")
+        nota = (f"\n[SISTEMA: esta petición se quedó esperando a una tarea en segundo plano ({motivo}) y YA HA TERMINADO. La petición original del usuario es la de arriba y "
+                "sigue sin cumplir salvo que ese paso fuese justo lo que pidió. Haz AHORA lo que falta (por ejemplo, abrir lo que se acaba de instalar) con tus herramientas, "
+                "sin volver a lanzar el paso previo, y cuéntale el resultado final en una frase. Si lo que pidió era precisamente esa tarea, di solo que ya está." +
+                (" Se ha actualizado TODO el sistema: recomiéndale reiniciar cuando pueda." if reiniciar else "") + "]")
+        threading.Thread(target=self._tarea, args=(self._atender, peticion, time.time(), None, nota, profundidad + 1), daemon=True).start()
+        return True
 
     def _anotar_tiempos(self, crono, origen, modo):
         """La línea de tiempos de esta petición (solo números). Medir es un extra: nunca estropea nada."""
