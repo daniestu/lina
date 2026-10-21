@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 from contextlib import nullcontext
+from datetime import datetime
 from pathlib import Path
 
 from lina.nucleo import ajustes as AJ
@@ -125,7 +126,7 @@ from lina.nucleo.constantes import (  # noqa: F401
     MODELOS_PROFUNDO, MODELO_LOCAL, MODELO_WHISPER, NO_VE_PANTALLA, OLLAMA, PANTALLA_SESION_SEG, PAUSA_BUSQUEDA_SEG,
     PAUSA_MODELO_SEG, PLAZO_PENSAR_A_FONDO, PRIORIDAD, PROMPT_WHISPER_CARACTERES, REINTENTOS_SERVIDOR, SESION_MINUTOS,
     SIN_RESPUESTA, TIEMPO_INSISTIR_SIN_AJUSTES, TIEMPO_PENSAR_A_FONDO, TIMEOUT_CONFIRMACION, TIMEOUT_INSISTIR_SIN_AJUSTES,
-    TIMEOUT_PENSAR_A_FONDO, TIMEOUT_PROFUNDO, VOZ, VRAM_NECESARIA_MB,
+    TIMEOUT_PENSAR_A_FONDO, TIMEOUT_PRIMERA_CLAVE, TIMEOUT_PROFUNDO, VOZ, VRAM_NECESARIA_MB,
 )
 
 
@@ -1029,6 +1030,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
                 return None
             oido, app = DIR.normalizar(datos["nombre"]), DIR.normalizar(m.group(1))
             return T("Abierto.") if (oido in app or app in oido) else T("Abierto {app}.", app=m.group(1))
+        if ident == "hora":
+            ahora = datetime.now()
+            return DIR.frase_de_fecha(ahora) if datos["que"] == "fecha" else DIR.frase_de_hora(ahora)
+        if ident == "ventanas":
+            r = str(self.ejecutor.sistema("ventanas", dict(datos)))
+            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
+                return None
+            return T("Hecho.")
         if ident in ("volumen", "silencio"):
             r = str(self.ejecutor.sistema("audio", dict(datos)))
             if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
@@ -1620,7 +1629,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         proveedor = IAC.actual().proveedor
         for i, clave in enumerate(claves):
             self.paso_guion = 0
-            r = preguntar_ia(proveedor, clave, modelo, *args, **kwargs)
+            hay_otra = i + 1 < len(claves)
+            # Si hay otra clave a la que recurrir, no se espera 20 s a la primera: lo normal es 1-3 s, y si no responde en 8 se prueba con la otra
+            extra = {"timeout": TIMEOUT_PRIMERA_CLAVE} if hay_otra and modo_claves == "rapido" and "timeout" not in kwargs else {}
+            r = preguntar_ia(proveedor, clave, modelo, *args, **kwargs, **extra)
             if r:
                 return r
             if i + 1 < len(claves):

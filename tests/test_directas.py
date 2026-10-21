@@ -40,6 +40,19 @@ def espanol(monkeypatch):
     ("pon el volumen al 40 por ciento", ("volumen", {"accion": "volumen", "valor": "40"})),
     ("sube el volumen al 80", ("volumen", {"accion": "volumen", "valor": "80"})),
     ("volumen al 30%", ("volumen", {"accion": "volumen", "valor": "30"})),
+    ("¿Puedes abrir Steam?", ("abrir_app", {"nombre": "steam"})),             # Whisper pone ¿? a las peticiones educadas
+    ("Maximiza esta ventana.", ("ventanas", {"accion": "maximizar", "ventana": "activa"})),
+    ("maximiza", ("ventanas", {"accion": "maximizar", "ventana": "activa"})),
+    ("Pon esta ventana en pantalla completa.", ("ventanas", {"accion": "pantalla_completa", "ventana": "activa"})),
+    ("pantalla completa", ("ventanas", {"accion": "pantalla_completa", "ventana": "activa"})),
+    ("quita la pantalla completa", ("ventanas", {"accion": "pantalla_completa", "ventana": "activa"})),
+    ("minimiza esta ventana", ("ventanas", {"accion": "minimizar", "ventana": "activa"})),
+    ("muestra el escritorio", ("ventanas", {"accion": "mostrar_escritorio"})),
+    ("¿Qué hora es?", ("hora", {"que": "hora"})),
+    ("dime la hora", ("hora", {"que": "hora"})),
+    ("me puedes decir la hora", ("hora", {"que": "hora"})),
+    ("¿Qué día es hoy?", ("hora", {"que": "fecha"})),
+    ("a qué día estamos", ("hora", {"que": "fecha"})),
     ("Silencia el sonido.", ("silencio", {"accion": "silenciar"})),
     ("silencia", ("silencio", {"accion": "silenciar"})),
     ("Silencia, el sonido.", ("silencio", {"accion": "silenciar"})),
@@ -52,7 +65,6 @@ def test_frases_que_son_ordenes_directas(frase, esperado):
 
 @pytest.mark.parametrize("frase", [
     "",                                                          # nada
-    "¿Puedes abrir Steam?",                                      # pregunta con signo
     "cómo abro Firefox",                                         # pregunta
     "qué pasa si abro Firefox",
     "no abras Firefox",                                          # negación
@@ -72,6 +84,10 @@ def test_frases_que_son_ordenes_directas(frase, esperado):
     "pon la música",
     "cállate",                                                   # eso es «para de hablar», no silenciar
     "borra todo",
+    "cierra esta ventana",                                       # cerrar pierde trabajo: nunca directa
+    "maximiza todas las ventanas y abre Firefox",
+    "qué hora es en Tokio",                                      # otra zona: lo sabe la IA
+    "qué día cae el próximo viernes",
     "apaga el ordenador",
     "reinicia el equipo",
     "instala Stremio",
@@ -96,12 +112,26 @@ def test_en_ingles(monkeypatch):
     assert D.entender("don't open Steam") is None
     assert D.entender("how do I open Steam") is None
     assert D.entender("open the door") is None
+    assert D.entender("What time is it?") == ("hora", {"que": "hora"})
+    assert D.entender("what's the date today") == ("hora", {"que": "fecha"})
+    assert D.entender("maximize this window") == ("ventanas", {"accion": "maximizar", "ventana": "activa"})
+    assert D.entender("full screen") == ("ventanas", {"accion": "pantalla_completa", "ventana": "activa"})
+    assert D.entender("show the desktop") == ("ventanas", {"accion": "mostrar_escritorio"})
+    assert D.entender("what time is it in Tokyo") is None
 
 
 def test_frase_de_volumen():
     assert D.frase_de_volumen("Ventana: Volume: 0.85") == "Volumen al 85 %."
     assert D.frase_de_volumen("Volume: 0.40 [MUTED]") == "Está silenciado."
     assert D.frase_de_volumen("no sé") is None
+
+
+def test_frases_de_hora_y_fecha():
+    from datetime import datetime
+    assert D.frase_de_hora(datetime(2026, 10, 21, 16, 58)) == "Son las 16:58."
+    assert D.frase_de_hora(datetime(2026, 10, 21, 1, 5)) == "Es la 1:05."
+    assert D.frase_de_hora(datetime(2026, 10, 21, 0, 5)) == "Son las 00:05."
+    assert D.frase_de_fecha(datetime(2026, 10, 21, 9, 0)) == "Hoy es miércoles 21 de octubre."
 
 
 def test_lina_directas_lista_y_prueba():

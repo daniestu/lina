@@ -61,6 +61,7 @@ TIEMPO_INSISTIR_SIN_AJUSTES = 60              # si no hay ajustes de configuraci
 TIMEOUT_INSISTIR_SIN_AJUSTES = 30             # y cada respuesta de Gemini se espera como mucho esto
 TIMEOUT_PROFUNDO = 90                         # segundos que se espera la respuesta de Gemini al insistir (el razonamiento alto tarda más)
 PAUSA_RED_SEG = 30                          # tras un timeout o un fallo de conexión (no de cuota ni de servidor), se salta ese modelo solo este tiempo
+TIMEOUT_PRIMERA_CLAVE = 8                    # con dos claves, segundos que se espera a la primera (la gratuita) antes de probar con la otra
 TIMEOUT_REVISOR = 4                         # segundos que espera el revisor «¿se cumplió lo pedido?» (y solo prueba un modelo): no merece frenar la respuesta
 PAUSA_MODELO_SEG = 180                      # tras un 503/429 o un timeout, se salta ese modelo este tiempo
 PAUSA_BUSQUEDA_SEG = 1800                   # si la búsqueda de Google da error de cuota, se prueba sin ella este tiempo

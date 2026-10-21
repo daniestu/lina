@@ -622,3 +622,8 @@
 "Órdenes directas (sin IA)" = "Direct commands (no AI)"
 "Con la IA, sin herramientas" = "With the AI, no tools"
 "Con la IA y herramientas" = "With the AI and tools"
+"Son las {hora}." = "It is {hora}."
+"Es la {hora}." = "It is {hora}."
+"Hoy es {dia} {n} de {mes}." = "Today is {dia}, {mes} {n}."
+"maximiza esta ventana · pantalla completa · minimiza esta ventana · muestra el escritorio" = "maximize this window · full screen · minimize this window · show the desktop"
+"qué hora es · qué día es hoy" = "what time is it · what day is it"

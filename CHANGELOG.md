@@ -6,11 +6,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ### Añadido
 - **Órdenes directas** (fase 12 del plan de mejoras): «abre Firefox», «sube el volumen», «baja el volumen un 20 %», «pon el volumen al 40», «silencia el sonido» y «quita el silencio» se entienden y se hacen sin llamar a la IA, con las mismas herramientas y reglas de seguridad de siempre. Si la frase no está clara (pregunta, negación, dos cosas encadenadas, un programa que no está instalado, un fallo) se la deja a la IA como antes. `lina directas` lista lo que sabe hacer y `lina directas probar "frase"` dice qué haría sin ejecutarlo; se apaga con `lina config poner directas.activo no`.
+- Más órdenes directas, también sin IA: «maximiza esta ventana», «pantalla completa» (y quitarla), «minimiza esta ventana», «muestra el escritorio» (sobre la ventana activa; cerrar no entra: se podría perder trabajo), y «¿qué hora es?» / «¿qué día es hoy?», que dice el propio código con la hora del equipo. Las peticiones educadas que Whisper escribe con «¿…?» («¿puedes abrir Steam?») también valen.
 - Las frases cortas de voz («Abierto.», «Volumen al 40 %.») se guardan ya sintetizadas en la caché y la segunda vez suenan al instante, sin arrancar Piper.
 
 ### Cambiado
 - El revisor «¿se cumplió lo pedido?» ya no se llama cuando el propio código comprobó lo hecho (un programa abierto, un volumen leído después de tocarlo), espera 4 segundos en vez de 8 y prueba un solo modelo; con Google lento, una orden de 3 s dejaba de pasar a 14 s.
-- Un fallo de conexión o un timeout deja en pausa a un modelo 30 segundos en vez de 3 minutos (los fallos de cuota y de servidor siguen igual), y un timeout del revisor ya no pausa al modelo que contesta: antes un solo fallo desviaba todo a la clave de pago durante minutos.
+- Un fallo de conexión o un timeout deja en pausa a un modelo 30 segundos la primera vez, el doble la segunda y así hasta 3 minutos, y se olvida en cuanto responde bien (los fallos de cuota y de servidor siguen en 3 minutos); un timeout del revisor ya no pausa al modelo que contesta. Con la clave gratuita lenta o saturada, cada petición esperaba 20 s antes de pasar a la de pago.
+- Con dos claves (gratuita y de pago), la primera solo espera 8 segundos antes de probar con la otra, en vez de 20 (a fondo y con una sola clave sigue como antes).
 - `lina tiempos` separa las órdenes directas de las que pasan por la IA.
 
 ### Corregido

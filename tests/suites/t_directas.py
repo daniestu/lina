@@ -86,6 +86,22 @@ ej = Ejec(); a = asistente(ej)
 r, _ = pedir(a, "quita el silencio")
 ok(r == ("Sonido activado.", "silencio"), f"activar: {r}")
 
+# ---- ventanas: sobre la ventana activa, con la herramienta de siempre; dice «Hecho.»
+for frase, accion in (("Maximiza esta ventana.", "maximizar"), ("Pon esta ventana en pantalla completa.", "pantalla_completa"), ("minimiza esta ventana", "minimizar")):
+    ej = Ejec(audio="código de salida: 0 (0 s)\n\nCOMPROBADO AHORA: Ahora: ventana «Konsole», es la activa"); a = asistente(ej)
+    r, _ = pedir(a, frase)
+    ok(r == ("Hecho.", "ventanas") and ej.llamadas == [("ventanas", {"accion": accion, "ventana": "activa"})], f"ventanas {accion}: {r} {ej.llamadas}")
+ej = Ejec(audio="No sé cuál es la ventana activa ahora mismo."); a = asistente(ej)
+r, _ = pedir(a, "maximiza esta ventana")
+ok(r is None and ej.cancelado == 1 and not a.dichas, "ventanas: si no se puede, a la IA")
+
+# ---- la hora y la fecha las dice el código: ni IA ni herramientas
+ej = Ejec(); a = asistente(ej)
+r, crono = pedir(a, "¿Qué hora es?")
+ok(r and r[1] == "hora" and (r[0].startswith("Son las ") or r[0].startswith("Es la ")) and ej.llamadas == [], f"hora: {r} {ej.llamadas}")
+r, _ = pedir(a, "¿Qué día es hoy?")
+ok(r and r[0].startswith("Hoy es ") and ej.llamadas == [], f"fecha: {r}")
+
 # ---- si el sistema pide confirmación, falla o no hay audio: a la IA, y lo preparado se descarta
 for texto in (H.MENSAJE_PREPARADO, "código de salida: 1", "No hay audio"):
     ej = Ejec(audio="código de salida: 0 " + texto if texto == H.MENSAJE_PREPARADO else texto); a = asistente(ej)
@@ -124,5 +140,23 @@ a.acciones_turno = [("procesos", {}, "...")]
 ok(a._acciones_comprobadas() is False, "una lectura que la IA resume (RAM, CPU): sí hay revisor")
 a.acciones_turno = []
 ok(a._acciones_comprobadas() is False, "sin acciones: sí hay revisor")
+
+# ---- con dos claves no se espera 20 s a la primera: se prueba con la otra a los 8 s (la última sí espera lo normal)
+vistos = []
+def falso_preguntar(proveedor, clave, modelo, *args, **kw):
+    vistos.append((clave, kw.get("timeout")))
+    return None if clave == "libre" else "respuesta"
+A.preguntar_ia = falso_preguntar
+b = A.Asistente.__new__(A.Asistente)
+b._claves = lambda modo: ["libre", "pago"]
+b.paso_guion = 0
+ok(b._gemini("rapido", "m", "pregunta", None) == "respuesta" and vistos == [("libre", A.TIMEOUT_PRIMERA_CLAVE), ("pago", None)], f"timeouts por clave: {vistos}")
+vistos.clear()
+b._gemini("profundo", "m", "pregunta", None)
+ok(vistos[0] == ("libre", None), f"a fondo: sin recortar: {vistos}")
+vistos.clear()
+b._claves = lambda modo: ["unica"]
+b._gemini("rapido", "m", "pregunta", None)
+ok(vistos == [("unica", None)], f"con una sola clave, sin recortar: {vistos}")
 
 print("fallos", fallos)

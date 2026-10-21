@@ -9,6 +9,7 @@ import re
 import unicodedata
 
 from lina.nucleo import idioma as IDI
+from lina.nucleo import texto as TXT
 from lina.nucleo.idioma import N_, T
 
 # Todo lo que se sabe hacer así (para `lina directas`): (id, ejemplo en español, ejemplo en inglés)
@@ -16,6 +17,8 @@ ACCIONES = (
     ("abrir_app", N_("abre Firefox · ábreme Steam · puedes abrir Dolphin"), "open Firefox"),
     ("volumen", N_("sube el volumen · baja el volumen · pon el volumen al 40"), "volume up · set the volume to 40"),
     ("silencio", N_("silencia el sonido · quita el silencio"), "mute · unmute"),
+    ("ventanas", N_("maximiza esta ventana · pantalla completa · minimiza esta ventana · muestra el escritorio"), "maximize this window · full screen"),
+    ("hora", N_("qué hora es · qué día es hoy"), "what time is it · what day is it"),
 )
 
 
@@ -50,7 +53,29 @@ def _nombre_valido(nombre):
     return not any(p in _CORTA_NOMBRE or p in _NO_ES_PROGRAMA for p in palabras)
 
 
+_VENT = r"(?:esta |la |mi )?(?:ventana|aplicacion|app|programa)?(?: actual| activa)?"
+
+
 def _es(n):
+    # ---- hora y fecha (se preguntan con «qué…»: van antes de descartar las preguntas)
+    if re.fullmatch(r"(?:que hora es|que hora tenemos|que hora tengo|que hora son|dime la hora|dame la hora|decir la hora|la hora|hora actual|tienes hora)"
+                    r"(?: actual| ahora| en este momento| ahora mismo)?", n):
+        return ("hora", {"que": "hora"})
+    if re.fullmatch(r"(?:que dia es|que fecha es|que fecha tenemos|a que dia estamos|en que dia estamos|a que fecha estamos|que dia de la semana es|dime la fecha|dame la fecha|"
+                    r"decir la fecha|la fecha|fecha actual)(?: de| es)?(?: hoy| actual| ahora)?", n):
+        return ("hora", {"que": "fecha"})
+    if re.match(r"^(?:como|que|cual|cuales|cuando|donde|quien|por que|para que|sabes|dime|saber)\b", n):
+        return None
+    # ---- ventanas (sobre la ventana activa; nunca cerrar: se podría perder trabajo)
+    if re.fullmatch(r"(?:maximiza|maximizar|ponla a pantalla maximizada|agranda|agrandar)(?: " + _VENT + r")?|pon " + _VENT + r" (?:en|a) (?:modo )?maximizad[oa]", n):
+        return ("ventanas", {"accion": "maximizar", "ventana": "activa"})
+    if re.fullmatch(r"(?:pon|poner|ponla|pasa|pasar|cambia|cambiar)(?: " + _VENT + r")? (?:en|a) pantalla completa|pantalla completa|(?:quita|quitar|sal de|salir de) (?:la )?pantalla completa"
+                    r"|(?:pon|poner|activa|activar|quita|quitar|sal de|salir de) (?:el )?(?:modo )?pantalla completa", n):
+        return ("ventanas", {"accion": "pantalla_completa", "ventana": "activa"})
+    if re.fullmatch(r"(?:minimiza|minimizar|esconde|esconder|oculta|ocultar)(?: " + _VENT + r")?", n):
+        return ("ventanas", {"accion": "minimizar", "ventana": "activa"})
+    if re.fullmatch(r"(?:muestra|mostrar|enseña|ensena|ver|ve al|ir al|vete al)(?: me)? (?:el )?escritorio|(?:minimiza|esconde|oculta) todo|(?:minimiza|esconde|oculta) todas las ventanas", n):
+        return ("ventanas", {"accion": "mostrar_escritorio"})
     # ---- silencio
     if re.fullmatch(r"(?:silencia(?:r)?|silencialo|silenciala|mutea(?:r)?)(?: el (?:sonido|audio|volumen|ordenador|equipo|pc)| todo| el sonido del ordenador)?", n):
         return ("silencio", {"accion": "silenciar"})
@@ -81,6 +106,20 @@ def _es(n):
 
 
 def _en(n):
+    if re.fullmatch(r"(?:what time is it|what s the time|what is the time|tell me the time|give me the time|the time|what time do we have)(?: now| right now)?", n):
+        return ("hora", {"que": "hora"})
+    if re.fullmatch(r"(?:what day is it|what s the date|what is the date|what is today s date|what s today s date|tell me the date|the date|what date is it)(?: today)?", n):
+        return ("hora", {"que": "fecha"})
+    if re.match(r"^(?:how|what|which|when|where|who|why|tell|do you know)\b", n):
+        return None
+    if re.fullmatch(r"(?:maximi[sz]e)(?: (?:this |the |my )?(?:window|app|application|program))?", n):
+        return ("ventanas", {"accion": "maximizar", "ventana": "activa"})
+    if re.fullmatch(r"(?:(?:make|put|set|turn)(?: (?:this |the |my )?(?:window|app|application|program))? (?:in|into|to|on) full ?screen|full ?screen|(?:exit|leave) full ?screen)", n):
+        return ("ventanas", {"accion": "pantalla_completa", "ventana": "activa"})
+    if re.fullmatch(r"(?:minimi[sz]e|hide)(?: (?:this |the |my )?(?:window|app|application|program))?", n):
+        return ("ventanas", {"accion": "minimizar", "ventana": "activa"})
+    if re.fullmatch(r"(?:show|go to) (?:the )?desktop|minimi[sz]e (?:everything|all(?: windows)?)", n):
+        return ("ventanas", {"accion": "mostrar_escritorio"})
     if re.fullmatch(r"(?:mute|silence)(?: (?:the )?(?:sound|audio|volume|computer|pc))?", n):
         return ("silencio", {"accion": "silenciar"})
     if re.fullmatch(r"(?:unmute|turn (?:the )?(?:sound|audio) (?:back )?on|un mute)(?: (?:the )?(?:sound|audio|volume))?", n):
@@ -102,8 +141,8 @@ def _en(n):
 def entender(texto):
     """(id, datos) si la frase ES una orden directa clara; None en cualquier otro caso (preguntas, negaciones, órdenes encadenadas, dudas)."""
     original = str(texto or "")
-    if not original.strip() or len(original) > 80 or "¿" in original:
-        return None                                              # frases largas o preguntas: las entiende la IA
+    if not original.strip() or len(original) > 80:
+        return None                                              # frases largas: las entiende la IA
     n = normalizar(original)
     en = IDI.actual() == "en"
     cortesia, final = (_CORTESIA_EN, _FINAL_EN) if en else (_CORTESIA_ES, _FINAL_ES)
@@ -111,9 +150,7 @@ def entender(texto):
     n = re.sub(final + r"$", "", n).strip()
     if re.match(r"^(?:no|nunca|jamas|sin|don t|dont|do not|never)\b", n):
         return None
-    if re.match(r"^(?:como|que|cual|cuales|cuando|donde|quien|por que|para que|sabes|dime|how|what|which|when|where|who|why)\b", n):
-        return None
-    return _en(n) if en else _es(n)
+    return _en(n) if en else _es(n)                              # (cada idioma descarta las preguntas, salvo «qué hora es» y similares)
 
 
 def frase_de_volumen(salida):
@@ -124,6 +161,19 @@ def frase_de_volumen(salida):
     if m.group(2):
         return T("Está silenciado.")
     return T("Volumen al {n} %.", n=round(float(m.group(1)) * 100))
+
+
+def frase_de_hora(ahora):
+    """«Son las 16:58.» (o «Es la 1:05.»): la hora la dice el código, no la IA."""
+    if IDI.actual() != "en" and ahora.hour == 1:
+        return T("Es la {hora}.", hora=f"1:{ahora.minute:02d}")
+    return T("Son las {hora}.", hora=ahora.strftime("%H:%M"))
+
+
+def frase_de_fecha(ahora):
+    en = IDI.actual() == "en"
+    dia, mes = (TXT._DAYS, TXT._MONTHS) if en else (TXT._DIAS, TXT._MESES)
+    return T("Hoy es {dia} {n} de {mes}.", dia=dia[ahora.weekday()], n=ahora.day, mes=mes[ahora.month - 1])
 
 
 def principal(argv, salida=print, activo=True):

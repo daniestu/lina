@@ -83,11 +83,21 @@ def preguntar_local(pregunta, imagen, permitir_escalar, historial=(), datos_sist
 
 
 _pausa_modelo: dict = {}
+_fallos_red: dict = {}            # modelo -> fallos de conexión seguidos (la pausa se alarga con cada uno y se olvida al responder bien)
 
 
 def _id_pausa(modelo, clave):
     """Con dos claves, que una falle (por ejemplo, la gratuita sin cupo) no deja en pausa a la otra."""
     return modelo if PRES.una_sola_clave() else f"{modelo}|{PRES.nombre_de(clave)}"
+def _pausar_por_red(modelo, clave):
+    """Tras un timeout o un fallo de conexión: PAUSA_RED_SEG la primera vez, el doble la segunda… hasta PAUSA_MODELO_SEG. Con un servicio que va lento
+    varias veces seguidas, así no se vuelve a esperar 20 s en cada petición; en cuanto responde bien, se olvida."""
+    k = _id_pausa(modelo, clave)
+    n = _fallos_red.get(k, 0)
+    _fallos_red[k] = n + 1
+    _pausa_modelo[k] = time.time() + min(PAUSA_RED_SEG * 2 ** n, PAUSA_MODELO_SEG)
+
+
 _gasto_tarea = {"tokens": 0}              # lo que lleva gastado la petición actual        # modelo -> momento hasta el que se salta
 _pausa_busqueda = [0.0]   # hasta cuándo no se usa la búsqueda de Google
 
@@ -160,11 +170,12 @@ def _pedir_corto(proveedor, clave, modelo, sistema, mensajes, etiqueta, *, inten
     for intento in range(intentos):
         r = proveedor.turno(clave, modelo, sistema, mensajes, timeout=timeout, **ajustes)
         if not isinstance(r, PROV.ErrorIA):
+            _fallos_red.pop(_id_pausa(modelo, clave), None)
             return r
         if r.tipo == "red":
             log(f"{modelo}: sin conexión o demasiado lento al {etiqueta} ({r.resumen})")
             if pausar_en_red:
-                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_RED_SEG
+                _pausar_por_red(modelo, clave)
             return None
         if r.estado == 400 and degradar and intento < intentos - 1:
             for ajuste in degradar.pop(0):
@@ -475,7 +486,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
         if isinstance(r, PROV.ErrorIA):
             if r.tipo == "red":
                 log(f"{modelo}: sin conexión o demasiado lento ({r.resumen})")
-                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_RED_SEG
+                _pausar_por_red(modelo, clave)
                 return None
             if r.tipo == "vacia":
                 log(f"{modelo}: {r.resumen}")
@@ -513,6 +524,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                 _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
             return None
         reintentos = 0
+        _fallos_red.pop(_id_pausa(modelo, clave), None)
         if busqueda_dio_429:
             _pausa_busqueda[0] = time.time() + PAUSA_BUSQUEDA_SEG
             log("La búsqueda de Google da error de cuota: la desactivo unos minutos")
