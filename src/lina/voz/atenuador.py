@@ -31,7 +31,7 @@ def pactl(*args, tiempo=4):
         return ""
 
 
-def leer_programas(texto):
+def leer_programas(texto, propios=False):
     """De la salida de `pactl list sink-inputs`: [{"id", "volumen" (%), "app"}] de los que suenan de verdad (ni pausados ni silenciados ni de Lina)."""
     salida = []
     for bloque in re.split(r"\n(?=Sink Input #)", texto or ""):
@@ -45,7 +45,8 @@ def leer_programas(texto):
             return (re.search(rf'{re.escape(k)}\s*=\s*"([^"]*)"', bloque) or [None, ""])[1]
         binario, pid = os.path.basename(propiedad("application.process.binary")).lower(), propiedad("application.process.id")
         app = propiedad("application.name") or binario
-        if binario in _PROPIOS or pid == str(os.getpid()) or FUENTE_ECO in bloque or any(r in app.lower() for r in _RASTROS_PROPIOS):
+        es_propio = binario in _PROPIOS or pid == str(os.getpid()) or FUENTE_ECO in bloque or any(r in app.lower() for r in _RASTROS_PROPIOS)
+        if es_propio != propios:
             continue
         salida.append({"id": m.group(1), "volumen": round(sum(porcentajes) / len(porcentajes)), "app": app})
     return salida
@@ -85,6 +86,18 @@ class Atenuador:
             devueltos += 1
         return devueltos
 
+    def arreglar_propios(self):
+        """PipeWire recuerda el volumen de cada programa por su nombre: si alguna vez se bajó el sonido de Lina (sus pitidos), los siguientes saldrían igual de
+        bajos. Se pone a 100 % el de Lina si lo encuentra más bajo. Devuelve cuántos tocó."""
+        n = 0
+        for p in leer_programas(self.ejecutar("list", "sink-inputs"), propios=True):
+            if p["volumen"] < 100 and "python" in p["app"].lower():
+                self.ejecutar("set-sink-input-volume", p["id"], "100%")
+                n += 1
+        if n:
+            self.log("Sonido: devuelvo a su volumen normal los pitidos de Lina")
+        return n
+
     # ----- uso
     def bajar(self, dueno="atajo"):
         """Baja lo que suena. Se puede llamar varias veces; no hace nada si ya está bajado."""
@@ -121,6 +134,7 @@ class Atenuador:
                 self.reloj.cancel()
                 self.reloj = None
             n = self._devolver(bajados)
+            self.arreglar_propios()
             self._apuntar()
             if n:
                 self.log("Sonido: devuelto a como estaba")
@@ -128,6 +142,7 @@ class Atenuador:
 
     def recuperar(self):
         """Al arrancar: si Lina se cerró con el sonido bajado, lo devuelve."""
+        self.arreglar_propios()
         try:
             bajados = json.loads(self.archivo.read_text(encoding="utf-8"))
         except (OSError, ValueError):

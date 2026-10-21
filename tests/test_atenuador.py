@@ -133,3 +133,13 @@ def test_el_pitido_de_lina_no_se_baja(tmp_path):
                  ("8", 70, {"app": "PortAudio", "binario": ""}))
     a.bajar()
     assert p.vol == {"5": 16, "7": 70, "8": 70}
+
+
+def test_los_pitidos_de_lina_que_se_quedaron_bajos_se_arreglan(tmp_path):
+    p, a = hacer(tmp_path, ("5", 80, {}), ("7", 20, {"app": "PipeWire ALSA [python3.14]", "binario": ""}))
+    assert a.arreglar_propios() == 1
+    assert p.vol == {"5": 80, "7": 100}
+    assert a.recuperar() == 0 and p.vol["7"] == 100           # al arrancar también
+    p.vol["7"] = 30
+    a.recuperar()
+    assert p.vol["7"] == 100
