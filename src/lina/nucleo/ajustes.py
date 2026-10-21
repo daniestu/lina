@@ -52,6 +52,9 @@ ESQUEMA: dict = {
         "residente": (True, "bool", None, N_("true: la voz de Piper se mantiene cargada en un proceso aparte (se cierra sola tras 10 minutos sin hablar) y las frases salen "
                       "sin la espera de cargarla cada vez; si falla, se usa el método de siempre. Ocupa algo de memoria mientras está cargada.")),
     },
+    "memoria": {
+        "usar": (True, "bool", None, N_("true: Lina tiene en cuenta lo que le pediste recordar («recuerda que mi juego favorito es…») cuando viene al caso. false: sigue guardado pero no lo usa. Se ve y se borra con:  lina memoria")),
+    },
     "sonido": {
         "bajar_al_escuchar": (True, "bool", None, N_("true: mientras te escucha (atajo u «Oye Lina») baja lo que suena en el ordenador (música, series, juegos) para oírte bien, como el coche, y lo devuelve a como estaba al terminar. No toca el volumen general.")),
         "volumen_al_escuchar": (20, "int", (0, 100), N_("A qué porcentaje de su volumen baja lo que suena mientras te escucha (20 = a una quinta parte; 0 = lo deja en silencio).")),
@@ -114,7 +117,7 @@ ESQUEMA: dict = {
         "indicador_instalar": (True, "bool", None, N_("true: si faltan paquetes para dibujarlo, los instala solo (repositorios oficiales).")),
     },
 }
-TITULOS = {"asistente": N_("Identidad"), "voz": N_("Voz"), "sonido": N_("Sonido mientras te escucha"), "activacion": N_("Manos libres"), "autonomia": N_("Autonomía: qué hace solo y qué te pregunta"),
+TITULOS = {"asistente": N_("Identidad"), "voz": N_("Voz"), "sonido": N_("Sonido mientras te escucha"), "memoria": N_("Memoria de preferencias"), "activacion": N_("Manos libres"), "autonomia": N_("Autonomía: qué hace solo y qué te pregunta"),
            "directas": N_("Órdenes directas (sin IA)"), "ia": N_("Inteligencia artificial"), "gasto": N_("Gasto con la clave de pago"), "privacidad": N_("Privacidad"), "interfaz": N_("Interfaz")}
 
 # Nombres planos que usa el manos libres desde siempre (activacion.txt) → ajuste nuevo

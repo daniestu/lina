@@ -40,6 +40,7 @@ from lina.nucleo import tiempos as TIE
 from lina.nucleo import directas as DIR
 from lina.nucleo import cache_voz as CV
 from lina.escritorio import sesion as SES
+from lina.nucleo import memoria as MEM
 from lina.nucleo import reproductor as REPRO
 from lina.voz import atenuador as ATE
 from lina.voz import piper_residente as PIPER_RES
@@ -906,6 +907,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if orden_ml:                                            # «activa el manos libres», «te llamas Jarvis»…: lo hace el código, sin IA
             self.decir(self._gestionar_manos_libres(orden_ml))
             return
+        recuerdo = MEM.entender(pregunta)
+        if recuerdo and C.entender_alias(pregunta) is None:     # «recuerda que mi juego favorito es…», «olvida lo de…», «¿qué recuerdas de mí?»: lo hace el código, la IA no escribe en la memoria
+            log(f"Memoria: {recuerdo[0]}")
+            self.decir(MEM.gestionar(recuerdo))
+            return
         accion = C.entender_alias(pregunta)
         if accion:                                              # «cuando oigas cait quiero decir Kate»: se apunta, sin gastar una llamada
             self.decir(self._gestionar_alias(accion))
@@ -963,6 +969,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if not imagen and not self.pedir_pantalla:
             pregunta += ("\n[SISTEMA: esta petición NO lleva captura de pantalla: no sabes lo que hay en ella (solo el título de la ventana). "
                          "Si lo que te piden depende de verla, usa ver_pantalla; sin imagen NUNCA describas lo que se ve.]")
+        if AJ.actuales(log=lambda m: None).get("memoria", "usar"):
+            recuerdos = MEM.nota_para_la_ia(self.pregunta_pura)   # solo lectura, y solo los que vienen al caso; no entra en el historial
+            if recuerdos:
+                pregunta += f"\n[SISTEMA: {recuerdos}]"
+                log("Memoria: le paso a la IA lo que me pediste recordar y viene al caso")
         pregunta += f"\n[SISTEMA: {texto_fecha_hora()}]"            # la hora no se inventa ni se reutiliza: va en cada petición (y no entra en el historial)
         previas = []                                              # lo último que pidió el usuario: para «ahora desactívala», que sola no dice de qué habla
         for h in reversed(self.historial):

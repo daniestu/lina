@@ -56,6 +56,12 @@ que no se pueden desactivar. Los perfiles se aplican encima de `politica.txt`: p
 | `velocidad` | `1.0` | Velocidad al hablar: 1 normal, 1.2 más rápida, 0.8 más lenta. |
 | `residente` | `true` | true: la voz de Piper se mantiene cargada en un proceso aparte (se cierra sola tras 10 minutos sin hablar) y las frases salen sin la espera de cargarla cada vez; si falla, se usa el método de siempre. Ocupa algo de memoria mientras está cargada. |
 
+### [memoria] Memoria de preferencias
+
+| Ajuste | De fábrica | Qué hace |
+|---|---|---|
+| `usar` | `true` | true: Lina tiene en cuenta lo que le pediste recordar («recuerda que mi juego favorito es…») cuando viene al caso. false: sigue guardado pero no lo usa. Se ve y se borra con:  lina memoria |
+
 ### [sonido] Sonido mientras te escucha
 
 | Ajuste | De fábrica | Qué hace |

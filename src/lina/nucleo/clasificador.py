@@ -65,11 +65,11 @@ _PROPIO = (r"(?:^|/)lina/(?:nucleo|voz|escritorio|modulos|mcp|datos)/|site-packa
           r"lina\.service|systemd/user/lina|systemctl[^;|&\n]*\blina\b|mcp\.json|mcp_estado|"
           r"\b(?:politica|comandos|activacion|presupuesto|paquetes_confiables|alias|vocabulario|disco_datos)\.txt|config\.toml|mcp_claves|"
           r"\b(?:asistente|herramientas|grupos|sistema|juegoconf|web|notas|recordatorios|oficina|organizacion|interfaz|interfaz_atspi|interfaz_vision|indicador|"
-          r"plataforma|manos_libres|comandos|politica|diario|presupuesto|recetas|juegos|rutas|claves|ajustes)\.py|\.config/asistente|\.local/share/asistente")
+          r"plataforma|manos_libres|comandos|politica|diario|presupuesto|recetas|memoria|juegos|rutas|claves|ajustes)\.py|\.config/asistente|\.local/share/asistente")
 _SUDOERS = r"/etc/sudoers|\bvisudo\b|sudoers\.d"
 # Órdenes de Lina que cambian sus propios permisos, gasto, voz o claves: las da el usuario en su terminal o con el atajo, nunca la IA
 _ORDEN_PROPIA = (r"(?:^|[\s;&|(`/])(?:lina|python3?\s+-m\s+lina(?:\.__main__)?)\s+"
-                 r"(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S|privilegios\s+(?:instalar|total|quitar)\b|privacidad\s+(?:si|no|preguntar|sí)\b|olvidar\b)")
+                 r"(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S|privilegios\s+(?:instalar|total|quitar)\b|privacidad\s+(?:si|no|preguntar|sí)\b|olvidar\b|memoria\b)")
 # El ayudante de root y todo lo que lo activa: solo se usa instalando paquetes (la forma exacta que reconoce analizar_instalacion)
 _AYUDANTE_ROOT = r"/usr/lib/lina\b|org\.lina\.instalar|sudoers\.d/lina|nucleo/raiz\b|\braiz\.py|\bprivilegios\.py"
 

@@ -69,7 +69,7 @@ def datos(tmp_path, monkeypatch):
     recetas.write_text("{}")
     monkeypatch.setattr(OLV, "QUE", {
         "diario": ("diario", lambda: [diario]), "acciones": ("acciones", lambda: [acciones, acciones.with_name("acciones.log.1")]),
-        "recetas": ("recetas", lambda: [recetas]), "tiempos": ("tiempos", lambda: [tmp_path / "tiempos.jsonl"]), "registro": ("registro", lambda: [])})
+        "recetas": ("recetas", lambda: [recetas]), "memoria": ("memoria", lambda: [tmp_path / "memoria.json"]), "tiempos": ("tiempos", lambda: [tmp_path / "tiempos.jsonl"]), "registro": ("registro", lambda: [])})
     return diario, acciones, recetas
 
 

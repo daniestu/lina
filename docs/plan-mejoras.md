@@ -12,7 +12,7 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 | 11b | No olvidar la petición tras un paso previo *(hecha)* | S | — |
 | 12 | Camino rápido: órdenes simples sin pasar por la IA, y voz sin esperas *(hecha: abrir programa, volumen, silencio, ventanas, hora y música; voz con caché y Piper residente; falta confirmar en el equipo el Piper residente)* | L | 11 |
 | 12b | Recetas que se ejecutan solas *(hecha: falta probarla en el equipo de Dani)* | L | 12 |
-| 13 | Memoria de preferencias | M | — |
+| 13 | Memoria de preferencias *(hecha: falta probarla en el equipo de Dani)* | M | — |
 | 14 | Bluetooth completo y más diagnóstico de juegos | S | 12 (para sus órdenes directas) |
 | 15 | GPU y energía (módulo opcional) | M | — |
 
