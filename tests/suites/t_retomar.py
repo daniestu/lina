@@ -113,4 +113,29 @@ ej2.pregunta_pura = "Abre Stremio"
 r2 = ej2.ejecutar("sleep 3", "instalar algo")
 ok("RETOMARÁ" not in r2, "sin retomar, no promete nada")
 
+# ---- una música o un programa lanzado y dejado funcionando no es una tarea que «termine»
+for c in ("setsid mpv --no-video x &", "nohup firefox &", "mpv --no-video https://x", "vlc /tmp/a.mp3", "/usr/bin/mpv a.mp3"):
+    ok(H._es_lanzamiento_persistente(c), f"lanzamiento persistente: {c}")
+for c in ("flatpak install -y flathub com.x.X", "sleep 3", "apt install mpv", "pip install yt-dlp"):
+    ok(not H._es_lanzamiento_persistente(c), f"no es persistente: {c}")
+
+# ---- si has pedido otra cosa desde entonces, la petición vieja no se retoma
+a = A.Asistente.__new__(A.Asistente)
+a.historial = [{"rol": "user", "texto": "Reproduce música de Queen"}, {"rol": "model", "texto": "Puesta."},
+               {"rol": "user", "texto": "Para la música"}, {"rol": "model", "texto": "Parada."}]
+ok(a._pidio_otra_cosa_despues("Reproduce música de Queen"), "pidió parar la música después: no se retoma")
+a.historial = [{"rol": "user", "texto": "Pregunta: Abre Stremio\n[SISTEMA: x]"}, {"rol": "model", "texto": "Instalando."},
+               {"rol": "user", "texto": "Gracias"}, {"rol": "model", "texto": "De nada."}]
+ok(not a._pidio_otra_cosa_despues("Abre Stremio"), "un «gracias» no cuenta como otra petición")
+a.historial = [{"rol": "user", "texto": "Abre Stremio"}, {"rol": "model", "texto": "Instalando."}]
+ok(not a._pidio_otra_cosa_despues("Abre Stremio"), "sin nada después: se retoma")
+ok(not a._pidio_otra_cosa_despues("otra que no está"), "petición desconocida: no bloquea")
+
+# ---- y el comando que se queda funcionando no se vigila como tarea (rama del tiempo de espera)
+e, avisos = ejecutor(lambda *a: True)
+e.pregunta_pura = "Reproduce música de Queen"
+H.TIMEOUT_ESPERA = 1
+r = e.ejecutar("sleep 3 &", "poner música")
+ok("RETOMARÁ SOLO" not in r, f"un lanzamiento persistente no promete retomar: {r[:200]}")
+
 print("fallos", fallos)

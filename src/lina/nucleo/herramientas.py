@@ -437,6 +437,22 @@ def _es_actualizacion_completa(comando):
     return PL.es_actualizacion_completa(comando)
 
 
+_REPRODUCTORES = {"mpv", "vlc", "mplayer", "celluloid", "smplayer", "audacious", "cmus", "mpg123", "ffplay", "paplay", "aplay"}
+
+
+def _es_lanzamiento_persistente(comando):
+    """Un programa que se deja funcionando (música, vídeo, una aplicación): `setsid mpv … &`, `nohup x &`. Que termine es que el usuario lo cerró o lo paró,
+    no que se haya acabado una tarea que su petición estuviera esperando: no se retoma nada ni se avisa de que «ya ha terminado»."""
+    c = comando.strip()
+    if re.match(r"(?:setsid|nohup|disown)\b", c) or re.search(r"&\s*$", c):
+        return True
+    try:
+        palabras = [os.path.basename(t) for t in shlex.split(c)]
+    except ValueError:
+        return False
+    return bool(palabras) and palabras[0] in _REPRODUCTORES
+
+
 def clasificar(comando):
     """Devuelve (clase, motivo). Clases: bloqueado, instalar, lanzar, inocuo, lectura, critico, autonomo."""
     comando = comando.strip()
@@ -1887,7 +1903,7 @@ class Ejecutor:
         try:
             salida, _ = proc.communicate(timeout=TIMEOUT_ESPERA)
         except subprocess.TimeoutExpired:
-            if _motivo_es_abrir(motivo):               # un programa con ventana sigue en marcha mientras esté abierto: no es una tarea que «termine»
+            if _motivo_es_abrir(motivo) or _es_lanzamiento_persistente(comando):    # un programa o una música sigue en marcha mientras esté abierto: no es una tarea que «termine»
                 threading.Thread(target=self._esperar_sin_avisar, args=(proc, comando), daemon=True).start()
                 anotar(f"[abierto, sigue en marcha] {comando}")
                 return ("El programa se ha abierto y sigue en marcha, que es lo normal en una aplicación con ventana. Ya está abierto: no hay nada "

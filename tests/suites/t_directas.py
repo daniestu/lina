@@ -179,6 +179,17 @@ for frase, sub, dicho, estado in (("pausa la música", "pause", "Pausado.", "Pau
     ej = Musica(estado=estado); a = asistente(ej)
     r, _ = pedir(a, frase)
     ok(r == (dicho, "reproduccion") and ("cmd", f"playerctl {sub}") in ej.llamadas, f"reproducción {frase}: {r} {ej.llamadas}")
+# la música de Lina (mpv con socket) va antes que cualquier otro reproductor compatible, como el navegador
+enviados = []
+A.REPRO.enviar_mpv = lambda accion: enviados.append(accion) or True
+ej = Musica(jugadores="brave.instance1"); a = asistente(ej)
+r, _ = pedir(a, "para la música")
+ok(r == ("Parada.", "reproduccion") and enviados == ["detener"] and ej.llamadas == [], f"primero el mpv de Lina: {r} {enviados} {ej.llamadas}")
+A.REPRO.enviar_mpv = lambda accion: False
+# parar con playerctl y que siga sonando: no se da por hecho
+ej = Musica(jugadores="brave.instance1", estado="Playing"); a = asistente(ej)
+r, _ = pedir(a, "para la música")
+ok(r is None and not a.dichas, f"playerctl stop pero sigue sonando: {r}")
 # si el estado no queda como se pidió (el «hecho» de playerctl no vale), no se da por hecho
 ej = Musica(estado="Playing"); a = asistente(ej)
 r, _ = pedir(a, "pausa")

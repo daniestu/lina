@@ -193,7 +193,7 @@ class MixinPasos:
                     continue
                 if not _ok(n, r):
                     continue                                     # intento fallido: no forma parte de lo que funcionó
-                if clase not in {"autonomo", "inocuo", "critico"} or _NO_REPETIR.search(cmd) or _FECHAS.search(cmd) or len(cmd) > 300:
+                if clase not in {"autonomo", "inocuo", "critico"} or _NO_REPETIR.search(cmd) or _FECHAS.search(cmd) or len(cmd) > 300 or H._es_lanzamiento_persistente(cmd):
                     return
                 try:
                     shlex.split(cmd)

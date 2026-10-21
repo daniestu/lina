@@ -1075,6 +1075,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         """Pausa, sigue, cambia de canción o para lo que suena. Primero el reproductor que hable MPRIS (playerctl); si no hay, el mpv que lanzó Lina.
         True solo si se comprobó que se hizo; False si no hay nada que controlar."""
         ej = self.ejecutor
+        if REPRO.enviar_mpv(accion):                              # la música que puso Lina va primero: es la que quieres parar (el navegador también habla MPRIS)
+            return True
         lista = str(ej.herramienta({"comando": "playerctl -l", "motivo": "mirar qué reproductores hay"}))
         hay = " ".join(lista.splitlines()[1:]).strip()
         if lista.startswith("código de salida: 0") and hay and hay != "(sin salida)":
@@ -1084,12 +1086,13 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 r = str(ej.herramienta({"comando": "playerctl pause", "motivo": "controlar la reproducción"}))      # no todos los reproductores saben parar: se deja en pausa
             if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
                 return False
-            if accion in ("pausar", "reanudar"):                  # se mira que ha quedado como se pidió, en vez de fiarse del «hecho»
+            if accion in ("pausar", "reanudar", "detener"):       # se mira que ha quedado como se pidió, en vez de fiarse del «hecho»
                 estado = str(ej.herramienta({"comando": "playerctl status", "motivo": "comprobar la reproducción"}))
-                esperado = "Paused" if accion == "pausar" else "Playing"
-                return estado.startswith("código de salida: 0") and esperado in estado
+                if accion == "reanudar":
+                    return estado.startswith("código de salida: 0") and "Playing" in estado
+                return "Playing" not in estado
             return True
-        return REPRO.enviar_mpv(accion)
+        return False
 
     def _cerrar_directa(self, pregunta, frase, ident, inicio, crono):
         log(f"Directa [{ident}]: hecho sin llamar a la IA")
@@ -1118,11 +1121,25 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return False
         return True
 
+    def _pidio_otra_cosa_despues(self, peticion):
+        """¿Has pedido algo distinto desde que dijiste `peticion`? Retomar una petición vieja entonces es hacer algo que ya no quieres («para la música» y que
+        vuelva a sonar). Un «gracias» o una queja sobre lo mismo no cuentan."""
+        from lina.nucleo.turnos import es_seguimiento
+        usuario = [re.sub(r"^.*?Pregunta:\s*", "", h["texto"], flags=re.S) for h in getattr(self, "historial", []) if h.get("rol") == "user"]
+        usuario = [re.split(r"\n\[SISTEMA", u)[0].strip() for u in usuario]
+        for i in range(len(usuario) - 1, -1, -1):
+            if usuario[i] == str(peticion).strip():
+                return any(u and not es_seguimiento(u) for u in usuario[i + 1:])
+        return False
+
     def _continuar_peticion(self, peticion, motivo, profundidad, reiniciar=False):
         """Una tarea en segundo plano (instalar, descargar…) ha terminado y la petición del usuario seguía sin cumplir: se retoma SOLA, sin que la repita.
         Espera a que no estés hablando con Lina; devuelve True si se hace cargo (entonces no hace falta el aviso de «ya ha terminado»)."""
         if profundidad >= MAX_CONTINUACIONES:
             log(f"Petición «{peticion[:60]}»: ya la he retomado {profundidad} veces, no sigo")
+            return False
+        if self._pidio_otra_cosa_despues(peticion):
+            log(f"Petición «{peticion[:60]}»: has pedido otra cosa desde entonces, no la retomo")
             return False
         for _ in range(240):
             with self.cerrojo:
@@ -1132,6 +1149,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                     break
             time.sleep(0.5)
         else:
+            return False
+        if self._pidio_otra_cosa_despues(peticion):               # puede haber pasado mientras esperaba su turno
+            log(f"Petición «{peticion[:60]}»: has pedido otra cosa mientras esperaba, no la retomo")
+            self.estado = "esperando"
             return False
         log(f"Retomo la petición «{peticion if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'}» ahora que ha terminado: {motivo}")
         nota = (f"\n[SISTEMA: esta petición se quedó esperando a una tarea en segundo plano ({motivo}) y YA HA TERMINADO. La petición original del usuario es la de arriba y "
