@@ -21,7 +21,8 @@ AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
   lina ia [ORDEN]            con qué IA habla Lina (Gemini, Anthropic, OpenAI y compatibles) y cómo cambiarla:  lina ia ayuda
   lina privilegios [instalar|total|quitar]   qué permisos de administrador tiene Lina y cómo dárselos o quitárselos (siempre tras enseñarte lo que se escribe)
   lina privacidad [si|no]    qué se envía a la IA y qué no, y si permites enviar capturas de tu pantalla
-  lina olvidar [QUÉ]         borra lo que Lina guarda de ti: diario, registro de acciones, recetas, registro del sistema (antes enseña qué y cuánto)
+  lina olvidar [QUÉ]         borra lo que Lina guarda de ti: diario, registro de acciones, recetas, tiempos, registro del sistema (antes enseña qué y cuánto)
+  lina tiempos [N]           en qué fase se va el tiempo de tus últimas N peticiones (solo números, nada de lo que dices)
   lina manos-libres ORDEN    probar "frase" · eco · nivel   (ajustes del manos libres)
   lina indicador probar      enseña el resplandor de escucha
   lina interfaz ORDEN        diagnostico · preparar · estado   (control de programas con la pantalla)
@@ -85,6 +86,9 @@ def main(argv=None):
     if orden == "olvidar":
         from lina.nucleo import olvidar
         return olvidar.principal(resto)
+    if orden == "tiempos":
+        from lina.nucleo import tiempos
+        return tiempos.principal(resto)
     if orden == "voz":
         from lina.voz import voces
         return voces.principal(resto)

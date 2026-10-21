@@ -22,6 +22,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import nullcontext
 from pathlib import Path
 
 from lina.nucleo import ajustes as AJ
@@ -33,6 +34,7 @@ from lina.nucleo.idioma import T
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
+from lina.nucleo import tiempos as TIE
 from lina.escritorio import sesion as SES
 from lina.voz import voces as VOC
 
@@ -716,11 +718,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             self.reproductor.terminate()
 
     # --- De la voz a la respuesta ---
-    def _transcribir(self, audio, inicio):
+    def _transcribir(self, audio, inicio, crono=None):
         """De audio a texto con Whisper (con la pista de tu vocabulario y tus programas)."""
         with self.cerrojo_whisper:
-            segmentos, _ = self.whisper.transcribe(audio, language=IDI.actual(), vad_filter=True, initial_prompt=prompt_whisper())
-            texto = " ".join(s.text for s in segmentos).strip()
+            with (crono.medir("whisper") if crono else nullcontext()):
+                segmentos, _ = self.whisper.transcribe(audio, language=IDI.actual(), vad_filter=True, initial_prompt=prompt_whisper())
+                texto = " ".join(s.text for s in segmentos).strip()
         log(f"Pregunta: «{texto if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'}» ({time.time() - inicio:.1f} s)")
         return texto
 
@@ -841,16 +844,18 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
 
     def _voz_a_respuesta(self, audio):
         inicio = time.time()
+        crono = TIE.Cronometro()
         if len(audio) < FRECUENCIA * 0.3:
             self.decir(T("No te he oído."))
             return
-        pregunta = self._transcribir(audio, inicio)
+        pregunta = self._transcribir(audio, inicio, crono)
         if not pregunta:
             self.decir(T("No te he entendido."))
             return
-        self._atender(pregunta, inicio)
+        self._atender(pregunta, inicio, crono)
 
-    def _atender(self, pregunta, inicio):
+    def _atender(self, pregunta, inicio, crono=None):
+        crono = crono or TIE.Cronometro()
         euros = PRES.entender_tope(pregunta)
         if euros is not None:                                   # solo TÚ cambias el tope de gasto: lo hace el código ante una frase tuya, nunca la IA
             self.decir(PRES.subir_tope(euros, voz_libre=self.origen_voz_libre))
@@ -935,7 +940,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             if not confirmado:  # que sepas que va a tardar un poco más
                 aviso_voz = threading.Thread(target=self._hablar, args=(T("Vale, lo pienso con calma."),), daemon=True)
                 aviso_voz.start()
-        respuesta, origen = self.responder(pregunta, imagen, modo)
+        crono.sumar("previas", crono.total() - crono.fases.get("whisper", 0.0))
+        self.crono = crono                                         # las herramientas suman aquí su tiempo
+        t_ia = crono.reloj()
+        try:
+            respuesta, origen = self.responder(pregunta, imagen, modo)
+        finally:
+            self.crono = None
+        crono.sumar("ia", crono.reloj() - t_ia - crono.fases.get("herramientas", 0.0))
         if aviso_voz:
             aviso_voz.join()
         if not self.ejecutor.pendientes and PIDE_CONFIRMACION.search(respuesta or ""):
@@ -961,7 +973,22 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         if self.interrumpiendo:                                    # estás hablando: no le hablo encima (la respuesta queda en el historial)
             log("Estás hablando: no leo en voz alta la respuesta anterior")
         else:
+            self.ultima_habla = (0.0, 0.0)
             self.decir(respuesta)
+            crono.sumar("sintesis", self.ultima_habla[0])
+            crono.sumar("voz", self.ultima_habla[1])
+            self._anotar_tiempos(crono, origen, modo)
+
+    def _anotar_tiempos(self, crono, origen, modo):
+        """La línea de tiempos de esta petición (solo números). Medir es un extra: nunca estropea nada."""
+        try:
+            if not AJ.actuales(log=lambda m: None).get("privacidad", "registrar_tiempos"):
+                return
+            reg = crono.registro(origen, modo)
+            log(TIE.linea_de_registro(reg))
+            TIE.guardar(reg)
+        except Exception as e:
+            log(f"Tiempos: fallo {e!r}")
 
     def _gestionar_alias(self, accion):
         if accion[0] == "aprender":
@@ -1161,7 +1188,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         if tope:
             return tope
         del self.guion_herramientas[self.paso_guion:]   # ya no coincide: se descarta lo que sobraba del intento anterior
-        resultado = self._ejecutar_herramienta(nombre, args)
+        crono = getattr(self, "crono", None)
+        with (crono.medir("herramientas") if crono else nullcontext()):
+            resultado = self._ejecutar_herramienta(nombre, args)
+        if crono:
+            crono.herramientas += 1
         self.acciones_turno.append((nombre, args, resultado))
         self.guion_herramientas.append((clave, resultado))
         self.paso_guion += 1
@@ -1759,10 +1790,13 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             velocidad = AJ.actuales(log=lambda m: None).get("voz", "velocidad")
             if abs(velocidad - 1.0) > 0.01:
                 orden += ["--length-scale", f"{1.0 / velocidad:.3f}"]          # Piper: más de 1 = más lento; aquí la velocidad es la inversa
+            t0 = time.monotonic()
             subprocess.run(orden + ["-f", str(AUDIO_RESPUESTA), "--", texto],
                            cwd=RUT.asegurar(RUT.VOCES), check=True, capture_output=True)
+            t1 = time.monotonic()
             self.reproductor = subprocess.Popen(["paplay", str(AUDIO_RESPUESTA)])
             self.reproductor.wait()
+            self.ultima_habla = (t1 - t0, time.monotonic() - t1)      # síntesis y reproducción: para `lina tiempos`
         except subprocess.CalledProcessError as e:
             log(f"Error de Piper: {e.stderr.decode(errors='ignore')[:200]}")
         finally:

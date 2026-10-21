@@ -90,6 +90,7 @@ ESQUEMA: dict = {
                      "(decídelo con:  lina privacidad) · si: se envían cuando hacen falta, nunca en modo privado ni con ventanas sensibles · no: nunca.")),
         "registrar_preguntas": (True, "bool", None, N_("true: lo que dices y lo que contesto queda en el registro del sistema (journalctl), útil para depurar. false: se omite.")),
         "registro_ruido": (False, "bool", None, N_("true: se apunta en el registro lo que oye y descarta (solo para depurar).")),
+        "registrar_tiempos": (True, "bool", None, N_("true: se apuntan cuántos segundos tarda cada fase de una petición (solo números, nunca lo que dices). Se ven con:  lina tiempos")),
         "almacen_claves": ("auto", "opcion", ("auto", "archivo"), N_("auto: las claves van al llavero del sistema si lo hay (y si no, a un archivo solo tuyo). archivo: siempre archivo.")),
     },
     "interfaz": {

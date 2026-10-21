@@ -111,6 +111,7 @@ dices, así que por voz exige el atajo (o se hace en la terminal).
 | `capturas` | `"preguntar"` | Enviar capturas de tu pantalla a la IA. `preguntar`: aún no has decidido, no se envía ninguna (decídelo con `lina privacidad`) · `si`: cuando hacen falta, nunca en modo privado ni con ventanas sensibles · `no`: nunca. La IA no puede cambiarlo. |
 | `registrar_preguntas` | `true` | true: lo que dices y lo que contesto queda en el registro del sistema (journalctl), útil para depurar. false: se omite. |
 | `registro_ruido` | `false` | true: se apunta en el registro lo que oye y descarta (solo para depurar). |
+| `registrar_tiempos` | `true` | true: se apuntan cuántos segundos tarda cada fase de una petición (solo números, nunca lo que dices). Se ven con:  lina tiempos |
 
 ### [interfaz] Interfaz
 

@@ -4,6 +4,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Añadido
+- `lina tiempos [N]`: en qué fase se va el tiempo de tus últimas N peticiones (Whisper, decisiones previas del código, IA, herramientas, síntesis de la voz y reproducción), por separado con y sin herramientas, con media, mediana y la fase más lenta. Es la base para decidir qué acelerar (fase 11 del [plan de mejoras](docs/plan-mejoras.md)).
+- Cada petición deja una línea `Tiempos […]` en el registro y una entrada en `~/.local/state/lina/tiempos.jsonl` con **solo números** (nunca lo que dijiste ni lo que contestó Lina); el archivo se recorta solo al llegar a ~200 KB. Se desactiva con `lina config poner privacidad.registrar_tiempos no` y se borra con `lina olvidar tiempos` (también incluido en `lina olvidar todo`).
+
 ## [0.1.0-beta] - 2026-10-20
 
 ### Corregido
