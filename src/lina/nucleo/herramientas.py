@@ -467,6 +467,20 @@ def es_afirmativo(texto):
     return comandos.es_afirmativo(texto)
 
 
+def _sin_reproductor():
+    """playerctl contesta «hecho» (código 0, sin salida) aunque no haya NADA que controlar, y eso ha hecho decir «música parada» con la música sonando.
+    Si no hay ningún reproductor que hable MPRIS, el mensaje de error (en vez del falso éxito); si lo hay, o no se puede mirar, ''."""
+    try:
+        r = subprocess.run(["playerctl", "-l"], capture_output=True, text=True, timeout=4)
+    except (OSError, subprocess.SubprocessError):
+        return ""                                          # sin playerctl lo dirá el propio comando («command not found»)
+    if r.returncode == 0 and r.stdout.strip():
+        return ""
+    return ("código de salida: 1 (0 s)\n\nNo se ha hecho nada: ningún reproductor se puede controlar con playerctl ahora mismo. Si la música la puso Lina con mpv "
+            "y se lanzó sin socket de control, no hay forma de pausarla así: ciérrala con `lina musica detener` si es de Lina, o dile al usuario que no puedes "
+            "controlarla. NO digas que está parada.")
+
+
 # ======================= EJECUTAR COMANDOS =======================
 def _recortar(salida):
     salida = salida.strip()
@@ -1307,6 +1321,11 @@ class Ejecutor:
                     f"que eso no lo haces y por qué.")
         if clase == "inocuo" and REC is not None and (REC.para_comando(comando) or {}).get("leer"):
             return self._con_red(comando, motivo, "inocuo")                 # con receta se sabe leer el valor de antes: se anota para poder deshacer
+        if clase == "inocuo" and re.fullmatch(r"playerctl (?:play|pause|play-pause|next|previous|stop)", comando):
+            sin = _sin_reproductor()
+            if sin:
+                anotar(f"[sin-reproductor] {comando}")
+                return sin
         if clase in {"lectura", "inocuo"}:
             return self.ejecutar(comando, motivo)
         if clase == "lanzar":

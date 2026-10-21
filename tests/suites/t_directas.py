@@ -161,16 +161,46 @@ b._claves = lambda modo: ["unica"]
 b._gemini("rapido", "m", "pregunta", None)
 ok(vistos == [("unica", None)], f"con una sola clave, sin recortar: {vistos}")
 
-# ---- música: playerctl con la herramienta de siempre; sin reproductor o sin playerctl, a la IA
-for frase, sub, dicho in (("pausa la música", "pause", "Pausado."), ("reanuda", "play", "Reanudado."), ("siguiente canción", "next", "Siguiente."), ("la anterior", "previous", "Anterior.")):
-    ej = Ejec(); a = asistente(ej)
+# ---- música: primero el reproductor que hable MPRIS (playerctl), comprobando el estado; si no hay, el mpv de Lina; si no, a la IA
+class Musica(Ejec):
+    def __init__(self, jugadores="spotify", estado="Paused"):
+        super().__init__(); self.jugadores, self.estado = jugadores, estado
+    def herramienta(self, args):
+        c = args["comando"]; self.llamadas.append(("cmd", c))
+        if c == "playerctl -l":
+            return "código de salida: 0 (0 s)\n\n" + (self.jugadores or "(sin salida)")
+        if c == "playerctl status":
+            return "código de salida: 0 (0 s)\n\n" + self.estado
+        return getattr(self, "cmd", "código de salida: 0 (0 s)\n\n")
+
+for frase, sub, dicho, estado in (("pausa la música", "pause", "Pausado.", "Paused"), ("reanuda", "play", "Reanudado.", "Playing"),
+                                  ("siguiente canción", "next", "Siguiente.", "Playing"), ("la anterior", "previous", "Anterior.", "Playing"),
+                                  ("para la música", "stop", "Parada.", "Stopped")):
+    ej = Musica(estado=estado); a = asistente(ej)
     r, _ = pedir(a, frase)
-    ok(r == (dicho, "reproduccion") and ej.llamadas == [("cmd", f"playerctl {sub}")], f"reproducción {frase}: {r} {ej.llamadas}")
-for malo in ("código de salida: 1 (0 s)\n\nNo players found", "código de salida: 127 (0 s)\n\nplayerctl: command not found", H.MENSAJE_PREPARADO):
-    ej = Ejec(); ej.cmd = malo; a = asistente(ej)
-    r, _ = pedir(a, "pausa")
-    ok(r is None and ej.cancelado == 1 and not a.dichas, f"sin reproductor: {malo[:30]} -> {r}")
-ej = Ejec(); a = asistente(ej)
+    ok(r == (dicho, "reproduccion") and ("cmd", f"playerctl {sub}") in ej.llamadas, f"reproducción {frase}: {r} {ej.llamadas}")
+# si el estado no queda como se pidió (el «hecho» de playerctl no vale), no se da por hecho
+ej = Musica(estado="Playing"); a = asistente(ej)
+r, _ = pedir(a, "pausa")
+ok(r is None and not a.dichas, f"playerctl dijo hecho pero sigue sonando: {r}")
+# sin ningún reproductor MPRIS ni mpv de Lina: a la IA (y no se dice que se ha parado)
+import lina.nucleo.reproductor as RP
+RP.ruta_mpv = lambda: "/no/existe.sock"
+ej = Musica(jugadores=""); a = asistente(ej)
+r, _ = pedir(a, "pausa la música")
+ok(r is None and ej.cancelado == 1 and not a.dichas and not any(c[1] == "playerctl pause" for c in ej.llamadas), f"sin reproductor: {r} {ej.llamadas}")
+# con el mpv de Lina (socket de control) se pausa sin playerctl
+enviados = []
+A.REPRO.enviar_mpv = lambda accion: enviados.append(accion) or True
+ej = Musica(jugadores=""); a = asistente(ej)
+r, _ = pedir(a, "pausa la música")
+ok(r == ("Pausado.", "reproduccion") and enviados == ["pausar"], f"mpv de Lina: {r} {enviados}")
+A.REPRO.enviar_mpv = lambda accion: False
+for malo in ("código de salida: 1 (0 s)\n\nfallo", H.MENSAJE_PREPARADO):
+    ej = Musica(); ej.cmd = malo; a = asistente(ej)
+    r, _ = pedir(a, "siguiente")
+    ok(r is None and not a.dichas, f"playerctl falla: {malo[:20]} -> {r}")
+ej = Musica(); a = asistente(ej)
 a.historial = [{"rol": "user", "texto": "pon música"}, {"rol": "model", "texto": "¿Quieres la lista de siempre o la nueva?"}]
 r, _ = pedir(a, "la anterior")
 ok(r is None and ej.llamadas == [], f"si Lina acaba de preguntar, «la anterior» es una respuesta: {r}")

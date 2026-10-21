@@ -145,7 +145,7 @@ def test_lina_directas_lista_y_prueba():
 
 
 @pytest.mark.parametrize("frase,accion", [
-    ("Pausa", "pausar"), ("pausa la música", "pausar"), ("pon la música en pausa", "pausar"), ("para la música", "pausar"), ("Oye, pausa, por favor.", "pausar"),
+    ("Pausa", "pausar"), ("pausa la música", "pausar"), ("pon la música en pausa", "pausar"), ("para la música", "detener"), ("quita la música", "detener"), ("apaga la música", "detener"), ("detén la reproducción", "detener"), ("Oye, pausa, por favor.", "pausar"),
     ("reanuda", "reanudar"), ("sigue con la música", "reanudar"), ("continúa la reproducción", "reanudar"), ("dale al play", "reanudar"), ("quita la pausa", "reanudar"),
     ("siguiente", "siguiente"), ("la siguiente canción", "siguiente"), ("pasa a la siguiente", "siguiente"), ("salta esta canción", "siguiente"),
     ("anterior", "anterior"), ("la canción anterior", "anterior"), ("vuelve a la anterior", "anterior"),
@@ -159,6 +159,7 @@ def test_reproduccion(frase, accion):
     "para", "sigue", "continúa",                                 # sueltas pueden ser cualquier cosa
     "no pauses la música", "cuál es la siguiente", "cómo pauso la música",
     "pausa la música y abre Firefox", "pausa el temporizador", "siguiente capítulo", "pausa en 5 minutos",
+    "quita el tema", "cierra el vídeo", "quita el audio", "apaga el ordenador",
 ])
 def test_reproduccion_que_no_es_directa(frase):
     r = D.entender(frase)
@@ -167,7 +168,7 @@ def test_reproduccion_que_no_es_directa(frase):
 
 def test_reproduccion_en_ingles(monkeypatch):
     monkeypatch.setattr(I, "LECTOR", lambda: Ajustes("en"))
-    for frase, accion in (("pause", "pausar"), ("pause the music", "pausar"), ("resume", "reanudar"), ("play", "reanudar"), ("next song", "siguiente"),
+    for frase, accion in (("pause", "pausar"), ("pause the music", "pausar"), ("stop the music", "detener"), ("resume", "reanudar"), ("play", "reanudar"), ("next song", "siguiente"),
                           ("skip", "siguiente"), ("previous song", "anterior"), ("go back a song", "anterior")):
         assert D.entender(frase) == ("reproduccion", {"accion": accion}), frase
     assert D.entender("how do I pause the music") is None

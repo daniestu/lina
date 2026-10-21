@@ -39,6 +39,7 @@ from lina.nucleo import tiempos as TIE
 from lina.nucleo import directas as DIR
 from lina.nucleo import cache_voz as CV
 from lina.escritorio import sesion as SES
+from lina.nucleo import reproductor as REPRO
 from lina.voz import piper_residente as PIPER_RES
 from lina.voz import voces as VOC
 
@@ -1054,11 +1055,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 return None
             return T("Hecho.")
         if ident == "reproduccion":
-            sub = {"pausar": "pause", "reanudar": "play", "siguiente": "next", "anterior": "previous"}[datos["accion"]]
-            r = str(self.ejecutor.herramienta({"comando": f"playerctl {sub}", "motivo": "controlar la reproducción"}))
-            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
-                return None                                       # sin playerctl o sin nada sonando: lo decide la IA
-            return {"pausar": T("Pausado."), "reanudar": T("Reanudado."), "siguiente": T("Siguiente."), "anterior": T("Anterior.")}[datos["accion"]]
+            accion = datos["accion"]
+            hecho = self._controlar_musica(accion)
+            if not hecho:
+                return None                                       # nada que controlar (o no se pudo comprobar): lo decide la IA
+            return {"pausar": T("Pausado."), "reanudar": T("Reanudado."), "siguiente": T("Siguiente."), "anterior": T("Anterior."), "detener": T("Parada.")}[accion]
         if ident in ("volumen", "silencio"):
             r = str(self.ejecutor.sistema("audio", dict(datos)))
             if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
@@ -1069,6 +1070,26 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 return T("Sonido activado.")
             return DIR.frase_de_volumen(r) or T("Hecho.")
         return None
+
+    def _controlar_musica(self, accion):
+        """Pausa, sigue, cambia de canción o para lo que suena. Primero el reproductor que hable MPRIS (playerctl); si no hay, el mpv que lanzó Lina.
+        True solo si se comprobó que se hizo; False si no hay nada que controlar."""
+        ej = self.ejecutor
+        lista = str(ej.herramienta({"comando": "playerctl -l", "motivo": "mirar qué reproductores hay"}))
+        hay = " ".join(lista.splitlines()[1:]).strip()
+        if lista.startswith("código de salida: 0") and hay and hay != "(sin salida)":
+            sub = {"pausar": "pause", "reanudar": "play", "siguiente": "next", "anterior": "previous", "detener": "stop"}[accion]
+            r = str(ej.herramienta({"comando": f"playerctl {sub}", "motivo": "controlar la reproducción"}))
+            if accion == "detener" and not r.startswith("código de salida: 0"):
+                r = str(ej.herramienta({"comando": "playerctl pause", "motivo": "controlar la reproducción"}))      # no todos los reproductores saben parar: se deja en pausa
+            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
+                return False
+            if accion in ("pausar", "reanudar"):                  # se mira que ha quedado como se pidió, en vez de fiarse del «hecho»
+                estado = str(ej.herramienta({"comando": "playerctl status", "motivo": "comprobar la reproducción"}))
+                esperado = "Paused" if accion == "pausar" else "Playing"
+                return estado.startswith("código de salida: 0") and esperado in estado
+            return True
+        return REPRO.enviar_mpv(accion)
 
     def _cerrar_directa(self, pregunta, frase, ident, inicio, crono):
         log(f"Directa [{ident}]: hecho sin llamar a la IA")
