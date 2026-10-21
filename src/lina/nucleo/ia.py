@@ -21,7 +21,7 @@ from lina.nucleo import proveedor_anthropic as PAN  # noqa: F401  (los proveedor
 from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
 from lina.nucleo.constantes import (BUSQUEDA, ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
-                                    MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, REINTENTOS_SERVIDOR,
+                                    MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, PAUSA_RED_SEG, TIMEOUT_REVISOR, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, VRAM_NECESARIA_MB)
 from lina.nucleo.opcionales import PRES
 from lina.nucleo.registro import log
@@ -164,7 +164,7 @@ def _pedir_corto(proveedor, clave, modelo, sistema, mensajes, etiqueta, *, inten
         if r.tipo == "red":
             log(f"{modelo}: sin conexión o demasiado lento al {etiqueta} ({r.resumen})")
             if pausar_en_red:
-                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
+                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_RED_SEG
             return None
         if r.estado == 400 and degradar and intento < intentos - 1:
             for ajuste in degradar.pop(0):
@@ -242,7 +242,7 @@ PROMPT_INTERRUPCION = (
     "exige que el usuario lo haya dejado claro. Responde solo con el JSON pedido.")
 
 
-def _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, maximo=200, proveedor=None):
+def _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, maximo=200, proveedor=None, timeout=None, un_modelo=False, pausar_en_red=True):
     """Una pregunta corta con respuesta JSON. `validar(objeto)` lanza ValueError/KeyError si no sirve. Devuelve (objeto, modelo) o None si ningún
     modelo respondió bien."""
     proveedor = proveedor or IAC.actual().proveedor
@@ -251,9 +251,11 @@ def _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, ma
             log(f"{modelo}: en pausa por un fallo reciente, lo salto")
             continue
         r = _pedir_corto(proveedor, clave, modelo, prompt, [{"rol": "user", "texto": contenido}], f"entender {etiqueta}",
-                         intentos=3, degradar=[("nivel",), ("json_esquema",)], timeout=TIMEOUT_CONFIRMACION,
+                         intentos=3, degradar=[("nivel",), ("json_esquema",)], timeout=timeout or TIMEOUT_CONFIRMACION, pausar_en_red=pausar_en_red,
                          temperatura=0, max_salida=maximo, json_esquema=esquema, nivel=nivel_razonamiento(modelo, "rapido"))
         if r is None:
+            if un_modelo:
+                return None
             continue
         try:
             obj = json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", r.texto.strip()))
@@ -268,12 +270,12 @@ def _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, ma
     return None
 
 
-def _mini_consulta_ia(clave, prompt, esquema, contenido, validas, etiqueta):
+def _mini_consulta_ia(clave, prompt, esquema, contenido, validas, etiqueta, **extra):
     """Una pregunta corta a la IA con respuesta JSON de las opciones dadas. Devuelve {'decision', 'modelo'} o None si ningún modelo respondió bien."""
     def validar(obj):
         if obj["decision"] not in validas:
             raise ValueError(f"decisión desconocida: {obj['decision']!r}")
-    hecho = _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar)
+    hecho = _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, **extra)
     return {"decision": hecho[0]["decision"], "modelo": hecho[1]} if hecho else None
 
 
@@ -305,7 +307,8 @@ def verificar_cumplimiento(clave, peticion, acciones, respuesta, con_pantalla=Fa
                      "(no figura en <acciones>).</contexto>\n") if con_pantalla else ""
     contenido = (nota_pantalla + f"<peticion>\n{H._limpiar_para_ia(peticion, 400)}\n</peticion>\n<acciones>\n" + ("\n".join(lineas) or "(ninguna)") + "\n</acciones>\n"
                  f"<respuesta>\n{H._limpiar_para_ia(respuesta, 600)}\n</respuesta>")
-    r = _mini_consulta_ia(clave, PROMPT_CUMPLIMIENTO, ESQUEMA_CUMPLIMIENTO, contenido, DECISIONES_CUMPLIMIENTO, "si se cumplió lo pedido")
+    r = _mini_consulta_ia(clave, PROMPT_CUMPLIMIENTO, ESQUEMA_CUMPLIMIENTO, contenido, DECISIONES_CUMPLIMIENTO, "si se cumplió lo pedido",
+                         timeout=TIMEOUT_REVISOR, un_modelo=True, pausar_en_red=False)     # un timeout del revisor no deja en pausa al modelo que contesta
     return bool(r and r["decision"] == "no_cumplido")
 
 
@@ -472,7 +475,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
         if isinstance(r, PROV.ErrorIA):
             if r.tipo == "red":
                 log(f"{modelo}: sin conexión o demasiado lento ({r.resumen})")
-                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
+                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_RED_SEG
                 return None
             if r.tipo == "vacia":
                 log(f"{modelo}: {r.resumen}")

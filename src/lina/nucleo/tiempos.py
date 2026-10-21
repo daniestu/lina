@@ -138,7 +138,10 @@ def principal(argv, salida=print, archivo=None):
         salida(T("Todavía no hay tiempos medidos. Habla con Lina un rato y vuelve a probar. (Se guardan solo números, nunca lo que dices; "
                  "se desactiva con:  lina config poner privacidad.registrar_tiempos no)"))
         return 0
-    _bloque(N_("Sin herramientas"), [r for r in registros if not r.get("herramientas")], salida)
-    _bloque(N_("Con herramientas"), [r for r in registros if r.get("herramientas")], salida)
+    directas = [r for r in registros if str(r.get("ruta", "")).startswith("directa")]
+    resto = [r for r in registros if r not in directas]
+    _bloque(N_("Órdenes directas (sin IA)"), directas, salida)
+    _bloque(N_("Con la IA, sin herramientas"), [r for r in resto if not r.get("herramientas")], salida)
+    _bloque(N_("Con la IA y herramientas"), [r for r in resto if r.get("herramientas")], salida)
     salida(T("Se guardan solo números en {archivo}; lo borras con:  lina olvidar tiempos", archivo=archivo or ARCHIVO))
     return 0

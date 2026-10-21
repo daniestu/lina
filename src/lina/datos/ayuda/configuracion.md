@@ -82,6 +82,15 @@ que no se pueden desactivar. Los perfiles se aplican encima de `politica.txt`: p
 | `persistencia` | `"perfil"` | Crear servicios o tareas automáticas. |
 | `archivos_de_paquetes` | `"perfil"` | Modificar archivos de programas instalados (/usr…). |
 
+### [directas] Órdenes directas (sin IA)
+
+Las órdenes claras y de riesgo bajo («abre Firefox», «sube el volumen», «silencia el sonido») se hacen sin llamar a la IA: mucho más rápido y sin gasto. Usan las mismas herramientas y
+reglas de seguridad de siempre. Si la frase no está clara (una pregunta, una negación, dos cosas encadenadas) o algo falla, se la dejo a la IA. Mira cuáles hay y pruébalas con `lina directas`.
+
+| Ajuste | De fábrica | Qué hace |
+|---|---|---|
+| `activo` | `true` | true: las órdenes claras y de riesgo bajo («abre Firefox», «sube el volumen») se hacen sin llamar a la IA, mucho más rápido. Mira cuáles y pruébalas con:  lina directas |
+
 ### [ia] Inteligencia artificial
 
 Con qué IA habla Lina. Por defecto es Gemini con tu clave gratuita y no hace falta tocar nada. Mira y cambia con `lina ia`. Cambiar de proveedor decide a qué empresa se envía lo que

@@ -95,15 +95,16 @@ def test_lina_tiempos_sin_datos_y_con_datos(tmp_path):
     archivo = tmp_path / "t.jsonl"
     salida = []
     assert TIE.principal([], salida.append, archivo) == 0 and "Todavía no hay tiempos" in salida[0]
-    for ia, herr in ((1.0, 0), (5.0, 2)):
+    for ia, herr, ruta in ((1.0, 0, "g"), (5.0, 2, "g"), (0.0, 0, "directa:abrir_app")):
         c = TIE.Cronometro(Reloj())
         c.sumar("ia", ia)
         c.herramientas = herr
-        TIE.guardar(c.registro("g"), archivo)
+        TIE.guardar(c.registro(ruta), archivo)
     salida.clear()
     assert TIE.principal([], salida.append, archivo) == 0
     texto = "\n".join(salida)
-    assert "Sin herramientas: 1 peticiones" in texto and "Con herramientas: 1 peticiones" in texto and "La fase más lenta" in texto
+    assert "Con la IA, sin herramientas: 1 peticiones" in texto and "Con la IA y herramientas: 1 peticiones" in texto and "La fase más lenta" in texto
+    assert "Órdenes directas (sin IA): 1 peticiones" in texto
 
 
 def test_lina_tiempos_rechaza_un_numero_raro(tmp_path):

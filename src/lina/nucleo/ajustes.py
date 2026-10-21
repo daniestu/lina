@@ -72,6 +72,10 @@ ESQUEMA: dict = {
         "persistencia": ("perfil", "opcion", MODOS_CATEGORIA, N_("Crear servicios o tareas automáticas.")),
         "archivos_de_paquetes": ("perfil", "opcion", MODOS_CATEGORIA, N_("Modificar archivos de programas instalados (/usr…).")),
     },
+    "directas": {
+        "activo": (True, "bool", None, N_("true: las órdenes claras y de riesgo bajo («abre Firefox», «sube el volumen») se hacen sin llamar a la IA, mucho más rápido. "
+                   "Mira cuáles y pruébalas con:  lina directas")),
+    },
     "ia": {
         "proveedor": ("gemini", "opcion", ("gemini", "openai", "anthropic"), N_("Con qué IA habla Lina: gemini (por defecto, con clave gratuita), anthropic, o openai "
                       "(OpenAI y todo lo compatible: OpenRouter, Groq, Mistral, Ollama, LM Studio, un servidor de tu empresa…). Mira y cambia con:  lina ia")),
@@ -103,7 +107,7 @@ ESQUEMA: dict = {
     },
 }
 TITULOS = {"asistente": N_("Identidad"), "voz": N_("Voz"), "activacion": N_("Manos libres"), "autonomia": N_("Autonomía: qué hace solo y qué te pregunta"),
-           "ia": N_("Inteligencia artificial"), "gasto": N_("Gasto con la clave de pago"), "privacidad": N_("Privacidad"), "interfaz": N_("Interfaz")}
+           "directas": N_("Órdenes directas (sin IA)"), "ia": N_("Inteligencia artificial"), "gasto": N_("Gasto con la clave de pago"), "privacidad": N_("Privacidad"), "interfaz": N_("Interfaz")}
 
 # Nombres planos que usa el manos libres desde siempre (activacion.txt) → ajuste nuevo
 PLANAS = {

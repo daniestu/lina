@@ -1,0 +1,128 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
+"""Fase 12: las órdenes directas se hacen sin llamar a la IA, con las mismas herramientas; si no queda claro o falla, se las deja a la IA."""
+import sys, time, os, tempfile, threading
+os.environ["HOME"] = tempfile.mkdtemp()
+from unittest.mock import MagicMock
+for m in ("sounddevice", "faster_whisper"):
+    sys.modules[m] = MagicMock()
+from lina.nucleo import asistente as A
+from lina.nucleo import herramientas as H
+from lina.nucleo import tiempos as TIE
+
+fallos = 0
+def ok(c, m):
+    global fallos
+    if not c:
+        fallos += 1; print("FALLO:", m)
+
+class Ejec:
+    """Un ejecutor falso: apunta lo que se le pide y devuelve lo que se le diga."""
+    def __init__(self, abrir="Abierto «Firefox Web Browser». Ya está.", audio="código de salida: 0 (0 s)\n\nCOMPROBADO AHORA: Altavoces: Volume: 0.85"):
+        self.pendientes, self.recetas_diferidas, self.continuar = [], [], "x"
+        self.llamadas, self.abrir, self.audio, self.cancelado = [], abrir, audio, 0
+        self.pregunta_pura, self.borrado_definitivo = "", True
+    def abrir_app(self, nombre):
+        self.llamadas.append(("abrir_app", nombre)); return self.abrir
+    def sistema(self, nombre, args):
+        self.llamadas.append((nombre, args)); return self.audio
+    def cancelar(self, rechazar=False):
+        self.cancelado += 1
+
+def asistente(ej, activo=True):
+    a = A.Asistente.__new__(A.Asistente)
+    a.ejecutor, a.historial, a.interrumpiendo = ej, [], False
+    a.hilo_captura = threading.Thread(target=lambda: None); a.hilo_captura.start()
+    a.nueva_tarea = lambda: None
+    a._continuar_peticion = lambda *x: True
+    dichas = []
+    a.decir = lambda t: dichas.append(t)
+    a.dichas = dichas
+    A.AJ.actuales = lambda log=None: _Aj(activo)
+    return a
+
+class _Aj:
+    def __init__(self, activo): self.activo = activo
+    def get(self, s, c):
+        return {("directas", "activo"): self.activo, ("privacidad", "registrar_preguntas"): True, ("privacidad", "registrar_tiempos"): False}[(s, c)]
+
+def pedir(a, frase):
+    crono = TIE.Cronometro()
+    r = a._intentar_directa(frase, crono)
+    if r:
+        a._cerrar_directa(frase, r[0], r[1], time.time(), crono)
+    return r, crono
+
+# ---- abrir un programa: lo hace con abrir_app y dice «Abierto.» (lo oído está dentro del nombre real)
+ej = Ejec(); a = asistente(ej)
+r, crono = pedir(a, "Abre Firefox.")
+ok(r == ("Abierto.", "abrir_app") and ej.llamadas == [("abrir_app", "firefox")], f"abrir: {r} {ej.llamadas}")
+ok(a.dichas == ["Abierto."] and a.historial[-1] == {"rol": "model", "texto": "Abierto."}, f"se dice y queda en el historial: {a.dichas} {a.historial}")
+ok(ej.continuar == a._continuar_peticion or callable(ej.continuar), "se restablece el retomar tras la directa")
+ok("herramientas" in crono.fases and "sintesis" in crono.fases, "se miden las fases")
+
+# ---- si el programa abierto se llama distinto de lo oído, lo dice
+ej = Ejec(abrir="Abierto «Navegador Brave»."); a = asistente(ej)
+r, _ = pedir(a, "abre el explorador")
+ok(r == ("Abierto Navegador Brave.", "abrir_app"), f"nombre distinto: {r}")
+
+# ---- no instalado / varios que encajan / error: no es una directa, se la deja a la IA (y no se dice nada)
+for texto in ("No hay ningún programa INSTALADO que encaje con «stremio»", "Hay varios programas que encajan con «x»: ...", "Intenté abrir «Y» con `y` y: fallo"):
+    ej = Ejec(abrir=texto); a = asistente(ej)
+    r, _ = pedir(a, "abre stremio")
+    ok(r is None and not a.dichas and ej.cancelado == 1, f"se deja a la IA: {texto[:30]} -> {r} {a.dichas}")
+
+# ---- volumen: la frase sale de lo que se lee DESPUÉS de tocarlo
+ej = Ejec(); a = asistente(ej)
+r, _ = pedir(a, "Sube el volumen.")
+ok(r == ("Volumen al 85 %.", "volumen") and ej.llamadas == [("audio", {"accion": "subir"})], f"subir: {r} {ej.llamadas}")
+ej = Ejec(); a = asistente(ej)
+r, _ = pedir(a, "pon el volumen al 40")
+ok(ej.llamadas == [("audio", {"accion": "volumen", "valor": "40"})], f"poner: {ej.llamadas}")
+ej = Ejec(); a = asistente(ej)
+r, _ = pedir(a, "silencia el sonido")
+ok(r == ("Silenciado.", "silencio"), f"silenciar: {r}")
+ej = Ejec(); a = asistente(ej)
+r, _ = pedir(a, "quita el silencio")
+ok(r == ("Sonido activado.", "silencio"), f"activar: {r}")
+
+# ---- si el sistema pide confirmación, falla o no hay audio: a la IA, y lo preparado se descarta
+for texto in (H.MENSAJE_PREPARADO, "código de salida: 1", "No hay audio"):
+    ej = Ejec(audio="código de salida: 0 " + texto if texto == H.MENSAJE_PREPARADO else texto); a = asistente(ej)
+    r, _ = pedir(a, "sube el volumen")
+    ok(r is None and not a.dichas and ej.cancelado == 1, f"volumen no confirmado: {texto[:30]} -> {r}")
+
+# ---- lo que NO es directa no toca nada
+ej = Ejec(); a = asistente(ej)
+for frase in ("abre Firefox y busca recetas", "no abras Firefox", "¿cómo subo el volumen?", "borra todo", "apaga el ordenador"):
+    r, _ = pedir(a, frase)
+    ok(r is None, f"no es directa: {frase}")
+ok(ej.llamadas == [] and not a.dichas, f"no se ha llamado a nada: {ej.llamadas}")
+
+# ---- desactivadas por el ajuste, o con algo pendiente de tu «sí»: nada
+ej = Ejec(); a = asistente(ej, activo=False)
+ok(pedir(a, "abre Firefox")[0] is None and ej.llamadas == [], "ajuste directas.activo = false")
+ej = Ejec(); ej.pendientes = [{"comando": "x"}]; a = asistente(ej)
+ok(pedir(a, "abre Firefox")[0] is None and ej.llamadas == [], "con algo pendiente de confirmar, lo decide el flujo normal")
+
+# ---- un fallo inesperado nunca se queda sin respuesta: a la IA
+class Roto(Ejec):
+    def abrir_app(self, nombre):
+        raise RuntimeError("boom")
+ej = Roto(); a = asistente(ej)
+ok(pedir(a, "abre Firefox")[0] is None, "excepción: se deja a la IA")
+
+# ---- el revisor sobra cuando el código ya comprobó lo hecho
+a = asistente(Ejec())
+a.acciones_turno = [("abrir_app", {"nombre": "firefox"}, "Abierto «Firefox». Ya está")]
+ok(a._acciones_comprobadas() is True, "abrir comprobado: sin revisor")
+a.acciones_turno = [("audio", {"accion": "subir"}, "código de salida: 0 (0 s)\n\nCOMPROBADO AHORA: x: Volume: 0.5")]
+ok(a._acciones_comprobadas() is True, "volumen leído: sin revisor")
+a.acciones_turno = [("abrir_app", {}, "Abierto «F»."), ("ejecutar_comando", {"comando": "rm x"}, "código de salida: 0")]
+ok(a._acciones_comprobadas() is False, "si hubo otra acción, sí hay revisor")
+a.acciones_turno = [("procesos", {}, "...")]
+ok(a._acciones_comprobadas() is False, "una lectura que la IA resume (RAM, CPU): sí hay revisor")
+a.acciones_turno = []
+ok(a._acciones_comprobadas() is False, "sin acciones: sí hay revisor")
+
+print("fallos", fallos)

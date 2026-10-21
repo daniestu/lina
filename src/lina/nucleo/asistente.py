@@ -35,6 +35,8 @@ from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
 from lina.nucleo import tiempos as TIE
+from lina.nucleo import directas as DIR
+from lina.nucleo import cache_voz as CV
 from lina.escritorio import sesion as SES
 from lina.voz import voces as VOC
 
@@ -45,7 +47,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import solo_herramientas_meta
+from lina.nucleo.turnos import HERRAMIENTAS_META, solo_herramientas_meta
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -890,6 +892,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         if self.historial and time.time() - self.ultima_pregunta > SESION_MINUTOS * 60:
             log("Sesión caducada por inactividad: empiezo una conversación nueva")
             self.historial.clear()
+        directa = self._intentar_directa(pregunta, crono)
+        if directa:
+            self._cerrar_directa(pregunta, directa[0], directa[1], inicio, crono)
+            return
         self.hilo_captura.join()
         imagen = preparar_imagen()
         self.pregunta_pura = pregunta
@@ -980,6 +986,86 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             crono.sumar("sintesis", self.ultima_habla[0])
             crono.sumar("voz", self.ultima_habla[1])
             self._anotar_tiempos(crono, origen, modo)
+
+    def _intentar_directa(self, pregunta, crono):
+        """Fase 12: órdenes claras y de riesgo bajo («abre Firefox», «sube el volumen») se hacen aquí, sin llamar a la IA. Va por las mismas herramientas y reglas
+        que cuando decide la IA. Devuelve (frase, id) si lo ha hecho, o None (y todo sigue como siempre: lo entiende la IA)."""
+        try:
+            if not AJ.actuales(log=lambda m: None).get("directas", "activo") or self.ejecutor.pendientes:
+                return None
+            orden = DIR.entender(pregunta)
+            if not orden:
+                return None
+            ident, datos = orden
+            self.hilo_captura.join()
+            self.nueva_tarea()
+            self.pregunta_pura = self.ejecutor.pregunta_pura = pregunta
+            self.ejecutor.borrado_definitivo = False
+            self.ejecutor.continuar = None                         # una orden directa no espera a nada en segundo plano: si tarda, se la deja a la IA
+            try:
+                with crono.medir("herramientas"):
+                    frase = self._ejecutar_directa(ident, datos)
+            finally:
+                self.ejecutor.continuar = self._continuar_peticion
+            self.ejecutor.recetas_diferidas = []
+            if frase is None:
+                self.ejecutor.cancelar()
+                log(f"Directa [{ident}]: no ha quedado claro o no ha podido; se lo dejo a la IA")
+                return None
+            return frase, ident
+        except Cancelado:
+            raise
+        except Exception as e:
+            self.ejecutor.continuar = self._continuar_peticion
+            log(f"Directa: fallo {e!r}; se lo dejo a la IA")
+            return None
+
+    def _ejecutar_directa(self, ident, datos):
+        """Hace la orden directa con las herramientas de siempre y devuelve lo que se dirá, o None si no se pudo comprobar que se hizo."""
+        if ident == "abrir_app":
+            r = str(self.ejecutor.abrir_app(datos["nombre"]))
+            m = re.match(r"(?:Abierto|Abriendo) «(.+?)»", r)
+            if not m:
+                return None
+            oido, app = DIR.normalizar(datos["nombre"]), DIR.normalizar(m.group(1))
+            return T("Abierto.") if (oido in app or app in oido) else T("Abierto {app}.", app=m.group(1))
+        if ident in ("volumen", "silencio"):
+            r = str(self.ejecutor.sistema("audio", dict(datos)))
+            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
+                return None
+            if datos["accion"] == "silenciar":
+                return T("Silenciado.")
+            if datos["accion"] == "activar_sonido":
+                return T("Sonido activado.")
+            return DIR.frase_de_volumen(r) or T("Hecho.")
+        return None
+
+    def _cerrar_directa(self, pregunta, frase, ident, inicio, crono):
+        log(f"Directa [{ident}]: hecho sin llamar a la IA")
+        log(f"Respuesta [directa]: {frase if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'} ({time.time() - inicio:.1f} s en total)")
+        self.guardar_en_historial(pregunta, frase)
+        if self.interrumpiendo:
+            log("Estás hablando: no leo en voz alta la respuesta anterior")
+            return
+        self.ultima_habla = (0.0, 0.0)
+        self.decir(frase)
+        crono.sumar("sintesis", self.ultima_habla[0])
+        crono.sumar("voz", self.ultima_habla[1])
+        self._anotar_tiempos(crono, f"directa:{ident}", "directa")
+
+    def _acciones_comprobadas(self):
+        """¿Todo lo hecho en esta petición lo ha comprobado el código (el programa se abrió, el volumen quedó leído)? Entonces el revisor sobra."""
+        reales = [a for a in self.acciones_turno if a[0] not in HERRAMIENTAS_META]
+        if not reales:
+            return False
+        for nombre, _, res in reales:
+            r = str(res)
+            if nombre == "abrir_app" and re.match(r"(?:Abierto|Abriendo) «", r):
+                continue
+            if nombre == "audio" and r.startswith("código de salida: 0") and "COMPROBADO AHORA" in r:
+                continue
+            return False
+        return True
 
     def _continuar_peticion(self, peticion, motivo, profundidad, reiniciar=False):
         """Una tarea en segundo plano (instalar, descargar…) ha terminado y la petición del usuario seguía sin cumplir: se retoma SOLA, sin que la repita.
@@ -1614,7 +1700,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             obst = f"lo que pidió el usuario («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») no se ha cumplido; la respuesta fue: «{str(respuesta)[:200]}»"
             log("La respuesta dice que no se ha podido hacer lo pedido: reintento a fondo")
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
-              and verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, respuesta,
+              and not self._acciones_comprobadas() and verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, respuesta,
                                                      bool(imagen is not None or self.pantalla_adjunta))):
             obst = (f"lo que pidió el usuario («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») no se ha cumplido tal cual o la respuesta no se apoya "
                     f"en lo que se hizo de verdad; la respuesta fue: «{str(respuesta)[:200]}»")
@@ -1816,10 +1902,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
             if abs(velocidad - 1.0) > 0.01:
                 orden += ["--length-scale", f"{1.0 / velocidad:.3f}"]          # Piper: más de 1 = más lento; aquí la velocidad es la inversa
             t0 = time.monotonic()
-            subprocess.run(orden + ["-f", str(AUDIO_RESPUESTA), "--", texto],
-                           cwd=RUT.asegurar(RUT.VOCES), check=True, capture_output=True)
+            sonido = CV.buscar(VOC.modelo(voz), VOC.locutor(voz), velocidad, texto)       # una frase corta ya sintetizada suena al instante
+            if sonido:
+                log("Voz: frase corta ya sintetizada (caché)")
+            else:
+                subprocess.run(orden + ["-f", str(AUDIO_RESPUESTA), "--", texto],
+                               cwd=RUT.asegurar(RUT.VOCES), check=True, capture_output=True)
+                CV.guardar(AUDIO_RESPUESTA, VOC.modelo(voz), VOC.locutor(voz), velocidad, texto)
+                sonido = AUDIO_RESPUESTA
             t1 = time.monotonic()
-            self.reproductor = subprocess.Popen(["paplay", str(AUDIO_RESPUESTA)])
+            self.reproductor = subprocess.Popen(["paplay", str(sonido)])
             self.reproductor.wait()
             self.ultima_habla = (t1 - t0, time.monotonic() - t1)      # síntesis y reproducción: para `lina tiempos`
         except subprocess.CalledProcessError as e:

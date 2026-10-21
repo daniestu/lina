@@ -38,7 +38,7 @@ visto.clear(); a.insistiendo=False; r,m=a._insistir_si_hace_falta("No he podido.
 # revisor
 from lina.nucleo import asistente as A2
 llamadas=[]
-def mini(clave,prompt,esq,cont,val,et):
+def mini(clave,prompt,esq,cont,val,et,**extra):
     llamadas.append(cont); return {"decision":"no_cumplido" if "Según la página" in cont else "cumplido","modelo":"x"}
 from lina.nucleo import ia as IA; IA._mini_consulta_ia=mini
 visto.clear(); a.insistiendo=False; a.obstaculo=""; a.pregunta_pura="lee la página copiada"

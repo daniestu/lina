@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Añadido
+- **Órdenes directas** (fase 12 del plan de mejoras): «abre Firefox», «sube el volumen», «baja el volumen un 20 %», «pon el volumen al 40», «silencia el sonido» y «quita el silencio» se entienden y se hacen sin llamar a la IA, con las mismas herramientas y reglas de seguridad de siempre. Si la frase no está clara (pregunta, negación, dos cosas encadenadas, un programa que no está instalado, un fallo) se la deja a la IA como antes. `lina directas` lista lo que sabe hacer y `lina directas probar "frase"` dice qué haría sin ejecutarlo; se apaga con `lina config poner directas.activo no`.
+- Las frases cortas de voz («Abierto.», «Volumen al 40 %.») se guardan ya sintetizadas en la caché y la segunda vez suenan al instante, sin arrancar Piper.
+
+### Cambiado
+- El revisor «¿se cumplió lo pedido?» ya no se llama cuando el propio código comprobó lo hecho (un programa abierto, un volumen leído después de tocarlo), espera 4 segundos en vez de 8 y prueba un solo modelo; con Google lento, una orden de 3 s dejaba de pasar a 14 s.
+- Un fallo de conexión o un timeout deja en pausa a un modelo 30 segundos en vez de 3 minutos (los fallos de cuota y de servidor siguen igual), y un timeout del revisor ya no pausa al modelo que contesta: antes un solo fallo desviaba todo a la clave de pago durante minutos.
+- `lina tiempos` separa las órdenes directas de las que pasan por la IA.
+
 ### Corregido
 - Una petición que necesita un paso previo largo ya no se olvida: si Lina tenía que instalar algo para abrirlo («abre Stremio») y la instalación pasaba a segundo plano, al terminar solo avisaba de que «ya ha terminado» y no abría nada. Ahora retoma sola la petición original cuando acaba la tarea (hasta 3 vueltas seguidas), le cuenta a la IA qué terminó y qué falta, y las instrucciones de la IA dicen expresamente que su trabajo es cumplir la petición completa, no el primer paso.
 - La captura de pantalla se enviaba a la IA en todas las peticiones durante minutos después de pedir algo como «maximiza esta ventana» (incluso para «¿qué hora es?» o una receta), porque cada petición alargaba el plazo de «seguir con la ayuda de pantalla». Ahora seguir una ayuda no la alarga, y el plazo baja de 180 a 90 segundos.
