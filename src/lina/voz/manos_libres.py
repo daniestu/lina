@@ -710,7 +710,10 @@ class ManosLibres:
             return
         self._sonido_bajado = espera
         try:
-            (self.a._bajar_sonido if espera else self.a._subir_sonido)("manos libres")
+            if espera:                                   # el pitido de «te he oído» dura 0,12 s: se espera a que acabe para que no se baje con lo demás
+                threading.Timer(0.4, lambda: self.a._bajar_sonido("manos libres") if self.modo == "orden" else None).start()
+            else:
+                self.a._subir_sonido("manos libres")
         except AttributeError:
             pass
 

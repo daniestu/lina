@@ -20,6 +20,7 @@ MAX_SEGUNDOS = 60               # una escucha no dura más; pasado esto se devue
 NIVEL_POR_DEFECTO = 20          # % de lo que tenía
 _PROPIOS = {"piper", "lina"}    # programas de Lina (su voz, sus pitidos) que nunca se bajan
 FUENTE_ECO = "lina_eco"
+_RASTROS_PROPIOS = ("python", "portaudio", "lina")      # los pitidos de Lina salen por PortAudio y PipeWire los llama «ALSA plug-in [python3.13]», sin pid fiable
 
 
 def pactl(*args, tiempo=4):
@@ -43,9 +44,10 @@ def leer_programas(texto):
         def propiedad(k, bloque=bloque):
             return (re.search(rf'{re.escape(k)}\s*=\s*"([^"]*)"', bloque) or [None, ""])[1]
         binario, pid = os.path.basename(propiedad("application.process.binary")).lower(), propiedad("application.process.id")
-        if binario in _PROPIOS or pid == str(os.getpid()) or FUENTE_ECO in bloque:
+        app = propiedad("application.name") or binario
+        if binario in _PROPIOS or pid == str(os.getpid()) or FUENTE_ECO in bloque or any(r in app.lower() for r in _RASTROS_PROPIOS):
             continue
-        salida.append({"id": m.group(1), "volumen": round(sum(porcentajes) / len(porcentajes)), "app": propiedad("application.name") or binario})
+        salida.append({"id": m.group(1), "volumen": round(sum(porcentajes) / len(porcentajes)), "app": app})
     return salida
 
 

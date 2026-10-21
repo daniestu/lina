@@ -21,6 +21,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - `lina tiempos` separa las órdenes directas de las que pasan por la IA.
 
 ### Corregido
+- Con «Oye Lina» no se oía el pitido de «te he oído» porque se bajaba junto con lo demás que sonaba: ahora los sonidos de Lina no se bajan y el volumen se baja cuando el pitido ya ha terminado.
 - «Pon música de Queen» decía «puesta» sin que sonara nada: el `mpv` se lanzaba en segundo plano con la salida tirada y nadie comprobaba que arrancara. Ahora la música se pone con `lina musica poner "Queen"` (o un enlace), que busca con yt-dlp, arranca mpv con su socket, cierra la música anterior y solo dice «Sonando» si mpv está vivo y contesta; si falta mpv o yt-dlp, no encuentra la canción o mpv se cierra, lo cuenta. Las recetas viejas que lanzaban un programa y lo dejaban abierto se descartan.
 - «Para la música» paraba el reproductor equivocado (el navegador también habla MPRIS, así que `playerctl stop` le contestaba a Brave y Lina decía «Parada» con su música sonando): ahora se prueba primero el mpv que puso Lina, y con playerctl se comprueba que ha dejado de sonar antes de decir que está hecho.
 - Después de parar la música, a veces volvía a sonar sola: el `mpv` lanzado en segundo plano se vigilaba como una tarea, y al cerrarse Lina «retomaba» la petición original («Reproduce música de Queen»). Un programa que se deja abierto ya no se trata como tarea que termina, y una petición vieja no se retoma si has pedido otra cosa después.

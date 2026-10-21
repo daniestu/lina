@@ -120,7 +120,16 @@ def test_manos_libres_baja_al_oir_el_nombre_y_devuelve_con_la_orden():
     assert hechos == []
     ml.modo = "orden"
     ml._sonido_en_espera_de_orden(); ml._sonido_en_espera_de_orden()
+    assert hechos == []                                  # espera a que acabe el pitido
+    import time; time.sleep(0.8)
     assert hechos == [("baja", "manos libres")]
     ml.modo = None
     ml._sonido_en_espera_de_orden()
     assert hechos == [("baja", "manos libres"), ("sube", "manos libres")]
+
+
+def test_el_pitido_de_lina_no_se_baja(tmp_path):
+    p, a = hacer(tmp_path, ("5", 80, {}), ("7", 70, {"app": "ALSA plug-in [python3.13]", "binario": "python3.13", "pid": "1"}),
+                 ("8", 70, {"app": "PortAudio", "binario": ""}))
+    a.bajar()
+    assert p.vol == {"5": 16, "7": 70, "8": 70}
