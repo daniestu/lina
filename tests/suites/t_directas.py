@@ -26,6 +26,8 @@ class Ejec:
         self.llamadas.append(("abrir_app", nombre)); return self.abrir
     def sistema(self, nombre, args):
         self.llamadas.append((nombre, args)); return self.audio
+    def herramienta(self, args):
+        self.llamadas.append(("cmd", args["comando"])); return getattr(self, "cmd", "código de salida: 0 (0 s)\n\n")
     def cancelar(self, rechazar=False):
         self.cancelado += 1
 
@@ -158,5 +160,19 @@ vistos.clear()
 b._claves = lambda modo: ["unica"]
 b._gemini("rapido", "m", "pregunta", None)
 ok(vistos == [("unica", None)], f"con una sola clave, sin recortar: {vistos}")
+
+# ---- música: playerctl con la herramienta de siempre; sin reproductor o sin playerctl, a la IA
+for frase, sub, dicho in (("pausa la música", "pause", "Pausado."), ("reanuda", "play", "Reanudado."), ("siguiente canción", "next", "Siguiente."), ("la anterior", "previous", "Anterior.")):
+    ej = Ejec(); a = asistente(ej)
+    r, _ = pedir(a, frase)
+    ok(r == (dicho, "reproduccion") and ej.llamadas == [("cmd", f"playerctl {sub}")], f"reproducción {frase}: {r} {ej.llamadas}")
+for malo in ("código de salida: 1 (0 s)\n\nNo players found", "código de salida: 127 (0 s)\n\nplayerctl: command not found", H.MENSAJE_PREPARADO):
+    ej = Ejec(); ej.cmd = malo; a = asistente(ej)
+    r, _ = pedir(a, "pausa")
+    ok(r is None and ej.cancelado == 1 and not a.dichas, f"sin reproductor: {malo[:30]} -> {r}")
+ej = Ejec(); a = asistente(ej)
+a.historial = [{"rol": "user", "texto": "pon música"}, {"rol": "model", "texto": "¿Quieres la lista de siempre o la nueva?"}]
+r, _ = pedir(a, "la anterior")
+ok(r is None and ej.llamadas == [], f"si Lina acaba de preguntar, «la anterior» es una respuesta: {r}")
 
 print("fallos", fallos)

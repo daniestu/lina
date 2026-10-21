@@ -39,6 +39,7 @@ from lina.nucleo import tiempos as TIE
 from lina.nucleo import directas as DIR
 from lina.nucleo import cache_voz as CV
 from lina.escritorio import sesion as SES
+from lina.voz import piper_residente as PIPER_RES
 from lina.voz import voces as VOC
 
 import numpy as np
@@ -437,7 +438,7 @@ def escuchar_mandos(al_pulsar):
 
 
 from lina.nucleo.ia import (  # noqa: F401
-    Cancelado, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
+    Cancelado, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily,
@@ -861,6 +862,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _atender(self, pregunta, inicio, crono=None, nota_sistema="", profundidad=0):
         crono = crono or TIE.Cronometro()
+        recoger_llamadas()                                          # cuenta de cero las llamadas a la IA de esta petición (se apuntan en `lina tiempos`)
         self.ejecutor.profundidad = profundidad                     # >0: esta vuelta retoma una petición que esperó a una tarea en segundo plano
         euros = PRES.entender_tope(pregunta)
         if euros is not None:                                   # solo TÚ cambias el tope de gasto: lo hace el código ante una frase tuya, nunca la IA
@@ -965,6 +967,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             respuesta, origen = self.responder(pregunta, imagen, modo)
         finally:
             self.crono = None
+            crono.llamadas = recoger_llamadas()
         crono.sumar("ia", crono.reloj() - t_ia - crono.fases.get("herramientas", 0.0))
         if aviso_voz:
             aviso_voz.join()
@@ -1008,6 +1011,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             if not orden:
                 return None
             ident, datos = orden
+            if ident == "reproduccion" and self.historial and self.historial[-1]["rol"] == "model" and "?" in self.historial[-1]["texto"]:
+                return None                                       # «la siguiente» / «la anterior» pueden ser la respuesta a una pregunta de Lina: lo entiende la IA
             self.hilo_captura.join()
             self.nueva_tarea()
             self.pregunta_pura = self.ejecutor.pregunta_pura = pregunta
@@ -1048,6 +1053,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
                 return None
             return T("Hecho.")
+        if ident == "reproduccion":
+            sub = {"pausar": "pause", "reanudar": "play", "siguiente": "next", "anterior": "previous"}[datos["accion"]]
+            r = str(self.ejecutor.herramienta({"comando": f"playerctl {sub}", "motivo": "controlar la reproducción"}))
+            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
+                return None                                       # sin playerctl o sin nada sonando: lo decide la IA
+            return {"pausar": T("Pausado."), "reanudar": T("Reanudado."), "siguiente": T("Siguiente."), "anterior": T("Anterior.")}[datos["accion"]]
         if ident in ("volumen", "silencio"):
             r = str(self.ejecutor.sistema("audio", dict(datos)))
             if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
@@ -1928,8 +1939,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             if sonido:
                 log("Voz: frase corta ya sintetizada (caché)")
             else:
-                subprocess.run(orden + ["-f", str(AUDIO_RESPUESTA), "--", texto],
-                               cwd=RUT.asegurar(RUT.VOCES), check=True, capture_output=True)
+                residente = AJ.actuales(log=lambda m: None).get("voz", "residente") and _piper_residente().sintetizar(
+                    VOC.modelo(voz), RUT.asegurar(RUT.VOCES), VOC.locutor(voz), (1.0 / velocidad) if abs(velocidad - 1.0) > 0.01 else None, texto, AUDIO_RESPUESTA)
+                if not residente:                                      # sin residente (apagado o falló): un Piper para esta frase, como siempre
+                    subprocess.run(orden + ["-f", str(AUDIO_RESPUESTA), "--", texto],
+                                   cwd=RUT.asegurar(RUT.VOCES), check=True, capture_output=True)
                 CV.guardar(AUDIO_RESPUESTA, VOC.modelo(voz), VOC.locutor(voz), velocidad, texto)
                 sonido = AUDIO_RESPUESTA
             t1 = time.monotonic()
@@ -1959,6 +1973,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         return True
 
 
+_residente = []
+
+
+def _piper_residente():
+    """El Piper que mantiene la voz cargada (uno para todo el programa; se crea la primera vez que se pide)."""
+    if not _residente:
+        _residente.append(PIPER_RES.PiperResidente(log=log))
+    return _residente[0]
+
+
 def main():
     CL.proteger_salida()                                           # ninguna clave sale en el registro
     if AJ.actuales(log=lambda m: None).get("privacidad", "capturas") == "preguntar":
@@ -1975,6 +1999,8 @@ def main():
     RUT.asegurar(RUT.CONFIG); RUT.asegurar(RUT.DATOS); RUT.asegurar(RUT.ESTADO); RUT.asegurar(RUT.EJECUCION)
     global VOZ
     VOZ = VOC.preparar(log=log) or VOZ
+    if AJ.actuales(log=lambda m: None).get("voz", "residente"):       # la voz se carga ya, mientras arranca lo demás: la primera frase suena sin esperas
+        threading.Thread(target=lambda: _piper_residente().precalentar(VOC.modelo(VOC.voz_elegida() or VOZ), RUT.asegurar(RUT.VOCES)), daemon=True).start()
     asistente = Asistente()
     evento = threading.Event()
     signal.signal(signal.SIGUSR1, lambda *_: evento.set())

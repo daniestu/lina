@@ -49,6 +49,8 @@ ESQUEMA: dict = {
     "voz": {
         "voz": ("es_MX-claude-high", "texto", None, N_("Voz de Piper. Mira las que hay con:  lina voz")),
         "velocidad": (1.0, "float", (0.5, 2.0), N_("Velocidad al hablar: 1 normal, 1.2 más rápida, 0.8 más lenta.")),
+        "residente": (True, "bool", None, N_("true: la voz de Piper se mantiene cargada en un proceso aparte (se cierra sola tras 10 minutos sin hablar) y las frases salen "
+                      "sin la espera de cargarla cada vez; si falla, se usa el método de siempre. Ocupa algo de memoria mientras está cargada.")),
     },
     "activacion": {
         "activo": (True, "bool", None, N_("false: apaga el manos libres (el atajo sigue funcionando siempre).")),

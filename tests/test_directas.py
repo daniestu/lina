@@ -142,3 +142,32 @@ def test_lina_directas_lista_y_prueba():
     salida.clear()
     assert D.principal(["probar", "borra todo"], salida.append) == 0 and "no es una orden directa" in salida[0]
     assert D.principal(["probar"], salida.append) == 2 and D.principal(["otra"], salida.append) == 2
+
+
+@pytest.mark.parametrize("frase,accion", [
+    ("Pausa", "pausar"), ("pausa la música", "pausar"), ("pon la música en pausa", "pausar"), ("para la música", "pausar"), ("Oye, pausa, por favor.", "pausar"),
+    ("reanuda", "reanudar"), ("sigue con la música", "reanudar"), ("continúa la reproducción", "reanudar"), ("dale al play", "reanudar"), ("quita la pausa", "reanudar"),
+    ("siguiente", "siguiente"), ("la siguiente canción", "siguiente"), ("pasa a la siguiente", "siguiente"), ("salta esta canción", "siguiente"),
+    ("anterior", "anterior"), ("la canción anterior", "anterior"), ("vuelve a la anterior", "anterior"),
+])
+def test_reproduccion(frase, accion):
+    assert D.entender(frase) == ("reproduccion", {"accion": accion})
+
+
+@pytest.mark.parametrize("frase", [
+    "pon la música", "pon música de Queen",                      # empezar algo nuevo necesita elegir qué: la IA
+    "para", "sigue", "continúa",                                 # sueltas pueden ser cualquier cosa
+    "no pauses la música", "cuál es la siguiente", "cómo pauso la música",
+    "pausa la música y abre Firefox", "pausa el temporizador", "siguiente capítulo", "pausa en 5 minutos",
+])
+def test_reproduccion_que_no_es_directa(frase):
+    r = D.entender(frase)
+    assert r is None or r[0] != "reproduccion"
+
+
+def test_reproduccion_en_ingles(monkeypatch):
+    monkeypatch.setattr(I, "LECTOR", lambda: Ajustes("en"))
+    for frase, accion in (("pause", "pausar"), ("pause the music", "pausar"), ("resume", "reanudar"), ("play", "reanudar"), ("next song", "siguiente"),
+                          ("skip", "siguiente"), ("previous song", "anterior"), ("go back a song", "anterior")):
+        assert D.entender(frase) == ("reproduccion", {"accion": accion}), frase
+    assert D.entender("how do I pause the music") is None

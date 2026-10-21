@@ -117,3 +117,41 @@ def test_el_ajuste_existe_y_esta_activo_por_defecto(tmp_path):
     aj = AJ.Ajustes(tmp_path / "config.toml", log=lambda m: None)
     assert aj.get("privacidad", "registrar_tiempos") is True
     assert "tiempos" in OLV.QUE and "tiempos" in OLV.TODO
+
+
+def test_las_llamadas_a_la_ia_se_apuntan_y_se_resumen():
+    c = TIE.Cronometro(Reloj())
+    c.llamadas = [(1.2, "ok"), (20.0, "red"), (3.1, "ok"), (0.8, "429")]
+    reg = c.registro("ia", "rapido")
+    assert reg["llamadas"] == [[1.2, "ok"], [20.0, "red"], [3.1, "ok"], [0.8, "429"]]
+    assert "4 llamadas a la IA" in TIE.linea_de_registro(reg) and "20,0 s red" in TIE.linea_de_registro(reg)
+    ll = TIE.resumir_llamadas([reg, {"fases": {}, "llamadas": [[2.0, "ok"]]}, {"fases": {}}])
+    assert ll["n"] == 5 and ll["peticiones"] == 2 and ll["maxima"] == 20.0 and ll["fallidas"] == {"429": 1, "red": 1}
+    assert TIE.resumir_llamadas([{"fases": {}}]) is None
+    assert "llamadas" not in TIE.Cronometro(Reloj()).registro("x")                  # sin llamadas, el registro queda como siempre
+
+
+def test_lina_tiempos_cuenta_las_llamadas(tmp_path):
+    archivo = tmp_path / "t.jsonl"
+    c = TIE.Cronometro(Reloj())
+    c.sumar("ia", 3.0)
+    c.llamadas = [(2.5, "ok"), (9.0, "503")]
+    TIE.guardar(c.registro("ia", "rapido"), archivo)
+    salida = []
+    assert TIE.principal([], salida.append, archivo) == 0
+    texto = "\n".join(salida)
+    assert "Llamadas a la IA: 2 en 1 peticiones" in texto and "503 ×1" in texto
+    assert "nombre" not in json.dumps(json.loads(archivo.read_text().splitlines()[0]))        # solo números y códigos
+
+
+def test_cada_llamada_a_la_ia_se_mide(monkeypatch):
+    from lina.nucleo import ia, proveedores as PROV
+
+    class Falso:
+        def turno(self, clave, modelo, *a, **k):
+            return PROV.ErrorIA(tipo="cuota", estado=429, resumen="x") if modelo == "malo" else "respuesta"
+    ia.recoger_llamadas()
+    assert ia._turno_medido(Falso(), "k", "bueno", "s", []) == "respuesta"
+    ia._turno_medido(Falso(), "k", "malo", "s", [])
+    hechas = ia.recoger_llamadas()
+    assert [r for _, r in hechas] == ["ok", "429"] and all(s >= 0 for s, _ in hechas) and ia.recoger_llamadas() == []

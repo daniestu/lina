@@ -163,12 +163,36 @@ def _registrar_uso(clave, modelo, r):
             _gasto_tarea["tokens"] += r.uso[campo]
 
 
+_llamadas = []                       # (segundos, resultado) de cada llamada a la IA desde la última vez que se recogieron (para `lina tiempos`)
+_cerrojo_llamadas = threading.Lock()
+MAX_LLAMADAS_ANOTADAS = 30
+
+
+def _turno_medido(proveedor, clave, modelo, *args, **kwargs):
+    """proveedor.turno, apuntando cuánto tardó y cómo acabó («ok», el código HTTP, «red»…). Solo números: nunca el contenido."""
+    t0 = time.monotonic()
+    r = proveedor.turno(clave, modelo, *args, **kwargs)
+    segundos = time.monotonic() - t0
+    resultado = "ok" if not isinstance(r, PROV.ErrorIA) else ("red" if r.tipo == "red" else str(r.estado or r.tipo))
+    with _cerrojo_llamadas:
+        if len(_llamadas) < MAX_LLAMADAS_ANOTADAS:
+            _llamadas.append((round(segundos, 3), resultado))
+    return r
+
+
+def recoger_llamadas():
+    """Las llamadas a la IA hechas desde la última vez; las deja a cero."""
+    with _cerrojo_llamadas:
+        hechas, _llamadas[:] = list(_llamadas), []
+    return hechas
+
+
 def _pedir_corto(proveedor, clave, modelo, sistema, mensajes, etiqueta, *, intentos, degradar=(), timeout, pausar_en_red=True, **ajustes):
     """Una petición corta a UN modelo. Si da 400 se van quitando los ajustes opcionales de `degradar` (uno por intento).
     Devuelve la Respuesta o None (con el motivo ya anotado en el registro; los fallos de cuota y de servidor dejan el modelo en pausa)."""
     degradar = list(degradar)
     for intento in range(intentos):
-        r = proveedor.turno(clave, modelo, sistema, mensajes, timeout=timeout, **ajustes)
+        r = _turno_medido(proveedor, clave, modelo, sistema, mensajes, timeout=timeout, **ajustes)
         if not isinstance(r, PROV.ErrorIA):
             _fallos_red.pop(_id_pausa(modelo, clave), None)
             return r
@@ -481,7 +505,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                 log(f"{modelo}: se acabó el plazo para esta petición")
                 return None
             espera_max = min(timeout, restante)
-        r = proveedor.turno(clave, modelo, sistema or instrucciones(), mensajes, herramientas=herramientas if con_herramientas and not nativa else None,
+        r = _turno_medido(proveedor, clave, modelo, sistema or instrucciones(), mensajes, herramientas=herramientas if con_herramientas and not nativa else None,
                             nivel=nivel, busqueda_nativa=nativa and con_herramientas, timeout=espera_max, post=_post_cancelable)
         if isinstance(r, PROV.ErrorIA):
             if r.tipo == "red":

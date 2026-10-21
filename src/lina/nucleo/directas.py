@@ -18,6 +18,7 @@ ACCIONES = (
     ("volumen", N_("sube el volumen · baja el volumen · pon el volumen al 40"), "volume up · set the volume to 40"),
     ("silencio", N_("silencia el sonido · quita el silencio"), "mute · unmute"),
     ("ventanas", N_("maximiza esta ventana · pantalla completa · minimiza esta ventana · muestra el escritorio"), "maximize this window · full screen"),
+    ("reproduccion", N_("pausa · sigue con la música · siguiente canción · canción anterior"), "pause · resume · next song · previous song"),
     ("hora", N_("qué hora es · qué día es hoy"), "what time is it · what day is it"),
 )
 
@@ -97,6 +98,23 @@ def _es(n):
                      r" (?:al|a|en|hasta el|hasta) ?(\d{1,3}) ?(?:%|por ciento)?", n)
     if m:
         return ("volumen", {"accion": "volumen", "valor": m.group(1)})
+    # ---- música y vídeo que ya suenan (playerctl): no empieza nada nuevo, solo controla lo que hay
+    _OBJ = r"(?:musica|cancion|reproduccion|video|podcast|audio|pista|tema)"
+    if re.fullmatch(r"(?:pausa|pausar|pausame|pausalo|pausala)(?: (?:la|el|esta|esa|este))?(?: " + _OBJ + r")?(?: un momento| un segundo)?"
+                    r"|(?:pon|poner|ponla|ponlo)(?: (?:la|el|esta|ese|esa))?(?: " + _OBJ + r")? en pausa|(?:pon|poner) pausa(?: a(?:l| la| el)? " + _OBJ + r")?"
+                    r"|(?:para|parar|deten|detener|calla|apaga|apagar)(?: (?:la|el|esta|esa|este))? " + _OBJ, n):
+        return ("reproduccion", {"accion": "pausar"})
+    if re.fullmatch(r"(?:reanuda|reanudar|reanudala|reanudalo|retoma|retomar)(?: (?:la|el|esta|esa|este))?(?: " + _OBJ + r")?"
+                    r"|(?:continua|continuar|sigue|seguir|continualo|continuala)(?: con)?(?: (?:la|el|esta|esa|este)) " + _OBJ
+                    + r"|(?:dale|dar|dame|pulsa|pon|poner)(?: (?:al|a|el))? play|play|(?:quita|quitar) (?:la )?pausa", n):
+        return ("reproduccion", {"accion": "reanudar"})
+    if re.fullmatch(r"(?:la )?(?:siguiente|proxima)(?: (?:cancion|pista|tema))?|(?:cancion|pista|tema) (?:siguiente|proxima)"
+                    r"|(?:pasa|pasar|salta|saltar|cambia|cambiar|ve|ir|pon|poner|ponme|avanza|avanzar)(?: (?:a|de|la|el|esta|esa))* (?:siguiente|proxima)(?: (?:cancion|pista|tema))?"
+                    r"|(?:salta|saltar|pasa|pasar|cambia|cambiar|omite|omitir)(?: (?:de|esta|esa|la))* (?:cancion|pista|tema)(?: actual)?", n):
+        return ("reproduccion", {"accion": "siguiente"})
+    if re.fullmatch(r"(?:la )?anterior|(?:la )?(?:cancion|pista|tema) anterior|(?:vuelve|volver|ve|ir|retrocede|retroceder|pon|poner|ponme)(?: (?:a|de|la|el))* anterior"
+                    r"|(?:vuelve|volver|retrocede|retroceder)(?: (?:a|de|la|el))* (?:cancion|pista|tema)(?: anterior)?", n):
+        return ("reproduccion", {"accion": "anterior"})
     # ---- abrir un programa
     m = re.fullmatch(r"(?:abre|abrir|abreme|abrime|lanza|lanzar|lanzame|ejecuta|ejecutar|inicia|iniciar|arranca|arrancar|pon en marcha)(?: me)? "
                      + _ARTICULOS_ES + r"(.+)", n)
@@ -132,6 +150,15 @@ def _en(n):
     m = re.fullmatch(r"(?:set|put|change|turn) (?:the )?(?:volume|sound|audio)(?: level)? (?:to|at) (\d{1,3}) ?(?:%|percent)?", n)
     if m:
         return ("volumen", {"accion": "volumen", "valor": m.group(1)})
+    _OBJ = r"(?:music|song|track|playback|video|podcast|audio)"
+    if re.fullmatch(r"pause(?: (?:the|this|that))?(?: " + _OBJ + r")?|(?:stop|halt) (?:the|this|that) " + _OBJ, n):
+        return ("reproduccion", {"accion": "pausar"})
+    if re.fullmatch(r"(?:resume|unpause|continue)(?: (?:the|this|that))?(?: " + _OBJ + r")?|play|hit play|press play|(?:keep|go on) playing", n):
+        return ("reproduccion", {"accion": "reanudar"})
+    if re.fullmatch(r"(?:the )?next(?: (?:song|track))?|(?:skip|go to|play)(?: (?:to|the|this|that))* (?:next(?: (?:song|track))?|(?:song|track))|(?:skip|next)", n):
+        return ("reproduccion", {"accion": "siguiente"})
+    if re.fullmatch(r"(?:the )?(?:previous|last)(?: (?:song|track))?|(?:go back|back|go to|play)(?: (?:to|the|a|one))* (?:previous|last)(?: (?:song|track))?|(?:go back|back)(?: (?:a|one))? (?:song|track)", n):
+        return ("reproduccion", {"accion": "anterior"})
     m = re.fullmatch(r"(?:open|launch|start|run) " + _ARTICULOS_EN + r"(.+?)(?: app| application| program)?", n)
     if m and _nombre_valido(m.group(1)):
         return ("abrir_app", {"nombre": m.group(1)})

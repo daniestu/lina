@@ -26,6 +26,7 @@ class Cronometro:
         self.reloj = reloj
         self.fases = {}
         self.herramientas = 0
+        self.llamadas = []                      # [(segundos, resultado)] de cada llamada a la IA de esta petición
         self.inicio = reloj()
 
     def sumar(self, fase, segundos):
@@ -47,8 +48,11 @@ class Cronometro:
 
     def registro(self, ruta, modo=""):
         """La línea que se guarda: solo números y la ruta que se siguió. Sin texto del usuario."""
-        return {"t": int(time.time()), "ruta": str(ruta)[:60], "modo": str(modo)[:12], "herramientas": self.herramientas,
-                "fases": {k: round(v, 3) for k, v in self.fases.items()}, "hasta_oirte": round(self.hasta_oirte(), 3)}
+        reg = {"t": int(time.time()), "ruta": str(ruta)[:60], "modo": str(modo)[:12], "herramientas": self.herramientas,
+               "fases": {k: round(v, 3) for k, v in self.fases.items()}, "hasta_oirte": round(self.hasta_oirte(), 3)}
+        if self.llamadas:
+            reg["llamadas"] = [[round(float(s), 3), str(r)[:12]] for s, r in self.llamadas[:30]]
+        return reg
 
 
 def _s(x):
@@ -61,6 +65,8 @@ def linea_de_registro(reg):
     partes = [f"{k} {_s(f[k])}" for k in FASES if k in f]
     if reg["herramientas"]:
         partes.append(f"{reg['herramientas']} herramientas")
+    if reg.get("llamadas"):
+        partes.append(f"{len(reg['llamadas'])} llamadas a la IA ({', '.join(f'{_s(s)} {r}' for s, r in reg['llamadas'][:8])})")
     return "Tiempos [" + reg["ruta"] + "]: " + " · ".join(partes) + f" · hasta oírte {_s(reg['hasta_oirte'])}"
 
 
@@ -110,6 +116,20 @@ def resumir(registros):
     return out
 
 
+def resumir_llamadas(registros):
+    """Las llamadas a la IA de esos registros: cuántas, tiempo medio y mediano, la más lenta y cuántas fallaron (y por qué). None si no hay ninguna."""
+    todas = [(float(s), str(r)) for reg in registros for s, r in reg.get("llamadas", []) if isinstance(s, (int, float))]
+    if not todas:
+        return None
+    duraciones = [s for s, _ in todas]
+    fallidas = {}
+    for _, r in todas:
+        if r != "ok":
+            fallidas[r] = fallidas.get(r, 0) + 1
+    return {"n": len(todas), "peticiones": sum(1 for reg in registros if reg.get("llamadas")), "media": statistics.mean(duraciones),
+            "mediana": statistics.median(duraciones), "maxima": max(duraciones), "fallidas": fallidas}
+
+
 def _bloque(titulo, registros, salida):
     if not registros:
         return
@@ -121,6 +141,12 @@ def _bloque(titulo, registros, salida):
                                                                               mediana=_s(r["hasta_oirte"][1])))
     if r["mas_lenta"]:
         salida("  " + T("La fase más lenta: {fase}.", fase=T(NOMBRES[r["mas_lenta"]])))
+    ll = resumir_llamadas(registros)
+    if ll:
+        salida("  " + T("Llamadas a la IA: {n} en {p} peticiones · media {media} · mediana {mediana} · la más lenta {maxima}", n=ll["n"], p=ll["peticiones"],
+                        media=_s(ll["media"]), mediana=_s(ll["mediana"]), maxima=_s(ll["maxima"])))
+        if ll["fallidas"]:
+            salida("  " + T("   no llegaron bien: {detalle}", detalle=", ".join(f"{k} ×{v}" for k, v in sorted(ll["fallidas"].items()))))
 
 
 def principal(argv, salida=print, archivo=None):
