@@ -610,6 +610,7 @@ _INOCUO_REGEX = [
     r"wpctl set-mute @DEFAULT_AUDIO_SINK@ (0|1|toggle)",
     r"playerctl (play|pause|play-pause|next|previous|stop)",
     r"lina musica (pausar|reanudar|siguiente|anterior|detener)",
+    r"lina musica poner [^'\"]+|lina musica poner \"[^\"]+\"|lina musica poner '[^']+'",
 ]
 _METACARACTERES = re.compile(r"[;&|<>$`\n\\]")
 

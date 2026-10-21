@@ -62,6 +62,16 @@ def _nucleo(ajuste):
 
 
 # ======================= el archivo =======================
+def _lanza_programa(r):
+    """¿Es una receta que lanza un programa y lo deja abierto (una música con mpv)? Eso no se repite como receta: no se comprueba que suene y deja procesos sueltos."""
+    from lina.nucleo import herramientas as H
+    comandos = [str(r.get("cambiar", ""))]
+    for p in r.get("pasos") or []:
+        if isinstance(p, dict) and isinstance(p.get("args"), dict):
+            comandos.append(str(p["args"].get("comando", "")))
+    return any(c.strip() and H._es_lanzamiento_persistente(c) for c in comandos)
+
+
 def _cargar():
     try:
         datos = json.loads(ARCHIVO.read_text(encoding="utf-8"))
@@ -69,7 +79,8 @@ def _cargar():
         return []
     if not isinstance(datos, list):
         return []
-    return [r for r in datos if isinstance(r, dict) and r.get("ajuste") and r.get("tipo") in {"kde", "comando", "interfaz", "pasos"} and isinstance(r.get("nucleo"), list)]
+    return [r for r in datos if isinstance(r, dict) and r.get("ajuste") and r.get("tipo") in {"kde", "comando", "interfaz", "pasos"} and isinstance(r.get("nucleo"), list)
+            and not _lanza_programa(r)]
 
 
 def _guardar(recetas):

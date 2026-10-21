@@ -444,7 +444,7 @@ def _es_lanzamiento_persistente(comando):
     """Un programa que se deja funcionando (música, vídeo, una aplicación): `setsid mpv … &`, `nohup x &`. Que termine es que el usuario lo cerró o lo paró,
     no que se haya acabado una tarea que su petición estuviera esperando: no se retoma nada ni se avisa de que «ya ha terminado»."""
     c = comando.strip()
-    if re.match(r"(?:setsid|nohup|disown)\b", c) or re.search(r"&\s*$", c):
+    if re.match(r"(?:setsid|nohup|disown|lina musica)\b", c) or re.search(r"&\s*$", c):
         return True
     try:
         palabras = [os.path.basename(t) for t in shlex.split(c)]

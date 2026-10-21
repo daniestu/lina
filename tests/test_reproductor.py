@@ -89,3 +89,74 @@ def test_el_comando_playerctl_se_detiene_ante_la_falta_de_reproductor(monkeypatc
 
 def test_la_orden_lina_musica_es_inocua():
     assert H.clasificar("lina musica detener")[0] == "inocuo" and H.clasificar("lina musica pausar")[0] == "inocuo"
+
+
+# ---- lina musica poner: solo dice que suena si suena
+class _Proc:
+    def __init__(self, vivo=True):
+        self.vivo = vivo
+    def poll(self):
+        return None if self.vivo else 1
+    def terminate(self):
+        self.vivo = False
+
+
+def _preparar(monkeypatch, tmp_path, mpv="/usr/bin/mpv", ytdlp="/usr/bin/yt-dlp", busqueda=None, proc=None, responde=True):
+    monkeypatch.setattr(RP.shutil, "which", lambda n: {"mpv": mpv, "yt-dlp": ytdlp}.get(n))
+    lanzados = []
+    monkeypatch.setattr(RP.subprocess, "run", busqueda or (lambda *a, **k: subprocess.CompletedProcess(a, 0, "https://x/audio\n", "")))
+    monkeypatch.setattr(RP.subprocess, "Popen", lambda cmd, **k: lanzados.append(cmd) or (proc or _Proc()))
+    monkeypatch.setattr(RP, "enviar_mpv", lambda accion, ruta=None, espera=1: responde if accion == "vivo" else False)
+    monkeypatch.setattr(RP.time, "sleep", lambda s: None)
+    return lanzados, tmp_path / "mpv.sock"
+
+
+def test_poner_suena(monkeypatch, tmp_path):
+    lanzados, ruta = _preparar(monkeypatch, tmp_path)
+    dicho = []
+    assert RP.poner("Queen", ruta=ruta, salida=dicho.append) == 0
+    assert dicho == ["Sonando: Queen."] and lanzados[0][0] == "/usr/bin/mpv" and f"--input-ipc-server={ruta}" in lanzados[0] and lanzados[0][-1] == "https://x/audio"
+
+
+def test_poner_sin_mpv_o_sin_ytdlp(monkeypatch, tmp_path):
+    for faltan in ({"mpv": None}, {"ytdlp": None}):
+        _, ruta = _preparar(monkeypatch, tmp_path, **faltan)
+        dicho = []
+        assert RP.poner("Queen", ruta=ruta, salida=dicho.append) == 1 and "No está instalado" in dicho[0]
+
+
+def test_poner_no_encuentra(monkeypatch, tmp_path):
+    _, ruta = _preparar(monkeypatch, tmp_path, busqueda=lambda *a, **k: subprocess.CompletedProcess(a, 1, "", "ERROR: no hay red\n"))
+    dicho = []
+    assert RP.poner("Queen", ruta=ruta, salida=dicho.append) == 1 and "no hay red" in dicho[0] and "No suena nada" in dicho[0]
+
+
+def test_poner_mpv_muere_o_no_responde(monkeypatch, tmp_path):
+    _, ruta = _preparar(monkeypatch, tmp_path, proc=_Proc(vivo=False))
+    dicho = []
+    assert RP.poner("Queen", ruta=ruta, salida=dicho.append) == 1 and "No suena nada" in dicho[0]
+    _, ruta = _preparar(monkeypatch, tmp_path, responde=False)
+    t = iter(range(0, 1000, 5))
+    monkeypatch.setattr(RP.time, "time", lambda: next(t))
+    dicho = []
+    assert RP.poner("Queen", ruta=ruta, salida=dicho.append, arranque_seg=12) == 1 and "No suena nada" in dicho[0]
+
+
+def test_poner_enlace_no_pasa_por_ytdlp(monkeypatch, tmp_path):
+    lanzados, ruta = _preparar(monkeypatch, tmp_path, ytdlp=None)
+    assert RP.poner("https://youtu.be/x", ruta=ruta, salida=lambda t: None) == 0 and lanzados[0][-1] == "https://youtu.be/x"
+
+
+def test_poner_es_inocuo_y_persistente():
+    assert H.clasificar('lina musica poner "Queen"')[0] in {"inocuo", "autonomo"}
+    assert H._es_lanzamiento_persistente('lina musica poner "Queen"')
+
+
+def test_receta_que_lanza_mpv_se_descarta(monkeypatch, tmp_path):
+    from lina.nucleo import recetas as R
+    archivo = tmp_path / "recetas.json"
+    archivo.write_text(json.dumps([
+        {"ajuste": "música de queen", "tipo": "pasos", "nucleo": ["queen"], "pasos": [{"herr": "ejecutar_comando", "args": {"comando": "setsid mpv --no-video x &"}}]},
+        {"ajuste": "volumen", "tipo": "pasos", "nucleo": ["volumen"], "pasos": [{"herr": "ejecutar_comando", "args": {"comando": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 40%"}}]}]))
+    monkeypatch.setattr(R, "ARCHIVO", archivo)
+    assert [r["ajuste"] for r in R._cargar()] == ["volumen"]

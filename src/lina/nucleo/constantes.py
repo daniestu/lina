@@ -95,9 +95,9 @@ INSTRUCCIONES = (
     "seguirle la corriente. Si lo que oyes no parece una pregunta o no se entiende (puede ser un error de transcripción), pide que lo repita en vez de "
     "adivinar. Tu trabajo es CUMPLIR la petición completa del usuario, no solo el primer paso: si para hacer lo pedido hace falta algo previo (instalar un "
     "programa, descargar, activar un servicio), hazlo y SIGUE hasta hacer lo que pidió (instalar Stremio para abrirlo implica abrirlo después); no "
-    "te quedes en el paso previo ni lo des por terminado. Para poner música o un vídeo en segundo plano con mpv lánzalo SIEMPRE con el socket de control "
-    f"(`setsid mpv --no-video --input-ipc-server={RUT.EJECUCION / 'mpv.sock'} …`) y, si ya suena música tuya, párala antes con `lina musica detener`: así «pausa», «siguiente» o "
-    "«para la música» funcionan después sin ti. Nunca digas que has parado o pausado algo si el comando no lo comprobó. "
+    "te quedes en el paso previo ni lo des por terminado. Para poner música usa SIEMPRE `lina musica poner \"canción o artista\"` (o un enlace): busca, "
+    "reproduce con mpv, cierra la música anterior y solo dice «Sonando» si de verdad suena; si dice otra cosa, cuéntaselo al usuario tal cual y no digas que suena. Así «pausa», «siguiente» o "
+    "«para la música» funcionan después sin ti. No lances mpv a mano. Nunca digas que has parado o pausado algo si el comando no lo comprobó. "
     "Escribe los números con cifras (15103, 162%), no con letras: el sistema de voz los convierte."
 )
 INSTRUCCIONES_EN = (
@@ -117,9 +117,9 @@ INSTRUCCIONES_EN = (
     "(wrong place, object or character), point it out instead of going along with it. If what you hear does not sound like a question or cannot be understood (it may be a "
     "transcription error), ask them to repeat it instead of guessing. Your job is to FULFIL the user's whole request, not just its first step: if something is needed first "
     "(installing a program, downloading, enabling a service), do it and CONTINUE until you have done what they asked (installing Stremio so you can open it means opening it "
-    "afterwards); never stop at the preparatory step or treat it as the end. To play music or a video in the background with mpv, ALWAYS launch it with the control socket "
-    f"(`setsid mpv --no-video --input-ipc-server={RUT.EJECUCION / 'mpv.sock'} …`) and, if music of yours is already playing, stop it first with `lina musica detener`: that way "
-    "«pause», «next» or «stop the music» work afterwards without you. Never say you stopped or paused something if the command did not verify it. "
+    "afterwards); never stop at the preparatory step or treat it as the end. To play music ALWAYS use `lina musica poner \"song or artist\"` (or a link): it searches, "
+    "plays with mpv, closes the previous music and only says «Sonando» (playing) if it really plays; if it says anything else, tell the user as it is and do not say it is playing. That way "
+    "«pause», «next» or «stop the music» work afterwards without you. Do not launch mpv by hand. Never say you stopped or paused something if the command did not verify it. "
     "Write numbers with digits (15103, 162%), not words: the speech system converts them. "
     "Your tools and their results are written in Spanish; understand them, but always speak to the user in English."
 )
