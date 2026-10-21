@@ -11,6 +11,7 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 | 11 | Medir dónde se va el tiempo *(hecha)* | S | — |
 | 11b | No olvidar la petición tras un paso previo *(hecha)* | S | — |
 | 12 | Camino rápido: órdenes simples sin pasar por la IA, y voz sin esperas *(casi hecha: abrir programa, volumen, silencio, ventanas y hora; falta reproducción)* | L | 11 |
+| 12b | Recetas que se ejecutan solas | L | 12 |
 | 13 | Memoria de preferencias | M | — |
 | 14 | Bluetooth completo y más diagnóstico de juegos | S | 12 (para sus órdenes directas) |
 | 15 | GPU y energía (módulo opcional) | M | — |
@@ -112,6 +113,27 @@ captura de pantalla y de la IA. Ahí ya hay un patrón: «lo hace el código, si
   parámetros fuera de rango y ejecutor falso de principio a fin.
 - Registro «Directa: …» con su tiempo para comparar durante una semana con lo que habría hecho la IA.
 - **Hecho cuando:** ≥ 95 % de aciertos en la tabla, **cero** falsos positivos con consecuencias, y el objetivo de latencia de la fase 11 cumplido en tu equipo.
+
+---
+
+## Fase 12b — Recetas que se ejecutan solas (L)
+
+**Para qué:** «desactiva mi cámara» la primera vez hay que descubrirlo (la IA piensa, prueba, comprueba). La segunda debería ser tan rápida como «sube el volumen». Hoy no lo es por dos motivos:
+
+1. **Se aprende muy poco.** Solo se apunta una receta si en la petición hubo UN comando de cambio y luego otro de lectura que mira lo mismo, o un ajuste de KDE comprobado en pantalla, o la IA llama a `guardar_receta` (casi nunca). Lo que lleva varios pasos, o no se lee después, se pierde.
+2. **Una receta es una pista, no un atajo.** Aunque exista, la petición va a la IA, que la lee y vuelve a ejecutarla: dos o tres llamadas, de 3 a 20 s según cómo vaya Google.
+
+**Qué se hace**
+1. **Aprender de cualquier éxito.** Cuando una petición termina CUMPLIDA (el código lo comprobó o el revisor lo confirma), sin nada pendiente de tu «sí» y sin contenido de internet de por medio, se guarda **la secuencia de pasos que de verdad funcionó**: las herramientas llamadas con sus datos, sin los intentos fallidos ni las exploraciones; el valor que cambió se convierte en `{valor}`; y **cómo se comprobó** (qué lectura confirmó el resultado y qué salida dio).
+2. **Repetir sin IA.** Si lo que pides encaja claramente con una receta, el código la ejecuta paso a paso con las mismas herramientas y las mismas reglas de seguridad de siempre (un paso crítico sigue pidiendo tu atajo; una receta no da permisos nuevos), repite la comprobación y dice el resultado. Va delante de la IA, igual que las órdenes directas.
+3. **Dirección y valores.** «Activa» y «desactiva» no pueden confundirse: cada receta guarda el efecto que produce y el encaje exige la misma dirección; si no está claro, vale solo como pista, como ahora. Los números («al 40») se sustituyen en `{valor}`.
+4. **Si falla, a la IA.** Si un paso da error o la comprobación no da lo esperado, la IA toma el relevo con una nota («la receta falló en tal paso»); dos fallos seguidos y la receta se borra (como ya pasa).
+5. **Confianza gradual.** Una receta comprobada por el código (se leyó el estado después y coincide) se repite directamente a la siguiente; una que solo confirmó el revisor necesita un segundo éxito antes de ejecutarse sola.
+6. **Control.** `lina recetas` (ver, probar sin ejecutar, borrar), «olvida cómo desactivar la cámara» por voz, ajuste `recetas.directas` para apagarlo, y cada ejecución queda en el diario como cualquier otra acción (se puede deshacer).
+
+**Pruebas:** aprendizaje de secuencias de varios pasos; que no aprende nada de lo fallido, contaminado, pendiente o no cumplido; encaje por dirección (activar/desactivar) y por valor; paso crítico que sigue pidiendo confirmación; fallo a mitad que cae a la IA; borrado tras dos fallos; `lina recetas`.
+
+**Hecho cuando:** pides algo que Lina tuvo que descubrir (p. ej. desactivar la cámara), lo repites y se hace sin llamar a la IA en menos de ~2 s, con la misma comprobación.
 
 ---
 
