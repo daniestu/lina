@@ -29,7 +29,7 @@ With the **free** key, according to Google's current terms, what is sent may be 
 |---|---|---|
 | Change journal and copies for undoing | `~/.local/share/lina/diario` | `lina olvidar diario` |
 | Action log (commands run) | `~/.local/state/lina/acciones.log` (rotates itself at ~1 MB) | `lina olvidar acciones` |
-| Learned recipes | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` |
+| Learned recipes (what you already asked me that went well: the phrase, the steps and how it was checked; never passwords) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` or `lina recetas borrar todas` |
 | Timings of each request (numbers only, never what you say; `lina tiempos` summarises them) | `~/.local/state/lina/tiempos.jsonl` (trims itself at ~200 KB) | `lina olvidar tiempos` |
 | System log (what you say and I answer, unless you turn it off) | `journalctl --user -u lina` | `lina olvidar registro` |
 

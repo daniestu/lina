@@ -18,10 +18,13 @@ import time
 
 from lina.nucleo import comandos
 from lina.nucleo import rutas as RUT
+from lina.nucleo.idioma import T
 
 ARCHIVO = RUT.DATOS / "recetas.json"
 MAX_RECETAS = 100
 FALLOS_PARA_OLVIDAR = 2
+MAX_FRASES = 8
+MAX_PASOS = 6
 _lock = threading.RLock()
 
 _TONTAS = set("""los las una uno unos unas del que como esto esta este estos estas hay hazlo haz dime oye ahora otra vez mas menos muy todo toda sobre entre
@@ -66,7 +69,7 @@ def _cargar():
         return []
     if not isinstance(datos, list):
         return []
-    return [r for r in datos if isinstance(r, dict) and r.get("ajuste") and r.get("tipo") in {"kde", "comando", "interfaz"} and isinstance(r.get("nucleo"), list)]
+    return [r for r in datos if isinstance(r, dict) and r.get("ajuste") and r.get("tipo") in {"kde", "comando", "interfaz", "pasos"} and isinstance(r.get("nucleo"), list)]
 
 
 def _guardar(recetas):
@@ -96,7 +99,8 @@ def _parecidas(a, b):
 
 def _poner(recetas, nueva, misma_receta):
     """Mete la receta; si ya había una igual o que habla de lo mismo, la sustituye (conserva id, creación y aciertos) en vez de duplicar."""
-    previa = next((r for r in recetas if r["tipo"] == nueva["tipo"] and (misma_receta(r) or _parecidas(r["nucleo"], nueva["nucleo"]))), None)
+    # Los pasos de «desactiva la cámara» y de «activa la cámara» comparten palabras: solo se funden si los pasos son idénticos.
+    previa = next((r for r in recetas if r["tipo"] == nueva["tipo"] and (misma_receta(r) or (nueva["tipo"] != "pasos" and _parecidas(r["nucleo"], nueva["nucleo"])))), None)
     ahora = time.strftime("%Y-%m-%d")
     if previa:
         # Se conserva el nombre con el que se apuntó (así lo llama el usuario) y se SUMAN las palabras nuevas: «luz nocturna» no se pierde porque la
@@ -105,6 +109,9 @@ def _poner(recetas, nueva, misma_receta):
         if previa.get("nucleo"):
             nueva["ajuste"], nueva["nucleo"] = previa["ajuste"], previa["nucleo"]
         nueva.update(id=previa["id"], creada=previa.get("creada", ahora), exitos=int(previa.get("exitos", 0)) + 1, fallos=0, ultima=ahora)
+        if nueva["tipo"] == "pasos":
+            nueva["frases"] = list(dict.fromkeys(list(nueva.get("frases", [])) + list(previa.get("frases", []))))[:MAX_FRASES]
+            nueva["verificada"] = bool(nueva.get("verificada") or previa.get("verificada"))
         if nueva["tipo"] == "kde" and misma_receta(previa):             # el mismo ajuste con otro valor: se suman los ejemplos
             vistos = {e.get("valor") for e in nueva["ejemplos"]}
             nueva["ejemplos"] = (nueva["ejemplos"] + [e for e in previa.get("ejemplos", []) if e.get("valor") not in vistos])[:4]
@@ -226,6 +233,160 @@ def _texto_paso(p):
     return f"interfaz(clic, descripcion=«{p['descripcion']}»{', boton=derecho' if p.get('boton') == 'derecho' else ''}{', veces=2' if p.get('veces') == 2 else ''})"
 
 
+# ======================= secuencias de pasos que se repiten sin IA (fase 12b) =======================
+# Una receta de «pasos» guarda lo que de verdad funcionó para una petición: las herramientas llamadas, con sus datos. Si la misma petición vuelve a
+# decirse con las mismas palabras, el asistente repite los pasos con las mismas herramientas y reglas de seguridad de siempre, sin llamar a la IA.
+HERRAMIENTAS_REPETIBLES = {"ejecutar_comando", "abrir_app", "ventanas", "audio", "pantalla", "red", "kde_dbus"}
+_RELLENO = set("""el la los las un una unos unas mi mis tu tus de del al a por favor porfa oye vale venga hola ok ahora ya gracias lina puedes podrias podria me te
+quiero que necesito pido gustaria quisiera otra vez tambien""".split())
+_CONECTORES = {"y", "e", "o", "u", "ni", "luego", "despues", "entonces", "pero", "mientras", "cuando", "si", "tras", "antes"}
+_INTERROGATIVA = re.compile(r"^(?:que|cual|cuales|como|cuando|donde|quien|por que|para que|sabes|dime|puedo|se puede|hay|esta|estan|es|son|tengo|tienes|estas)\b")
+_ON = re.compile(r"^(?:activ\w*|enciend\w*|encend\w*|habilit\w*|conect\w*|prend\w*)$")
+_OFF = re.compile(r"^(?:desactiv\w*|apag\w*|deshabilit\w*|desconect\w*)$")
+_SECRETO = re.compile(r"(?i)pass(?:word|wd)?|contrase|secret|token|api[_-]?key|credential|clave|\bkey\b|bearer|private")
+
+
+def _fragmentos(texto):
+    """(palabras de la frase sin relleno, con «activar» y «desactivar» reducidos a + y -, y los números que había) o None si no es una orden sencilla:
+    preguntas, frases con varias órdenes encadenadas o demasiado largas."""
+    if "?" in str(texto or "") or "¿" in str(texto or ""):
+        return None
+    n = comandos.normalizar(texto)
+    palabras = n.split()
+    if not palabras or len(palabras) > 14 or _INTERROGATIVA.match(n) or any(p in _CONECTORES for p in palabras):
+        return None
+    numeros = [p for p in palabras if p.isdigit()]
+    if len(numeros) > 1 or any(len(x) > 4 for x in numeros):
+        return None
+    sal = ["+" if _ON.match(p) else "-" if _OFF.match(p) else p for p in palabras if p not in _RELLENO]
+    return (sal, numeros) if sal else None
+
+
+def _clave_frase(palabras, numero=None):
+    return " ".join(sorted("#" if numero and p == numero else p for p in palabras))
+
+
+def polaridad(texto):
+    """{'+'} si la frase pide activar, {'-'} si pide desactivar (o ambos / ninguno)."""
+    f = _fragmentos(texto)
+    return {p for p in (f[0] if f else []) if p in ("+", "-")}
+
+
+def _parametrizar(pasos, numero):
+    """Sustituye el número que se dijo por {valor} en los datos de los pasos (si aparece como número suelto). Devuelve (pasos, ¿se usó?)."""
+    if not numero:
+        return pasos, False
+    patron = re.compile(r"(?<![\w.])" + re.escape(numero) + r"(?![\w.])")
+    usado = [False]
+
+    def cambiar(x):
+        if isinstance(x, str):
+            nuevo, n = patron.subn("{valor}", x)
+            usado[0] = usado[0] or n > 0
+            return nuevo
+        if isinstance(x, dict):
+            return {k: cambiar(v) for k, v in x.items()}
+        return x
+    nuevos = [{**p, "args": cambiar(p["args"])} for p in pasos]
+    return (nuevos, True) if usado[0] else (pasos, False)
+
+
+def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, web=False):
+    """Apunta la secuencia que cumplió `frase`. `pasos`: [{"herr", "args"}] ya filtrados por quien llama (solo lo que cambió algo y funcionó).
+    `comprobar` y `esperado`: el comando de solo lectura que lo confirmó y lo que dio. `verificada`: lo comprobó el código (no solo el revisor)."""
+    f = _fragmentos(frase)
+    if not f or web or not pasos or len(pasos) > MAX_PASOS:
+        return None
+    palabras, numeros = f
+    limpios = []
+    for p in pasos:
+        if p.get("herr") not in HERRAMIENTAS_REPETIBLES or not isinstance(p.get("args"), dict):
+            return None
+        args = {str(k): (_limpio(v, 400) if isinstance(v, str) else v) for k, v in p["args"].items() if isinstance(v, (str, int, float, bool))}
+        if p["herr"] == "ejecutar_comando":
+            if not args.get("comando"):
+                return None
+            args["motivo"] = _libre(args.get("motivo", ""), 80) or "tarea"
+        limpios.append({"herr": p["herr"], "args": args, **({"comprobado": True} if p.get("comprobado") else {})})
+    if _SECRETO.search(json.dumps(limpios, ensure_ascii=False)) or "toggle" in json.dumps(limpios).lower():
+        return None                                                       # nada con contraseñas, y nada que alterne (repetirlo daría otro resultado)
+    limpios, con_valor = _parametrizar(limpios, numeros[0] if numeros else None)
+    ajuste = _libre(frase, 60)
+    clave = _clave_frase(palabras, numeros[0] if con_valor and numeros else None)
+    nucleo = _nucleo(ajuste)
+    if not ajuste or not nucleo:
+        return None
+    esperado = _limpio(esperado, 160)
+    if _SECRETO.search(esperado) or not comprobar:
+        comprobar, esperado = "", ""
+    nueva = {"tipo": "pasos", "ajuste": ajuste, "nucleo": nucleo, "palabras": sorted(set(_tokens(ajuste)) - _GEN), "pedido": _limpio(frase, 120), "web": False,
+             "pasos": limpios, "frases": [clave], "comprobar": _limpio(comprobar, 300), "esperado": esperado, "verificada": bool(verificada),
+             "valor_usado": numeros[0] if con_valor and numeros else "", "cambiar": ""}
+    with _lock:
+        recetas = _cargar()
+        resultado = _poner(recetas, nueva, lambda r: r.get("pasos") == nueva["pasos"])
+        _guardar(recetas)
+    log(f"Receta aprendida (pasos): «{ajuste}» en {len(limpios)} paso(s){' (comprobada por el código)' if nueva['verificada'] else ''}")
+    return resultado
+
+
+def para_frase(texto):
+    """(receta, valor) si lo pedido es, palabra por palabra (salvo cortesías y el orden), una petición que ya se cumplió con una receta de pasos que
+    se puede repetir sin IA; None en cualquier otro caso. Una receta se repite sola si el código comprobó su resultado, o si ya funcionó dos veces."""
+    f = _fragmentos(texto)
+    if not f:
+        return None
+    palabras, numeros = f
+    with _lock:
+        recetas = _cargar()
+    for r in recetas:
+        if r.get("tipo") != "pasos" or int(r.get("fallos", 0)) > 0 or not (int(r.get("exitos", 0)) >= 2 or (r.get("verificada") and int(r.get("exitos", 0)) >= 1)):
+            continue
+        con_valor = "{valor}" in json.dumps(r.get("pasos", []))
+        for fr in r.get("frases", []):
+            if "#" in fr.split():
+                if con_valor and len(numeros) == 1 and _clave_frase(palabras, numeros[0]) == fr:
+                    return r, numeros[0]
+            elif _clave_frase(palabras) == fr and not con_valor:
+                return r, None
+    return None
+
+
+def con_valor(args, valor):
+    """Los datos de un paso con {valor} sustituido por el número dicho (quien llama ya comprobó que son solo cifras)."""
+    return {k: (v.replace("{valor}", str(valor or "")) if isinstance(v, str) else v) for k, v in args.items()}
+
+
+def resultado_pasos(ident, bien):
+    """Anota cómo fue repetir una receta de pasos: un acierto la afianza; un fallo, y a la segunda seguida se olvida."""
+    olvidada = None
+    with _lock:
+        recetas = _cargar()
+        for r in list(recetas):
+            if r["id"] != ident:
+                continue
+            if bien:
+                r["exitos"], r["fallos"], r["ultima"] = int(r.get("exitos", 0)) + 1, 0, time.strftime("%Y-%m-%d")
+            else:
+                r["fallos"] = int(r.get("fallos", 0)) + 1
+                if r["fallos"] >= FALLOS_PARA_OLVIDAR:
+                    recetas.remove(r)
+                    olvidada = r["ajuste"]
+        _guardar(recetas)
+    if olvidada:
+        log(f"Receta olvidada por fallar dos veces: {olvidada}")
+    return olvidada
+
+
+def coincide_salida(esperado, salida, tolerancia=0.8):
+    """¿Se parece lo que dio la comprobación a lo de la vez que se aprendió? Basta con que aparezcan el 80 % de sus palabras (cifras y letras)."""
+    clave = [w for w in re.findall(r"[a-z0-9]+", comandos.normalizar(esperado)) if len(w) >= 2]
+    if not clave:
+        return True
+    hay = set(re.findall(r"[a-z0-9]+", comandos.normalizar(salida)))
+    return sum(1 for w in clave if w in hay) / len(clave) >= tolerancia
+
+
 # ======================= usar =======================
 def buscar(texto, maximo=2):
     """Las recetas que encajan con lo que acabas de pedir. Encaja si dices las palabras que definen el ajuste (al menos el 60 % de las suyas),
@@ -254,6 +415,11 @@ def _como_se_hace(r):
         recarga = f", recargar=«{r['recargar']}»" if r.get("recargar") else ""
         return (f"{cabecera}: probar_ajuste_kde con archivo=«{r['archivo']}», grupos={json.dumps(r['grupos'], ensure_ascii=False)}, clave=«{r['clave']}», "
                 f"panel=«{r['panel']}», control=«{r['control']}»{recarga}. Valor → lo que mostró el panel: {ejemplos}. Con otro valor, adapta valor y esperado.")
+    if r["tipo"] == "pasos":
+        pasos = " → ".join(f"({i}) {p['herr']}({', '.join(f'{k}=«{v}»' for k, v in p['args'].items() if k != 'motivo')})" for i, p in enumerate(r.get("pasos", []), 1))
+        valor = f" (en {{valor}} va lo que pida el usuario; la última vez {r.get('valor_usado')})" if "{valor}" in pasos else ""
+        comp = f" Se comprobó con `{r['comprobar']}` y dio «{r.get('esperado', '')}»." if r.get("comprobar") else ""
+        return f"{cabecera}: se hizo con estos pasos{valor}: {pasos}.{comp} Pruébalos tal cual; cada paso pasa por las mismas protecciones de siempre."
     if r["tipo"] == "interfaz":
         pasos = " → ".join(f"({i}) {_texto_paso(p)}" for i, p in enumerate(r.get("pasos", []), 1))
         valor = " (en {valor} va lo que pida el usuario; la última vez " + (r.get("valor_usado") or "?") + ")" if "{valor}" in pasos else ""
@@ -371,7 +537,8 @@ def olvidar(texto):
     ids = {r["id"] for r in buscar(texto, 5)}
     with _lock:
         recetas = _cargar()
-        borradas = [r for r in recetas if r["id"] in ids or claves == str(r["ajuste"]).lower()]
+        pol = polaridad(texto)
+        borradas = [r for r in recetas if (r["id"] in ids and not (r["tipo"] == "pasos" and pol and pol != polaridad(r["ajuste"]))) or claves == str(r["ajuste"]).lower()]
         if borradas:
             _guardar([r for r in recetas if r not in borradas])
     return [r["ajuste"] for r in borradas]
@@ -382,5 +549,58 @@ def listar():
         recetas = _cargar()
     if not recetas:
         return "Todavía no he aprendido ninguna receta: cada ajuste nuevo lo descubro desde cero y, cuando queda comprobado, lo apunto."
-    return "Recetas aprendidas: " + "; ".join(f"«{r['ajuste']}» ({'ajuste de KDE' if r['tipo'] == 'kde' else 'interfaz' if r['tipo'] == 'interfaz' else 'comando'}, {int(r.get('exitos', 1))} veces, "
+    return "Recetas aprendidas: " + "; ".join(f"«{r['ajuste']}» ({'ajuste de KDE' if r['tipo'] == 'kde' else 'interfaz' if r['tipo'] == 'interfaz' else 'pasos' if r['tipo'] == 'pasos' else 'comando'}, {int(r.get('exitos', 1))} veces, "
                                               f"última {r.get('ultima', '?')})" for r in recetas)
+
+
+# ======================= lina recetas =======================
+def _se_repite_sola(r):
+    return r.get("tipo") == "pasos" and int(r.get("fallos", 0)) == 0 and (int(r.get("exitos", 0)) >= 2 or (bool(r.get("verificada")) and int(r.get("exitos", 0)) >= 1))
+
+
+def principal(argv, salida=print):
+    """`lina recetas` (lo aprendido), `lina recetas probar "frase"` (qué haría, sin ejecutar nada) y `lina recetas borrar ID|todas`."""
+    if argv[:1] == ["probar"]:
+        frase = " ".join(argv[1:]).strip()
+        if not frase:
+            salida(T("Uso:  lina recetas probar \"desactiva la cámara\""))
+            return 2
+        hallada = para_frase(frase)
+        if hallada:
+            r, valor = hallada
+            salida(T("«{frase}»: la receta {id} («{ajuste}») la repetiría sin llamar a la IA, con {n} paso(s).", frase=frase, id=r["id"], ajuste=r["ajuste"], n=len(r["pasos"])))
+            for i, p in enumerate(r["pasos"], 1):
+                args = con_valor(p["args"], valor)
+                salida(f"  {i}. {p['herr']}: " + (args.get("comando") or ", ".join(f"{k}={v}" for k, v in args.items())))
+            if r.get("comprobar"):
+                salida("  " + T("y comprueba con:  {comando}", comando=r["comprobar"]))
+        else:
+            salida(T("«{frase}»: no hay ninguna receta fiable para esa frase tal cual; se la dejo a la IA.", frase=frase))
+        return 0
+    if argv[:1] == ["borrar"]:
+        if len(argv) != 2:
+            salida(T("Uso:  lina recetas borrar r0001   |   lina recetas borrar todas"))
+            return 2
+        with _lock:
+            recetas = _cargar()
+            quedan = [] if argv[1] == "todas" else [r for r in recetas if r["id"] != argv[1]]
+            if len(quedan) == len(recetas):
+                salida(T("No hay ninguna receta con ese id."))
+                return 1
+            _guardar(quedan)
+        salida(T("Borradas: {n}.", n=len(recetas) - len(quedan)))
+        return 0
+    if argv:
+        salida(T("Uso:  lina recetas   |   lina recetas probar \"frase\"   |   lina recetas borrar ID|todas"))
+        return 2
+    with _lock:
+        recetas = _cargar()
+    if not recetas:
+        salida(T("Todavía no he aprendido ninguna receta: cuando algo que me pidas salga bien, lo apunto para hacerlo más rápido la próxima vez."))
+        return 0
+    salida(T("Recetas aprendidas ({n}). Las marcadas con * se repiten sin llamar a la IA:", n=len(recetas)))
+    for r in sorted(recetas, key=lambda r: r["id"]):
+        etiqueta = {"kde": "KDE", "comando": T("comando"), "interfaz": T("interfaz"), "pasos": T("pasos")}[r["tipo"]]
+        salida(f"  {'*' if _se_repite_sola(r) else ' '} {r['id']}  {etiqueta:9} «{r['ajuste']}»  " + T("{n} vez/veces, última {fecha}", n=int(r.get("exitos", 1)), fecha=r.get("ultima", "?")))
+    salida(T("Pruébalas con:  lina recetas probar \"frase\"   ·   bórralas con:  lina recetas borrar ID   ·   se apagan con:  lina config poner directas.recetas no"))
+    return 0

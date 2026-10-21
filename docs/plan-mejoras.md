@@ -11,7 +11,7 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 | 11 | Medir dónde se va el tiempo *(hecha)* | S | — |
 | 11b | No olvidar la petición tras un paso previo *(hecha)* | S | — |
 | 12 | Camino rápido: órdenes simples sin pasar por la IA, y voz sin esperas *(casi hecha: abrir programa, volumen, silencio, ventanas y hora; falta reproducción)* | L | 11 |
-| 12b | Recetas que se ejecutan solas | L | 12 |
+| 12b | Recetas que se ejecutan solas *(hecha: falta probarla en el equipo de Dani)* | L | 12 |
 | 13 | Memoria de preferencias | M | — |
 | 14 | Bluetooth completo y más diagnóstico de juegos | S | 12 (para sus órdenes directas) |
 | 15 | GPU y energía (módulo opcional) | M | — |

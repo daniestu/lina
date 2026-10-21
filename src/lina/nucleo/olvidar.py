@@ -13,7 +13,7 @@ from lina.nucleo.idioma import N_
 QUE = {
     "diario": (N_("el diario de cambios y las copias para deshacer (después no podrás deshacer lo anterior)"), lambda: [RUT.DATOS / "diario"]),
     "acciones": (N_("el registro de las órdenes que se han ejecutado"), lambda: [RUT.REGISTRO_ACCIONES, RUT.REGISTRO_ACCIONES.with_name(RUT.REGISTRO_ACCIONES.name + ".1")]),
-    "recetas": (N_("las recetas aprendidas (cómo cambiar ajustes concretos)"), lambda: [RUT.DATOS / "recetas.json"]),
+    "recetas": (N_("las recetas aprendidas (cómo hacer lo que ya me has pedido)"), lambda: [RUT.DATOS / "recetas.json"]),
     "tiempos": (N_("las mediciones de tiempo de las peticiones (solo números)"), lambda: [RUT.ESTADO / "tiempos.jsonl"]),
     "registro": (N_("el registro del sistema de tu usuario (journalctl --user): incluye lo que dijiste y contesté"), lambda: []),
 }

@@ -454,6 +454,7 @@ from lina.nucleo.asistente_interfaz import MixinInterfaz
 
 
 from lina.nucleo.asistente_ajustes import MixinAjustes
+from lina.nucleo.asistente_pasos import MixinPasos
 
 
 from lina.nucleo.asistente_pantalla import MixinPantalla
@@ -468,7 +469,7 @@ _ACCION_DESTRUCTIVA = IDI.PorIdioma({
     "en": re.compile(r"\b(i will|i ll|i am going to|i m going to|proceeding|i have (formatted|deleted|erased|wiped)|already (formatted|deleted|erased|wiped)|i formatted|i deleted|i erased|i wiped)\b"),
 })
 
-class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, MixinMCP):
+class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, MixinInterfaz, MixinMCP):
     modo_privado = False          # «modo privado»: no se envía NINGUNA captura de tu pantalla (se recuerda aunque reinicies)
     ultima_pantalla_t = 0.0       # cuándo se usó la pantalla por última vez (para seguir una ayuda paso a paso)
     pedir_pantalla = False        # la IA ha pedido ver la captura y falta repetir la petición con ella
@@ -897,6 +898,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         if directa:
             self._cerrar_directa(pregunta, directa[0], directa[1], inicio, crono)
             return
+        self._nota_pasos = ""
+        if not profundidad:                                     # fase 12b: algo que ya se cumplió antes con unos pasos que funcionaron se repite sin IA
+            repetida = self._intentar_receta_pasos(pregunta, crono)
+            if repetida:
+                self._cerrar_directa(pregunta, repetida[0], repetida[1], inicio, crono)
+                return
+            if self._nota_pasos:
+                nota_sistema += f"\n[SISTEMA: {self._nota_pasos}]"
         self.hilo_captura.join()
         imagen = preparar_imagen()
         self.pregunta_pura = pregunta
@@ -976,6 +985,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinInterfaz, M
         log(f"Respuesta [{origen}]: {respuesta if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'} ({time.time() - inicio:.1f} s en total)")
         try:
             self._aprender_automatico()
+            self._aprender_pasos()
         except Exception as e:                                     # aprender es un extra: nunca debe estropear la respuesta
             log(f"Receta automática: fallo {e!r}")
         self.guardar_en_historial(pregunta_sin_receta, respuesta)

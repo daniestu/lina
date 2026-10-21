@@ -29,7 +29,7 @@ Con la clave **gratuita**, según las condiciones de Google vigentes, lo que se 
 |---|---|---|
 | Diario de cambios y copias para deshacer | `~/.local/share/lina/diario` | `lina olvidar diario` |
 | Registro de acciones (órdenes ejecutadas) | `~/.local/state/lina/acciones.log` (rota solo al llegar a ~1 MB) | `lina olvidar acciones` |
-| Recetas aprendidas | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` |
+| Recetas aprendidas (lo que ya me pediste y salió bien: la frase, los pasos y cómo se comprobó; nunca contraseñas) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` o `lina recetas borrar todas` |
 | Tiempos de cada petición (solo números, nunca lo que dices; `lina tiempos` los resume) | `~/.local/state/lina/tiempos.jsonl` (se recorta solo al llegar a ~200 KB) | `lina olvidar tiempos` |
 | Registro del sistema (lo que dices y contesto, si no lo desactivas) | `journalctl --user -u lina` | `lina olvidar registro` |
 

@@ -75,6 +75,8 @@ ESQUEMA: dict = {
     "directas": {
         "activo": (True, "bool", None, N_("true: las órdenes claras y de riesgo bajo («abre Firefox», «sube el volumen») se hacen sin llamar a la IA, mucho más rápido. "
                    "Mira cuáles y pruébalas con:  lina directas")),
+        "recetas": (True, "bool", None, N_("true: lo que ya me has pedido una vez y salió bien (p. ej. «desactiva la cámara») lo aprendo y, si lo repites con las mismas palabras, lo hago sin "
+                    "llamar a la IA. Mira lo aprendido con:  lina recetas")),
     },
     "ia": {
         "proveedor": ("gemini", "opcion", ("gemini", "openai", "anthropic"), N_("Con qué IA habla Lina: gemini (por defecto, con clave gratuita), anthropic, o openai "

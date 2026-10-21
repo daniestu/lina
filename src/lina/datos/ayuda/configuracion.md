@@ -90,6 +90,7 @@ reglas de seguridad de siempre. Si la frase no está clara (una pregunta, una ne
 | Ajuste | De fábrica | Qué hace |
 |---|---|---|
 | `activo` | `true` | true: las órdenes claras y de riesgo bajo («abre Firefox», «sube el volumen») se hacen sin llamar a la IA, mucho más rápido. Mira cuáles y pruébalas con:  lina directas |
+| `recetas` | `true` | true: lo que ya me has pedido una vez y salió bien (p. ej. «desactiva la cámara») lo aprendo y, si lo repites con las mismas palabras, lo hago sin llamar a la IA. Mira lo aprendido con:  lina recetas |
 
 ### [ia] Inteligencia artificial
 
