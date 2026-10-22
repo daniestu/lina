@@ -13,6 +13,7 @@ import time
 import wave
 
 from lina.nucleo import comandos as C
+from lina.nucleo import cuda as CUDA
 from lina.nucleo import idioma as IDI
 from lina.nucleo import rutas as RUT
 from lina.nucleo.idioma import T
@@ -144,6 +145,8 @@ def cargar(motor, modelo, procesador, calculo):
     """→ función `transcribir(audio, idioma, pista) -> texto`. Falla con una excepción que se cuenta, nunca se traga."""
     if motor == "faster-whisper":
         from faster_whisper import WhisperModel
+        if procesador == "cuda":
+            CUDA.cargar_librerias()                                        # si están en el entorno de Lina; si no, falla con su motivo
         if procesador == "cuda" and not _cuda_faster():
             raise RuntimeError(T("no hay tarjeta gráfica que use faster-whisper"))
         m = WhisperModel(modelo, device=procesador, compute_type=calculo)
@@ -211,13 +214,13 @@ def etiqueta(c):
 def informe(esperadas, medidas):
     """El texto de la tabla y, debajo, lo que falló en cada combinación."""
     lineas = [T("RESULTADOS  (frases: {n}). «Aciertos» = idéntica a lo que dijiste, sin contar mayúsculas ni tildes.", n=len(esperadas)), ""]
-    lineas.append(f"{'':<46}{T('aciertos'):>10}{T('parecido'):>10}{T('media'):>9}{T('máx.'):>8}{T('carga'):>8}{T('VRAM'):>9}")
+    lineas.append(f"{'':<52}{T('aciertos'):>10}{T('parecido'):>10}{T('media'):>9}{T('máx.'):>8}{T('carga'):>8}{T('VRAM'):>9}")
     for comb, r in medidas:
         if "error" in r:
-            lineas.append(f"{etiqueta(comb):<46}{T('no disponible')}: {r['error']}")
+            lineas.append(f"{etiqueta(comb):<52}{T('no disponible')}: {r['error']}")
             continue
         vram = f"{r['vram_mb']} MB" if r.get("vram_mb") is not None else "-"
-        lineas.append(f"{etiqueta(comb):<46}{r['aciertos']:>6}/{r['total']:<3}{r['similitud'] * 100:>8.0f} %{r['media_s']:>7.2f} s{r['max_s']:>6.2f} s{r['carga_s']:>6.1f} s{vram:>9}")
+        lineas.append(f"{etiqueta(comb):<52}{r['aciertos']:>6}/{r['total']:<3}{r['similitud'] * 100:>8.0f} %{r['media_s']:>7.2f} s{r['max_s']:>6.2f} s{r['carga_s']:>6.1f} s{vram:>9}")
     lineas += ["", T("DÓNDE FALLA CADA UNA  (lo que dijiste → lo que oyó)")]
     for comb, r in medidas:
         if "error" in r:
@@ -226,6 +229,10 @@ def informe(esperadas, medidas):
         lineas.append(f"\n{etiqueta(comb)}: " + (T("ninguna") if not malas else ""))
         lineas += [f"   «{e}» → «{t}»" for e, t in malas]
     return "\n".join(lineas)
+
+
+def instalar_cuda(salida=print):
+    return CUDA.instalar(salida=salida)
 
 
 def principal(argv, salida=print, entrada=input, grabar=grabar_una, cargador=cargar):
@@ -257,6 +264,11 @@ def principal(argv, salida=print, entrada=input, grabar=grabar_una, cargador=car
         if entrada(T("¿Sigo? [s/N] ")).strip().lower() not in ("s", "si", "sí", "y", "yes"):
             salida(T("Vale, no mido nada. Tus grabaciones siguen guardadas."))
             return 0
+    if any(c[2] == "cuda" and c[0] == "faster-whisper" for c in elegidas) and CUDA.hay_nvidia() and not CUDA.instaladas():
+        salida(T("\nPara usar tu tarjeta NVIDIA con faster-whisper faltan las librerías CUDA (cuBLAS y cuDNN, unos 700 MB). Se instalarían solo en el entorno de Lina con pip; no tocan el sistema."))
+        if entrada(T("¿Las instalo? [s/N] ")).strip().lower() in ("s", "si", "sí", "y", "yes"):
+            salida(T("Instalando…"))
+            salida(T("Hecho.") if instalar_cuda(salida) else T("No he podido instalarlas; esas filas saldrán como no disponibles."))
     audios = [leer_wav(ruta_audio(i)) for i in range(len(lista))]
     pista = _pista()
     medidas = []

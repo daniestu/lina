@@ -75,3 +75,29 @@ def test_si_dices_que_no_a_las_descargas_no_mide(carpeta, monkeypatch):
         raise AssertionError("no debía medir")
     assert PV.principal([], salida=sali.append, entrada=lambda *a: "n", cargador=cargador) == 0
     assert any("no mido nada" in x for x in sali)
+
+
+def test_cuda_instalar_y_cargar(monkeypatch):
+    from lina.nucleo import cuda as CU
+    llamadas = []
+
+    class R:
+        returncode = 0
+        stdout = stderr = ""
+    monkeypatch.setattr(CU, "instaladas", lambda: True)
+    assert CU.instalar(ejecutar=lambda cmd, **k: (llamadas.append(cmd), R())[1])
+    assert llamadas[0][1:4] == ["-m", "pip", "install"] and "nvidia-cublas-cu12" in llamadas[0]
+    monkeypatch.setattr(CU, "instaladas", lambda: False)
+    assert CU.cargar_librerias() is False                 # sin las librerías no hace nada ni falla
+
+
+def test_cuda_instalar_cuenta_el_fallo():
+    from lina.nucleo import cuda as CU
+
+    class R:
+        returncode = 1
+        stdout = ""
+        stderr = "ERROR: sin red\n"
+    dicho = []
+    assert CU.instalar(salida=dicho.append, ejecutar=lambda *a, **k: R()) is False
+    assert "sin red" in dicho[0]
