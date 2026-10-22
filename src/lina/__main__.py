@@ -26,6 +26,7 @@ AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
   lina memoria [borrar ID|todas]   lo que le has pedido recordar («recuerda que…»): verlo y borrarlo
   lina recetas [probar F|borrar ID]   lo que Lina ha aprendido a hacer y repite sin llamar a la IA; «probar» dice qué haría con una frase
   lina musica ORDEN          controla la música que pone Lina con mpv: poner "Queen" · pausar · reanudar · siguiente · anterior · detener
+  lina probar-voz [--completo]  graba unas frases tuyas y mide qué Whisper te entiende mejor (motor, modelo, CPU o tarjeta gráfica); no cambia nada
   lina tiempos [N]           en qué fase se va el tiempo de tus últimas N peticiones (solo números, nada de lo que dices)
   lina manos-libres ORDEN    probar "frase" · eco · nivel   (ajustes del manos libres)
   lina indicador probar      enseña el resplandor de escucha
@@ -96,6 +97,9 @@ def main(argv=None):
     if orden == "musica":
         from lina.nucleo import reproductor
         return reproductor.principal(resto)
+    if orden == "probar-voz":
+        from lina.nucleo import probar_voz
+        return probar_voz.principal(resto)
     if orden == "memoria":
         from lina.nucleo import memoria
         return memoria.principal(resto)
