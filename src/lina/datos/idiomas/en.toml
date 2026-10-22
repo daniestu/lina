@@ -692,3 +692,7 @@
 "Memoria de preferencias" = "Preference memory"
 "true: Lina tiene en cuenta lo que le pediste recordar («recuerda que mi juego favorito es…») cuando viene al caso. false: sigue guardado pero no lo usa. Se ve y se borra con:  lina memoria" = "true: Lina takes into account what you asked it to remember («remember that my favourite game is…») when it is relevant. false: it stays saved but is not used. View and delete it with:  lina memoria"
 "lo que me has pedido recordar («recuerda que…»)" = "what you asked me to remember («remember that…»)"
+"conecta mis auriculares · desconecta el mando · enciende el bluetooth" = "connect my headphones · disconnect the controller · turn on the bluetooth"
+"Bluetooth encendido." = "Bluetooth on."
+"Conectado." = "Connected."
+"Desconectado." = "Disconnected."

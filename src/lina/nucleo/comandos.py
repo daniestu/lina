@@ -706,6 +706,12 @@ def _preferida_en_memoria(qj, candidatos):
             hay = [a for a in candidatos if any(len(n) >= 4 and f" {n} " in texto for n in _nombres_de_app(a))]
             if len(hay) == 1:
                 return hay[0]
+            if not hay:                                                 # «los Anker» para «Anker Soundcore»: vale una palabra del nombre que solo tenga esa candidata
+                palabras = [set(w for w in normalizar(a["nombre"]).split() if len(w) >= 4) for a in candidatos]
+                propias = [{w for w in p if sum(w in q for q in palabras) == 1} for p in palabras]
+                hay = [a for a, p in zip(candidatos, propias) if any(f" {w} " in texto for w in p)]
+                if len(hay) == 1:
+                    return hay[0]
     except Exception:
         return None
     return None

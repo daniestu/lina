@@ -1109,6 +1109,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             if not hecho:
                 return None                                       # nada que controlar (o no se pudo comprobar): lo decide la IA
             return {"pausar": T("Pausado."), "reanudar": T("Reanudado."), "siguiente": T("Siguiente."), "anterior": T("Anterior."), "detener": T("Parada.")}[accion]
+        if ident == "bluetooth":
+            r = str(self.ejecutor.sistema("red", dict(datos)))
+            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
+                return None                                       # no está emparejado, hay varios que encajan… lo decide la IA con las pistas del error
+            if datos["accion"] == "bluetooth_encender":
+                return T("Bluetooth encendido.") if "Powered: yes" in r else None
+            quedo_conectado = "no conectado" not in r.split("Ahora:")[-1] and "conectado" in r.split("Ahora:")[-1]
+            if (datos["accion"] == "bluetooth_conectar") != quedo_conectado:
+                return None                                       # el comando dijo bien pero no quedó como se pidió: no se afirma nada
+            return T("Conectado.") if quedo_conectado else T("Desconectado.")
         if ident in ("volumen", "silencio"):
             r = str(self.ejecutor.sistema("audio", dict(datos)))
             if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
@@ -1571,7 +1581,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if nombre in {"proton", "opciones_lanzamiento"}:
             return self.ejecutor.steam_config(nombre, args)
         if nombre == "ver_juegos":
-            return self.ejecutor.ver_juegos(args.get("buscar"))
+            return self.ejecutor.ver_juegos(args.get("buscar"), bool(args.get("diagnostico")))
         if nombre == "abrir_app":
             return self.ejecutor.abrir_app(args.get("nombre", ""))
         if nombre == "ver_gasto":

@@ -189,6 +189,60 @@ def _quitar_opcion(lineas, clave):
     return antes - len(lineas)
 
 
+def _hay(programa):
+    return shutil.which(programa) is not None
+
+
+def _capas_vulkan():
+    """Los manifiestos de capas de Vulkan que hay en el sistema (los de LSFG, MangoHud, etc.)."""
+    carpetas = [Path("/usr/share/vulkan/implicit_layer.d"), Path("/etc/vulkan/implicit_layer.d"), Path.home() / ".local/share/vulkan/implicit_layer.d"]
+    return sorted({f.name for c in carpetas if c.is_dir() for f in c.glob("*.json")})
+
+
+def diagnostico():
+    """Qué hay y qué falta para jugar bien en este equipo: GameMode, Vulkan, MangoHud y LSFG. SOLO MIRA: no cambia nada. Cada línea: ✔ está bien, ✘ falta o falla."""
+    filas = []
+    # GameMode
+    if _hay("gamemoderun") or _hay("gamemoded"):
+        rc, out = _ej(["gamemoded", "-t"], timeout=15) if _hay("gamemoded") else (None, "")
+        if rc == 0 and "successful" in out.lower():
+            filas.append("✔ GameMode: instalado y funciona (prueba superada). En Steam se usa con la opción de lanzamiento «gamemoderun %command%».")
+        elif rc is None:
+            filas.append("✔ GameMode: instalado (no he podido hacer la prueba).")
+        else:
+            filas.append(f"✘ GameMode: instalado pero la prueba falla ({out.splitlines()[-1][:120] if out else 'sin mensaje'}).")
+    else:
+        filas.append("✘ GameMode: no está instalado (paquete «gamemode»). Mejora el rendimiento en algunos juegos.")
+    # Vulkan
+    if _hay("vulkaninfo"):
+        rc, out = _ej(["vulkaninfo", "--summary"], timeout=20)
+        gpus = re.findall(r"deviceName\s*=\s*(.+)", out) if rc == 0 else []
+        versiones = re.findall(r"apiVersion\s*=\s*([\d.]+)", out) if rc == 0 else []
+        reales = [g.strip() for g in gpus if "llvmpipe" not in g.lower() and "software" not in g.lower()]
+        if reales:
+            filas.append(f"✔ Vulkan: {', '.join(reales[:3])}" + (f" (API {versiones[0]})" if versiones else "") + ".")
+        elif gpus:
+            filas.append(f"✘ Vulkan: solo veo renderizado por software ({gpus[0].strip()}): faltan los controladores Vulkan de tu tarjeta (vulkan-radeon, nvidia-utils, vulkan-intel…).")
+        else:
+            filas.append(f"✘ Vulkan: vulkaninfo no ha encontrado ninguna GPU ({out.splitlines()[-1][:120] if out else 'sin mensaje'}).")
+    else:
+        filas.append("✘ Vulkan: no puedo comprobarlo, falta «vulkaninfo» (paquete vulkan-tools).")
+    # MangoHud
+    if _hay("mangohud"):
+        activas = _activas(_leer_mangohud())
+        filas.append("✔ MangoHud: instalado" + (f", con {len(activas)} opción(es) en su configuración." if activas else ", sin configuración propia (usa la de fábrica)."))
+    else:
+        filas.append("✘ MangoHud: no está instalado (paquete «mangohud»); es el contador de FPS.")
+    # LSFG (generación de fotogramas)
+    capas = [c for c in _capas_vulkan() if "lsfg" in c.lower()]
+    config = (Path.home() / ".config/lsfg-vk/conf.toml").exists()
+    if capas or config or _hay("lsfg-vk-ui"):
+        filas.append("✔ LSFG-VK (generación de fotogramas): " + ("capa de Vulkan instalada" if capas else "configuración presente") + (", con configuración." if config and capas else "."))
+    else:
+        filas.append("· LSFG-VK (generación de fotogramas): no está instalado (opcional; necesita además tu copia de Lossless Scaling).")
+    return "Diagnóstico para jugar (solo he mirado, no he cambiado nada):\n" + "\n".join(filas)
+
+
 def _leer_mangohud():
     try:
         return RUTA_MANGOHUD.read_text(encoding="utf-8").splitlines()

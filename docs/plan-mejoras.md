@@ -13,7 +13,7 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 | 12 | Camino rápido: órdenes simples sin pasar por la IA, y voz sin esperas *(hecha: abrir programa, volumen, silencio, ventanas, hora y música; voz con caché y Piper residente; falta confirmar en el equipo el Piper residente)* | L | 11 |
 | 12b | Recetas que se ejecutan solas *(hecha: falta probarla en el equipo de Dani)* | L | 12 |
 | 13 | Memoria de preferencias *(hecha: falta probarla en el equipo de Dani)* | M | — |
-| 14 | Bluetooth completo y más diagnóstico de juegos | S | 12 (para sus órdenes directas) |
+| 14 | Bluetooth completo y más diagnóstico de juegos *(hecha: falta probarla en el equipo de Dani)* | S | 12 (para sus órdenes directas) |
 | 15 | GPU y energía (módulo opcional) | M | — |
 
 Fuera del plan, a propósito: excluir monitores de las capturas (Lina captura todos), una ventana de chat con historial (Lina es de voz) y quitar las

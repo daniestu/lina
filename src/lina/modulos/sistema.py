@@ -571,6 +571,53 @@ def _bt_dispositivos():
     return res
 
 
+_BT_TIPOS = {            # lo que se dice → los iconos que BlueZ da a ese tipo de dispositivo
+    "auriculares": {"audio-headset", "audio-headphones"}, "cascos": {"audio-headset", "audio-headphones"}, "audifonos": {"audio-headset", "audio-headphones"},
+    "headphones": {"audio-headset", "audio-headphones"}, "headset": {"audio-headset", "audio-headphones"}, "earbuds": {"audio-headset", "audio-headphones"},
+    "altavoz": {"audio-speakers", "audio-card"}, "altavoces": {"audio-speakers", "audio-card"}, "speaker": {"audio-speakers", "audio-card"},
+    "mando": {"input-gaming"}, "gamepad": {"input-gaming"}, "controller": {"input-gaming"},
+    "raton": {"input-mouse"}, "mouse": {"input-mouse"}, "teclado": {"input-keyboard"}, "keyboard": {"input-keyboard"},
+    "movil": {"phone"}, "telefono": {"phone"}, "phone": {"phone"}}
+
+
+def _bt_info(mac):
+    """{'icono', 'bateria'} de un dispositivo según `bluetoothctl info`."""
+    rc, out = ej(["bluetoothctl", "info", mac], timeout=6)
+    info = {"icono": "", "bateria": None}
+    if rc != 0:
+        return info
+    m = re.search(r"Icon:\s*(\S+)", out)
+    info["icono"] = m.group(1) if m else ""
+    m = re.search(r"Battery Percentage:\s*0x[0-9a-fA-F]+\s*\((\d{1,3})\)", out)
+    info["bateria"] = int(m.group(1)) if m else None
+    return info
+
+
+def _bt_por_tipo(objetivo, disp, desconectar=False):
+    """«los auriculares», «el mando»…: los dispositivos de ese TIPO, aunque no se llamen así. None si no es un tipo; si hay varios, antes el que dijiste
+    recordar (memoria), luego el único conectado (al desconectar) o el único emparejado de ese tipo."""
+    clave = " ".join(w for w in _quitar_acentos(objetivo.lower()).split() if w not in {"mis", "mi", "los", "las", "el", "la", "unos", "unas", "bluetooth", "de"})
+    iconos = _BT_TIPOS.get(clave)
+    if not iconos:
+        return None
+    de_tipo = [d for d in disp if _bt_info(d["mac"])["icono"] in iconos]
+    if len(de_tipo) > 1:
+        pseudo = [{"nombre": d["nombre"], "comando": "", "es": "", "id": d["mac"]} for d in de_tipo]
+        from lina.nucleo import comandos
+        elegida = comandos._preferida_en_memoria(clave, pseudo)
+        if elegida is not None:
+            return [d for d in de_tipo if d["mac"] == elegida["id"]]
+        if desconectar:
+            conectados = [d for d in de_tipo if d["conectado"]]
+            if len(conectados) == 1:
+                return conectados
+    return de_tipo
+
+
+def _quitar_acentos(t):
+    return "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
+
+
 def estado_red():
     _, d = ej(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device", "status"])
     _, ip = ej(["ip", "-br", "-4", "addr"])
@@ -630,15 +677,19 @@ def planificar_red(args):
         _, show = ej(["bluetoothctl", "show"], timeout=6)
         datos = [l.strip() for l in show.splitlines() if l.strip().startswith(("Powered", "Discoverable", "Pairable", "Name"))]
         disp = _bt_dispositivos()
-        return {"texto": "Bluetooth:\n" + "\n".join(datos) + "\nDispositivos:\n"
-                + ("\n".join(f"- {d['nombre']} ({d['mac']}) {'CONECTADO' if d['conectado'] else 'no conectado'}" for d in disp) or "(ninguno emparejado)")}
+
+        def linea(d):
+            bateria = _bt_info(d["mac"])["bateria"] if d["conectado"] else None
+            return f"- {d['nombre']} ({d['mac']}) {'CONECTADO' if d['conectado'] else 'no conectado'}" + (f" · batería {bateria} %" if bateria is not None else "")
+        return {"texto": "Bluetooth:\n" + "\n".join(datos) + "\nDispositivos:\n" + ("\n".join(linea(d) for d in disp) or "(ninguno emparejado)")}
     if accion in {"bluetooth_encender", "bluetooth_apagar"}:
         quiere = "on" if accion.endswith("encender") else "off"
         return {"comando": f"bluetoothctl power {quiere}", "motivo": f"{'encender' if quiere == 'on' else 'apagar'} el Bluetooth", "espera": 1.5,
                 "comprobar": lambda: "Bluetooth ahora: " + " ".join(l.strip() for l in ej(["bluetoothctl", "show"])[1].splitlines() if "Powered" in l)}
     disp = _bt_dispositivos()
-    cerca = _mejores(objetivo, disp, lambda d: (d["nombre"],), minimo=65, margen=3) if objetivo else (
-        [d for d in disp if d["conectado"]] if accion == "bluetooth_desconectar" else [])
+    por_tipo = _bt_por_tipo(objetivo, disp, desconectar=accion == "bluetooth_desconectar") if objetivo else None
+    cerca = por_tipo if por_tipo else (_mejores(objetivo, disp, lambda d: (d["nombre"],), minimo=65, margen=3) if objetivo else (
+        [d for d in disp if d["conectado"]] if accion == "bluetooth_desconectar" else []))
     if not cerca:
         return {"error": "No encuentro ese dispositivo entre los emparejados: " + (", ".join(d["nombre"] for d in disp) or "(ninguno)")}
     if len(cerca) > 1:

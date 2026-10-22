@@ -1859,8 +1859,11 @@ class Ejecutor:
         anotar(f"[receta-auto] por confirmar: {rec['ajuste']}: {rec['cambiar']}")
         return True
 
-    def ver_juegos(self, buscar=None):
-        """Los juegos instalados (Steam, Heroic, Lutris), agrupados por lanzador."""
+    def ver_juegos(self, buscar=None, diagnostico=False):
+        """Los juegos instalados (Steam, Heroic, Lutris), agrupados por lanzador. Con `diagnostico`, en vez de la lista: qué hay y qué falta para jugar (solo mira)."""
+        if diagnostico:
+            from lina.modulos import juegoconf
+            return juegoconf.diagnostico()
         if not juegos:
             return "Falta juegos.py: no tengo la biblioteca de juegos."
         todos = juegos.biblioteca(forzar=True)

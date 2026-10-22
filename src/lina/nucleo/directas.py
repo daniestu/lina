@@ -19,6 +19,7 @@ ACCIONES = (
     ("silencio", N_("silencia el sonido · quita el silencio"), "mute · unmute"),
     ("ventanas", N_("maximiza esta ventana · pantalla completa · minimiza esta ventana · muestra el escritorio"), "maximize this window · full screen"),
     ("reproduccion", N_("pausa · sigue con la música · siguiente canción · canción anterior · para la música"), "pause · resume · next song · previous song · stop the music"),
+    ("bluetooth", N_("conecta mis auriculares · desconecta el mando · enciende el bluetooth"), "connect my headphones · disconnect the controller"),
     ("hora", N_("qué hora es · qué día es hoy"), "what time is it · what day is it"),
 )
 
@@ -118,6 +119,17 @@ def _es(n):
     if re.fullmatch(r"(?:la )?anterior|(?:la )?(?:cancion|pista|tema) anterior|(?:vuelve|volver|ve|ir|retrocede|retroceder|pon|poner|ponme)(?: (?:a|de|la|el))* anterior"
                     r"|(?:vuelve|volver|retrocede|retroceder)(?: (?:a|de|la|el))* (?:cancion|pista|tema)(?: anterior)?", n):
         return ("reproduccion", {"accion": "anterior"})
+    # ---- bluetooth (dispositivos ya emparejados; emparejar uno nuevo no se hace por aquí)
+    if re.fullmatch(r"(?:enciende|encender|activa|activar|pon|poner)(?: el)? bluetooth", n):
+        return ("bluetooth", {"accion": "bluetooth_encender"})
+    m = re.fullmatch(r"(conecta|conectar|conectame|conectate|desconecta|desconectar|desconectame)(?: me)?(?: a)? ((?:(?:mis|mi|los|las|el|la|unos|unas) )?[a-z0-9 ]{3,30})", n)
+    if m:
+        objetivo = re.sub(r"^(?:(?:mis|mi|los|las|el|la|unos|unas)(?: |$))+", "", re.sub(r"\b(?:por )?bluetooth\b", "", m.group(2)).strip()).strip()
+        if not objetivo and m.group(2).strip().endswith("bluetooth") and m.group(1).startswith("conec"):
+            return ("bluetooth", {"accion": "bluetooth_encender"})         # «conecta el bluetooth» = enciéndelo
+        if objetivo and not re.search(r"\b(?:wifi|wi fi|red|redes|internet|vpn|ethernet|cable|servidor|ordenador|pc|equipo|base de datos|sesion|cuenta)\b", objetivo) \
+                and len(objetivo.split()) <= 4 and not set(objetivo.split()) & _CORTA_NOMBRE:
+            return ("bluetooth", {"accion": "bluetooth_desconectar" if m.group(1).startswith("desc") else "bluetooth_conectar", "objetivo": objetivo})
     # ---- abrir un programa
     m = re.fullmatch(r"(?:abre|abrir|abreme|abrime|lanza|lanzar|lanzame|ejecuta|ejecutar|inicia|iniciar|arranca|arrancar|pon en marcha)(?: me)? "
                      + _ARTICULOS_ES + r"(.+)", n)
@@ -164,6 +176,14 @@ def _en(n):
         return ("reproduccion", {"accion": "siguiente"})
     if re.fullmatch(r"(?:the )?(?:previous|last)(?: (?:song|track))?|(?:go back|back|go to|play)(?: (?:to|the|a|one))* (?:previous|last)(?: (?:song|track))?|(?:go back|back)(?: (?:a|one))? (?:song|track)", n):
         return ("reproduccion", {"accion": "anterior"})
+    if re.fullmatch(r"(?:turn on|switch on|enable) (?:the )?bluetooth", n):
+        return ("bluetooth", {"accion": "bluetooth_encender"})
+    m = re.fullmatch(r"(connect|disconnect)(?: to)? ((?:(?:my|the|your) )?[a-z0-9 ]{3,30})", n)
+    if m:
+        objetivo = re.sub(r"^(?:(?:my|the|your)(?: |$))+", "", re.sub(r"\bbluetooth\b", "", m.group(2)).strip()).strip()
+        if objetivo and not re.search(r"\b(?:wifi|wi fi|network|internet|vpn|ethernet|server|computer|pc|database|session|account)\b", objetivo) and len(objetivo.split()) <= 4 \
+                and not set(objetivo.split()) & _CORTA_NOMBRE:
+            return ("bluetooth", {"accion": "bluetooth_" + ("desconectar" if m.group(1) == "disconnect" else "conectar"), "objetivo": objetivo})
     m = re.fullmatch(r"(?:open|launch|start|run) " + _ARTICULOS_EN + r"(.+?)(?: app| application| program)?", n)
     if m and _nombre_valido(m.group(1)):
         return ("abrir_app", {"nombre": m.group(1)})
