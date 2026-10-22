@@ -98,3 +98,32 @@ def test_la_ia_tampoco_puede_tocar_el_archivo_ni_borrarlo_con_la_orden(tmp_path)
 
 def test_lina_olvidar_incluye_la_memoria():
     assert "memoria" in OLV.QUE and "memoria" in OLV.TODO
+
+
+# ---- «abre el navegador»: el tuyo, no uno que tenga «Browser» en el nombre
+def _apps():
+    return [{"nombre": "Avahi Zeroconf Browser", "comando": "avahi-discover", "es": "", "id": "avahi-discover", "generico": "Navegador Zeroconf", "claves": ""},
+            {"nombre": "Brave", "comando": "brave", "es": "", "id": "brave-browser", "generico": "Navegador web", "claves": ""},
+            {"nombre": "Firefox", "comando": "firefox", "es": "", "id": "firefox", "generico": "Navegador web", "claves": ""}]
+
+
+def test_abre_el_navegador_usa_el_predeterminado(monkeypatch):
+    from lina.nucleo import comandos as C
+    monkeypatch.setattr(C, "_predeterminada", lambda tipo: "firefox")
+    r = C.buscar_app("abre el navegador", _apps())
+    assert r[0][0] == 100 and r[0][1]["nombre"] == "Firefox" and all(p < 100 for p, _ in r[1:])
+
+
+def test_abre_el_navegador_usa_lo_que_pediste_recordar(monkeypatch):
+    from lina.nucleo import comandos as C
+    monkeypatch.setattr(C, "_predeterminada", lambda tipo: "firefox")
+    M.recordar("mi navegador favorito es el de Brave")
+    r = C.buscar_app("el navegador", _apps())
+    assert r[0][1]["nombre"] == "Brave" and r[0][0] == 100
+
+
+def test_un_programa_con_nombre_propio_no_se_toca(monkeypatch):
+    from lina.nucleo import comandos as C
+    monkeypatch.setattr(C, "_predeterminada", lambda tipo: "firefox")
+    M.recordar("mi navegador favorito es el de Brave")
+    assert C.buscar_app("abre Firefox", _apps())[0][1]["nombre"] == "Firefox"

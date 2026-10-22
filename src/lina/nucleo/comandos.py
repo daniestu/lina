@@ -662,6 +662,55 @@ def _nombres_de_app(app):
                         normalizar(ident.rsplit(".", 1)[-1])} if len(n) >= 2}
 
 
+# Palabras que no son el nombre de un programa sino un TIPO de programa («abre el navegador»): se resuelven con lo que prefieres o lo que tienes como predeterminado
+_TIPOS_DE_PROGRAMA = {"navegador": "web", "navegador web": "web", "browser": "web", "web browser": "web", "internet": "web",
+                      "correo": "correo", "cliente de correo": "correo", "email": "correo", "mail": "correo", "email client": "correo"}
+
+
+def _predeterminada(tipo):
+    """El id del lanzador que el sistema tiene como predeterminado para ese tipo de programa (sin «.desktop»), o ''."""
+    import subprocess
+    orden = {"web": ["xdg-settings", "get", "default-web-browser"], "correo": ["xdg-mime", "query", "default", "x-scheme-handler/mailto"]}.get(tipo)
+    if not orden:
+        return ""
+    try:
+        r = subprocess.run(orden, capture_output=True, text=True, timeout=4)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return r.stdout.strip().removesuffix(".desktop") if r.returncode == 0 else ""
+
+
+def _preferida_en_memoria(qj, apps):
+    """Si le pediste que recordara cuál es tu «navegador» (o tu «correo»), esa app; solo si el recuerdo nombra UNA app instalada."""
+    try:
+        from lina.nucleo import ajustes as AJ
+        from lina.nucleo import memoria as MEM
+        if not AJ.actuales(log=lambda m: None).get("memoria", "usar"):
+            return None
+        for r in reversed(MEM._cargar()):
+            texto = " " + normalizar(r["texto"]) + " "
+            if f" {qj} " not in texto and qj.split()[0] not in texto.split():
+                continue
+            hay = [a for a in apps if any(len(n) >= 4 and f" {n} " in texto for n in _nombres_de_app(a))]
+            if len(hay) == 1:
+                return hay[0]
+    except Exception:
+        return None
+    return None
+
+
+def _app_por_tipo(qj, apps):
+    """La app que corresponde a «el navegador» / «el correo»: la que pediste recordar y, si no, la predeterminada del sistema."""
+    tipo = _TIPOS_DE_PROGRAMA.get(qj)
+    if not tipo:
+        return None
+    elegida = _preferida_en_memoria(qj, apps)
+    if elegida:
+        return elegida
+    ident = _predeterminada(tipo)
+    return next((a for a in apps if ident and str(a.get("id", "")) == ident), None)
+
+
 def buscar_app(consulta, apps=None):
     """Los programas INSTALADOS que encajan con lo que se ha dicho, de más a menos parecido: [(puntos 0-100, app)]. Mira nombre, nombre en
     español, comando, id del lanzador, tipo de programa y palabras clave, y tolera que el reconocimiento de voz haya oído otra cosa que suena igual.
@@ -672,6 +721,7 @@ def buscar_app(consulta, apps=None):
     qj = " ".join(q)
     apps = nombres_de_apps() if apps is None else apps
     resultado = []
+    por_tipo = _app_por_tipo(qj, apps)
     for a in apps:
         nombres = _nombres_de_app(a)
         palabras_nombre = set(normalizar(a["nombre"] + " " + a.get("es", "")).split())
@@ -689,6 +739,8 @@ def buscar_app(consulta, apps=None):
             puntos = int(80 * sonido) if sonido >= UMBRAL_PARECIDO else 0
         if puntos >= 55:
             resultado.append((puntos, a))
+    if por_tipo is not None:                                            # «el navegador» es el tuyo; las demás coincidencias de palabras («Avahi Zeroconf Browser») quedan por debajo
+        resultado = [(100, por_tipo)] + [(min(p, 69), a) for p, a in resultado if a is not por_tipo]
     resultado.sort(key=lambda x: (-x[0], len(x[1]["nombre"]), normalizar(x[1]["nombre"])))
     return resultado
 
