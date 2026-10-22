@@ -936,7 +936,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             self._cerrar_directa(pregunta, directa[0], directa[1], inicio, crono)
             return
         self._nota_pasos = ""
-        if not profundidad:                                     # fase 12b: algo que ya se cumplió antes con unos pasos que funcionaron se repite sin IA
+        if not profundidad and not self._hay_recuerdos_pertinentes(pregunta):   # fase 12b: algo que ya se cumplió antes con unos pasos que funcionaron se repite sin IA
             repetida = self._intentar_receta_pasos(pregunta, crono)
             if repetida:
                 self._cerrar_directa(pregunta, repetida[0], repetida[1], inicio, crono)
@@ -1041,6 +1041,13 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             crono.sumar("voz", self.ultima_habla[1])
             self._anotar_tiempos(crono, origen, modo)
 
+    def _hay_recuerdos_pertinentes(self, pregunta):
+        """¿Le pediste recordar algo que viene al caso de esta petición? Entonces no vale un atajo que no lo mira: que lo decida la IA, que sí lo recibe."""
+        try:
+            return bool(AJ.actuales(log=lambda m: None).get("memoria", "usar") and MEM.relevantes(pregunta))
+        except Exception:
+            return False
+
     def _intentar_directa(self, pregunta, crono):
         """Fase 12: órdenes claras y de riesgo bajo («abre Firefox», «sube el volumen») se hacen aquí, sin llamar a la IA. Va por las mismas herramientas y reglas
         que cuando decide la IA. Devuelve (frase, id) si lo ha hecho, o None (y todo sigue como siempre: lo entiende la IA)."""
@@ -1051,6 +1058,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             if not orden:
                 return None
             ident, datos = orden
+            if ident != "abrir_app" and self._hay_recuerdos_pertinentes(pregunta):
+                log(f"Directa [{ident}]: hay algo que me pediste recordar que viene al caso; lo decide la IA con eso delante")
+                return None                                       # (abrir un programa ya lo tiene en cuenta al elegir cuál)
             if ident == "reproduccion" and self.historial and self.historial[-1]["rol"] == "model" and "?" in self.historial[-1]["texto"]:
                 return None                                       # «la siguiente» / «la anterior» pueden ser la respuesta a una pregunta de Lina: lo entiende la IA
             self.hilo_captura.join()

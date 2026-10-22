@@ -663,16 +663,26 @@ def _nombres_de_app(app):
 
 
 # Palabras que no son el nombre de un programa sino un TIPO de programa («abre el navegador»): se resuelven con lo que prefieres o lo que tienes como predeterminado
-_TIPOS_DE_PROGRAMA = {"navegador": "web", "navegador web": "web", "browser": "web", "web browser": "web", "internet": "web",
-                      "correo": "correo", "cliente de correo": "correo", "email": "correo", "mail": "correo", "email client": "correo"}
+def _clave_consulta(texto):
+    return " ".join(w for w in normalizar(texto).split() if w not in _RELLENO and w not in _VERBOS_DE_PROGRAMA)
+
+
+_TIPOS_DE_PROGRAMA = {_clave_consulta(k): v for k, v in {
+    "navegador": "web", "navegador web": "web", "browser": "web", "web browser": "web", "internet": "web",
+    "correo": "x-scheme-handler/mailto", "cliente de correo": "x-scheme-handler/mailto", "email": "x-scheme-handler/mailto", "mail": "x-scheme-handler/mailto",
+    "email client": "x-scheme-handler/mailto",
+    "reproductor de video": "video/mp4", "reproductor de videos": "video/mp4", "video player": "video/mp4",
+    "reproductor de musica": "audio/mpeg", "reproductor de audio": "audio/mpeg", "music player": "audio/mpeg",
+    "visor de imagenes": "image/png", "visor de fotos": "image/png", "image viewer": "image/png",
+    "editor de texto": "text/plain", "text editor": "text/plain", "bloc de notas": "text/plain",
+    "lector de pdf": "application/pdf", "visor de pdf": "application/pdf", "pdf": "application/pdf",
+    "gestor de archivos": "inode/directory", "explorador de archivos": "inode/directory", "file manager": "inode/directory"}.items()}
 
 
 def _predeterminada(tipo):
     """El id del lanzador que el sistema tiene como predeterminado para ese tipo de programa (sin «.desktop»), o ''."""
     import subprocess
-    orden = {"web": ["xdg-settings", "get", "default-web-browser"], "correo": ["xdg-mime", "query", "default", "x-scheme-handler/mailto"]}.get(tipo)
-    if not orden:
-        return ""
+    orden = ["xdg-settings", "get", "default-web-browser"] if tipo == "web" else ["xdg-mime", "query", "default", tipo]
     try:
         r = subprocess.run(orden, capture_output=True, text=True, timeout=4)
     except (OSError, subprocess.SubprocessError):
@@ -680,18 +690,20 @@ def _predeterminada(tipo):
     return r.stdout.strip().removesuffix(".desktop") if r.returncode == 0 else ""
 
 
-def _preferida_en_memoria(qj, apps):
-    """Si le pediste que recordara cuál es tu «navegador» (o tu «correo»), esa app; solo si el recuerdo nombra UNA app instalada."""
+def _preferida_en_memoria(qj, candidatos):
+    """Si le pediste que recordara cuál prefieres para eso («mi cámara favorita es Cheese», «mi navegador es Brave»), esa app; solo si el recuerdo nombra
+    UNA de las candidatas (si nombra varias, no hay forma de saber cuál)."""
     try:
         from lina.nucleo import ajustes as AJ
         from lina.nucleo import memoria as MEM
         if not AJ.actuales(log=lambda m: None).get("memoria", "usar"):
             return None
+        buscado = MEM._raices(qj)
         for r in reversed(MEM._cargar()):
-            texto = " " + normalizar(r["texto"]) + " "
-            if f" {qj} " not in texto and qj.split()[0] not in texto.split():
+            if not (buscado & MEM._raices(r["texto"])):
                 continue
-            hay = [a for a in apps if any(len(n) >= 4 and f" {n} " in texto for n in _nombres_de_app(a))]
+            texto = " " + normalizar(r["texto"]) + " "
+            hay = [a for a in candidatos if any(len(n) >= 4 and f" {n} " in texto for n in _nombres_de_app(a))]
             if len(hay) == 1:
                 return hay[0]
     except Exception:
@@ -699,13 +711,15 @@ def _preferida_en_memoria(qj, apps):
     return None
 
 
-def _app_por_tipo(qj, apps):
-    """La app que corresponde a «el navegador» / «el correo»: la que pediste recordar y, si no, la predeterminada del sistema."""
+def _app_preferida(qj, resultado, apps):
+    """Entre varias que encajan con lo que dijiste («la cámara», «el navegador»), la que prefieres: primero la que le pediste recordar y, si no hay y es un tipo
+    conocido de programa, la que el sistema tiene como predeterminada. None si no hay nada que decida (entonces se pregunta o decide la IA)."""
     tipo = _TIPOS_DE_PROGRAMA.get(qj)
-    if not tipo:
-        return None
-    elegida = _preferida_en_memoria(qj, apps)
-    if elegida:
+    candidatos = list(apps) if tipo else [a for _, a in resultado]
+    if not tipo and (len(candidatos) < 2 or (resultado[0][0] == 100 and resultado[1][0] < 100)):
+        return None                                                    # un solo programa, o uno que se llama exactamente así: no hay nada que preferir
+    elegida = _preferida_en_memoria(qj, candidatos)
+    if elegida is not None or not tipo:
         return elegida
     ident = _predeterminada(tipo)
     return next((a for a in apps if ident and str(a.get("id", "")) == ident), None)
@@ -721,7 +735,6 @@ def buscar_app(consulta, apps=None):
     qj = " ".join(q)
     apps = nombres_de_apps() if apps is None else apps
     resultado = []
-    por_tipo = _app_por_tipo(qj, apps)
     for a in apps:
         nombres = _nombres_de_app(a)
         palabras_nombre = set(normalizar(a["nombre"] + " " + a.get("es", "")).split())
@@ -739,8 +752,10 @@ def buscar_app(consulta, apps=None):
             puntos = int(80 * sonido) if sonido >= UMBRAL_PARECIDO else 0
         if puntos >= 55:
             resultado.append((puntos, a))
-    if por_tipo is not None:                                            # «el navegador» es el tuyo; las demás coincidencias de palabras («Avahi Zeroconf Browser») quedan por debajo
-        resultado = [(100, por_tipo)] + [(min(p, 69), a) for p, a in resultado if a is not por_tipo]
+    resultado.sort(key=lambda x: (-x[0], len(x[1]["nombre"]), normalizar(x[1]["nombre"])))
+    elegida = _app_preferida(qj, resultado, apps)
+    if elegida is not None:                                             # la tuya sube a 100; las demás coincidencias («Avahi Zeroconf Browser») quedan por debajo
+        resultado = [(100, elegida)] + [(min(p, 69), a) for p, a in resultado if a is not elegida]
     resultado.sort(key=lambda x: (-x[0], len(x[1]["nombre"]), normalizar(x[1]["nombre"])))
     return resultado
 

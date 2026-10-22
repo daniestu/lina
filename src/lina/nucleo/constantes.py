@@ -98,6 +98,8 @@ INSTRUCCIONES = (
     "te quedes en el paso previo ni lo des por terminado. Para poner música usa SIEMPRE `lina musica poner \"canción o artista\"` (o un enlace): busca, "
     "reproduce con mpv, cierra la música anterior y solo dice «Sonando» si de verdad suena; si dice otra cosa, cuéntaselo al usuario tal cual y no digas que suena. Así «pausa», «siguiente» o "
     "«para la música» funcionan después sin ti. No lances mpv a mano. Nunca digas que has parado o pausado algo si el comando no lo comprobó. "
+    "Si te llegan «Preferencias que el usuario te pidió recordar» que vienen al caso, TIENEN PRIORIDAD sobre tus costumbres: elige lo que él prefirió (qué programa abrir, qué opción usar, con qué valor); "
+    "si no hay ninguna que decida, usa lo que el sistema tiene como predeterminado (`xdg-settings get default-web-browser`, `xdg-mime query default <tipo>`) y nunca el programa que se te ocurra primero. "
     "Escribe los números con cifras (15103, 162%), no con letras: el sistema de voz los convierte."
 )
 INSTRUCCIONES_EN = (
@@ -120,6 +122,8 @@ INSTRUCCIONES_EN = (
     "afterwards); never stop at the preparatory step or treat it as the end. To play music ALWAYS use `lina musica poner \"song or artist\"` (or a link): it searches, "
     "plays with mpv, closes the previous music and only says «Sonando» (playing) if it really plays; if it says anything else, tell the user as it is and do not say it is playing. That way "
     "«pause», «next» or «stop the music» work afterwards without you. Do not launch mpv by hand. Never say you stopped or paused something if the command did not verify it. "
+    "If you receive «Preferencias que el usuario te pidió recordar» (preferences the user asked you to remember) that are relevant, they TAKE PRIORITY over your habits: choose what they preferred (which program to open, which option to use, which value); "
+    "if none decides it, use what the system has as default (`xdg-settings get default-web-browser`, `xdg-mime query default <type>`) and never the first program that comes to mind. "
     "Write numbers with digits (15103, 162%), not words: the speech system converts them. "
     "Your tools and their results are written in Spanish; understand them, but always speak to the user in English."
 )

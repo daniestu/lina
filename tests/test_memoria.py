@@ -127,3 +127,49 @@ def test_un_programa_con_nombre_propio_no_se_toca(monkeypatch):
     monkeypatch.setattr(C, "_predeterminada", lambda tipo: "firefox")
     M.recordar("mi navegador favorito es el de Brave")
     assert C.buscar_app("abre Firefox", _apps())[0][1]["nombre"] == "Firefox"
+
+
+# ---- vale para cualquier cosa, no solo el navegador
+def _camaras():
+    return [{"nombre": "Cheese", "comando": "cheese", "es": "", "id": "org.gnome.Cheese", "generico": "Cámara web", "claves": "camara;webcam"},
+            {"nombre": "Kamoso", "comando": "kamoso", "es": "", "id": "org.kde.kamoso", "generico": "Cámara web", "claves": "camara;webcam"},
+            {"nombre": "Kate", "comando": "kate", "es": "", "id": "org.kde.kate", "generico": "Editor de texto", "claves": ""}]
+
+
+def test_con_dos_camaras_se_abre_la_que_dijiste(monkeypatch):
+    from lina.nucleo import comandos as C
+    monkeypatch.setattr(C, "_predeterminada", lambda tipo: "")
+    r = C.buscar_app("abre la cámara", _camaras())
+    assert r[0][0] < 100 and r[1][0] < 100 or r[0][0] == r[1][0]            # sin recuerdo, no hay una elegida: se pregunta o decide la IA
+    M.recordar("mi cámara favorita es Kamoso")
+    r = C.buscar_app("abre la cámara", _camaras())
+    assert r[0][1]["nombre"] == "Kamoso" and r[0][0] == 100 and all(p < 100 for p, _ in r[1:])
+
+
+def test_un_recuerdo_que_nombra_dos_no_decide(monkeypatch):
+    from lina.nucleo import comandos as C
+    monkeypatch.setattr(C, "_predeterminada", lambda tipo: "")
+    M.recordar("mi cámara es Cheese o Kamoso según el día")
+    r = C.buscar_app("abre la cámara", _camaras())
+    assert not (r[0][0] == 100 and r[1][0] < 100)
+
+
+def test_sin_recuerdo_se_usa_el_predeterminado_del_sistema_para_otros_tipos(monkeypatch):
+    from lina.nucleo import comandos as C
+    pedidos = []
+    monkeypatch.setattr(C, "_predeterminada", lambda tipo: pedidos.append(tipo) or "org.kde.kate")
+    r = C.buscar_app("abre el editor de texto", _camaras())
+    assert pedidos == ["text/plain"] and r[0][1]["nombre"] == "Kate" and r[0][0] == 100
+
+
+def test_un_atajo_no_se_salta_lo_que_pediste_recordar(archivo):
+    import sys
+    from unittest.mock import MagicMock
+    for m in ("sounddevice", "faster_whisper"):
+        sys.modules.setdefault(m, MagicMock())
+    from lina.nucleo import asistente as A
+    a = A.Asistente.__new__(A.Asistente)
+    assert not a._hay_recuerdos_pertinentes("sube el volumen")
+    M.recordar("quiero el volumen siempre al 40 por ciento")
+    assert a._hay_recuerdos_pertinentes("sube el volumen")
+    assert not a._hay_recuerdos_pertinentes("abre Firefox")
