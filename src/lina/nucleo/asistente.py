@@ -1574,7 +1574,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return ("Modo privado activado: no enviaré ninguna captura de tu pantalla hasta que me lo digas (se recuerda aunque reinicie)."
                     + (" Ojo: en ESTA petición la captura ya iba con la pregunta." if self.pantalla_adjunta else "")) if activo else \
                    "Modo privado desactivado: vuelvo a poder mirar la pantalla cuando haga falta (salvo ventanas sensibles)."
-        if nombre in {"ventanas", "procesos", "servicios", "red", "energia", "pantalla", "audio", "kde_dbus"}:
+        if nombre in {"ventanas", "procesos", "servicios", "red", "energia", "pantalla", "audio", "kde_dbus", "gpu"}:
             return self.ejecutor.sistema(nombre, args)
         if nombre == "mangohud":
             return self.ejecutor.mangohud(args)

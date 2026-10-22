@@ -278,6 +278,11 @@ def _critico_extra(comando):
         if base in {"flatpak", "snap"} and "install" in args and (any(a.endswith((".flatpakref", ".flatpak", ".snap")) or "://" in a for a in args)
                                                               or {"--dangerous", "--devmode", "--classic"} & set(args)):
             return "instala software de fuera de las tiendas oficiales"
+        if base == "lact" and args[:1] == ["cli"] and not (args[1:2] in (["list-gpus"], ["info"]) or args[1:3] in (["profile", "list"], ["profile", "get"])):
+            return "cambia la configuración de la tarjeta gráfica (LACT)"
+        if base == "nvidia-smi" and any(a in {"-pl", "--power-limit", "-lgc", "--lock-gpu-clocks", "-lmc", "--lock-memory-clocks", "-rgc", "-rmc", "-pm", "--persistence-mode", "-ac", "-rac", "-r", "--gpu-reset"}
+                                         or a.startswith(("--power-limit=", "--lock-gpu-clocks=", "--lock-memory-clocks=")) for a in args):
+            return "cambia límites o frecuencias de la tarjeta gráfica"
         if base == "setfacl" and any(a in ("-R", "--recursive") for a in args):
             return "cambia permisos de acceso en masa"
     return None
@@ -521,6 +526,8 @@ def _segmento_lectura(t):
         return primero in {"get", "list", "version"}
     if base == "upower":
         return not any(x in {"--monitor", "--monitor-detail"} for x in a)
+    if base == "lact":                                         # LACT: mirar sí; cambiar de perfil o tocar la tarjeta, no (eso pide confirmación)
+        return a[:1] == ["cli"] and (a[1:2] in (["list-gpus"], ["info"]) or a[1:3] in (["profile", "list"], ["profile", "get"], ["profile"]) or a[1:4] == ["profile", "auto-switch", "get"])
     if base == "bluetoothctl":
         return primero in {"show", "devices", "info", "paired-devices", "list"}
     if base == "brightnessctl":

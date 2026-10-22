@@ -14,7 +14,7 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 | 12b | Recetas que se ejecutan solas *(hecha: falta probarla en el equipo de Dani)* | L | 12 |
 | 13 | Memoria de preferencias *(hecha: falta probarla en el equipo de Dani)* | M | — |
 | 14 | Bluetooth completo y más diagnóstico de juegos *(hecha: falta probarla en el equipo de Dani)* | S | 12 (para sus órdenes directas) |
-| 15 | GPU y energía (módulo opcional) | M | — |
+| 15 | GPU y energía (módulo opcional) *(hecha: falta probarla en el equipo de Dani)* | M | — |
 
 Fuera del plan, a propósito: excluir monitores de las capturas (Lina captura todos), una ventana de chat con historial (Lina es de voz) y quitar las
 confirmaciones por atajo (es una decisión de seguridad, no una carencia).

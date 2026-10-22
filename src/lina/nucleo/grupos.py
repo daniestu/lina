@@ -24,7 +24,7 @@ META = "mas_herramientas"
 GRUPOS = {
     "ajustes_kde": ["buscar_ajuste_kde", "probar_ajuste_kde", "buscar_clave_en_binarios", "observar_config",
                     "guardar_receta", "olvidar_receta", "ver_recetas"],
-    "sistema": ["ventanas", "procesos", "servicios", "red", "energia", "pantalla", "audio", "kde_dbus"],
+    "sistema": ["ventanas", "procesos", "servicios", "red", "energia", "pantalla", "audio", "kde_dbus", "gpu"],
     "juegos": ["ver_juegos", "mangohud", "opciones_lanzamiento", "proton"],
     "archivos": ["crear_documento", "disenar_documento", "hoja_calculo", "presentacion", "copiar_portapapeles", "buscar_youtube", "ver_papelera", "restaurar_de_papelera", "vaciar_papelera"],
     "memoria": ["ver_diario", "alias_de_voz", "ver_gasto", "ver_recetas", "olvidar_receta"],
@@ -34,10 +34,21 @@ GRUPOS = {
     "yo": ["mis_ajustes"],
     "interfaz": ["interfaz", "ventanas", "guardar_receta_interfaz"],
 }
+# Herramientas que solo se ofrecen si hay algo con lo que usarlas (nombre → función que dice si hay). Sin GPU compatible, «gpu» ni sale.
+OPCIONALES = {"gpu": lambda: __import__("lina.modulos.gpu", fromlist=["hay"]).hay()}
+
+
+def _disponible(nombre):
+    try:
+        return OPCIONALES[nombre]() if nombre in OPCIONALES else True
+    except Exception:
+        return False
+
+
 # Los grupos nuevos (fase C) se registran con registrar_grupo().
 DESCRIPCION = {
     "ajustes_kde": "cambiar ajustes de KDE/Plasma y aprender recetas",
-    "sistema": "ventanas, procesos, servicios, red/Bluetooth, energía, pantallas, audio, D-Bus, copias de seguridad",
+    "sistema": "ventanas, procesos, servicios, red/Bluetooth, energía, pantallas, audio, D-Bus, tarjeta gráfica (si hay), copias de seguridad",
     "juegos": "lista de juegos, MangoHud, Proton y opciones de lanzamiento de Steam",
     "archivos": "documentos, portapapeles, vídeos de YouTube y papelera",
     "memoria": "diario de cambios, alias de voz, gasto de Gemini y recetas aprendidas",
@@ -182,7 +193,7 @@ def herramientas(declaraciones, grupos):
     nombres = set(NUCLEO)
     for g in grupos:
         nombres |= set(GRUPOS.get(g, []))
-    lista = [d for d in declaraciones if d["name"] in nombres]
+    lista = [d for d in declaraciones if d["name"] in nombres and _disponible(d["name"])]
     if any(g not in grupos for g in GRUPOS):                   # si ya van todos, no hace falta
         lista.append(declaracion_meta(grupos))
     return lista
@@ -208,7 +219,7 @@ def cargar(grupo, declaraciones, lista, cargados):
     if grupo in cargados:
         return f"El grupo {grupo} ya estaba cargado: úsalo."
     tenidas = {d["name"] for d in lista}
-    nuevas = [d for d in declaraciones if d["name"] in GRUPOS[grupo] and d["name"] not in tenidas]
+    nuevas = [d for d in declaraciones if d["name"] in GRUPOS[grupo] and d["name"] not in tenidas and _disponible(d["name"])]
     lista.extend(nuevas)
     cargados.add(grupo)
     nombres = ", ".join(d["name"] for d in nuevas) or "(las mismas que ya tenías)"

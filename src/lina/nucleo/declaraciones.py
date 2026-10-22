@@ -203,6 +203,15 @@ DECLARACIONES: list[dict] = [
     {"name": "servicios",
      "description": "Servicios de systemd (del sistema y de tu usuario): ver estado o registro, listar los fallidos o en marcha, buscar por nombre aproximado, iniciar, parar, reiniciar, recargar, habilitar o deshabilitar. Entiende nombres aproximados. Tras actuar lee el estado real.",
      "parameters": {"type": "object", "properties": {"accion": {"type": "string", "description": "estado, registro, listar_fallidos, listar_en_marcha, buscar, iniciar, parar, reiniciar, recargar, habilitar, deshabilitar."}, "servicio": {"type": "string", "description": "Nombre del servicio, aunque no sea exacto."}, "ahora": {"type": "boolean", "description": "Con habilitar/deshabilitar: además iniciarlo/pararlo ya."}}, "required": ["accion"]}},
+    {"name": "gpu",
+     "description": ("La tarjeta gráfica: estado (uso, temperatura, frecuencias, consumo y límite de potencia, memoria de vídeo usada y POR QUÉ baja el rendimiento si lo hace: "
+                     "temperatura o potencia), LACT (ver sus perfiles y cambiar de perfil, que pide confirmación) y registro de métricas a un archivo CSV "
+                     "(«cada 2 segundos durante 15 minutos»; se para solo y se puede cancelar). Solo mira: no sube frecuencias, no quita límites ni toca ventiladores."),
+     "parameters": {"type": "object", "properties": {
+         "accion": {"type": "string", "description": "estado, lact, perfil, registro_iniciar, registro_estado, registro_parar."},
+         "objetivo": {"type": "string", "description": "Con estado: qué tarjeta si hay varias (opcional). Con perfil: el nombre del perfil de LACT (aproximado vale)."},
+         "intervalo_s": {"type": "integer", "description": "Con registro_iniciar: segundos entre muestras (1 a 60; 2 por defecto)."},
+         "minutos": {"type": "number", "description": "Con registro_iniciar: duración (hasta 60; 15 por defecto)."}}, "required": ["accion"]}},
     {"name": "red",
      "description": "Red y Bluetooth: estado de la conexión, redes Wi-Fi a la vista, encender/apagar el Wi-Fi, conectar o desconectar una conexión YA guardada, probar la conexión (ping) o el DNS, y Bluetooth (estado con la batería de lo conectado, encender/apagar, conectar/desconectar un dispositivo ya emparejado; en objetivo vale su nombre o su tipo: «auriculares», «mando», «teclado»). Las redes nuevas con contraseña las pone el usuario.",
      "parameters": {"type": "object", "properties": {"accion": {"type": "string", "description": "estado, wifi_redes, wifi_encender, wifi_apagar, conectar, desconectar, probar, dns, bluetooth_estado, bluetooth_encender, bluetooth_apagar, bluetooth_conectar, bluetooth_desconectar."}, "objetivo": {"type": "string", "description": "Nombre de la conexión o del dispositivo Bluetooth (aproximado vale), o el host para probar/dns."}}, "required": ["accion"]}},

@@ -1271,7 +1271,7 @@ def planificar_dbus(args):
 # ----------------------------------------------------------------------------------------------------------------------
 PLANIFICADORES = {"ventanas": planificar_ventanas, "procesos": planificar_procesos, "servicios": planificar_servicios,
                   "red": planificar_red, "energia": planificar_energia, "pantalla": planificar_pantalla, "audio": planificar_audio,
-                  "kde_dbus": planificar_dbus}
+                  "kde_dbus": planificar_dbus, "gpu": lambda args: __import__("lina.modulos.gpu", fromlist=["planificar"]).planificar(args)}
 
 
 def planificar(nombre, args):
