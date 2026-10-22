@@ -68,7 +68,7 @@ _PALABRAS: dict[str, str | dict[str, str]] = {
                r"internet|bluetooth|conexion|dns|ping|energia|bateria|suspend|hibern|reinici|apag|bloque|sesion|monitor|resolucion|hercios|"
                r"\bhz\b|frecuencia|gira|rotar|vrr|hdr|brillo|volumen|audio|sonido|silenci|mute|microfono|altavoz|auricular|salida|d-?bus|kwin|"
                r"copia de seguridad|backup|snapshot|snapper|dmidecode|temperatura|perfil)",
-    "juegos": r"\b(juegos|steam|proton|mangohud|fps|lanzamiento|heroic|lutris|hud|gamemode)",
+    "juegos": r"\b(juegos?|videojuegos?|jugar|jugando|gaming|steam|proton|mangohud|fps|lanzamiento|heroic|lutris|hud|gamemode)",
     "archivos": r"\b(documento|word|docx|curriculum|curriculo|cv|folleto|ficha|excel|ecxel|exel|extel|excell|xlsx|hoja de calculo|hojas de calculo|tabla|powerpoint|pptx|presentacion|diapositivas?|slides?|carta|informe|redacta|resumen|portapapeles|copia el|copia este|youtube|video|papelera|borra|elimina|"
                 r"recupera|restaura|vaciar|vacia)",
     "web": r"(https?://|www\.|\.(com|es|org|net|io|dev)\b|\b(pagina web|la web|esa web|este enlace|el enlace|enlace|articulo|noticia|url|lee la pagina|lee esta|(lee|leer|leeme|leela|mira|miral[ao]|resume|resumeme|explicame|analiza)\w*\s+(\w+\s+){0,2}(pagina|web|enlace|link)|(pagina|web|enlace|link|articulo)\s+(que\s+)?(tengo\s+)?copiad[oa]|resume (esta|esa|la) (pagina|web)|que dice (la|esa|esta))\b)",
@@ -87,7 +87,7 @@ _PALABRAS_EN = {
                r"bluetooth|connection|dns|ping|power|battery|suspend|hibernate|reboot|restart|shut ?down|power off|lock|session|monitor|resolution|"
                r"refresh rate|\bhz\b|rotate|vrr|hdr|brightness|volume|audio|sound|mute|microphone|speakers?|headphones?|output|d-?bus|kwin|"
                r"backup|snapshot|snapper|dmidecode|temperature|profile)",
-    "juegos": r"\b(games?|steam|proton|mangohud|fps|launch options?|heroic|lutris|hud|gamemode)",
+    "juegos": r"\b(games?|gaming|play(ing)? games?|steam|proton|mangohud|fps|launch options?|heroic|lutris|hud|gamemode)",
     "archivos": r"\b(documents?|word|docx|resume|cv|leaflet|flyer|excel|xlsx|spreadsheet|table|powerpoint|pptx|presentation|slides?|letter|report|"
                 r"clipboard|youtube|video|trash|recycle bin|delete|remove|recover|restore|empty)",
     "web": r"(https?://|www\.|\.(com|es|org|net|io|dev)\b|\b(web ?page|website|this link|the link|link|article|news|url|read (this|the) (page|site)|"

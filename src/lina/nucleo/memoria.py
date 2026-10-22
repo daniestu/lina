@@ -33,12 +33,14 @@ _lock = threading.RLock()
 # ----- lo que dices (por idioma)
 _ES = {
     "recordar": re.compile(r"^(?:por favor,?\s*)?(?:recuerda|apunta|anota|memoriza|ten\s+(?:en\s+cuenta|presente)|guarda(?:\s+en\s+(?:la\s+)?memoria)?)\s+que\s+(?P<t>.+)$", re.I),
-    "olvidar": re.compile(r"^(?:por favor,?\s*)?(?:olvida|borra|elimina|quita)(?:\s+de\s+(?:la\s+)?memoria)?\s+(?:lo\s+de|lo\s+que\s+(?:te\s+)?(?:dije|he\s+dicho|pedí|pedi)\s+(?:de|sobre)|el\s+recuerdo\s+(?:de|sobre)|que)\s+(?P<t>.+)$", re.I),
+    "olvidar": re.compile(r"^(?:por favor,?\s*)?(?:olvida|borra|elimina|quita)(?:\s+de\s+(?:la\s+)?memoria)?\s+(?:lo\s+(?:del?|de\s+(?:la|las|los))|lo\s+que\s+(?:te\s+)?(?:dije|he\s+dicho|pedí|pedi)\s+(?:del?|sobre)(?:\s+(?:la|las|los|el))?|el\s+recuerdo\s+(?:del?|sobre)(?:\s+(?:la|las|los|el))?|que)\s+(?P<t>.+)$", re.I),
+    "todo": re.compile(r"^(?:por\s+favor,?\s*)?(?:olvida|borra|elimina)\s+todo(?:\s+lo\s+que\s+(?:recuerdas|sabes|tienes\s+(?:apuntado|guardado)|has\s+apuntado)(?:\s+(?:de|sobre)\s+m[ií])?)?$|^(?:por\s+favor,?\s*)?(?:olvida|borra)\s+(?:la\s+memoria|tus\s+recuerdos|mis\s+recuerdos)$", re.I),
     "listar": re.compile(r"^(?:qu[eé]\s+)(?:recuerdas|sabes|tienes\s+(?:apuntado|guardado)|has\s+apuntado)(?:\s+(?:de|sobre)\s+m[ií])?$", re.I),
 }
 _EN = {
     "recordar": re.compile(r"^(?:please,?\s*)?(?:remember|note|make\s+a\s+note|keep\s+in\s+mind)\s+that\s+(?P<t>.+)$", re.I),
     "olvidar": re.compile(r"^(?:please,?\s*)?(?:forget|delete|remove)\s+(?:what\s+i\s+said\s+about|about|that|the\s+memory\s+(?:of|about))\s+(?P<t>.+)$", re.I),
+    "todo": re.compile(r"^(?:please,?\s*)?(?:forget|delete|erase)\s+(?:everything(?:\s+(?:you\s+(?:remember|know)|about\s+me))*|your\s+memory|my\s+memories)$", re.I),
     "listar": re.compile(r"^what\s+do\s+you\s+(?:remember|know)\s+about\s+me$", re.I),
 }
 _POR_IDIOMA = {"es": _ES, "en": _EN}
@@ -96,6 +98,8 @@ def entender(texto):
     m = patrones["listar"].match(frase.rstrip("?¿ "))
     if m:
         return ("listar",)
+    if patrones["todo"].match(frase.rstrip(".?! ")):
+        return ("todo",)
     m = patrones["olvidar"].match(frase.rstrip(".?"))
     if m:
         return ("olvidar", m.group("t").strip())
@@ -175,6 +179,8 @@ def gestionar(accion):
         return recordar(accion[1])[1]
     if accion[0] == "olvidar":
         return olvidar(accion[1])[1]
+    if accion[0] == "todo":
+        return T("Borrar toda la memoria no lo hago por voz, por si fue un error. Si quieres, escribe  lina memoria borrar todas  en la terminal; o dime qué olvidar con «olvida lo de…».")
     return resumen_hablado()
 
 

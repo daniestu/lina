@@ -22,6 +22,11 @@ def test_entender_las_frases():
     assert M.entender("apunta que prefiero el tema oscuro")[0] == "recordar"
     assert M.entender("ten en cuenta que uso Brave") == ("recordar", "uso Brave")
     assert M.entender("olvida lo de Proton") == ("olvidar", "Proton")
+    assert M.entender("Olvida lo del volumen.") == ("olvidar", "volumen")
+    assert M.entender("olvida lo de las cámaras") == ("olvidar", "las cámaras")
+    assert M.entender("Olvida todo lo que recuerdas de mí.") == ("todo",)
+    assert M.entender("borra todo") == ("todo",)
+    assert "por voz" in M.gestionar(("todo",))
     assert M.entender("qué recuerdas de mí") == ("listar",)
     assert M.entender("¿Qué recuerdas de mí?") == ("listar",)
     for no in ("recuérdame mañana llamar a Pedro", "guarda el archivo", "apunta eso", "abre Firefox", "qué hora es", "recuerda"):

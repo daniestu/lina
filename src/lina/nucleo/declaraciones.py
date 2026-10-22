@@ -191,6 +191,7 @@ DECLARACIONES: list[dict] = [
     {"name": "ver_juegos",
      "description": ("Lista los juegos instalados en Steam, Heroic y Lutris (o los que encajan con un nombre). Úsala si el usuario pregunta qué juegos tiene "
                      "o si tiene uno concreto. Con diagnostico=true no lista juegos: dice qué hay y qué falta para jugar bien (GameMode, Vulkan, MangoHud, LSFG); solo mira, no cambia nada. "
+                     "Si pregunta si su equipo está bien para jugar, o por qué los juegos van mal, usa SIEMPRE diagnostico=true (y después, si hace falta, gpu para el detalle de la tarjeta). "
                      "Para ABRIR un juego usa abrir_app."),
      "parameters": {"type": "object", "properties": {"buscar": {"type": "string", "description": "Opcional: un nombre o parte de él."},
                                                      "diagnostico": {"type": "boolean", "description": "true: comprobar GameMode, Vulkan, MangoHud y LSFG en lugar de listar juegos."}}}},

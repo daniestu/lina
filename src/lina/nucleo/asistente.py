@@ -1106,6 +1106,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if ident == "reproduccion":
             accion = datos["accion"]
             hecho = self._controlar_musica(accion)
+            if hecho == "sin_cola":
+                return T("Solo hay una canción en la cola. Dime cuál quieres y la pongo.") if accion == "siguiente" else T("No hay una canción anterior. Dime cuál quieres y la pongo.")
             if not hecho:
                 return None                                       # nada que controlar (o no se pudo comprobar): lo decide la IA
             return {"pausar": T("Pausado."), "reanudar": T("Reanudado."), "siguiente": T("Siguiente."), "anterior": T("Anterior."), "detener": T("Parada.")}[accion]
@@ -1136,6 +1138,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         ej = self.ejecutor
         if REPRO.enviar_mpv(accion):                              # la música que puso Lina va primero: es la que quieres parar (el navegador también habla MPRIS)
             return True
+        if accion in ("siguiente", "anterior") and REPRO.enviar_mpv("vivo"):
+            return "sin_cola"                                     # suena una sola canción de Lina: no hay otra a la que saltar (y el navegador no es lo que quieres)
         lista = str(ej.herramienta({"comando": "playerctl -l", "motivo": "mirar qué reproductores hay"}))
         hay = " ".join(lista.splitlines()[1:]).strip()
         if lista.startswith("código de salida: 0") and hay and hay != "(sin salida)":

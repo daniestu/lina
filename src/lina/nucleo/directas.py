@@ -79,7 +79,7 @@ def _es(n):
     if re.fullmatch(r"(?:muestra|mostrar|enseña|ensena|ver|ve al|ir al|vete al)(?: me)? (?:el )?escritorio|(?:minimiza|esconde|oculta) todo|(?:minimiza|esconde|oculta) todas las ventanas", n):
         return ("ventanas", {"accion": "mostrar_escritorio"})
     # ---- silencio
-    if re.fullmatch(r"(?:silencia(?:r)?|silencialo|silenciala|mutea(?:r)?)(?: el (?:sonido|audio|volumen|ordenador|equipo|pc)| todo| el sonido del ordenador)?", n):
+    if re.fullmatch(r"(?:silencia(?:r)?|silencialo|silenciala|mutea(?:r)?)(?: (?:el|al) (?:sonido|audio|volumen|ordenador|equipo|pc)| todo| el sonido del ordenador)?", n):
         return ("silencio", {"accion": "silenciar"})
     if re.fullmatch(r"(?:quita(?:r)? (?:el )?silencio|quita(?:r)? el mute|desilencia(?:r)?|desmutea(?:r)?|activa(?:r)? (?:el )?(?:sonido|audio)|"
                     r"pon(?:er)? (?:el )?sonido|vuelve a poner (?:el )?sonido|restaura(?:r)? (?:el )?(?:sonido|audio))", n):
