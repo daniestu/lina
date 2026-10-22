@@ -37,7 +37,7 @@ AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
   lina update [--comprobar]  actualiza Lina (te enseña qué trae y pregunta); --volver deshace la última actualización
   lina doctor [--red]        comprueba la instalación y dice cómo arreglar lo que falle; --informe lo da sin datos personales
   lina bienvenida            te guía para dejar a Lina lista: clave de Gemini, micrófono, nombre, autonomía y privacidad
-  lina modelos [estado]      descarga (o dice si están) el modelo de voz a texto y la voz de Lina
+  lina modelos [estado|gpu]  descarga (o dice si están) el modelo de voz a texto y la voz de Lina; «gpu» deja lista tu tarjeta NVIDIA
   lina atajo [TECLA]         crea el atajo de teclado global para hablar con Lina (KDE y GNOME)
   lina uninstall [--todo]    quita lo que instaló Lina; --todo también tus ajustes, claves y datos
   lina mcp [--config]        servidor MCP de Lina para otras IAs

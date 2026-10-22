@@ -41,6 +41,7 @@ from lina.nucleo import directas as DIR
 from lina.nucleo import cache_voz as CV
 from lina.escritorio import sesion as SES
 from lina.nucleo import memoria as MEM
+from lina.nucleo import modelos as MODELOS
 from lina.nucleo import reproductor as REPRO
 from lina.voz import atenuador as ATE
 from lina.voz import piper_residente as PIPER_RES
@@ -487,8 +488,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     sustituida = False            # la tarea en curso se abandona porque has pedido otra cosa (no hace falta que diga «lo dejo»)
 
     def __init__(self):
-        log(f"Cargando Whisper ({MODELO_WHISPER})...")
-        self.whisper = WhisperModel(MODELO_WHISPER, device="cpu", compute_type="int8")
+        self.whisper = MODELOS.cargar_whisper(log, WhisperModel)
         self.modo_privado = ARCHIVO_PRIVADO.exists()
         if self.modo_privado:
             log("Modo privado ACTIVADO (se recuerda de antes): no envío capturas de tu pantalla hasta que lo quites")

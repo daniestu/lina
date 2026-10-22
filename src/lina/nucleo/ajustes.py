@@ -51,6 +51,9 @@ ESQUEMA: dict = {
         "velocidad": (1.0, "float", (0.5, 2.0), N_("Velocidad al hablar: 1 normal, 1.2 más rápida, 0.8 más lenta.")),
         "residente": (True, "bool", None, N_("true: la voz de Piper se mantiene cargada en un proceso aparte (se cierra sola tras 10 minutos sin hablar) y las frases salen "
                       "sin la espera de cargarla cada vez; si falla, se usa el método de siempre. Ocupa algo de memoria mientras está cargada.")),
+        "reconocimiento_procesador": ("auto", "opcion", ("auto", "cuda", "cpu"), N_("Dónde se entiende lo que dices: auto (la tarjeta NVIDIA si está lista, con  lina modelos gpu; si no, la CPU), cuda o cpu. "
+                                    "En la tarjeta el modelo ocupa unos 2,4 GB de VRAM mientras Lina está abierta: pon cpu si juegas justo de memoria de vídeo.")),
+        "reconocimiento_modelo": ("auto", "texto", None, N_("Modelo de Whisper. auto: «large-v3-turbo» en la tarjeta o «small» en la CPU. Otros: medium, large-v3… (deben estar bajados).")),
     },
     "memoria": {
         "usar": (True, "bool", None, N_("true: Lina tiene en cuenta lo que le pediste recordar («recuerda que mi juego favorito es…») cuando viene al caso. false: sigue guardado pero no lo usa. Se ve y se borra con:  lina memoria")),
