@@ -155,13 +155,13 @@ def hay_ollama(url=OLLAMA, http=requests):
         return None
 
 
-def corregir_con_ollama(modelo, texto, ordenes, vocabulario, cpu=False, url=OLLAMA, http=requests, mantener="3m"):
+def corregir_con_ollama(modelo, texto, ordenes, vocabulario, cpu=False, url=OLLAMA, http=requests, mantener="3m", sistema=None):
     opciones = {"temperature": 0, "num_predict": 120}
     if cpu:
         opciones["num_gpu"] = 0
     r = http.post(f"{url}/api/chat", timeout=120, json={
         "model": modelo, "stream": False, "format": "json", "keep_alive": mantener, "options": opciones,
-        "messages": [{"role": "system", "content": SISTEMA}, {"role": "user", "content": prompt_usuario(texto, ordenes, vocabulario)}]})
+        "messages": [{"role": "system", "content": sistema or SISTEMA}, {"role": "user", "content": prompt_usuario(texto, ordenes, vocabulario)}]})
     r.raise_for_status()
     import json
     contenido = r.json()["message"]["content"]
