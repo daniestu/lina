@@ -146,7 +146,12 @@ def transcribir_todo(lista, rutas, cargar, pista):
     return textos, sum(tiempos) / len(tiempos)
 
 
-def informe(condiciones, ollama, ejemplos):
+def fallos_whisper(lista, textos):
+    """Lo que Whisper solo no deja idéntico: (dijiste, oyó, ¿era orden rápida?, ¿Lina la entiende igual aun así?)."""
+    return [(f, t, d, d and entiende_igual(f, t)) for (f, d), t in zip(lista, textos) if not PV.acierta(f, t)]
+
+
+def informe(condiciones, ollama, ejemplos, fallos=()):
     L = [T("PRUEBA GRANDE · lo que importa es si Lina entiende la orden"), ""]
     for nombre, base in condiciones:
         L.append(T("{nombre}: {n} frases · Whisper solo: texto idéntico {a}/{n}, órdenes rápidas entendidas {b}/{c}, órdenes rápidas falsas {d}",
@@ -159,6 +164,9 @@ def informe(condiciones, ollama, ejemplos):
             continue
         vram = f"{f['vram_mb']} MB" if f.get("vram_mb") is not None else "-"
         L.append(f"{etiqueta:<44}{f['texto_ok']:>9}{f['directa_ok']:>9}{f['directa_falsa']:>8}{f['arregla']:>9}{f['estropea']:>10}{f['media_s']:>7.2f} s{vram:>9}")
+    for nombre, filas in fallos:
+        L += ["", T("DÓNDE FALLA WHISPER SOLO ({nombre}):  [orden] = orden rápida; ✓ = Lina la entiende igual, ✗ = no", nombre=nombre)]
+        L += [f"   {'[orden] ' + ('✓' if ok else '✗') if d else '[otra]  '}  «{f}» → «{t}»" for f, t, d, ok in filas]
     for titulo, filas in ejemplos:
         if filas:
             L += ["", titulo] + [f"   «{a}» → «{d}»" for a, d in filas[:12]]
@@ -179,19 +187,22 @@ def principal(argv, salida=print, entrada=input, cargar=MAS._cargar_gpu, http=MA
     for a in argv:
         if a.startswith("--modelos="):
             modelos = [m for m in a.split("=", 1)[1].split(",") if m]
-    instalados = MAS.hay_ollama(http=http)
-    if instalados is None:
-        salida(T("Ollama no responde en {url}. Arráncalo y repite.", url=MAS.OLLAMA))
-        return 1
-    tengo = {m.get("name", "") for m in instalados}
-    modelos = [m for m in modelos if m in tengo]
-    if not modelos:
-        salida(T("No tienes ninguno de esos modelos en Ollama (prueba:  ollama pull qwen2.5:3b)."))
-        return 1
+    if "--sin-ollama" in argv:
+        modelos = []
+    else:
+        instalados = MAS.hay_ollama(http=http)
+        if instalados is None:
+            salida(T("Ollama no responde en {url}. Arráncalo y repite (o usa --sin-ollama).", url=MAS.OLLAMA))
+            return 1
+        tengo = {m.get("name", "") for m in instalados}
+        modelos = [m for m in modelos if m in tengo]
+        if not modelos:
+            salida(T("No tienes ninguno de esos modelos en Ollama (prueba:  ollama pull qwen2.5:3b)."))
+            return 1
     vocabulario = MAS.vocabulario_propio()
     ordenes = ACE.ordenes_para(IDI.actual(), vocabulario)
     pista = PV._pista()
-    condiciones, ollama, ejemplos = [], [], []
+    condiciones, ollama, ejemplos, fallos = [], [], [], []
     for cond_ruido, nombre in ((False, T("en silencio")), (True, T("con ruido"))):
         idx = [i for i in range(len(lista)) if ruta(i, cond_ruido).exists()]
         if len(idx) < 20:
@@ -207,6 +218,7 @@ def principal(argv, salida=print, entrada=input, cargar=MAS._cargar_gpu, http=MA
             return 1
         base = evaluar(sub, textos)
         condiciones.append((nombre, base))
+        fallos.append((nombre, fallos_whisper(sub, textos)))
         for modelo in modelos:
             for cpu in (False, True):
                 salida(T("Ollama {modelo} en {donde} sobre {nombre}…", modelo=modelo, donde="CPU" if cpu else T("la tarjeta"), nombre=nombre))
@@ -234,7 +246,7 @@ def principal(argv, salida=print, entrada=input, cargar=MAS._cargar_gpu, http=MA
     if not condiciones:
         salida(T("No hay grabaciones suficientes. Graba con:  lina probar-voz grande"))
         return 1
-    texto = informe(condiciones, ollama, ejemplos)
+    texto = informe(condiciones, ollama, ejemplos, fallos)
     salida("\n" + texto)
     try:
         (PV.CARPETA / "informe-grande.txt").write_text(texto + "\n", encoding="utf-8")
