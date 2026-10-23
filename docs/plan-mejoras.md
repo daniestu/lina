@@ -181,12 +181,23 @@ tapado de claves; que «olvida» elimina de verdad.
 
 ---
 
+## Fase 16 — Encargar trabajos de programación a un agente externo (M, no prioritaria)
+
+Idea apuntada, sin empezar. Lina no lleva un agente de programación dentro: le encarga la tarea al que el usuario ya tenga instalado y con su propia cuenta.
+
+- **Camino elegido**: conectar por MCP (Lina ya tiene el grupo `mcp`). Claude Code puede ofrecerse como servidor MCP (`claude mcp serve`); hay que comprobar con la versión instalada que lo permite y qué herramientas expone. Alternativa si no: lanzarlo como programa con su modo sin pantalla (`claude -p`, `codex exec`).
+- **Neutral**: ajuste para elegir qué agente; nada de atarse a uno. No se incluye en Lina (Claude Code es propietario y el proyecto es AGPL): solo se llama al instalado.
+- **Seguridad**: apagado por defecto, limitado a una carpeta, confirmación con el atajo antes de empezar, lo que lea de webs o archivos se trata como datos y su propio código y ajustes quedan fuera de su alcance.
+- **Voz**: tareas largas en segundo plano con aviso al terminar.
+- **Privacidad y coste**: el código que toque sale al proveedor y gasta de su cuenta; se explica antes de activarlo.
+
 ## Orden y entregas
 
 1. **11** (rápida) y a continuación **12** (la que más cambia la experiencia), por partes: 12.1–12.2 primero con *abrir app* y *volumen*, probar en tu equipo y luego
    ampliar.
 2. **13** puede ir en paralelo a 12 si prefieres alternar.
 3. **14** y **15** al final, cuando haya demanda real.
+4. **16** cuando todo lo anterior esté probado y la voz funcione bien.
 
 Versión sugerida: `0.2.0-beta` al cerrar la fase 12 y la 13.
 
