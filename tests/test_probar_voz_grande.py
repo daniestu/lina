@@ -87,7 +87,7 @@ def test_principal_medir_con_motores_falsos(tmp_path, monkeypatch):
         def post(self, url, json=None, timeout=None):
             return Respuesta({"message": {"content": '{"texto": "Pausa"}'}})
     dicho = []
-    assert G.principal(["medir", "--modelos=qwen2.5:3b"], salida=dicho.append, cargar=cargar, http=Http()) == 0
+    assert G.principal(["medir", "--ollama", "--modelos=qwen2.5:3b"], salida=dicho.append, cargar=cargar, http=Http()) == 0
     todo = "\n".join(dicho)
     assert "PRUEBA GRANDE" in todo and "qwen2.5:3b" in todo and "solo si no es orden" in todo
     assert (tmp_path / "pv" / "informe-grande.txt").exists()
@@ -104,3 +104,45 @@ def test_un_programa_mal_oido_cuenta_si_lina_lo_llevaria_al_mismo(monkeypatch):
     monkeypatch.setattr(G.C, "buscar_app", lambda n, apps=None: [(80, {"nombre": "Kate"})] if "cate" in n.lower() or "kate" in n.lower() else [])
     assert G.entiende_igual("Abre Kate", "Abre el Cate.")
     assert not G.entiende_igual("Abre Kate", "Abre fær, fóks.")
+
+
+def test_las_tandas_se_descubren_y_se_nombran(tmp_path, monkeypatch):
+    monkeypatch.setattr(PV, "CARPETA", tmp_path / "pv")
+    for nombre in ("grande", "grande-ruido", "grande-ruido-bajando20", "grande-ruido-bajando0", "otra"):
+        (tmp_path / "pv" / nombre).mkdir(parents=True)
+    assert [t[0] for t in G.tandas_grabadas()] == ["grande", "grande-ruido", "grande-ruido-bajando0", "grande-ruido-bajando20"]
+    assert G.nombre_carpeta(True, 20) == "grande-ruido-bajando20" and G.nombre_carpeta(True) == "grande-ruido" and G.nombre_carpeta() == "grande"
+    assert "20 %" in G.etiqueta_de("grande-ruido-bajando20") and G.etiqueta_de("grande") == "en silencio"
+
+
+def test_grabar_bajando_baja_al_empezar_y_devuelve_al_terminar(tmp_path, monkeypatch):
+    monkeypatch.setattr(PV, "CARPETA", tmp_path / "pv")
+    monkeypatch.setattr(G.time, "sleep", lambda s: None)
+    eventos = []
+
+    class Atenuador:
+        def bajar(self, dueno):
+            eventos.append("bajar")
+
+        def subir(self, dueno, todos=False):
+            eventos.append("subir_todos" if todos else "subir")
+
+    def grabar(entrada=None, salida=None):
+        entrada("pulsa")
+        eventos.append("grabando")
+        entrada("termina")
+        return np.ones(PV.FRECUENCIA, dtype="float32") * 0.1
+    g = G.grabar_bajando(20, grabar, atenuador=Atenuador())
+    g(entrada=lambda m: "", salida=lambda m: None)
+    assert eventos == ["bajar", "grabando", "subir", "subir_todos"]
+    # y si la grabación se corta, el sonido se devuelve igual
+    eventos.clear()
+
+    def corta(entrada=None, salida=None):
+        entrada("pulsa")
+        raise KeyboardInterrupt
+    try:
+        G.grabar_bajando(20, corta, atenuador=Atenuador())(entrada=lambda m: "", salida=lambda m: None)
+    except KeyboardInterrupt:
+        pass
+    assert eventos[-1] == "subir_todos"

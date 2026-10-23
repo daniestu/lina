@@ -3,20 +3,25 @@
 """`lina probar-voz grande`: la prueba de verdad, con unas 100 frases tuyas, para saber si un corrector local (Ollama) sirve.
 
   lina probar-voz grande            graba las frases que falten (se puede parar con Ctrl+C y seguir otro día)
-  lina probar-voz grande --ruido    lo mismo con música o una serie sonando, que es cuando más falla
-  lina probar-voz grande medir      pasa tus grabaciones por Whisper y por Ollama y cuenta de verdad lo que se arregla y lo que se estropea
+  lina probar-voz grande --ruido    lo mismo con música sonando, sin tocar su volumen (el peor caso)
+  lina probar-voz grande --bajando[=N]   lo mismo con música, pero bajándola a N % al hablar, como hace Lina de verdad (N por defecto: tu ajuste, 20)
+  lina probar-voz grande medir      pasa todas tus grabaciones por Whisper y cuenta lo que se entiende en cada situación
+  lina probar-voz grande medir --ollama   además prueba modelos de Ollama como corrector (en las pruebas no sirvieron)
 
 Lo que se mide es lo que importa: ¿Lina entiende la orden? Para las órdenes rápidas se mira si `directas` las reconoce igual que si las hubiera
 escrito bien, y qué pasa con y sin corrector; para el resto, si el texto sale idéntico. Con los textos reales de Whisper, no con errores inventados."""
+import re
 import time
 
 from lina.nucleo import acercar as ACE
+from lina.nucleo import ajustes as AJ
 from lina.nucleo import comandos as C
 from lina.nucleo import directas as DIR
 from lina.nucleo import idioma as IDI
 from lina.nucleo import probar_voz as PV
 from lina.nucleo import probar_voz_mas as MAS
 from lina.nucleo.idioma import T
+from lina.voz import atenuador as ATE
 
 # Órdenes que Lina hace sin llamar a la IA (`directas`): se mide si las reconoce.
 DIRECTAS_ES = [
@@ -63,24 +68,83 @@ def frases():
     return salida
 
 
-def carpeta(ruido=False):
-    return PV.CARPETA / ("grande-ruido" if ruido else "grande")
+def nombre_carpeta(ruido=False, nivel=None):
+    if nivel is not None:
+        return f"grande-ruido-bajando{int(nivel)}"
+    return "grande-ruido" if ruido else "grande"
 
 
-def ruta(i, ruido=False):
-    return carpeta(ruido) / f"frase{i + 1:03d}.wav"
+def carpeta(ruido=False, nivel=None):
+    return PV.CARPETA / nombre_carpeta(ruido, nivel)
 
 
-def grabar_todas(ruido=False, grabar=PV.grabar_una, salida=print, entrada=input):
+def ruta(i, ruido=False, nivel=None):
+    return carpeta(ruido, nivel) / f"frase{i + 1:03d}.wav"
+
+
+def etiqueta_de(nombre):
+    """Cómo se llama en el informe cada tanda grabada."""
+    m = re.fullmatch(r"grande-ruido-bajando(\d+)", nombre)
+    if m:
+        return T("con ruido bajando al {n} %", n=m.group(1))
+    return T("con ruido") if nombre == "grande-ruido" else T("en silencio")
+
+
+def tandas_grabadas():
+    """[(nombre_de_carpeta, ruido, nivel)] de lo que hay grabado, en silencio primero."""
+    salida = []
+    if not PV.CARPETA.exists():
+        return salida
+    for d in sorted(PV.CARPETA.iterdir()):
+        m = re.fullmatch(r"grande(?:-ruido(?:-bajando(\d+))?)?", d.name)
+        if d.is_dir() and m:
+            salida.append((d.name, d.name != "grande", int(m.group(1)) if m.group(1) else None))
+    salida.sort(key=lambda x: (x[1], x[2] is not None, x[2] or 0))
+    return salida
+
+
+def grabar_bajando(nivel, grabar=PV.grabar_una, atenuador=None):
+    """Una grabación que baja lo que suena a `nivel` % justo al empezar y lo devuelve al terminar, como hace Lina con el atajo."""
+    def _grabar(entrada=input, salida=print):
+        a = atenuador or ATE.Atenuador(nivel=nivel, log=lambda m: None)
+        paso = {"n": 0}
+
+        def entrada_con_bajada(mensaje):
+            r = entrada(mensaje)
+            paso["n"] += 1
+            try:
+                if paso["n"] == 1:
+                    a.bajar("prueba")
+                    time.sleep(0.2)
+                elif paso["n"] == 2:
+                    a.subir("prueba")
+            except Exception:
+                pass
+            return r
+        try:
+            return grabar(entrada=entrada_con_bajada, salida=salida)
+        finally:
+            try:
+                a.subir("prueba", todos=True)
+            except Exception:
+                pass
+    return _grabar
+
+
+def grabar_todas(ruido=False, grabar=PV.grabar_una, salida=print, entrada=input, nivel=None):
     lista = frases()
-    if ruido:
-        salida(T("Pon música o una serie sonando con el volumen que sueles tener, y habla como lo haces siempre."))
-    hechas = sum(1 for i in range(len(lista)) if ruta(i, ruido).exists())
+    if nivel is not None:
+        ruido = True
+        grabar = grabar_bajando(nivel, grabar)
+        salida(T("Pon música sonando con el volumen que sueles tener. Al empezar a grabar se bajará a un {n} % y al terminar volverá.", n=int(nivel)))
+    elif ruido:
+        salida(T("Pon música sonando con el volumen que sueles tener, y habla como lo haces siempre."))
+    hechas = sum(1 for i in range(len(lista)) if ruta(i, ruido, nivel).exists())
     if hechas:
         salida(T("Ya tienes {n} de {total} grabadas; sigo por donde lo dejaste.", n=hechas, total=len(lista)))
     try:
         for i, (frase, _) in enumerate(lista):
-            if ruta(i, ruido).exists():
+            if ruta(i, ruido, nivel).exists():
                 continue
             while True:
                 salida(T("\nFrase {n} de {total}:  «{frase}»", n=i + 1, total=len(lista), frase=frase))
@@ -88,11 +152,11 @@ def grabar_todas(ruido=False, grabar=PV.grabar_una, salida=print, entrada=input)
                 if len(audio) < PV.FRECUENCIA * 0.3:
                     salida(T("   No he oído nada; repítela."))
                     continue
-                PV.guardar_wav(ruta(i, ruido), audio)
+                PV.guardar_wav(ruta(i, ruido, nivel), audio)
                 break
     except (KeyboardInterrupt, EOFError):
         salida(T("\nParo aquí. Cuando quieras sigo por donde lo dejaste."))
-    return sum(1 for i in range(len(lista)) if ruta(i, ruido).exists())
+    return sum(1 for i in range(len(lista)) if ruta(i, ruido, nivel).exists())
 
 
 # ======================= medir =======================
@@ -188,22 +252,28 @@ def principal(argv, salida=print, entrada=input, cargar=MAS._cargar_gpu, http=MA
     if IDI.actual() != "es":
         salida(T("Esta prueba grande solo está hecha en español por ahora."))
         return 1
-    ruido = "--ruido" in argv
     lista = frases()
     if "medir" not in argv:
-        hechas = grabar_todas(ruido, grabar=grabar, salida=salida, entrada=entrada)
+        nivel, ruido = None, "--ruido" in argv
+        for a in argv:
+            if a == "--bajando" or a.startswith("--bajando="):
+                try:
+                    nivel = int(a.split("=", 1)[1]) if "=" in a else int(AJ.solo_lectura().get("sonido", "volumen_al_escuchar"))
+                except (ValueError, TypeError):
+                    nivel = 20
+                nivel = max(0, min(100, nivel))
+        hechas = grabar_todas(ruido, grabar=grabar, salida=salida, entrada=entrada, nivel=nivel)
         salida(T("\nTienes {n} de {total} grabadas. Cuando quieras medir:  lina probar-voz grande medir", n=hechas, total=len(lista)))
         return 0
-    modelos = ["qwen2.5:3b", "qwen2.5:1.5b"]
-    for a in argv:
-        if a.startswith("--modelos="):
-            modelos = [m for m in a.split("=", 1)[1].split(",") if m]
-    if "--sin-ollama" in argv:
-        modelos = []
-    else:
+    modelos = []
+    if "--ollama" in argv:
+        modelos = ["qwen2.5:3b", "qwen2.5:1.5b"]
+        for a in argv:
+            if a.startswith("--modelos="):
+                modelos = [m for m in a.split("=", 1)[1].split(",") if m]
         instalados = MAS.hay_ollama(http=http)
         if instalados is None:
-            salida(T("Ollama no responde en {url}. Arráncalo y repite (o usa --sin-ollama).", url=MAS.OLLAMA))
+            salida(T("Ollama no responde en {url}. Arráncalo y repite (o quita --ollama).", url=MAS.OLLAMA))
             return 1
         tengo = {m.get("name", "") for m in instalados}
         modelos = [m for m in modelos if m in tengo]
@@ -214,16 +284,16 @@ def principal(argv, salida=print, entrada=input, cargar=MAS._cargar_gpu, http=MA
     ordenes = ACE.ordenes_para(IDI.actual(), vocabulario)
     pista = PV._pista()
     condiciones, ollama, ejemplos, fallos = [], [], [], []
-    for cond_ruido, nombre in ((False, T("en silencio")), (True, T("con ruido"))):
-        idx = [i for i in range(len(lista)) if ruta(i, cond_ruido).exists()]
+    for carpeta_nombre, cond_ruido, cond_nivel in tandas_grabadas():
+        nombre = etiqueta_de(carpeta_nombre)
+        idx = [i for i in range(len(lista)) if ruta(i, cond_ruido, cond_nivel).exists()]
         if len(idx) < 20:
-            if idx or not cond_ruido:
-                salida(T("{nombre}: solo {n} grabaciones (hacen falta al menos 20); lo salto.", nombre=nombre, n=len(idx)))
+            salida(T("{nombre}: solo {n} grabaciones (hacen falta al menos 20); lo salto.", nombre=nombre, n=len(idx)))
             continue
         sub = [lista[i] for i in idx]
         salida(T("Whisper sobre {n} frases {nombre}…", n=len(sub), nombre=nombre))
         try:
-            textos, _ = transcribir_todo(sub, [ruta(i, cond_ruido) for i in idx], cargar, pista)
+            textos, _ = transcribir_todo(sub, [ruta(i, cond_ruido, cond_nivel) for i in idx], cargar, pista)
         except Exception as e:
             salida(T("Whisper no ha cargado en la tarjeta ({error}).", error=f"{type(e).__name__}: {str(e)[:120]}"))
             return 1
