@@ -96,15 +96,26 @@ def grabar_todas(ruido=False, grabar=PV.grabar_una, salida=print, entrada=input)
 
 
 # ======================= medir =======================
+def _app_resuelta(nombre):
+    """El programa instalado al que llevaría ese nombre (como lo haría Lina de verdad, con su parecido de sonido), o None."""
+    try:
+        r = C.buscar_app(nombre)
+    except Exception:
+        return None
+    return C.normalizar(r[0][1]["nombre"]) if r and r[0][0] >= 70 else None
+
+
 def _datos_comparables(r):
     if r is None:
         return None
     ident, datos = r
+    if ident == "abrir_app":                                      # «Torfin» y «Dolphin» son lo mismo si Lina los lleva al mismo programa
+        return ident, _app_resuelta(datos.get("nombre", "")) or C.normalizar(datos.get("nombre", ""))
     return ident, {k: C.normalizar(v) if isinstance(v, str) else v for k, v in datos.items()}
 
 
 def entiende_igual(esperada, texto):
-    """¿`directas` entiende `texto` igual que la frase bien escrita? (misma orden y mismos datos)."""
+    """¿`directas` entiende `texto` igual que la frase bien escrita? (misma orden y mismos datos; los programas, por el que Lina abriría)."""
     return _datos_comparables(DIR.entender(texto)) == _datos_comparables(DIR.entender(esperada))
 
 

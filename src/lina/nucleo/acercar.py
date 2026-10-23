@@ -5,7 +5,10 @@
 Es parecido de sonido, sin IA y sin memoria de vídeo. Corrige en dos niveles:
   1. La frase entera, si es corta y casi idéntica a una orden conocida.
   2. Palabra a palabra, solo contra el vocabulario propio (programas, juegos, términos tuyos), nunca contra el diccionario.
-Devuelve siempre lo cambiado, para poder registrarlo y para que se pueda medir cuántas veces acierta y cuántas estropea algo."""
+Devuelve siempre lo cambiado, para poder registrarlo y para que se pueda medir cuántas veces acierta y cuántas estropea algo.
+
+NO SE USA EN LINA, y no debe usarse tal cual: con tus frases reales convertía «Desconecta los auriculares» en «conecta mis auriculares» (lo contrario) y «Pausa la
+música» en «para la música». Está para las pruebas de `lina probar-voz`; cualquier corrección que entre en Lina tendrá que no poder invertir ni cambiar una acción."""
 import difflib
 import re
 

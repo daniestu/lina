@@ -98,3 +98,9 @@ def test_fallos_de_whisper_solo_dicen_si_la_orden_se_entiende_igual():
     r = G.fallos_whisper(lista, ["Renuda la música", "Pausa", "Cuéntame un chiste", "sube el volumen."])
     assert [(f, ok) for f, _, d, ok in r if d] == [("Reanuda la música", False)]
     assert [f for f, _, d, _ in r if not d] == ["Cuéntame un chiste corto"]
+
+
+def test_un_programa_mal_oido_cuenta_si_lina_lo_llevaria_al_mismo(monkeypatch):
+    monkeypatch.setattr(G.C, "buscar_app", lambda n, apps=None: [(80, {"nombre": "Kate"})] if "cate" in n.lower() or "kate" in n.lower() else [])
+    assert G.entiende_igual("Abre Kate", "Abre el Cate.")
+    assert not G.entiende_igual("Abre Kate", "Abre fær, fóks.")
