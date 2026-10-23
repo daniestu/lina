@@ -12,7 +12,7 @@ from lina.voz import voces as VOC
 from lina.nucleo.idioma import T
 
 MODELO_WHISPER = "small"                    # voz a texto en la CPU: lo que se instala siempre y a lo que se vuelve si la tarjeta falla
-MODELO_GPU = "large-v3-turbo"               # con una NVIDIA lista: más preciso y, en la tarjeta, más rápido (medido: 14/15 frente a 12/15, 0,09 s frente a 0,6 s)
+MODELO_GPU = "large-v3-turbo"               # con una NVIDIA lista: más preciso y, en la tarjeta, más rápido (medido: 14/15 frente a 12/15, 0,09 s frente a 0,6 s; con pesos int8_float16 gasta ~1 GB de VRAM y acierta igual que con float16, que gasta ~2,2 GB)
 
 
 def whisper_listo(descargar=None, modelo=None):
@@ -55,7 +55,7 @@ def elegir_whisper(cuda_usable=None, descargar=None, ajustes=None):
     elegido = MODELO_GPU if modelo == "auto" else modelo
     if not whisper_listo(descargar, elegido):
         return MODELO_WHISPER, "cpu", "int8", f"la tarjeta está lista pero falta bajar «{elegido}» (prueba  lina modelos gpu)", elegido
-    return elegido, "cuda", "float16", "tarjeta NVIDIA lista", None
+    return elegido, "cuda", "int8_float16", "tarjeta NVIDIA lista", None
 
 
 def cargar_whisper(log=print, fabrica=None, elegir=None):

@@ -70,7 +70,7 @@ class _Aj:
 
 def test_elegir_whisper_usa_la_tarjeta_solo_si_todo_esta_listo():
     esta = lambda n, **k: None                                           # noqa: E731  (el modelo está en el disco)
-    assert MOD.elegir_whisper(True, esta, _Aj())[:3] == (MOD.MODELO_GPU, "cuda", "float16")
+    assert MOD.elegir_whisper(True, esta, _Aj())[:3] == (MOD.MODELO_GPU, "cuda", "int8_float16")
     assert MOD.elegir_whisper(False, esta, _Aj())[:3] == (MOD.MODELO_WHISPER, "cpu", "int8")
 
     def falta(n, **k):
@@ -82,7 +82,7 @@ def test_elegir_whisper_usa_la_tarjeta_solo_si_todo_esta_listo():
 def test_elegir_whisper_respeta_lo_que_pides():
     esta = lambda n, **k: None                                           # noqa: E731
     assert MOD.elegir_whisper(True, esta, _Aj(proc="cpu"))[:3] == (MOD.MODELO_WHISPER, "cpu", "int8")
-    assert MOD.elegir_whisper(True, esta, _Aj(modelo="medium"))[:3] == ("medium", "cuda", "float16")
+    assert MOD.elegir_whisper(True, esta, _Aj(modelo="medium"))[:3] == ("medium", "cuda", "int8_float16")
     assert "lina modelos gpu" in MOD.elegir_whisper(False, esta, _Aj(proc="cuda"))[3]
 
 

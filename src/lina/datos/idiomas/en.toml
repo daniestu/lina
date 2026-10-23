@@ -705,7 +705,7 @@
 "¿Las instalo? [s/N] " = "Shall I install them? [y/N] "
 "Instalando…" = "Installing…"
 "No he podido instalarlas; esas filas saldrán como no disponibles." = "I could not install them; those rows will show as not available."
-"Dónde se entiende lo que dices: auto (la tarjeta NVIDIA si está lista, con  lina modelos gpu; si no, la CPU), cuda o cpu. En la tarjeta el modelo ocupa unos 2,4 GB de VRAM mientras Lina está abierta: pon cpu si juegas justo de memoria de vídeo." = "Where what you say is understood: auto (the NVIDIA card if it is ready, with  lina modelos gpu; otherwise the CPU), cuda or cpu. On the card the model takes about 2.4 GB of VRAM while Lina is open: set cpu if you are tight on video memory when gaming."
+"Dónde se entiende lo que dices: auto (la tarjeta NVIDIA si está lista, con  lina modelos gpu; si no, la CPU), cuda o cpu. En la tarjeta el modelo ocupa alrededor de 1 GB de VRAM mientras Lina está abierta: pon cpu si juegas justo de memoria de vídeo." = "Where what you say is understood: auto (the NVIDIA card if it is ready, with  lina modelos gpu; otherwise the CPU), cuda or cpu. On the card the model takes about 1 GB of VRAM while Lina is open: set cpu if you are tight on video memory when gaming."
 "Listo: Lina usará la tarjeta para entenderte cuando se reinicie." = "Done: Lina will use the card to understand you once she restarts."
 "Modelo de Whisper. auto: «large-v3-turbo» en la tarjeta o «small» en la CPU. Otros: medium, large-v3… (deben estar bajados)." = "Whisper model. auto: «large-v3-turbo» on the card or «small» on the CPU. Others: medium, large-v3… (they must be downloaded)."
 "No he podido descargar el modelo ({error})." = "I could not download the model ({error})."
