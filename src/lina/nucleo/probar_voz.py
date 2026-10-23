@@ -236,6 +236,9 @@ def instalar_cuda(salida=print):
 
 
 def principal(argv, salida=print, entrada=input, grabar=grabar_una, cargador=cargar):
+    if argv[:1] == ["mas"]:
+        from lina.nucleo import probar_voz_mas
+        return probar_voz_mas.principal(argv[1:], salida=salida, entrada=entrada)
     if "borrar" in argv:
         if CARPETA.exists():
             shutil.rmtree(CARPETA, ignore_errors=True)
