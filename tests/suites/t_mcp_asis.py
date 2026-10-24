@@ -3,6 +3,11 @@
 import sys, os, json, tempfile, pathlib
 from unittest.mock import MagicMock
 casa = pathlib.Path(tempfile.mkdtemp()); os.environ["HOME"] = str(casa)
+# Aislado del equipo real: sin las carpetas XDG ni el bus de sesión de quien lo lance, y con las claves en archivo,
+# para que la prueba no escriba nada en su llavero del sistema.
+for _k in [k for k in os.environ if k.startswith("XDG_") or k == "DBUS_SESSION_BUS_ADDRESS"]:
+    del os.environ[_k]
+(casa/".config/lina").mkdir(parents=True); (casa/".config/lina/config.toml").write_text('[privacidad]\nalmacen_claves = "archivo"\n', encoding="utf-8")
 for m in ("sounddevice","faster_whisper"): sys.modules[m]=MagicMock()
 from lina.nucleo import asistente as A; from lina.nucleo import herramientas as H; from lina.nucleo import grupos as G; from lina.mcp import cliente as MC
 f=0
