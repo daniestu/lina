@@ -18,7 +18,8 @@ MODELOS_PROFUNDO = ["gemini-flash-latest", "gemini-flash-lite-latest"]  # modo "
 # Las palabras y frases que activan el modo a fondo, reinician la conversación o confirman acciones
 # están todas en comandos.txt (se editan sin reiniciar).
 PRIORIDAD = "nube"                          # "nube": Gemini siempre primero; "local": el modelo local primero si cabe en la VRAM
-VRAM_NECESARIA_MB = 8000                    # VRAM libre mínima para cargar el modelo local (solo si PRIORIDAD = "local")
+ESTIMACION_VRAM_LOCAL = 1.2                 # lo que ocupa un modelo de Ollama en la tarjeta ≈ su tamaño en disco × esto (por el contexto)
+SOLTAR_LOCAL_PLAN_B = "1m"                  # en el plan B, Ollama suelta el modelo de la tarjeta al minuto sin uso (no deja la VRAM ocupada)
 ANCHO_MAX_CAPTURA = 1280                    # la captura se reduce a este ancho antes de enviarla
 FRECUENCIA = 16000                          # frecuencia de grabación del micrófono
 OLLAMA = "http://localhost:11434"

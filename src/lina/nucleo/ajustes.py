@@ -97,6 +97,8 @@ ESQUEMA: dict = {
         "modelo_profundo": ("", "texto", None, N_("Modelo para el modo «a fondo». Vacío: el recomendado, o el rápido si no hay uno recomendado.")),
         "url_base": ("", "texto", None, N_("Solo con «openai»: dirección del servicio si no es OpenAI, p. ej. http://localhost:11434/v1 (Ollama). En local no hace falta clave.")),
         "razonamiento": (False, "bool", None, N_("Solo con «openai»: true si el modelo es de razonamiento (o3, gpt-5…) y admite indicar cuánto pensar.")),
+        "tope_vram_mb": (4096, "int", (512, 65536), N_("Lo máximo de memoria de vídeo (MB) que Lina ocupa a la vez, contando Whisper. El modelo local de reserva (Ollama) solo "
+                         "se carga si cabe dentro de este tope.")),
     },
     "gasto": {
         "tope_mensual_eur": (10.0, "float", (0.0, 100000.0), N_("Lo máximo que gastas al mes con la clave de pago, en euros.")),

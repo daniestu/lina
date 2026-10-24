@@ -132,7 +132,7 @@ from lina.nucleo.constantes import (  # noqa: F401
     MODELOS_PROFUNDO, MODELO_LOCAL, MODELO_WHISPER, NO_VE_PANTALLA, OLLAMA, PANTALLA_SESION_SEG, PAUSA_BUSQUEDA_SEG,
     PAUSA_MODELO_SEG, PLAZO_PENSAR_A_FONDO, PRIORIDAD, PROMPT_WHISPER_CARACTERES, REINTENTOS_SERVIDOR, SESION_MINUTOS,
     SIN_RESPUESTA, TIEMPO_INSISTIR_SIN_AJUSTES, TIEMPO_PENSAR_A_FONDO, TIMEOUT_CONFIRMACION, TIMEOUT_INSISTIR_SIN_AJUSTES,
-    TIMEOUT_PENSAR_A_FONDO, TIMEOUT_PRIMERA_CLAVE, TIMEOUT_PROFUNDO, VOZ, VRAM_NECESARIA_MB,
+    TIMEOUT_PENSAR_A_FONDO, TIMEOUT_PRIMERA_CLAVE, TIMEOUT_PROFUNDO, VOZ, SOLTAR_LOCAL_PLAN_B,
 )
 
 
@@ -449,7 +449,7 @@ from lina.nucleo.ia import (  # noqa: F401
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
-    vram_libre_mb,
+    cabe_modelo_local,
 )
 
 
@@ -2012,12 +2012,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.ejecutor.recetas_diferidas = []
         self.acciones_confirmadas = []
         # 1) Modelo local primero, solo si PRIORIDAD = "local" y cabe en la gráfica
-        if PRIORIDAD == "local" and puede_usar_local():
-            r = preguntar_local(pregunta, imagen, permitir_escalar=True, historial=self.historial)
-            if r and "ESCALAR" not in r.upper():
-                return r, "local"
-            if r:
-                log("El modelo local no lo ve en pantalla: paso a Gemini")
+        if PRIORIDAD == "local":
+            cabe, motivo, _ = cabe_modelo_local()
+            if not cabe:                                  # pediste lo local primero: si no se usa, que conste por qué y que la pregunta sale a la nube
+                log(f"Prioridad local, pero no uso el modelo local ({motivo}): paso a la nube ({IAC.actual().nombre})")
+            else:
+                r = preguntar_local(pregunta, imagen, permitir_escalar=True, historial=self.historial)
+                if r and "ESCALAR" not in r.upper():
+                    return r, "local"
+                if r:
+                    log("El modelo local no lo ve en pantalla: paso a Gemini")
         # 2) Gemini, del mejor al más ligero, con herramientas
         if self.clave:
             grupos = self._preparar_grupos_mcp(self.elegir_grupos(pregunta))
@@ -2043,7 +2047,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         resumen = self.resumen_de_lo_hecho()
         if resumen:
             return resumen, "código (Gemini dejó de responder tras actuar)"
-        # 3) Plan B: el local, si Gemini no responde (sin internet, límite gratuito o saturación). Sin herramientas.
+        # 3) Plan B: el local, si Gemini no responde (sin internet, límite gratuito o saturación). Sin herramientas, y solo si cabe en el tope de VRAM.
+        cabe, motivo, por_vram = cabe_modelo_local()
+        if not cabe:
+            log(f"Plan B: no uso el modelo local ({motivo})")
+            if por_vram:
+                return (T("Gemini no responde y el modelo local no cabe en la tarjeta gráfica sin pasar del límite de memoria. Inténtalo dentro de un rato."),
+                        "código (plan B sin VRAM)")
+            return SIN_RESPUESTA, "local (plan B no disponible)"
         pregunta_local = pregunta + ("\n[Nota: ahora mismo no tienes herramientas porque Gemini no responde. Si te piden una acción "
                                      "en el PC, di en una sola frase que ahora no puedes ejecutarla y que lo intente dentro de un "
                                      "rato. No des instrucciones ni comandos salvo que te los pidan.]")
@@ -2051,7 +2062,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             consulta = f"{self.contexto['nombre'] or ''} {self.pregunta_pura}".strip()
             pregunta_local = f"{pregunta_local}\n\n{buscar_tavily(consulta)}"
         r = preguntar_local(pregunta_local, imagen, permitir_escalar=False, historial=self.historial,
-                            datos_sistema=H.hechos_sistema())
+                            datos_sistema=H.hechos_sistema(), soltar_en=SOLTAR_LOCAL_PLAN_B)      # que no deje la VRAM ocupada después
         return (r or SIN_RESPUESTA), "local (plan B)"
 
     def decir(self, texto):

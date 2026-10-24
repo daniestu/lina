@@ -120,6 +120,7 @@ dices, así que por voz exige el atajo (o se hace en la terminal).
 | `modelo_profundo` | `""` | Modelo para el modo «a fondo». Vacío: el recomendado, o el rápido si no hay recomendado. |
 | `url_base` | `""` | Solo con `openai`: dirección del servicio si no es OpenAI, p. ej. `http://localhost:11434/v1` (Ollama). En local no hace falta clave. |
 | `razonamiento` | `false` | Solo con `openai`: `true` si el modelo es de razonamiento y admite indicar cuánto pensar. |
+| `tope_vram_mb` | `4096` | Lo máximo de memoria de vídeo (MB) que Lina ocupa a la vez, contando Whisper en la tarjeta. El modelo local de reserva (Ollama, cuando Gemini no responde) solo se carga si cabe dentro de este tope y hay esa memoria libre; sin tarjeta gráfica usa la CPU, y con una tarjeta cuya memoria no se puede leer no se carga. |
 
 ### [gasto] Gasto con la clave de pago
 

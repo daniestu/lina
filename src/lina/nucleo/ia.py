@@ -4,13 +4,13 @@
 mini-consultas que entienden si dices «sí» o interrumpes. Aquí no hay nada de audio ni de ejecución de herramientas."""
 import json
 import re
-import subprocess
 import threading
 import time
 from urllib.parse import urlparse
 
 import requests
 
+from lina.nucleo import ajustes as AJ
 from lina.nucleo import claves as CL
 from lina.nucleo import herramientas as H
 from lina.nucleo import ia_activa as IAC
@@ -22,40 +22,69 @@ from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
 from lina.nucleo.constantes import (BUSQUEDA, ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
                                     MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, PAUSA_RED_SEG, TIMEOUT_REVISOR, REINTENTOS_SERVIDOR,
-                                    TIMEOUT_CONFIRMACION, VRAM_NECESARIA_MB)
+                                    TIMEOUT_CONFIRMACION, ESTIMACION_VRAM_LOCAL)
 from lina.nucleo.opcionales import PRES
 from lina.nucleo.registro import log
 from lina.nucleo.turnos import HERRAMIENTAS_META
 
+def _ollama_mb(ruta, campo):
+    """MB que dice Ollama del modelo local en /api/ps (lo que ocupa cargado: `size_vram`) o /api/tags (su tamaño en disco: `size`); None si no está o no contesta."""
+    try:
+        modelos = requests.get(f"{OLLAMA}{ruta}", timeout=2).json().get("models", [])
+    except (requests.RequestException, ValueError, AttributeError):
+        return None
+    for m in modelos:
+        if MODELO_LOCAL in (m.get("name"), m.get("model")) and isinstance(m.get(campo), (int, float)):
+            return m[campo] / 1e6
+    return None
+
+
 def modelo_local_cargado():
-    """¿Está ya el modelo local en la gráfica? (entonces no necesita VRAM extra)"""
-    try:
-        cargados = requests.get(f"{OLLAMA}/api/ps", timeout=2).json().get("models", [])
-        return any(MODELO_LOCAL in (m.get("name"), m.get("model")) for m in cargados)
-    except (requests.RequestException, ValueError):
-        return False
+    """¿Está ya el modelo local cargado en Ollama? (entonces no ocupa VRAM nueva)"""
+    return _ollama_mb("/api/ps", "size_vram") is not None
 
 
-def vram_libre_mb():
-    try:
-        salida = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5).stdout
-        return int(salida.split()[0])
-    except (subprocess.SubprocessError, ValueError, IndexError, FileNotFoundError):
-        return 0
+def cabe_modelo_local(tope_mb=None, memoria=None, whisper_mb=None):
+    """¿Se puede usar el modelo local sin pasar del tope de VRAM de Lina (ia.tope_vram_mb, contando Whisper)? → (sí/no, motivo, por_vram).
+    Ya cargado: sí. Sin tarjeta: sí (Ollama usa la CPU). Con tarjeta que se puede medir (NVIDIA, AMD): solo si lo que ocupará + Whisper cabe en el tope y hay
+    esa memoria libre. Con tarjeta que no se puede medir: no. `por_vram` dice si el no es por la memoria de vídeo (y no porque Ollama no esté)."""
+    if modelo_local_cargado():
+        return True, f"{MODELO_LOCAL} ya está cargado", False
+    if memoria is None:
+        try:
+            from lina.modulos import gpu as GPU
+            memoria = GPU.memoria_libre()
+        except Exception as e:                         # sin el módulo de la tarjeta (o si falla) no se sabe medir: lo prudente es no cargar
+            memoria = ("ilegible", None)
+            log(f"Modelo local: no he podido leer la tarjeta gráfica ({e!r})")
+    estado, libre = memoria
+    if estado == "sin_tarjeta":
+        return True, "sin tarjeta gráfica: Ollama usará la CPU", False
+    if estado != "medible":
+        return False, "hay tarjeta gráfica pero no puedo leer cuánta memoria le queda", True
+    tamano = _ollama_mb("/api/tags", "size")
+    if tamano is None:
+        return False, f"Ollama no contesta o no tiene {MODELO_LOCAL}", False
+    if tope_mb is None:
+        tope_mb = AJ.actuales(log=lambda m: None).get("ia", "tope_vram_mb")
+    if whisper_mb is None:
+        from lina.nucleo import modelos as MOD
+        whisper_mb = MOD.vram_whisper_mb()
+    necesita = tamano * ESTIMACION_VRAM_LOCAL
+    if necesita + whisper_mb > tope_mb:
+        return False, (f"{MODELO_LOCAL} necesita ~{necesita:.0f} MB y con Whisper ({whisper_mb:.0f} MB) pasaría del tope de {tope_mb:.0f} MB (ia.tope_vram_mb)"), True
+    if necesita > libre:
+        return False, f"{MODELO_LOCAL} necesita ~{necesita:.0f} MB y la tarjeta solo tiene {libre:.0f} MB libres", True
+    return True, f"{MODELO_LOCAL} cabe (~{necesita:.0f} MB + Whisper {whisper_mb:.0f} MB, tope {tope_mb:.0f} MB)", False
 
 
 def puede_usar_local():
-    if modelo_local_cargado():
-        log("Modelo local ya cargado en la gráfica")
-        return True
-    libre = vram_libre_mb()
-    log(f"VRAM libre: {libre} MB (necesita {VRAM_NECESARIA_MB})")
-    return libre >= VRAM_NECESARIA_MB
+    cabe, motivo, _ = cabe_modelo_local()
+    log(f"Modelo local: {'lo uso' if cabe else 'no lo uso'} ({motivo})")
+    return cabe
 
 
-def preguntar_local(pregunta, imagen, permitir_escalar, historial=(), datos_sistema=""):
+def preguntar_local(pregunta, imagen, permitir_escalar, historial=(), datos_sistema="", soltar_en="10m"):
     sistema = instrucciones() + (INSTRUCCION_LOCAL if permitir_escalar else "")
     if datos_sistema:
         sistema += (f"\n\nDATOS DEL SISTEMA DEL USUARIO (es {PL.detectar()['distro']}: no recomiendes comandos, paquetes ni programas "
@@ -71,7 +100,7 @@ def preguntar_local(pregunta, imagen, permitir_escalar, historial=(), datos_sist
         r = requests.post(f"{OLLAMA}/api/chat", timeout=90, json={
             "model": MODELO_LOCAL,
             "stream": False,
-            "keep_alive": "10m",  # se descarga de la gráfica tras 10 min sin uso
+            "keep_alive": soltar_en,  # se descarga de la gráfica tras este tiempo sin uso
             "messages": mensajes,
             "options": {"temperature": 0.2},
         })

@@ -174,6 +174,24 @@ def leer(gpu):
     return {"nvidia": _leer_nvidia, "amd": _leer_amd, "intel": _leer_intel}[gpu["fabricante"]](gpu)
 
 
+def memoria_libre(raiz=None):
+    """Para decidir si cabe un modelo local: ('sin_tarjeta', None) si no hay ninguna GPU (Ollama usaría la CPU); ('medible', MB libres) con la tarjeta que
+    más memoria libre tiene; o ('ilegible', None) si hay tarjeta pero no se puede saber cuánta memoria le queda (p. ej. una Intel integrada)."""
+    gpus = detectar(raiz)
+    if not gpus:
+        return "sin_tarjeta", None
+    libres = []
+    for g in gpus:
+        try:
+            m = leer(g)
+        except Exception:
+            continue
+        usada, total = m.get("vram_usada_mb"), m.get("vram_total_mb")
+        if usada is not None and total:
+            libres.append(total - usada)
+    return ("medible", max(libres)) if libres else ("ilegible", None)
+
+
 def _fmt(valor, unidad, decimales=0):
     return "?" if valor is None else f"{valor:.{decimales}f} {unidad}"
 

@@ -58,14 +58,27 @@ def elegir_whisper(cuda_usable=None, descargar=None, ajustes=None):
     return elegido, "cuda", "int8_float16", "tarjeta NVIDIA lista", None
 
 
+VRAM_WHISPER_MB = {"int8_float16": 1100, "float16": 2300}     # lo que ocupa Whisper en la tarjeta (medido con large-v3-turbo; con margen)
+_en_tarjeta = {"mb": 0}
+
+
+def vram_whisper_mb():
+    """MB de VRAM que ocupa el Whisper cargado (0 si está en la CPU): cuenta para el tope de VRAM de Lina (ia.tope_vram_mb)."""
+    return _en_tarjeta["mb"]
+
+
 def cargar_whisper(log=print, fabrica=None, elegir=None):
     """Carga Whisper como toca. Si la tarjeta falla al cargar, vuelve a `small` en la CPU y lo cuenta: poder hablar con Lina pesa más que ir rápido."""
     if fabrica is None:
         from faster_whisper import WhisperModel as fabrica
     modelo, proc, calculo, motivo, _ = (elegir or elegir_whisper)()
     log(f"Cargando Whisper ({modelo}, {'tarjeta gráfica' if proc == 'cuda' else 'CPU'}): {motivo}...")
+    _en_tarjeta["mb"] = 0
     try:
-        return fabrica(modelo, device=proc, compute_type=calculo)
+        cargado = fabrica(modelo, device=proc, compute_type=calculo)
+        if proc == "cuda":
+            _en_tarjeta["mb"] = VRAM_WHISPER_MB.get(calculo, max(VRAM_WHISPER_MB.values()))
+        return cargado
     except Exception as e:
         if (modelo, proc) == (MODELO_WHISPER, "cpu"):
             raise
