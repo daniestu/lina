@@ -18,7 +18,7 @@ def test_acerca_frases_cortas_a_una_orden():
 
 
 def test_no_toca_lo_que_ya_esta_bien_ni_lo_que_no_se_parece():
-    for frase in ("Sube el volumen", "pon música", "Escribe una nota para mañana con la lista de la compra", "Dime qué tiempo hace en Madrid"):
+    for frase in ("Sube el volumen", "pon música", "Escribe una nota para mañana con la lista de la compra", "Dime qué tiempo hace en Zaragoza"):
         assert A.acercar(frase, ORDENES, VOCAB) == (frase, [])
 
 

@@ -38,10 +38,10 @@ ERRORES = {
 }
 # Frases largas y normales, sin ningún fallo: sirven para ver cuánto estropea cada ayuda lo que ya estaba bien.
 CONTROL = {
-    "es": ["Escribe una nota para mañana con la lista de la compra", "Dime qué tiempo hace en Madrid esta tarde", "Busca una receta de pasta con tomate y albahaca",
+    "es": ["Escribe una nota para mañana con la lista de la compra", "Dime qué tiempo hace en Zaragoza esta tarde", "Busca una receta de pasta con tomate y albahaca",
            "Cambia el fondo de pantalla por una foto de montañas", "Mira si hay actualizaciones pendientes en el sistema",
            "Quiero que me expliques cómo funciona la memoria de vídeo", "Abre la carpeta de descargas y ordena los archivos por fecha"],
-    "en": ["Write a note for tomorrow with the shopping list", "Tell me what the weather is like in Madrid this afternoon"],
+    "en": ["Write a note for tomorrow with the shopping list", "Tell me what the weather is like in Zaragoza this afternoon"],
 }
 
 

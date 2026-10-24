@@ -63,7 +63,7 @@ ok("lina clave TOKEN_X" in r and len(pend)==n,"falta clave: no pide confirmar, d
 r=a.herramienta_mcp_servidores({"accion":"anadir","nombre":"gh","url":"http://127.0.0.1:9/mcp","cabeceras":["Authorization=Bearer ghp_abcdefghijklmnopqrstu"]})
 ok("No escribas claves" in r,"clave real rechazada")
 import subprocess
-subprocess.run([sys.executable,"-m","lina","clave","TOKEN_X"],input="secreto123\n",text=True,capture_output=True)
+subprocess.run([sys.executable,"-m","lina","clave","TOKEN_X"],input="secreto123\n",text=True,capture_output=True,start_new_session=True)  # sin terminal de control: getpass lee de la entrada y no del teclado real
 cl=casa/".config/lina/mcp_claves.env"
 ok(cl.exists() and oct(cl.stat().st_mode)[-3:]=="600","archivo 600") 
 ok(MC.expandir("Bearer ${TOKEN_X}")=="Bearer secreto123","expandir usa el archivo")

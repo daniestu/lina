@@ -36,7 +36,7 @@ DIRECTAS_ES = [
 # Frases largas o con detalle, que van a la IA. Sin números (Whisper los escribe en cifras y no se podrían comparar).
 LARGAS_ES = [
     "Pon música", "Pon música de Queen", "Pon la canción Bohemian Rhapsody de Queen", "Búscame una receta de tortilla de patatas", "Abre Firefox y busca recetas de tortilla",
-    "Dime qué tiempo hace en Madrid esta tarde", "Escribe una nota para mañana con la lista de la compra", "Recuérdame llamar a mi madre dentro de una hora",
+    "Dime qué tiempo hace en Zaragoza esta tarde", "Escribe una nota para mañana con la lista de la compra", "Recuérdame llamar a mi madre dentro de una hora",
     "Pon un temporizador de un minuto", "Cuántos juegos tengo instalados en Steam", "Cómo va la gráfica", "Está bien mi equipo para jugar",
     "Cambia el fondo de pantalla por una foto de montañas", "Activa el modo oscuro", "Mira si hay actualizaciones pendientes en el sistema",
     "Cuánta memoria RAM estoy usando ahora mismo", "Cuánto espacio libre me queda en el disco", "Cierra todas las ventanas de Firefox",
