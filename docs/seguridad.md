@@ -16,6 +16,7 @@ Principios:
    `comandos.txt`) y solo con el atajo: ni una web con instrucciones escondidas ni una voz de fondo pueden volver a abrir la pantalla.
    Lo mismo con los **alias de voz** («cuando oigas cait quiero decir Kate»), que cambian cómo se entienden tus órdenes desde ese momento: la IA solo
    puede listarlos; apuntarlos lo hace el código ante tu frase y solo con el atajo, y olvidarlos también por «Oye Lina».
+   Y con la **memoria de preferencias**: «recuerda que…» solo se apunta con el atajo; «olvida lo de…» y «¿qué recuerdas de mí?» valen también por «Oye Lina».
 7. **Las claves** viven en el llavero del sistema (o en un archivo con permisos 600) y la IA no puede leerlas ni editarlas; ninguna sale en el registro.
 8. **Privilegios mínimos**: ver «Privilegios» más abajo. Lina nunca ve tu contraseña de administrador.
 

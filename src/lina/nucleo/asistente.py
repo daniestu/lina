@@ -945,6 +945,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         recuerdo = MEM.entender(pregunta)
         if recuerdo and C.entender_alias(pregunta) is None:     # «recuerda que mi juego favorito es…», «olvida lo de…», «¿qué recuerdas de mí?»: lo hace el código, la IA no escribe en la memoria
             log(f"Memoria: {recuerdo[0]}")
+            if recuerdo[0] == "recordar" and self.origen_voz_libre:   # apuntar solo con el atajo (otra voz no puede escribir tus preferencias); olvidar y listar, también por manos libres
+                log("Memoria: «recuerda que…» por manos libres: no se apunta (solo con el atajo)")
+                self.decir(T("Lo que me pides recordar solo lo apunto con el atajo, por si lo dijera otra voz: púlsalo y dímelo otra vez."))
+                return
             self.decir(MEM.gestionar(recuerdo))
             return
         accion = C.entender_alias(pregunta)
