@@ -2,7 +2,7 @@
 
 Para quien mantiene el proyecto. Nada de esto lo hace Lina sola: etiquetar, publicar y subir al AUR necesitan tu cuenta.
 
-## Antes de etiquetar (`v0.1.0-beta`)
+## Antes de etiquetar (el ejemplo es `v0.2.0-beta`)
 
 1. **Licencias de las voces inglesas** (`docs/creditos.md`): comprobadas para `ljspeech` y `bryce`. Si no permiten el uso, quitar la voz de
    `src/lina/voz/voces.py` o dejar el inglés fuera de la beta (`IDIOMAS = ("es",)` en `ajustes.py`).
@@ -14,17 +14,18 @@ Para quien mantiene el proyecto. Nada de esto lo hace Lina sola: etiquetar, publ
 4. `python scripts/comprobar_rastros.py` sin avisos.
 5. Probado a mano en un equipo real: `./install.sh`, `lina bienvenida`, `lina doctor --red`, hablar con el atajo, una confirmación por atajo, `lina update`,
    `lina uninstall`. Anotar en la hoja de ruta lo que falle.
-6. Versión en `pyproject.toml`: `0.1.0b1` (PEP 440) y en `CHANGELOG.md` pasar «Sin publicar» a `[0.1.0-beta] - AAAA-MM-DD`, dejando un «Sin publicar» vacío encima.
+6. Versión en `pyproject.toml` y `src/lina/__init__.py`: `0.2.0b1` (PEP 440); en `packaging/aur/PKGBUILD`, `pkgver=0.2.0b1` y `_tag=v0.2.0-beta`; y en `CHANGELOG.md` pasar «Sin publicar» a `[0.2.0-beta] - AAAA-MM-DD`, dejando un «Sin publicar» vacío encima.
 7. Cambiar el clasificador `Development Status` si procede (hoy «3 - Alpha»).
 
 ## Etiquetar
 
 ```sh
-git tag -a v0.1.0-beta -m "Lina 0.1.0-beta"
-git push origin main v0.1.0-beta
+git push origin main                       # primero el código: la etiqueta apunta a lo que ya está subido
+git tag -a v0.2.0-beta -m "Lina 0.2.0-beta"
+git push origin v0.2.0-beta
 ```
 
-En GitHub: *Releases → Draft a new release* con esa etiqueta, marcada como **pre-release**, y las notas copiadas del CHANGELOG.
+En GitHub: *Releases → Draft a new release* con esa etiqueta, marcada como **pre-release**, y las notas copiadas del CHANGELOG. Una release es una foto fija de esa etiqueta: no se actualiza sola, y quien instala con `install.sh` o `lina update` sigue la rama `main`, no la release.
 
 ## AUR
 
@@ -37,7 +38,7 @@ cp ../lina/packaging/aur/{PKGBUILD,lina-asistente.install} .
 updpkgsums                              # rellena sha256sums con el tarball de la etiqueta
 makepkg -si                             # probarlo en un Arch de verdad (y mejor en un contenedor limpio)
 makepkg --printsrcinfo > .SRCINFO
-git add PKGBUILD lina-asistente.install .SRCINFO && git commit -m "lina-asistente 0.1.0b1" && git push
+git add PKGBUILD lina-asistente.install .SRCINFO && git commit -m "lina-asistente 0.2.0b1" && git push
 ```
 
 No se ha podido probar `makepkg` desde el entorno de desarrollo, así que el `PKGBUILD` solo está comprobado en cuanto a sintaxis. `namcap PKGBUILD` ayuda a revisarlo.
