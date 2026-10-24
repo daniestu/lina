@@ -163,7 +163,7 @@ def _registrar_uso(clave, modelo, r):
             _gasto_tarea["tokens"] += r.uso[campo]
 
 
-_llamadas = []                       # (segundos, resultado) de cada llamada a la IA desde la última vez que se recogieron (para `lina tiempos`)
+_llamadas: list[tuple[float, str]] = []                       # (segundos, resultado) de cada llamada a la IA desde la última vez que se recogieron (para `lina tiempos`)
 _cerrojo_llamadas = threading.Lock()
 MAX_LLAMADAS_ANOTADAS = 30
 

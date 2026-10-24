@@ -2078,7 +2078,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         return True
 
 
-_residente = []
+_residente: list[PIPER_RES.PiperResidente] = []
 
 
 def _piper_residente():
