@@ -70,6 +70,19 @@ secret
 private browsing
 incognito
 
+# Private mode: exact phrases only. Turning it off is done by the code, only with the hotkey (never by the AI).
+[modo_privado_activar]
+turn on private mode
+
+[modo_privado_quitar]
+turn off private mode
+disable private mode
+exit private mode
+you can look at my screen now
+
+[modo_privado_estado]
+are you in private mode
+
 [profundo_frases]
 think carefully
 think hard

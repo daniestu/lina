@@ -43,8 +43,12 @@ SECCIONES = {
     "cancelar": 4,
     "profundo_peticiones_abiertas": 4,
     "ventanas_sensibles": 4,
+    "modo_privado_activar": 4,
+    "modo_privado_quitar": 4,
+    "modo_privado_estado": 4,
 }
-OPCIONALES = {"cancelar", "profundo_peticiones_abiertas", "ventanas_sensibles"}        # si tu comandos.txt es anterior y no la tiene, se usan las de fábrica sin avisar
+OPCIONALES = {"cancelar", "profundo_peticiones_abiertas", "ventanas_sensibles",       # si tu comandos.txt es anterior y no la tiene, se usan las de fábrica sin avisar
+              "modo_privado_activar", "modo_privado_quitar", "modo_privado_estado"}
 
 # ---- Valores de fábrica (se usan solo si falta una sección en comandos.txt) ----
 # @@DEFECTOS@@
@@ -262,6 +266,15 @@ DEFECTOS = {
         'mejor',
         'ni',
         'pero'],
+    'modo_privado_activar': [
+        'activa el modo privado'],
+    'modo_privado_quitar': [
+        'quita el modo privado',
+        'desactiva el modo privado',
+        'sal del modo privado',
+        'ya puedes mirar mi pantalla'],
+    'modo_privado_estado': [
+        'estás en modo privado'],
 }
 # @@FIN_DEFECTOS@@
 
@@ -430,6 +443,35 @@ def quiere_reiniciar(texto):
     """¿Has dicho «nueva conversación», «olvida lo anterior»...?"""
     solo = normalizar(texto)
     return any(_empieza(solo, e) for e in _datos()["reiniciar_conversacion"])
+
+
+_RELLENO_PRIVADO_INICIO = {"es": ("oye", "vale", "venga"), "en": ("hey", "ok", "okay")}
+_RELLENO_PRIVADO_FINAL = {"es": ("por favor", "gracias"), "en": ("please", "thanks", "thank you")}
+
+
+def entender_modo_privado(texto):
+    """«activa el modo privado», «quita el modo privado», «¿estás en modo privado?»: 'activar', 'quitar', 'estado' o None.
+    Solo frases EXACTAS de comandos.txt (con un «oye» delante o un «por favor» detrás vale): quitarlo lo decide el código, nunca la IA, así que ante
+    la duda (una negación, una pregunta, una frase larga) None y lo atiende la IA, que solo puede activarlo."""
+    solo = normalizar(texto)
+    if not solo or len(solo.split()) > 8:
+        return None
+    for relleno in IDI.segun(_RELLENO_PRIVADO_INICIO):
+        if solo.startswith(relleno + " "):
+            solo = solo[len(relleno) + 1:]
+    for relleno in IDI.segun(_RELLENO_PRIVADO_FINAL):
+        if solo.endswith(" " + relleno):
+            solo = solo[:-len(relleno) - 1]
+    datos = _datos()
+    if solo in datos["modo_privado_estado"]:
+        return "estado"
+    if "?" in str(texto) or "¿" in str(texto):          # «¿quita el modo privado?» es una pregunta, no una orden
+        return None
+    if solo in datos["modo_privado_quitar"]:
+        return "quitar"
+    if solo in datos["modo_privado_activar"]:
+        return "activar"
+    return None
 
 
 def prompt_reinicio():

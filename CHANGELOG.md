@@ -4,6 +4,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Seguridad
+- **El modo privado ya no lo puede quitar la IA.** Antes bastaba con que tu frase tuviera «ver» o «mira» («busca y mira qué tiempo hace») para que la IA pudiera quitarlo, por ejemplo empujada por una web con instrucciones escondidas. Ahora la IA solo puede activarlo, y quitarlo lo hace el código, sin IA, con una frase exacta tuya y pulsando el atajo: «quita el modo privado», «desactiva el modo privado», «sal del modo privado» o «ya puedes mirar mi pantalla» (con «Oye Lina» te pide que uses el atajo). Las negaciones, las preguntas y las frases largas no cuentan. También por código, sin gastar una llamada: «activa el modo privado» y «¿estás en modo privado?». Las frases están en `comandos.txt` (`[modo_privado_activar]`, `[modo_privado_quitar]`, `[modo_privado_estado]`); si tu copia es anterior y no las tiene, se usan las de fábrica.
+
 ### Corregido
 - **Nombres de programas famosos que Whisper oye mal** («abre feir folks» por Firefox, «abre ahí» por Brave, «Gate» por Kate, «Torfin» por Dolphin…): Lina trae de fábrica una lista de cómo suelen salir los nombres en inglés de unos 19 programas (Steam, Spotify, Discord, Telegram, Thunderbird, Krita, Inkscape, OBS, VLC…) y, justo después de «abre» o «cierra», los cambia por el nombre correcto, pero solo si el programa está instalado. Las palabras corrientes («ahí», «gate») solo se cambian si la frase acaba o sigue con «y…», y lo que tú apuntes en `alias.txt` o un programa tuyo con ese nombre manda siempre. El cambio queda en el registro.
 

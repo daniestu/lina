@@ -87,7 +87,7 @@ quiero poder
 #  Si el título o la clase de la ventana activa contiene alguna de estas palabras (sin importar mayúsculas ni tildes), la captura no
 #  viaja con tu pregunta ni se puede pedir después. Es una red de seguridad que NO depende de lo que decida la IA.
 #  Añade las tuyas (el nombre de tu banco, de tu gestor de contraseñas…). Si salta de más, borra la palabra.
-#  Aparte: puedes decir «modo privado» (o «no mires mi pantalla») y no se envía ninguna captura hasta que lo quites.
+#  Aparte: puedes pedir el modo privado (ver más abajo) y no se envía ninguna captura hasta que lo quites.
 # --------------------------------------------------------------------------------------------
 [ventanas_sensibles]
 banco
@@ -134,6 +134,26 @@ navegación privada
 private browsing
 incógnito
 incognito
+
+
+# --------------------------------------------------------------------------------------------
+#  MODO PRIVADO  (no se envía NINGUNA captura de tu pantalla hasta que lo quites; se recuerda aunque reinicies)
+#  Lo resuelve el código, sin la IA. Tiene que ser la frase EXACTA (con un «oye» delante o un «por favor» detrás vale):
+#  «no quites el modo privado», «¿quita el modo privado?» o una frase más larga no cuentan.
+#  QUITARLO solo lo haces tú, con una de estas frases y pulsando el atajo (con «Oye Lina» no, por si lo dijera otra voz).
+#  La IA puede activarlo si se lo pides con otras palabras («no mires mi pantalla»), pero nunca quitarlo.
+# --------------------------------------------------------------------------------------------
+[modo_privado_activar]
+activa el modo privado
+
+[modo_privado_quitar]
+quita el modo privado
+desactiva el modo privado
+sal del modo privado
+ya puedes mirar mi pantalla
+
+[modo_privado_estado]
+estás en modo privado
 
 
 # --------------------------------------------------------------------------------------------

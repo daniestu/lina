@@ -837,6 +837,37 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return T("Vale, ahora me llamo {nombre}. Di «Oye {nombre}».", nombre=nuevo.capitalize())
         return ""
 
+    def _poner_modo_privado(self, activo):
+        """Activa o quita el modo privado y lo recuerda en disco (aunque Lina se reinicie)."""
+        self.modo_privado = activo
+        try:
+            if activo:
+                ARCHIVO_PRIVADO.parent.mkdir(parents=True, exist_ok=True)
+                ARCHIVO_PRIVADO.write_text("1", encoding="utf-8")
+                self.captura_guardada = None
+            else:
+                ARCHIVO_PRIVADO.unlink(missing_ok=True)
+        except OSError as e:
+            log(f"No he podido recordar el modo privado: {e!r}")
+        log("Modo privado " + ("ACTIVADO" if activo else "desactivado"))
+
+    def _gestionar_modo_privado(self, accion):
+        """Las órdenes del modo privado que resuelve el código («activa / quita el modo privado», «¿estás en modo privado?»). Quitarlo solo con el atajo:
+        con «Oye Lina» podría decirlo otra voz. Devuelve lo que se dice."""
+        if accion == "estado":
+            return (T("Estoy en modo privado: no envío ninguna captura de tu pantalla.") if self.modo_privado
+                    else T("No estoy en modo privado: puedo mirar tu pantalla cuando haga falta, salvo ventanas sensibles."))
+        if accion == "activar":
+            self._poner_modo_privado(True)
+            return T("Modo privado activado: no enviaré ninguna captura de tu pantalla hasta que lo quites.")
+        if not self.modo_privado:
+            return T("No estaba en modo privado.")
+        if self.origen_voz_libre:
+            log("Quitar el modo privado por manos libres: no se hace (solo con el atajo)")
+            return T("El modo privado solo se quita con el atajo: púlsalo y dime «quita el modo privado».")
+        self._poner_modo_privado(False)
+        return T("Modo privado quitado: vuelvo a poder mirar la pantalla cuando haga falta, salvo ventanas sensibles.")
+
     def _cola(self):
         """Lo que has pedido con «además…» mientras trabajaba: se hace al terminar lo actual."""
         if getattr(self, "cola_peticiones", None) is None:
@@ -906,6 +937,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         orden_ml = ML.entender_orden(pregunta) if ML else None
         if orden_ml:                                            # «activa el manos libres», «te llamas Jarvis»…: lo hace el código, sin IA
             self.decir(self._gestionar_manos_libres(orden_ml))
+            return
+        privado = C.entender_modo_privado(pregunta)
+        if privado:                                             # «quita el modo privado»: lo hace el código, sin IA (la IA solo puede activarlo)
+            self.decir(self._gestionar_modo_privado(privado))
             return
         recuerdo = MEM.entender(pregunta)
         if recuerdo and C.entender_alias(pregunta) is None:     # «recuerda que mi juego favorito es…», «olvida lo de…», «¿qué recuerdas de mí?»: lo hace el código, la IA no escribe en la memoria
@@ -1562,25 +1597,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             self.pedir_pantalla = True
             return "Vale: se te adjuntará la captura en cuanto termines esta respuesta. No hagas nada más ahora; contesta solo con una frase corta."
         if nombre == "modo_privado":
-            activo = bool(args.get("activo"))
-            if not activo:                                # quitar la privacidad solo lo hace el usuario: lo tiene que haber pedido él en esta frase
-                dicho = C.normalizar(getattr(self, "pregunta_pura", ""))
-                if not any(w in dicho.split() for w in ("privado", "privacidad", "pantalla", "captura", "capturas", "mirar", "mira", "veas", "ver")):
-                    return "No quito el modo privado: eso solo lo hace el usuario, y no lo ha pedido en esta frase."
-            self.modo_privado = activo
-            try:
-                if activo:
-                    ARCHIVO_PRIVADO.parent.mkdir(parents=True, exist_ok=True)
-                    ARCHIVO_PRIVADO.write_text("1", encoding="utf-8")
-                    self.captura_guardada = None
-                else:
-                    ARCHIVO_PRIVADO.unlink(missing_ok=True)
-            except OSError as e:
-                log(f"No he podido recordar el modo privado: {e!r}")
-            log("Modo privado " + ("ACTIVADO" if activo else "desactivado"))
-            return ("Modo privado activado: no enviaré ninguna captura de tu pantalla hasta que me lo digas (se recuerda aunque reinicie)."
-                    + (" Ojo: en ESTA petición la captura ya iba con la pregunta." if self.pantalla_adjunta else "")) if activo else \
-                   "Modo privado desactivado: vuelvo a poder mirar la pantalla cuando haga falta (salvo ventanas sensibles)."
+            activo = args.get("activo")
+            if activo is False or str(activo).strip().lower() in ("false", "no", "0"):   # quitarlo NUNCA lo hace la IA: solo el código, ante una frase del usuario con el atajo
+                log("La IA ha intentado quitar el modo privado: no se hace")
+                return ("No quito el modo privado: eso no lo puedes hacer tú. Solo lo quita el usuario, pulsando el atajo y diciendo «quita el modo privado». "
+                        "Díselo así, en una frase.")
+            self._poner_modo_privado(True)
+            return ("Modo privado activado: no enviaré ninguna captura de tu pantalla hasta que el usuario lo quite (se recuerda aunque reinicie)."
+                    + (" Ojo: en ESTA petición la captura ya iba con la pregunta." if self.pantalla_adjunta else ""))
         if nombre in {"ventanas", "procesos", "servicios", "red", "energia", "pantalla", "audio", "kde_dbus", "gpu"}:
             return self.ejecutor.sistema(nombre, args)
         if nombre == "mangohud":

@@ -159,9 +159,10 @@ DECLARACIONES: list[dict] = [
                      "mirar_pantalla."),
      "parameters": {"type": "object", "properties": {}}},
     {"name": "modo_privado",
-     "description": ("Activa o quita el modo privado: con él activado NO se envía ninguna captura de la pantalla del usuario. Actívalo cuando pida "
-                     "privacidad («no mires mi pantalla», «modo privado», «déjame tranquilo con la pantalla»). Quitarlo solo si lo pide él."),
-     "parameters": {"type": "object", "properties": {"activo": {"type": "boolean", "description": "true para activarlo, false para quitarlo."}},
+     "description": ("Activa el modo privado: con él activado NO se envía ninguna captura de la pantalla del usuario. Actívalo cuando pida "
+                     "privacidad («no mires mi pantalla», «modo privado», «déjame tranquilo con la pantalla»). Quitarlo NO puedes: solo lo quita el "
+                     "usuario, pulsando el atajo y diciendo «quita el modo privado»; si te lo pide, díselo así."),
+     "parameters": {"type": "object", "properties": {"activo": {"type": "boolean", "description": "Siempre true (activarlo). Con false no se quita."}},
                     "required": ["activo"]}},
     {"name": "guardar_receta",
      "description": ("Apunta cómo conseguiste cambiar un ajuste CON UN COMANDO, para que la próxima vez se pruebe primero eso y no haya que descubrirlo otra "
@@ -389,7 +390,7 @@ _RECORTES = {
     "alias_de_voz": ("Apunta, borra o lista lo que la voz suele oír mal. «oido» = las palabras mal oídas TAL COMO salen en lo que dijo el usuario (hasta tres); "
                      "«significa» = lo que quería decir. Se rechaza lo que no aparezca en sus últimas frases."),
     "empezar_de_cero": "Olvida la conversación y empieza una nueva (no la uses por un simple cambio de tema).",
-    "modo_privado": "Activa o quita el modo privado (no se envía ninguna captura). Actívalo si pide privacidad; quitarlo solo si lo pide él.",
+    "modo_privado": "Activa el modo privado (no se envía ninguna captura) si pide privacidad. No puedes quitarlo: lo quita él con el atajo diciendo «quita el modo privado».",
     "ver_gasto": "Dice cuánto se ha gastado este mes con la clave de pago de Gemini y el tope. Solo consulta.",
     "buscar_ajuste_kde": "Busca en los esquemas de KDE de este equipo las claves reales de un ajuste (archivo, grupo, clave, tipo, valor por defecto y actual). Palabras en INGLÉS. Úsala antes de escribir.",
     "buscar_clave_en_binarios": "Busca claves de configuración compiladas en un programa de KDE sin esquema (palabras en INGLÉS) y enseña los grupos existentes en su archivo. Luego prueba con probar_ajuste_kde.",

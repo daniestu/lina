@@ -11,7 +11,9 @@ Principios:
    scripts de internet…).
 4. **Lo que lee de fuera es información, no órdenes** (webs, documentos, resultados de herramientas).
 5. **Todo cambio queda en un diario** y se puede deshacer; los borrados normales van a la papelera.
-6. **Sin telemetría.** Las capturas de pantalla solo se envían a la IA para responder, y existe un modo privado que las desactiva.
+6. **Sin telemetría.** Las capturas de pantalla solo se envían a la IA para responder, y existe un modo privado que las desactiva. La IA puede
+   activarlo, pero **quitarlo solo lo hace el código**, ante una frase exacta tuya («quita el modo privado», sección `[modo_privado_quitar]` de
+   `comandos.txt`) y solo con el atajo: ni una web con instrucciones escondidas ni una voz de fondo pueden volver a abrir la pantalla.
 7. **Las claves** viven en el llavero del sistema (o en un archivo con permisos 600) y la IA no puede leerlas ni editarlas; ninguna sale en el registro.
 8. **Privilegios mínimos**: ver «Privilegios» más abajo. Lina nunca ve tu contraseña de administrador.
 
