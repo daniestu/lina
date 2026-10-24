@@ -14,6 +14,8 @@ Principios:
 6. **Sin telemetría.** Las capturas de pantalla solo se envían a la IA para responder, y existe un modo privado que las desactiva. La IA puede
    activarlo, pero **quitarlo solo lo hace el código**, ante una frase exacta tuya («quita el modo privado», sección `[modo_privado_quitar]` de
    `comandos.txt`) y solo con el atajo: ni una web con instrucciones escondidas ni una voz de fondo pueden volver a abrir la pantalla.
+   Lo mismo con los **alias de voz** («cuando oigas cait quiero decir Kate»), que cambian cómo se entienden tus órdenes desde ese momento: la IA solo
+   puede listarlos; apuntarlos lo hace el código ante tu frase y solo con el atajo, y olvidarlos también por «Oye Lina».
 7. **Las claves** viven en el llavero del sistema (o en un archivo con permisos 600) y la IA no puede leerlas ni editarlas; ninguna sale en el registro.
 8. **Privilegios mínimos**: ver «Privilegios» más abajo. Lina nunca ve tu contraseña de administrador.
 

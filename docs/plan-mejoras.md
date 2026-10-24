@@ -15,7 +15,7 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 | 13 | Memoria de preferencias *(hecha: falta probarla en el equipo de Dani)* | M | — |
 | 14 | Bluetooth completo y más diagnóstico de juegos *(hecha: falta probarla en el equipo de Dani)* | S | 12 (para sus órdenes directas) |
 | 15 | GPU y energía (módulo opcional) *(hecha: falta probarla en el equipo de Dani)* | M | — |
-| 17 | Revisión de octubre de 2026: seguridad, latencia y voz, autonomía y mantenimiento *(en curso: 17.S1 hecha)* | L | — |
+| 17 | Revisión de octubre de 2026: seguridad, latencia y voz, autonomía y mantenimiento *(en curso: S1 y S2 hechas)* | L | — |
 
 Fuera del plan, a propósito: excluir monitores de las capturas (Lina captura todos), una ventana de chat con historial (Lina es de voz) y quitar las
 confirmaciones por atajo (es una decisión de seguridad, no una carencia).
@@ -217,7 +217,7 @@ Lo que ya está bien: `rm` va a la papelera; `shred`, `truncate` y `dd` sobre tu
 | # | Qué | Tamaño |
 |---|---|---|
 | S1 | **Modo privado solo por código** *(hecha)*: la IA solo puede activarlo; quitarlo, frase exacta de `comandos.txt` y solo con el atajo. | S |
-| S2 | **La IA no escribe alias de voz**: hoy `alias_de_voz` solo exige que lo oído aparezca en tus últimas frases y «significa» es libre, así que un alias inyectado («conecta = desconecta») invertiría órdenes futuras antes de llegar a `directas`. La IA solo podrá listarlos; apuntar y borrar, solo por tus frases («cuando oigas X quiero decir Y»), que ya resuelve el código. | S |
+| S2 | **La IA no escribe alias de voz** *(hecha; además, enseñar un alias solo con el atajo)*: antes `alias_de_voz` solo exige que lo oído aparezca en tus últimas frases y «significa» es libre, así que un alias inyectado («conecta = desconecta») invertiría órdenes futuras antes de llegar a `directas`. La IA solo podrá listarlos; apuntar y borrar, solo por tus frases («cuando oigas X quiero decir Y»), que ya resuelve el código. | S |
 | S3 | **VRAM antes de cargar Ollama**: el plan B (`preguntar_local` sin herramientas) carga `qwen3-vl:8b` sin mirar nada y puede pasar del tope de 4 GB junto a Whisper. Comprobar el tamaño del modelo y la VRAM libre antes; si no cabe dentro del tope, no se carga y se dice. | S |
 | S4 | **Más secretos**: añadir a la lista de credenciales `gh`, `docker`, `kube`, `.git-credentials`, historiales de shell y los perfiles de Chromium/Brave/Vivaldi (`Cookies`, `Login Data`); `env`/`printenv` pasan a tapar valores que parezcan claves. | S |
 | S5 | **Red de salida bloqueada en tareas contaminadas**: si en la tarea se ha leído contenido de fuera, los comandos que **envían** datos (las formas de la lista de arriba, `ssh` con orden remota, `socat`) se bloquean, sea cual sea el perfil. Descargar (`curl -o`, `wget` sin datos) sigue igual. Sin contenido de fuera no cambia nada. | M |

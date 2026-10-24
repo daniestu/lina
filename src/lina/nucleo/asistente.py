@@ -1275,6 +1275,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             log(f"Tiempos: fallo {e!r}")
 
     def _gestionar_alias(self, accion):
+        """«Cuando oigas cait quiero decir Kate» / «olvida el alias cait»: lo hace el código ante una frase tuya. Enseñar un alias solo con el atajo
+        (un alias cambia lo que se entiende en adelante, y con «Oye Lina» podría decirlo otra voz); olvidarlo vale también por manos libres."""
+        if accion[0] == "aprender" and self.origen_voz_libre:
+            log(f"Alias de voz (aprender) por manos libres: no se apunta «{accion[1]}» (solo con el atajo)")
+            return T("Los alias solo los apunto con el atajo, por si lo dijera otra voz: púlsalo y dímelo otra vez.")
         if accion[0] == "aprender":
             hecho, mensaje = C.guardar_alias(accion[1], accion[2])
         else:
@@ -1283,22 +1288,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         return mensaje
 
     def alias_de_voz(self, args):
-        """Herramienta de la IA: apuntar, borrar o listar lo que el reconocimiento de voz oye mal. Solo se apunta lo que el USUARIO ha dicho."""
+        """Herramienta de la IA: solo LISTAR lo que el reconocimiento de voz oye mal. Apuntar y borrar alias lo hace el código ante una frase del
+        usuario (ver _gestionar_alias): un alias inyectado por una web podría cambiar el sentido de órdenes futuras."""
         accion = H._sin_acentos(str(args.get("accion", "")).lower()).strip()
-        oido, significa = str(args.get("oido", "")), str(args.get("significa", ""))
         if accion == "listar":
             lista = C.listar_alias()
             return ("Alias apuntados: " + "; ".join(f"«{o}» = «{s}»" for o, s in lista) + ".") if lista else "No hay ningún alias apuntado."
-        if accion == "borrar":
-            return C.borrar_alias(oido)[1]
-        if accion in ("anadir", "apuntar"):
-            recientes = [self.pregunta_pura] + [h["texto"] for h in self.historial if h["rol"] == "user"][-4:]
-            buscado = " " + C.normalizar(oido) + " "
-            if not C.normalizar(oido) or not any(buscado in " " + C.normalizar(t) + " " for t in recientes if t):
-                return (f"No lo apunto: no encuentro «{oido}» en lo que ha dicho el usuario hace poco. Solo se apuntan palabras que ha dicho él; "
-                        "si quiere enseñarme una, que diga «cuando oigas X quiero decir Y».")
-            return C.guardar_alias(oido, significa)[1]
-        return "Acción no válida: usa añadir, borrar o listar."
+        if accion in ("anadir", "apuntar", "borrar", "quitar", "olvidar"):
+            return ("No lo apunto ni lo borro: los alias de voz solo los cambia el usuario, con su frase. Dile en una frase cómo: "
+                    "pulsando el atajo, «cuando oigas X quiero decir Y» para apuntarlo; u «olvida el alias X» para quitarlo.")
+        return "Acción no válida: solo puedes listar."
 
     def _resumen_de_lo_hecho(self):
         """Lo que esta tarea llegó a cambiar antes de pararla (máximo tres cosas), para contárselo al usuario."""

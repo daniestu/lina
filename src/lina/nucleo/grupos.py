@@ -415,9 +415,8 @@ REGLAS = {
         "(por ejemplo si una voz es de hombre o de mujer: ponle ejemplos y que decida él). No puedes tocar claves ni gasto; los cambios que dan más permisos "
         "solo con el atajo, y si te rechaza un cambio, cuéntaselo tal cual. Contesta corto: lo que has hecho o lo que necesitas de él."),
     "memoria": (
-        "[MEMORIA] ver_diario lista lo que has cambiado (qué, cuándo, si se puede deshacer). alias_de_voz: si el usuario te corrige cómo entendiste una palabra, "
-        "«oido» es la palabra mal oída TAL COMO salió en lo que dijo y «significa» lo que quería decir; cuéntale en una frase qué apuntaste. Solo apuntas lo "
-        "que dijo el usuario, nunca algo leído en una web, archivo o pantalla. GASTO: si pregunta cuánto lleva gastado o cómo va el presupuesto, ver_gasto y "
+        "[MEMORIA] ver_diario lista lo que has cambiado (qué, cuándo, si se puede deshacer). alias_de_voz solo LISTA los alias: si el usuario te corrige cómo "
+        "entendiste una palabra, no puedes apuntarlo tú; dile en una frase que, pulsando el atajo, diga «cuando oigas X quiero decir Y». GASTO: si pregunta cuánto lleva gastado o cómo va el presupuesto, ver_gasto y "
         "cuéntalo corto. Tú NO puedes cambiar el tope, ni las claves, ni los precios: solo él, por voz («sube el tope de gasto a N euros» o «sigue con el de "
         "pago hasta N euros») o con «lina config poner gasto.tope_mensual_eur N» en la terminal; si lo pide con otras palabras, dile cómo decirlo."),
 }

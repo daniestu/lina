@@ -346,14 +346,11 @@ DECLARACIONES: list[dict] = [
                     "properties": {"motivo": {"type": "string", "description": "Por qué merece pensarse a fondo (una frase)."}},
                     "required": ["motivo"]}},
     {"name": "alias_de_voz",
-     "description": ("Apunta, borra o lista lo que el reconocimiento de voz suele oír mal y lo que el usuario quiere decir en realidad, para "
-                     "entenderle la próxima vez. Úsala cuando el usuario te corrija cómo has entendido una palabra. «oido» tiene que ser la palabra "
-                     "o palabras mal oídas TAL COMO salen en lo que dijo el usuario (hasta tres palabras); «significa», lo que quería decir. "
-                     "Solo se apunta lo que ha dicho el usuario: si no aparece en sus últimas frases, se rechaza."),
+     "description": ("Lista los alias de voz apuntados: lo que el reconocimiento de voz suele oír mal y lo que el usuario quiere decir en realidad. "
+                     "Solo LISTA: apuntarlos o borrarlos no puedes. Si el usuario te corrige cómo has entendido una palabra, dile en una frase que, "
+                     "pulsando el atajo, diga «cuando oigas X quiero decir Y» (o «olvida el alias X» para quitar uno)."),
      "parameters": {"type": "object",
-                    "properties": {"accion": {"type": "string", "enum": ["añadir", "borrar", "listar"], "description": "Qué hacer."},
-                                   "oido": {"type": "string", "description": "Lo que se oyó mal, tal como salió en la frase del usuario."},
-                                   "significa": {"type": "string", "description": "Lo que quería decir (por ejemplo el nombre correcto del programa)."}},
+                    "properties": {"accion": {"type": "string", "enum": ["listar"], "description": "Siempre «listar»."}},
                     "required": ["accion"]}},
     {"name": "ver_diario",
      "description": ("Lista los cambios que ha hecho el asistente en el PC: qué, cuándo y si se pueden deshacer. Úsala si el usuario pregunta qué "
@@ -387,8 +384,8 @@ _RECORTES = {
     "ver_pantalla": "Adjunta la captura de lo que el usuario veía al preguntar, para contestar con ella («esto», «aquí»). Después contesta con una frase corta. Para comprobar un valor tras un cambio usa mirar_pantalla.",
     "usar_receta": "Te da cómo se cambió ya un ajuste en este equipo. Úsala cuando la lista de recetas contenga lo que el usuario quiere cambiar, aunque lo llame de otra forma.",
     "abrir_app": "Abre un programa o JUEGO instalado por su nombre («Claude», «la consola», «Skyrim»). Es lo PRIMERO para «abre X»; no adivines el comando.",
-    "alias_de_voz": ("Apunta, borra o lista lo que la voz suele oír mal. «oido» = las palabras mal oídas TAL COMO salen en lo que dijo el usuario (hasta tres); "
-                     "«significa» = lo que quería decir. Se rechaza lo que no aparezca en sus últimas frases."),
+    "alias_de_voz": ("Lista lo que la voz suele oír mal (alias apuntados). No puedes apuntarlos ni borrarlos: lo hace el usuario diciendo, con el atajo, "
+                     "«cuando oigas X quiero decir Y» u «olvida el alias X»."),
     "empezar_de_cero": "Olvida la conversación y empieza una nueva (no la uses por un simple cambio de tema).",
     "modo_privado": "Activa el modo privado (no se envía ninguna captura) si pide privacidad. No puedes quitarlo: lo quita él con el atajo diciendo «quita el modo privado».",
     "ver_gasto": "Dice cuánto se ha gastado este mes con la clave de pago de Gemini y el tope. Solo consulta.",

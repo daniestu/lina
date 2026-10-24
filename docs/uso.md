@@ -22,7 +22,7 @@ Lina entiende la intención, no frases fijas. Estos ejemplos son solo orientativ
 | Mirar la pantalla | «¿qué significa este error?», «¿dónde pulso para…?» (solo si permites las capturas: `lina privacidad`) |
 | Manejar programas por su interfaz | «pulsa Siguiente», «marca la casilla…» (requiere `lina interfaz preparar`) |
 | Sobre ella misma | «¿qué puedes hacer?», «cámbiate la voz», «llámate Jarvis», «¿cuánto he gastado de Gemini?» |
-| Corregirla | «cuando oigas cait quiero decir Kate» (para lo que oye mal), «olvida el alias cait» |
+| Corregirla | «cuando oigas cait quiero decir Kate» (para lo que oye mal; solo con el atajo), «olvida el alias cait» |
 
 ## Cómo te pide permiso
 

@@ -789,3 +789,4 @@
 "No estaba en modo privado." = "I wasn't in private mode."
 "El modo privado solo se quita con el atajo: púlsalo y dime «quita el modo privado»." = "Private mode can only be turned off with the hotkey: press it and tell me \"turn off private mode\"."
 "Modo privado quitado: vuelvo a poder mirar la pantalla cuando haga falta, salvo ventanas sensibles." = "Private mode off: I can look at the screen again when needed, except sensitive windows."
+"Los alias solo los apunto con el atajo, por si lo dijera otra voz: púlsalo y dímelo otra vez." = "I only note aliases with the hotkey, in case another voice said it: press it and tell me again."
