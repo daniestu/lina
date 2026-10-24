@@ -95,8 +95,8 @@ def test_principal_medir_con_motores_falsos(tmp_path, monkeypatch):
 
 def test_fallos_de_whisper_solo_dicen_si_la_orden_se_entiende_igual():
     lista = [("Reanuda la música", True), ("Pausa", True), ("Cuéntame un chiste corto", False), ("Sube el volumen", True)]
-    r = G.fallos_whisper(lista, ["Renuda la música", "Pausa", "Cuéntame un chiste", "sube el volumen."])
-    assert [(f, ok) for f, _, d, ok in r if d] == [("Reanuda la música", False)]
+    r = G.fallos_whisper(lista, ["Renuda la música", "Pausa", "Cuéntame un chiste", "Superlumen."])
+    assert [(f, ok) for f, _, d, ok in r if d] == [("Reanuda la música", True), ("Sube el volumen", False)]
     assert [f for f, _, d, _ in r if not d] == ["Cuéntame un chiste corto"]
 
 

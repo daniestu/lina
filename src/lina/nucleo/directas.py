@@ -55,6 +55,7 @@ def _nombre_valido(nombre):
     return not any(p in _CORTA_NOMBRE or p in _NO_ES_PROGRAMA for p in palabras)
 
 
+_VERBOS_QUE_ENCADENAN = {"abre", "abrir", "cierra", "cerrar", "lanza", "lanzar", "ejecuta", "inicia", "pon", "busca", "apaga", "enciende", "reinicia", "borra", "elimina"}
 _VENT = r"(?:esta |la |mi )?(?:ventana|aplicacion|app|programa)?(?: actual| activa)?"
 
 
@@ -108,7 +109,7 @@ def _es(n):
         return ("reproduccion", {"accion": "pausar"})
     if re.fullmatch(r"(?:para|parar|deten|detener|calla|callar|quita|quitar|apaga|apagar|cierra|cerrar)(?: me)?(?: (?:la|el|esta|esa|este))? " + _OBJ_DET, n):
         return ("reproduccion", {"accion": "detener"})
-    if re.fullmatch(r"(?:reanuda|reanudar|reanudala|reanudalo|retoma|retomar)(?: (?:la|el|esta|esa|este))?(?: " + _OBJ + r")?"
+    if re.fullmatch(r"(?:reanuda|renuda|reanudar|renudar|reanudala|reanudalo|retoma|retomar)(?: (?:la|el|esta|esa|este))?(?: " + _OBJ + r")?"
                     r"|(?:continua|continuar|sigue|seguir|continualo|continuala)(?: con)?(?: (?:la|el|esta|esa|este)) " + _OBJ
                     + r"|(?:dale|dar|dame|pulsa|pon|poner)(?: (?:al|a|el))? play|play|(?:quita|quitar) (?:la )?pausa", n):
         return ("reproduccion", {"accion": "reanudar"})
@@ -120,9 +121,9 @@ def _es(n):
                     r"|(?:vuelve|volver|retrocede|retroceder)(?: (?:a|de|la|el))* (?:cancion|pista|tema)(?: anterior)?", n):
         return ("reproduccion", {"accion": "anterior"})
     # ---- bluetooth (dispositivos ya emparejados; emparejar uno nuevo no se hace por aquí)
-    if re.fullmatch(r"(?:enciende|encender|activa|activar|pon|poner)(?: el)? bluetooth", n):
+    if re.fullmatch(r"(?:enciende|encender|entiende|activa|activar|pon|poner)(?: el)? bluetooth", n):
         return ("bluetooth", {"accion": "bluetooth_encender"})
-    m = re.fullmatch(r"(conecta|conectar|conectame|conectate|desconecta|desconectar|desconectame)(?: me)?(?: a)? ((?:(?:mis|mi|los|las|el|la|unos|unas) )?[a-z0-9 ]{3,30})", n)
+    m = re.fullmatch(r"(conecta|conectar|conectame|conectate|conecto|conectas|desconecta|desconectar|desconectame|desconecto|desconectas)(?: me)?(?: a)? ((?:(?:mis|mi|los|las|el|la|unos|unas) )?[a-z0-9 ]{3,30})", n)
     if m:
         objetivo = re.sub(r"^(?:(?:mis|mi|los|las|el|la|unos|unas)(?: |$))+", "", re.sub(r"\b(?:por )?bluetooth\b", "", m.group(2)).strip()).strip()
         if not objetivo and m.group(2).strip().endswith("bluetooth") and m.group(1).startswith("conec"):
@@ -133,8 +134,13 @@ def _es(n):
     # ---- abrir un programa
     m = re.fullmatch(r"(?:abre|abrir|abreme|abrime|lanza|lanzar|lanzame|ejecuta|ejecutar|inicia|iniciar|arranca|arrancar|pon en marcha)(?: me)? "
                      + _ARTICULOS_ES + r"(.+)", n)
-    if m and _nombre_valido(m.group(1)):
-        return ("abrir_app", {"nombre": m.group(1)})
+    if m:
+        nombre = m.group(1)
+        suelto = re.fullmatch(r"y (\S+)", nombre)                      # «ábreme y console»: Whisper cuela una «y» donde no la dijiste
+        if suelto and suelto.group(1) not in _CORTA_NOMBRE and suelto.group(1) not in _VERBOS_QUE_ENCADENAN:
+            nombre = suelto.group(1)
+        if _nombre_valido(nombre):
+            return ("abrir_app", {"nombre": nombre})
     return None
 
 
