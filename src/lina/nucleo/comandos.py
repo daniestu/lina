@@ -869,6 +869,33 @@ _NO_ES_ALIAS = {"para", "por", "con", "sin", "que", "los", "las", "una", "uno", 
                 "hay", "ese", "esa", "mis", "tus", "sus", "nos", "les", "ahora", "favor", "abre", "abrir", "cierra", "cerrar", "pon", "poner", "dime",
                 "hola", "vale", "gracias", "quiero", "puedes", "haz", "hacer", "algo", "todo", "nada", "sii", "nooo"}
 
+# Verbos de orden (infinitivo, imperativo): un alias no puede convertir uno en OTRO («conecta = desconecta», «sube = apaga el equipo»), porque cambiaría
+# lo que hace Lina cada vez que lo dices. Valen sus formas corrientes (sube, subes, subir, súbelo…); las correcciones de verdad («renuda = reanuda») pasan.
+_VERBOS_DE_ORDEN = {
+    "es": [("abrir", "abre"), ("cerrar", "cierra"), ("subir", "sube"), ("bajar", "baja"), ("conectar", "conecta"), ("desconectar", "desconecta"),
+           ("activar", "activa"), ("desactivar", "desactiva"), ("encender", "enciende"), ("apagar", "apaga"), ("borrar", "borra"), ("eliminar", "elimina"),
+           ("instalar", "instala"), ("desinstalar", "desinstala"), ("pausar", "pausa"), ("reanudar", "reanuda"), ("silenciar", "silencia"), ("poner", "pon"),
+           ("quitar", "quita"), ("reproducir", "reproduce"), ("detener", "deten"), ("reiniciar", "reinicia"), ("ejecutar", "ejecuta"),
+           ("lanzar", "lanza"), ("maximizar", "maximiza"), ("minimizar", "minimiza"), ("mover", "mueve"), ("vaciar", "vacia"), ("formatear", "formatea")],
+    "en": [(v, v) for v in ("open", "close", "start", "stop", "play", "pause", "resume", "mute", "unmute", "connect", "disconnect", "enable", "disable",
+                            "install", "uninstall", "delete", "remove", "raise", "lower", "increase", "decrease", "launch", "run", "restart", "reboot",
+                            "shutdown", "maximize", "minimize", "move", "empty", "format")],
+}
+_CLITICOS = ("melo", "mela", "telo", "tela", "selo", "sela", "los", "las", "les", "nos", "lo", "la", "le", "me", "te", "se")
+
+
+def _verbos_de_orden(texto):
+    """{infinitivo} de los verbos de orden que aparecen en `texto` (por sus formas corrientes, con o sin «lo/la/me…» pegado)."""
+    formas = {}
+    for inf, imp in _VERBOS_DE_ORDEN.get(IDI.actual(), _VERBOS_DE_ORDEN["es"]):
+        for f in (inf, imp, imp + "s", imp + "ed", imp + "ing") if IDI.actual() == "en" else (inf, imp, imp + "s"):
+            formas[f] = inf
+    hallados = set()
+    for w in normalizar(texto).split():
+        candidatas = [w] + [w[:-len(c)] for c in _CLITICOS if w.endswith(c) and len(w) - len(c) >= 3]
+        hallados |= {formas[c] for c in candidatas if c in formas}
+    return hallados
+
 
 def _leer_alias(ruta=None):
     """{oído normalizado: (oído, significa)} de alias.txt; se vuelve a leer solo si el archivo ha cambiado."""
@@ -918,6 +945,13 @@ def guardar_alias(oido, significa, ruta=None):
         return False, T("No lo he apuntado: «{palabra}» es una palabra demasiado corriente y se usaría sin querer en otras frases.", palabra=o)
     if clave == normalizar(s):
         return False, T("«{oido}» y «{significa}» ya suenan igual para mí: no hace falta apuntar nada.", oido=o, significa=s)
+    de_oido, de_significa = _verbos_de_orden(o), _verbos_de_orden(s)
+    if de_oido and de_significa - de_oido:
+        casa = str(Path.home())
+        archivo = str(ruta).replace(casa, "~", 1) if str(ruta).startswith(casa) else str(ruta)
+        return False, T("No lo he apuntado: «{oido}» y «{significa}» son órdenes distintas, y con este alias cada vez que dijeras «{oido}» haría otra cosa. "
+                        "Lo rechazo siempre que lo oído y lo que significa llevan verbos de orden distintos, aunque sean casi sinónimos. Si de verdad "
+                        "Whisper te entiende así, apúntalo tú a mano en {archivo}.", oido=o, significa=s, archivo=archivo)
     alias = _leer_alias(ruta)
     if clave not in alias and len(alias) >= MAX_ALIAS:
         return False, T("Ya hay {n} alias apuntados: borra alguno antes de añadir más.", n=MAX_ALIAS)
