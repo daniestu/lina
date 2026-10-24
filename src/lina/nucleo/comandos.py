@@ -944,6 +944,94 @@ def aplicar_alias(texto, ruta=None):
     return " ".join(salida), hechos
 
 
+# ---- Lo que Whisper suele oír cuando dices el nombre (inglés) de un programa famoso. Viene de fábrica; tus alias de alias.txt mandan sobre esto. ----
+# Solo se aplica DESPUÉS de un verbo de abrir/cerrar, sobre el nombre que le sigue, y solo si ese programa está instalado: «abre feir folks» → «abre Firefox».
+VARIANTES_OIDAS = {
+    "Firefox": ("feir folks", "feir fox", "fair fox", "fairfox", "fire fox", "feirfox", "fayer fox", "fayerfox", "faier fox", "fer fox", "fire folks", "fair folks"),
+    "Brave": ("ahi", "breif", "breiv", "breib", "brey", "breve", "brais", "bray", "breiv browser"),
+    "Kate": ("gate", "cate", "cait", "keit", "kait", "quet", "ket"),
+    "Dolphin": ("torfin", "dolfin", "dolfing", "dorfin", "tolfin", "dolfi", "dolphing", "dolfín"),
+    "Steam": ("estim", "stim", "istim", "esteam", "stiim", "estin"),
+    "Spotify": ("espotifai", "spotifai", "spotifay", "espotifay", "espotifi", "spotifi"),
+    "Discord": ("discor", "dis cord", "disco rd", "discors"),
+    "Telegram": ("telegran", "telegrama", "tele gram"),
+    "Thunderbird": ("sanderbird", "tanderbird", "thanderbird", "sunderbird", "tunderbird"),
+    "Krita": ("crita", "kreeta", "critta"),
+    "Inkscape": ("inscape", "inkescape", "ink scape", "inscaip"),
+    "Blender": ("blénder", "blender", "blendel"),
+    "Kdenlive": ("kdenlaiv", "kde enlive", "kde en live", "kdenlaib"),
+    "Lutris": ("lutri", "lutrix", "lutris"),
+    "Obsidian": ("obsidian", "obsidiana"),
+    "Chromium": ("cromium", "cromio", "cromiun"),
+    "Google Chrome": ("crom", "chrom", "gugel crom", "google crom"),
+    "OBS Studio": ("obs", "o be es", "obs estudio", "obs studio"),
+    "VLC": ("uvelece", "ve ele ce", "uve ele ce", "vlc"),
+}
+# Palabras corrientes: solo valen si lo que sigue es el final de la frase o un «y/luego» («abre ahí y busca…», no «abre ahí la carpeta»).
+_VARIANTES_AMBIGUAS = {"ahi", "breve", "gate", "cate", "ket", "quet", "crom", "obs", "telegrama"}
+_CONTINUA_ORDEN = {"y", "e", "luego", "despues", "ademas"}
+_VERBOS_PEGADOS = _VERBOS_DE_PROGRAMA | {"abreme", "lanzame", "ejecutame", "cierrame", "inicia", "iniciame"}
+
+
+def _variantes_por_oido():
+    tabla = {}
+    for destino, oidos in VARIANTES_OIDAS.items():
+        for o in oidos:
+            k = normalizar(o)
+            if k and k != normalizar(destino):
+                tabla[k] = destino
+    return tabla
+
+
+def aplicar_variantes(texto, apps=None):
+    """«abre feir folks» → «abre Firefox» cuando Firefox está instalado. Devuelve (frase nueva, [(oído, significa)]).
+    Solo toca el nombre que va justo después de un verbo de abrir o cerrar; si lo que se dijo ya es un programa tuyo, lo deja."""
+    if not texto:
+        return texto, []
+    tokens = re.findall(r"\S+", texto)
+    norm = [normalizar(t) for t in tokens]
+    if not any(w in _VERBOS_PEGADOS for w in norm):
+        return texto, []
+    tabla = _variantes_por_oido()
+    apps = nombres_de_apps() if apps is None else apps
+    if not apps:
+        return texto, []
+    salida, hechos, i = [], [], 0
+    while i < len(tokens):
+        salida.append(tokens[i])
+        if norm[i] not in _VERBOS_PEGADOS:
+            i += 1
+            continue
+        j = i + 1
+        while j < len(tokens) and norm[j] in _RELLENO:
+            salida.append(tokens[j])
+            j += 1
+        puesto = False
+        for n in range(min(3, len(tokens) - j), 0, -1):
+            oido = " ".join(norm[j:j + n])
+            destino = tabla.get(oido)
+            if not destino:
+                continue
+            siguiente = norm[j + n] if j + n < len(tokens) else ""
+            if oido in _VARIANTES_AMBIGUAS and siguiente and siguiente not in _CONTINUA_ORDEN:
+                continue
+            encaja = buscar_app(oido, apps)
+            if encaja and encaja[0][0] >= 84:                          # ya es un programa que tienes con ese nombre: no se toca
+                continue
+            instalada = buscar_app(destino, apps)
+            if not instalada or instalada[0][0] < 100:
+                continue
+            post = re.search(r"[^\w]*$", tokens[j + n - 1]).group()
+            salida.append(instalada[0][1]["nombre"] + post)
+            hechos.append((" ".join(tokens[j:j + n]), instalada[0][1]["nombre"]))
+            i = j + n
+            puesto = True
+            break
+        if not puesto:
+            i = j
+    return " ".join(salida), hechos
+
+
 def _acentos(frase):
     """Una frase como patrón que tolera tildes y espacios variables."""
     clases = {"a": "[aáà]", "e": "[eéè]", "i": "[ií]", "o": "[oó]", "u": "[uúü]"}

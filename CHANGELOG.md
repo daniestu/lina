@@ -4,6 +4,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Corregido
+- **Nombres de programas famosos que Whisper oye mal** («abre feir folks» por Firefox, «abre ahí» por Brave, «Gate» por Kate, «Torfin» por Dolphin…): Lina trae de fábrica una lista de cómo suelen salir los nombres en inglés de unos 19 programas (Steam, Spotify, Discord, Telegram, Thunderbird, Krita, Inkscape, OBS, VLC…) y, justo después de «abre» o «cierra», los cambia por el nombre correcto, pero solo si el programa está instalado. Las palabras corrientes («ahí», «gate») solo se cambian si la frase acaba o sigue con «y…», y lo que tú apuntes en `alias.txt` o un programa tuyo con ese nombre manda siempre. El cambio queda en el registro.
+
 ## [0.2.0-beta] - 2026-10-24
 
 Lina entiende mejor y se usa con más cosas: sin IA para más órdenes, con memoria de preferencias, sin que el sonido del PC la tape, con la tarjeta NVIDIA para entenderte, con Bluetooth y tarjeta gráfica, y con herramientas para medir con tu voz qué le funciona. Resumen de los cambios desde la beta anterior:

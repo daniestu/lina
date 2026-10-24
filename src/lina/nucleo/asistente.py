@@ -928,6 +928,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         pregunta, cambios = C.aplicar_alias(pregunta)
         for oido, significa in cambios:
             log(f"Alias de voz: «{oido}» → «{significa}»")
+        pregunta, cambios = C.aplicar_variantes(pregunta)        # lo que Whisper suele oír de «Firefox», «Brave», «Kate»… si están instalados
+        for oido, significa in cambios:
+            log(f"Nombre de programa mal oído: «{oido}» → «{significa}»")
         if self.historial and time.time() - self.ultima_pregunta > SESION_MINUTOS * 60:
             log("Sesión caducada por inactividad: empiezo una conversación nueva")
             self.historial.clear()
