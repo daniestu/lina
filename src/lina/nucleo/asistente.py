@@ -190,10 +190,11 @@ def pitido(frecuencia):
     sd.play((0.2 * np.sin(2 * np.pi * frecuencia * t)).astype(np.float32), 44100)
 
 
-def capturar_pantalla():
+def capturar_pantalla(ruta=None):
     """Captura la ventana activa (el juego o el navegador) con Spectacle."""
-    CAPTURA.unlink(missing_ok=True)
-    SES.actual().capturar(CAPTURA, activa=True, tiempo=10)
+    ruta = Path(ruta or CAPTURA)
+    ruta.unlink(missing_ok=True)
+    SES.actual().capturar(ruta, activa=True, tiempo=10)
 
 
 def ventana_activa():
@@ -530,6 +531,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         else:
             log("AVISO: falta politica.py: el asistente funciona en modo prudente (pide confirmación para casi todo)")
         H.hechos_sistema()  # precalienta los datos del sistema para que la primera pregunta no espere
+        for vieja in RUT.EJECUCION.glob("captura*.png"):              # capturas que quedaron de una vez anterior (Lina cerrada a medias)
+            vieja.unlink(missing_ok=True)
 
     def _configurar_ia(self, ia):
         """Las claves y el control de gasto de la IA activa. Se llama al arrancar y cada vez que cambia el proveedor (no hace falta reiniciar)."""
@@ -605,13 +608,17 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 self._terminar_interrupcion()
 
     def _preparar_contexto(self):
-        """Mira qué ventana tienes delante y hace la captura de lo que estás viendo (sin tocar el micrófono ni el estado)."""
+        """Mira qué ventana tienes delante (sin tocar el micrófono ni el estado). La captura, solo si se podrá usar: en un juego, ya; fuera, más tarde y
+        solo si la frase lo pide (ver _preparar_captura)."""
         self.titulo = ventana_activa()
-        self.contexto = detectar_contexto(self.titulo, clase_activa(), pid_ventana_activa())
+        clase = clase_activa()
+        self.contexto = detectar_contexto(self.titulo, clase, pid_ventana_activa())
         log(f"Contexto: {describir_contexto(self.contexto)} | ventana «{self.titulo or 'desconocida'}»")
-        # La captura se hace al empezar: es lo que estás viendo al preguntar.
-        self.hilo_captura = threading.Thread(target=capturar_pantalla, daemon=True)
-        self.hilo_captura.start()
+        try:
+            ident = SES.actual().ventana_activa().get("id", "")
+        except Exception:
+            ident = ""
+        self._preparar_captura({"id": ident, "titulo": self.titulo, "clase": clase})
 
     def _iniciar_grabacion(self):
         """Abre el micrófono y hace la captura de lo que estás viendo (sin tocar el estado)."""
@@ -895,6 +902,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             log(f"Error inesperado: {e!r}")
             self.decir(T("Ha habido un error. Mira la terminal."))
         finally:
+            try:
+                self._soltar_captura()                         # la captura de esta petición no se queda en el disco
+            except Exception as e:
+                log(f"Captura de pantalla: no he podido borrarla ({e!r})")
             siguiente = None
             with self.cerrojo:
                 if self.sustituida:
@@ -996,8 +1007,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 return
             if self._nota_pasos:
                 nota_sistema += f"\n[SISTEMA: {CL.limpiar_para_ia(self._nota_pasos)}]"
-        self.hilo_captura.join()
-        imagen = preparar_imagen()
+        imagen = self._captura_de_la_peticion(pregunta)            # en un juego, la de cuando pulsaste; fuera, ahora y solo si hace falta
         self.pregunta_pura = pregunta
         self.ejecutor.pregunta_pura = pregunta
         self.ejecutor.borrado_definitivo = C.borrado_definitivo(pregunta)
@@ -1022,6 +1032,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if not imagen and not self.pedir_pantalla:
             pregunta += ("\n[SISTEMA: esta petición NO lleva captura de pantalla: no sabes lo que hay en ella (solo el título de la ventana). "
                          "Si lo que te piden depende de verla, usa ver_pantalla; sin imagen NUNCA describas lo que se ve.]")
+            if getattr(self, "nota_captura", ""):
+                pregunta += (f"\n[SISTEMA: no se ha hecho la captura de pantalla porque {self.nota_captura}. Díselo al usuario en una frase y no adivines lo "
+                             "que hay en la pantalla.]")
         if AJ.actuales(log=lambda m: None).get("memoria", "usar"):
             recuerdos = MEM.nota_para_la_ia(self.pregunta_pura)   # solo lectura, y solo los que vienen al caso; no entra en el historial
             if recuerdos:
@@ -1115,8 +1128,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 return None                                       # (abrir un programa ya lo tiene en cuenta al elegir cuál)
             if ident == "reproduccion" and self.historial and self.historial[-1]["rol"] == "model" and "?" in self.historial[-1]["texto"]:
                 return None                                       # «la siguiente» / «la anterior» pueden ser la respuesta a una pregunta de Lina: lo entiende la IA
-            self.hilo_captura.join()
-            self.nueva_tarea()
+            self.nueva_tarea()                                   # (una orden directa no usa la captura: no se espera)
             self.pregunta_pura = self.ejecutor.pregunta_pura = pregunta
             self.ejecutor.borrado_definitivo = False
             self.ejecutor.continuar = None                         # una orden directa no espera a nada en segundo plano: si tarda, se la deja a la IA
@@ -1608,8 +1620,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             if self.pantalla_adjunta:
                 return "La captura ya va adjunta a esta petición: úsala."
             if not self.captura_guardada:
-                return ("No hay captura que enseñarte (la ventana parecía sensible o no se pudo capturar). Díselo al usuario y no adivines lo que "
-                        "hay en la pantalla.")
+                self.captura_guardada, motivo = self._capturar_ahora()          # fuera de un juego no se capturó al pulsar: se hace ahora, si se puede
+                if not self.captura_guardada:
+                    return (f"No hay captura que enseñarte ({motivo or 'no se ha podido capturar'}). Díselo al usuario y no adivines lo que hay en la "
+                            "pantalla.")
             self.pedir_pantalla = True
             return "Vale: se te adjuntará la captura en cuanto termines esta respuesta. No hagas nada más ahora; contesta solo con una frase corta."
         if nombre == "modo_privado":

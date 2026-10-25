@@ -82,8 +82,7 @@ class MixinPasos:
             if not hallada:
                 return None
             receta, valor = hallada
-            self.hilo_captura.join()
-            self.nueva_tarea()
+            self.nueva_tarea()                                   # (una receta no usa la captura: no se espera)
             self.pregunta_pura = self.ejecutor.pregunta_pura = pregunta
             self.ejecutor.borrado_definitivo = False
             self.ejecutor.continuar = None                       # una receta no espera tareas en segundo plano: si algo tarda, se lo dejo a la IA

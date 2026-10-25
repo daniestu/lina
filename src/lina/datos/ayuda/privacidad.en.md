@@ -35,7 +35,7 @@ With the **free** key, according to Google's current terms, what is sent may be 
 | System log (what you say and I answer, unless you turn it off) | `journalctl --user -u lina` | `lina olvidar registro` |
 
 So that what you say and I answer doesn't stay in the log: `lina config poner privacidad.registrar_preguntas false`.
-Temporary recordings and screenshots live in your session's runtime folder (memory) and disappear when you log out.
+Temporary recordings and screenshots live in your session's runtime folder (memory) and disappear when you log out; each screenshot is also deleted as soon as the request ends. A screenshot is only taken if it can be used: never in private mode, without your permission or with a sensitive window; in a game, when you press the hotkey; outside a game, after you speak and only if what you say needs it, and only if the same window is still in front.
 
 ## How to decide
 

@@ -55,7 +55,7 @@ def test_kde_usa_kdotool_como_siempre():
     s = sesion("KDE", "wayland", ["kdotool", "xdotool"], {("kdotool", "getactivewindow", "getwindowname"): "Skyrim",
                                                           ("kdotool", "getactivewindow", "getwindowclassname"): "steam_app_72850",
                                                           ("kdotool", "getactivewindow", "getwindowpid"): "4242"})
-    assert s.ventana_activa() == {"titulo": "Skyrim", "clase": "steam_app_72850", "pid": 4242, "metodo": "kdotool"}
+    assert s.ventana_activa() == {"titulo": "Skyrim", "clase": "steam_app_72850", "pid": 4242, "id": "", "metodo": "kdotool"}
 
 
 def test_x11_con_xdotool_y_xprop():
@@ -80,7 +80,7 @@ def test_hyprland_lee_la_ventana_con_foco():
 def test_gnome_wayland_sin_xdotool_no_inventa_nada():
     s = sesion("ubuntu:GNOME", "wayland", [])
     v = s.ventana_activa()
-    assert v == {"titulo": "", "clase": "", "pid": 0, "metodo": None}
+    assert v == {"titulo": "", "clase": "", "pid": 0, "id": "", "metodo": None}
     ventana, nota = s.capacidades()["ventana"]
     assert ventana is None and "xdotool" in nota
 
@@ -234,3 +234,18 @@ def test_sin_gtk_layer_shell_el_resplandor_lo_dice_y_se_pide_instalarlo():
     assert s.paquetes_que_faltan() == ["gtk3", "gtk-layer-shell", "pygobject", "pycairo"]
     assert sesion("KDE", "wayland", ["spectacle", "wl-copy"]).paquetes_que_faltan() == []         # con la capa, no se pide nada
     assert sesion("XFCE", "x11", [], respuestas=falta).paquetes_que_faltan() == ["xfce4-screenshooter", "xclip", "xdotool"]   # en X11 no hace falta la capa
+
+
+def test_la_ventana_activa_trae_su_identificador_en_cada_escritorio():
+    """La captura bajo demanda comprueba por él que sigue siendo la ventana que tenías delante al pulsar."""
+    kde = sesion("KDE", "wayland", ["kdotool"], {("kdotool", "getactivewindow", "getwindowname"): "Kate", ("kdotool", "getactivewindow", "getwindowclassname"): "kate",
+                                                  ("kdotool", "getactivewindow", "getwindowpid"): "7",
+                                                  ("kdotool", "getactivewindow"): lambda orden: SimpleNamespace(returncode=0, stdout="{abc}" if len(orden) == 2 else "x", stderr="")})
+    assert kde.ventana_activa()["id"] == "{abc}"
+    x11 = sesion("XFCE", "x11", ["xdotool"], {("xdotool", "getactivewindow"): "123", ("xdotool", "getwindowname"): "T", ("xdotool", "getwindowpid"): "1",
+                                              ("xdotool", "getwindowclassname"): "c"})
+    assert x11.ventana_activa()["id"] == "123"
+    arbol = {"nodes": [{"focused": True, "id": 42, "name": "Firefox", "app_id": "firefox", "pid": 9}]}
+    assert sesion("sway", "wayland", ["swaymsg"], {("swaymsg", "-t", "get_tree"): json.dumps(arbol)}).ventana_activa()["id"] == "42"
+    hypr = sesion("Hyprland", "wayland", ["hyprctl"], {("hyprctl", "activewindow"): json.dumps({"title": "K", "class": "k", "pid": 5, "address": "0x55aa"})})
+    assert hypr.ventana_activa()["id"] == "0x55aa"

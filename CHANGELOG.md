@@ -5,6 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Cambiado
+- **La captura de pantalla solo se hace cuando se puede usar.** Antes se capturaba la ventana activa en cada pulsación, también en modo privado, sin tu permiso o con una ventana sensible, y el archivo se quedaba hasta la siguiente. Ahora no se captura nada en esos casos; en un juego se captura al pulsar, como antes; fuera de un juego, después de hablar y solo si lo que dices lo pide («¿qué pone aquí?») o lo pide la IA, volviendo a comprobar en ese momento el modo privado, el permiso y si la ventana es sensible, y solo si sigue delante la misma ventana que al pulsar (si cambió, no se captura y se le dice a la IA). Cada captura se borra al terminar la petición, y las órdenes directas y las recetas ya no esperan a que termine.
 - **Las pruebas ya no tocan tu carpeta personal.** Antes, `pytest` en un equipo con Lina instalada escribía en tu registro de acciones, podía reescribir tu diario (al recortarlo) y leía tus ajustes, tu memoria, tus programas y tus juegos, así que el resultado podía depender de tu equipo. Ahora todas las pruebas usan una casa temporal en `tests/.casa-pruebas/` (fuera de `/tmp`, para que las rutas `~/…` no cuenten como desechables), sin bus de sesión ni escritorio, y `tests/test_aislamiento.py` falla si algo se sale de ella. Solo afecta a quien desarrolla Lina.
 
 ### Seguridad

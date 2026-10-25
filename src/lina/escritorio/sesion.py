@@ -89,13 +89,15 @@ class Sesion:
             if rc != 0:
                 return None
             v[campo] = out
+        rc, ident = self._ej(["kdotool", "getactivewindow"])
+        v["id"] = ident.strip() if rc == 0 else ""
         return v
 
     def _ventana_xdotool(self):
         rc, ident = self._ej(["xdotool", "getactivewindow"])
         if rc != 0 or not ident:
             return None
-        v = {"titulo": self._ej(["xdotool", "getwindowname", ident])[1], "pid": self._ej(["xdotool", "getwindowpid", ident])[1], "clase": ""}
+        v = {"titulo": self._ej(["xdotool", "getwindowname", ident])[1], "pid": self._ej(["xdotool", "getwindowpid", ident])[1], "clase": "", "id": ident.strip()}
         rc, clase = self._ej(["xdotool", "getwindowclassname", ident])
         if rc != 0 or not clase:
             rc, texto = self._ej(["xprop", "-id", ident, "WM_CLASS"]) if self.which("xprop") else (None, "")
@@ -117,7 +119,7 @@ class Sesion:
             n = pila.pop()
             if n.get("focused") and (n.get("pid") or n.get("app_id") or n.get("window_properties")):
                 clase = n.get("app_id") or (n.get("window_properties") or {}).get("class") or ""
-                return {"titulo": n.get("name") or "", "clase": clase, "pid": str(n.get("pid") or "")}
+                return {"titulo": n.get("name") or "", "clase": clase, "pid": str(n.get("pid") or ""), "id": str(n.get("id") or "")}
             pila.extend(n.get("nodes", []) + n.get("floating_nodes", []))
         return None
 
@@ -131,7 +133,7 @@ class Sesion:
             return None
         if not isinstance(d, dict) or not d.get("class") and not d.get("title"):
             return None
-        return {"titulo": d.get("title") or "", "clase": d.get("class") or "", "pid": str(d.get("pid") or "")}
+        return {"titulo": d.get("title") or "", "clase": d.get("class") or "", "pid": str(d.get("pid") or ""), "id": str(d.get("address") or "")}
 
     def metodos_ventana(self):
         """[(nombre, función)] en el orden que toca para este escritorio, solo los que tienen su programa instalado."""
@@ -141,7 +143,8 @@ class Sesion:
         return [(n, todos[n][1]) for n in orden if self._tiene(*todos[n][0])]
 
     def ventana_activa(self, vigencia=0.6):
-        """{'titulo','clase','pid','metodo'} de la ventana con el foco; con todo vacío si no se puede saber. Repite la respuesta si es de hace menos de `vigencia` s."""
+        """{'titulo','clase','pid','id','metodo'} de la ventana con el foco (`id`: su identificador en el escritorio, vacío si no se sabe); con todo vacío si
+        no se puede saber. Repite la respuesta si es de hace menos de `vigencia` s."""
         t, previa = self._ultima
         if previa is not None and time.monotonic() - t < vigencia:
             return previa
@@ -157,8 +160,8 @@ class Sesion:
                     pid = int(v.get("pid") or 0)
                 except ValueError:
                     pid = 0
-                return {"titulo": v.get("titulo", ""), "clase": v.get("clase", ""), "pid": pid, "metodo": nombre}
-        return {"titulo": "", "clase": "", "pid": 0, "metodo": None}
+                return {"titulo": v.get("titulo", ""), "clase": v.get("clase", ""), "pid": pid, "id": v.get("id", ""), "metodo": nombre}
+        return {"titulo": "", "clase": "", "pid": 0, "id": "", "metodo": None}
 
     def programa_ventanas(self):
         """'kdotool' o 'xdotool' (las dos hablan igual: search, windowactivate, getwindowname…) o None. Para quien las usa directamente."""
