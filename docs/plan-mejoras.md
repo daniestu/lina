@@ -15,7 +15,7 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 | 13 | Memoria de preferencias *(hecha: falta probarla en el equipo de Dani)* | M | — |
 | 14 | Bluetooth completo y más diagnóstico de juegos *(hecha: falta probarla en el equipo de Dani)* | S | 12 (para sus órdenes directas) |
 | 15 | GPU y energía (módulo opcional) *(hecha: falta probarla en el equipo de Dani)* | M | — |
-| 17 | Revisión de octubre de 2026: seguridad, latencia y voz, autonomía y mantenimiento *(en curso: S1, S2, S3, S4, S4b, S7 y M1 hechas)* | L | — |
+| 17 | Revisión de octubre de 2026: seguridad, latencia y voz, autonomía y mantenimiento *(en curso: S1, S2, S3, S4, S4b (que cierra S4c), S7, V1, V2 y M1 hechas; S5 aparcada)* | L | — |
 
 Fuera del plan, a propósito: excluir monitores de las capturas (Lina captura todos), una ventana de chat con historial (Lina es de voz) y quitar las
 confirmaciones por atajo (es una decisión de seguridad, no una carencia).
@@ -233,7 +233,7 @@ Lo que ya está bien: `rm` va a la papelera; `shred`, `truncate` y `dd` sobre tu
 | # | Qué | Tamaño |
 |---|---|---|
 | V1 | **Cola de voz** *(hecha: turno en orden de llegada, «cállate» descarta lo que espera, avisos de espera que caducan y notificación para avisos y confirmaciones que no llegan a decirse)*: hoy `_hablar` usa un solo `respuesta.wav` y un solo `self.reproductor`; avisos sueltos («lo pienso a fondo», «Google está tardando», el estado) pueden coincidir, pisarse el audio, y «cállate» solo para uno. Un hablante cada vez, archivos propios por frase. | S |
-| V2 | **Captura de pantalla solo cuando haga falta** *(hecha: no se captura si no se puede usar; en un juego al pulsar; fuera, tras hablar y solo si hace falta, comprobando de nuevo la privacidad y que sigue la misma ventana; un archivo por petición, borrado al terminar)*: hoy se hace en cada pulsación, también en modo privado o sin permiso. | S |
+| V2 | **Captura de pantalla solo cuando haga falta** *(hecha: no se captura si no se puede usar; en un juego al pulsar; fuera, tras hablar y solo si hace falta, comprobando de nuevo la privacidad y que sigue la misma ventana; un archivo por petición, borrado al terminar; donde el escritorio no dice qué ventana está activa, al pulsar como antes)*: hoy se hace en cada pulsación, también en modo privado o sin permiso. | S |
 | V3 | **Fin de frase por silencio con el atajo** (ajuste, apagado por defecto hasta medirlo): una pulsación en vez de dos, con el detector que ya usa el manos libres. Medir con `lina tiempos` y `probar-voz` que no corta frases. | M |
 | V4 | **Instrucciones más ligeras**: cada llamada lleva ~16 000 caracteres de instrucciones y 5 000–14 000 de herramientas, y se repiten en cada vuelta. Primero medir si la caché de Gemini se aprovecha (`cachedContentTokenCount` en el registro); después pasar las reglas de situaciones concretas (música, navegador…) a sus grupos. | M |
 | V5 | **Respuesta y voz por frases** (streaming): empezar Piper con la primera frase. Poco para respuestas de una frase; se nota en el modo «a fondo». Después de V1. | M |

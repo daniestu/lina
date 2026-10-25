@@ -35,7 +35,7 @@ Con la clave **gratuita**, según las condiciones de Google vigentes, lo que se 
 | Registro del sistema (lo que dices y contesto, si no lo desactivas) | `journalctl --user -u lina` | `lina olvidar registro` |
 
 Para que lo que dices y contesto no quede en el registro: `lina config poner privacidad.registrar_preguntas false`.
-Las grabaciones y capturas temporales viven en la carpeta de ejecución de tu sesión (memoria) y desaparecen al cerrar la sesión; cada captura, además, se borra en cuanto termina la petición. Solo se hace una captura si se podrá usar: nunca en modo privado, sin tu permiso o con una ventana sensible; en un juego, al pulsar el atajo; fuera de un juego, después de hablar y solo si lo que dices lo pide, y solo si sigue delante la misma ventana.
+Las grabaciones y capturas temporales viven en la carpeta de ejecución de tu sesión (memoria) y desaparecen al cerrar la sesión; cada captura, además, se borra en cuanto termina la petición. Solo se hace una captura si se podrá usar: nunca en modo privado, sin tu permiso o con una ventana sensible; en un juego, al pulsar el atajo; fuera de un juego, después de hablar y solo si lo que dices lo pide, y solo si sigue delante la misma ventana (en los escritorios que no dicen qué ventana está activa, como GNOME en Wayland sin xdotool, se hace al pulsar, como antes).
 
 ## Cómo decidirlo
 

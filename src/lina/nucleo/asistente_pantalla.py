@@ -79,10 +79,19 @@ class MixinPantalla:
         if motivo:
             log(f"Captura de pantalla: no la hago ({motivo})")
             return
-        if (self.contexto or {}).get("tipo") == "juego":
+        sin_identificar = not self._identificable(self.ventana_al_pulsar)
+        if sin_identificar:                                  # p. ej. GNOME en Wayland sin xdotool: luego no se podría comprobar que es la misma ventana
+            log("Captura de pantalla: no puedo saber qué ventana tienes delante, así que no podré comprobar después que sigue siendo la misma; "
+                "la hago ya, al pulsar, como antes (solo miro el modo privado y tu permiso)")
+        if sin_identificar or (self.contexto or {}).get("tipo") == "juego":
             from lina.nucleo import asistente as _A
             self.hilo_captura = threading.Thread(target=_A.capturar_pantalla, args=(self.ruta_captura,), daemon=True)
             self.hilo_captura.start()
+
+    @staticmethod
+    def _identificable(ventana):
+        """¿Se sabe qué ventana es (por su identificador, su título o su clase)?"""
+        return bool(ventana.get("id") or ventana.get("titulo") or ventana.get("clase"))
 
     @staticmethod
     def _misma_ventana(antes, ahora):
@@ -100,7 +109,10 @@ class MixinPantalla:
         motivo = self._motivo_sin_pantalla(ahora.get("titulo", ""), ahora.get("clase", ""))
         if motivo:
             return None, motivo
-        if not self._misma_ventana(getattr(self, "ventana_al_pulsar", None) or {}, ahora):
+        antes = getattr(self, "ventana_al_pulsar", None) or {}
+        if not self._identificable(antes) and not self._identificable(ahora):
+            log("Captura de pantalla: no puedo comprobar que sea la misma ventana (este escritorio no dice cuál está activa); capturo igualmente, como antes")
+        elif not self._misma_ventana(antes, ahora):
             return None, "la ventana activa ya no es la que tenía delante el usuario al hablar"
         ruta = getattr(self, "ruta_captura", None) or RUT.temporal("captura-ahora.png")
         self.ruta_captura = ruta

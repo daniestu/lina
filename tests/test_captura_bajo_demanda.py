@@ -187,3 +187,43 @@ def test_al_pulsar_se_sigue_leyendo_la_ventana(escritorio):
     a = _asistente()
     a._preparar_contexto()
     assert a.titulo == "Documento — Kate" and a.ventana_al_pulsar["id"] == "{ventana-1}"
+
+
+# ---------- escritorios donde no se puede saber qué ventana está activa (p. ej. GNOME en Wayland sin xdotool) ----------
+@pytest.fixture
+def sin_identificar(escritorio, monkeypatch):
+    from lina.nucleo import asistente_pantalla as P
+    escritorio.ventana.update(id="", titulo="", clase="", metodo=None)
+    registro = []
+    monkeypatch.setattr(P, "log", registro.append)
+    return escritorio, registro
+
+
+def test_sin_poder_identificar_la_ventana_se_captura_al_pulsar_como_antes(sin_identificar):
+    escritorio, registro = sin_identificar
+    _permiso("si")
+    a = _asistente()
+    a._preparar_contexto()
+    a.hilo_captura.join(5)
+    assert len(escritorio.capturas) == 1                           # al pulsar, aunque no sea un juego
+    assert any("no puedo saber qué ventana" in l for l in registro)
+    assert a._captura_de_la_peticion("¿qué pone aquí?") is not None and len(escritorio.capturas) == 1
+
+
+@pytest.mark.parametrize("privado, permiso", [(True, "si"), (False, "preguntar"), (False, "no")])
+def test_sin_poder_identificar_la_ventana_se_respetan_modo_privado_y_permiso(sin_identificar, privado, permiso):
+    escritorio, _ = sin_identificar
+    _permiso(permiso)
+    a = _asistente()
+    a.modo_privado = privado
+    assert _pulsar_y_pedir(a, "¿qué pone aquí?") is None and escritorio.capturas == []
+
+
+def test_sin_poder_identificar_la_ventana_conceder_el_permiso_captura_y_lo_apunta(sin_identificar):
+    escritorio, registro = sin_identificar
+    _permiso("preguntar")
+    a = _asistente()
+    a.imagen_del_turno = _pulsar_y_pedir(a, "¿qué pone aquí?")
+    assert "Permiso concedido" in a._conceder_capturas()
+    assert a.captura_guardada and len(escritorio.capturas) == 1
+    assert any("no puedo comprobar que sea la misma ventana" in l for l in registro)
