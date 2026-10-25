@@ -55,7 +55,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, pide_accion, pide_contenido, solo_herramientas_meta, solo_portadas, solo_se_informo
+from lina.nucleo.turnos import HERRAMIENTAS_META, pagina_que_no_es, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -451,7 +451,7 @@ from lina.nucleo.ia import (  # noqa: F401
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
-    cabe_modelo_local,
+    cabe_modelo_local, dominio_valido,
 )
 
 
@@ -1907,12 +1907,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             log("Pidió hacer algo y solo se ha informado (lo dice el código, sin revisor): reintento a fondo")
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and "?" not in str(respuesta)
               and pide_contenido(str(getattr(self, "pregunta_pura", "") or pregunta))
-              and solo_portadas(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura")):
-            portada = solo_portadas(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura")
-            obst = (f"el usuario pidió que le PUSIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») y solo se ha abierto la portada "
-                    f"de {portada}, no ese contenido: busca DENTRO de esa web (buscar_web con dominio «{portada.removeprefix('www.')}») la página de lo que pidió, "
-                    "comprueba que la fecha y la temporada son las de ahora y ábrela con xdg-open; si de verdad no está, díselo")
-            log(f"Pidió poner algo y solo se ha abierto la portada de {portada} (lo dice el código): reintento a fondo")
+              and pagina_que_no_es(self.acciones_turno, str(getattr(self, "pregunta_pura", "") or pregunta), lambda c: H.clasificar(c)[0] == "lectura")):
+            url, por_que = pagina_que_no_es(self.acciones_turno, str(getattr(self, "pregunta_pura", "") or pregunta), lambda c: H.clasificar(c)[0] == "lectura")
+            web = dominio_valido(url) or url
+            obst = (f"el usuario pidió que le PUSIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») y {por_que}: busca DENTRO de esa web "
+                    f"(buscar_web con dominio «{web}», en su idioma, con el nombre de ese contenido y palabras como «ficha» o «ver», no «canal» ni «programación») "
+                    "y abre con xdg-open el resultado cuyo título o dirección NOMBRE ese contenido y sea de la fecha y la temporada de ahora; nunca una guía de "
+                    "programación, un calendario ni una agenda. Si de verdad no está, díselo")
+            log(f"Pidió poner algo y {por_que} (lo dice el código): reintento a fondo")
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
               and not self._acciones_comprobadas() and verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, respuesta,
                                                      bool(imagen is not None or self.pantalla_adjunta))):

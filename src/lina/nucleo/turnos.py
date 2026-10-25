@@ -100,3 +100,65 @@ def solo_portadas(acciones, es_lectura):
                 return None
             portada = p.netloc
     return portada
+
+
+# Palabras de una petición que NO identifican el contenido (verbos, artículos, «partido», «navegador»…): lo que queda tiene que aparecer en lo que se abre.
+_PALABRAS_DE_RELLENO = {
+    "pon", "ponme", "ponlo", "ponla", "ponmelo", "ponmela", "reproduce", "reproduceme", "quiero", "ver", "dejame", "oye", "vale", "venga", "por", "favor",
+    "puedes", "podrias", "el", "la", "los", "las", "un", "una", "del", "de", "en", "al", "a", "y", "o", "con", "contra", "que", "me", "mi", "hoy", "ahora",
+    "partido", "partidazo", "encuentro", "navegador", "rayador", "brave", "firefox", "chrome", "directo", "vivo", "online", "television", "tele", "canal",
+    "serie", "pelicula", "capitulo", "episodio", "video", "temporada", "favor",
+    "put", "on", "play", "the", "match", "game", "in", "browser", "i", "want", "to", "watch", "let", "live", "now", "today", "please", "of", "vs", "versus",
+}
+_SINONIMOS = {"barca": "barcelona", "atleti": "atletico"}
+# Páginas que no son el contenido aunque lo nombren: guías de programación, calendarios, agendas.
+_PAGINA_DE_GUIA = re.compile(r"(?:^|[/_-])(?:programacion(?:-tv)?|parrilla|guia(?:-tv)?|calendario|agenda|horarios?|schedule|tv-guide|fixtures)(?:[/_.-]|$)")
+
+
+def palabras_distintivas(texto):
+    """Las palabras que identifican lo que se pidió poner («barcelona», «sevilla», «stranger», «things»), sin verbos, artículos ni palabras genéricas."""
+    return {_SINONIMOS.get(p, p) for p in C.normalizar(texto).split() if len(p) >= 3 and p not in _PALABRAS_DE_RELLENO and not p.isdigit()}
+
+
+def pagina_que_no_es(acciones, pregunta, es_lectura):
+    """Tras «pon…»: (dirección, motivo) si lo que se abrió NO es la página de lo pedido (una portada, una guía de programación o una página que no lo
+    nombra); None si se abrió algo que sí lo es, si se hizo otra cosa o si no se abrió nada."""
+    from urllib.parse import urlparse
+    abiertas = []
+    for nombre, args, _ in acciones or []:
+        if nombre in HERRAMIENTAS_DE_INFORMAR:
+            continue
+        comando = str((args or {}).get("comando", "")) if nombre == "ejecutar_comando" else ""
+        if nombre == "ejecutar_comando" and es_lectura(comando):
+            continue
+        urls = _URL.findall(comando)
+        if not urls or len(comando.split()) > 1 + len(urls):
+            return None
+        abiertas += [u.strip("'\"") for u in urls]
+    if not abiertas:
+        return None
+    distintivas = palabras_distintivas(pregunta)
+    titulos = {}                                                  # dirección → título, de los resultados de buscar_web («[1] Título (web) https://…»)
+    for nombre, _, resultado in acciones or []:
+        if nombre == "buscar_web":
+            for m in re.finditer(r"^\[\d+\] (.*) \([^)]*\) (https?://\S+)$", str(resultado), re.M):
+                titulos[m.group(2).rstrip("/")] = m.group(1)
+    for u in abiertas:
+        p = urlparse(u)
+        if p.path in ("", "/") and not p.query and not p.fragment:
+            if distintivas and any(d in C.normalizar(p.netloc).replace(" ", "") for d in distintivas):
+                return None                                   # «ponme Movistar Plus»: su portada es justo lo pedido
+            continue
+        if _PAGINA_DE_GUIA.search(p.path.lower()):
+            continue
+        texto_url = C.normalizar(f"{p.netloc} {p.path} {p.query}").replace(" ", "")
+        titulo = C.normalizar(titulos.get(u.rstrip("/"), "")).split()
+        if not distintivas or any(d in texto_url for d in distintivas) or any(d in {_SINONIMOS.get(t, t) for t in titulo} for d in distintivas):
+            return None                                       # esta sí es la página de lo pedido (o no hay con qué comparar)
+    u = abiertas[-1]
+    p = urlparse(u)
+    if p.path in ("", "/") and not p.query and not p.fragment:
+        return u, f"solo se ha abierto la portada de {p.netloc}"
+    if _PAGINA_DE_GUIA.search(p.path.lower()):
+        return u, f"lo que se abrió ({u}) es una guía de programación o un calendario, no la página de ese contenido"
+    return u, f"lo que se abrió ({u}) no nombra lo que pidió ({', '.join(sorted(distintivas))})"

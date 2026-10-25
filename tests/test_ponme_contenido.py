@@ -162,3 +162,57 @@ def test_abrir_una_web_que_se_pidio_abrir_no_hace_insistir(monkeypatch):
     monkeypatch.setattr(A, "verificar_cumplimiento", lambda *x, **k: False)
     a._insistir_si_hace_falta("Abierto.", "m", "rapido", "p", None, [], "s")
     assert not enviadas
+
+
+# ---------- lo que se abre tiene que ser la página de lo pedido ----------
+_PARTIDO = "Ponme el partido del Barça contra el Sevilla."
+
+
+def _abre(url, resultados=""):
+    return [("buscar_web", {"consulta": "x"}, resultados), ("ejecutar_comando", {"comando": f"xdg-open '{url}'"}, "código de salida: 0")]
+
+
+def test_palabras_distintivas():
+    assert TU.palabras_distintivas(_PARTIDO) == {"barcelona", "sevilla"}
+    assert TU.palabras_distintivas("Ponme Stranger Things en el navegador") == {"stranger", "things"}
+    assert TU.palabras_distintivas("ponme el partido") == set()
+
+
+@pytest.mark.parametrize("url, motivo", [
+    ("https://www.movistarplus.es/programacion-tv/daznli/2026-10-25", "guía de programación"),
+    ("https://www.movistarplus.es/deportes/futbol/la-liga-ea-sports/calendario", "guía de programación"),
+    ("https://www.movistarplus.es", "portada"),
+    ("https://www.movistarplus.es/deportes/futbol/ofertas", "no nombra"),
+])
+def test_lo_que_no_es_la_pagina_del_partido(url, motivo):
+    r = TU.pagina_que_no_es(_abre(url), _PARTIDO, lambda c: False)
+    assert r and motivo in r[1], (url, r)
+
+
+@pytest.mark.parametrize("url, pregunta, resultados", [
+    ("https://www.movistarplus.es/deportes/futbol-espanol/laliga-ea-sports-26-27/fc-barcelona-sevilla/ficha?tipo=E&id=1", _PARTIDO, ""),
+    ("https://www.netflix.com/es/series/stranger-things", "Ponme Stranger Things", ""),
+    ("https://www.netflix.com/es/title/80057281", "Ponme Stranger Things",
+     "RESULTADOS DE BÚSQUEDA:\n\n[1] Stranger Things | Sitio oficial de Netflix (netflix.com) https://www.netflix.com/es/title/80057281\nSerie"),
+    ("https://www.movistarplus.es", "Ponme Movistar Plus", ""),
+    ("https://www.dazn.com/es-ES/home", "ponme el partido", ""),             # sin palabras con las que comparar: no se juzga
+])
+def test_lo_que_si_es_la_pagina_de_lo_pedido(url, pregunta, resultados):
+    assert TU.pagina_que_no_es(_abre(url, resultados), pregunta, lambda c: False) is None
+
+
+def test_un_identificador_sin_titulo_que_lo_nombre_no_basta():
+    r = TU.pagina_que_no_es(_abre("https://www.netflix.com/es/title/80057281"), "Ponme Stranger Things", lambda c: False)
+    assert r and "no nombra" in r[1]
+
+
+def test_abrir_la_programacion_del_canal_hace_insistir_con_buenas_indicaciones(monkeypatch):
+    A, a, enviadas = _asistente(_PARTIDO, _abre("https://www.movistarplus.es/programacion-tv/daznli/2026-10-25"))
+    monkeypatch.setattr(A, "verificar_cumplimiento", MagicMock(side_effect=AssertionError("no hace falta el revisor")))
+    a._insistir_si_hace_falta("Lo emite DAZN LALIGA en Movistar Plus, ya lo he abierto.", "m", "rapido", "p", None, [], "s")
+    assert enviadas and "guía de programación" in enviadas[0] and "«movistarplus.es»" in enviadas[0] and "ficha" in enviadas[0]
+
+
+def test_la_regla_dice_como_buscar_y_que_no_abrir():
+    assert "nunca abras una guía de programación" in K.INSTRUCCIONES and "«ficha» o «ver»" in K.INSTRUCCIONES
+    assert "never open a TV guide" in K.INSTRUCCIONES_EN
