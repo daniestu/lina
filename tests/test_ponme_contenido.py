@@ -216,3 +216,105 @@ def test_abrir_la_programacion_del_canal_hace_insistir_con_buenas_indicaciones(m
 def test_la_regla_dice_como_buscar_y_que_no_abrir():
     assert "nunca abras una guía de programación" in K.INSTRUCCIONES and "«ficha» o «ver»" in K.INSTRUCCIONES
     assert "never open a TV guide" in K.INSTRUCCIONES_EN
+
+
+# ---------- la temporada de ahora, no la pasada ----------
+import datetime  # noqa: E402
+
+_ANTIGUA = "https://www.movistarplus.es/deportes/futbol-espanol/laliga-ea-sports-25-26/barcelona-sevilla/ficha?tipo=E&id=4067960"
+_ACTUAL = "https://www.movistarplus.es/deportes/futbol-espanol/laliga-ea-sports-26-27/fc-barcelona-sevilla/ficha?tipo=E&id=4345779"
+
+
+@pytest.fixture
+def octubre_2026(monkeypatch):
+    original = TU.temporada_actual
+    monkeypatch.setattr(TU, "temporada_actual", lambda hoy=None: original(hoy or datetime.date(2026, 10, 25)))
+
+
+def test_temporada_actual():
+    assert TU.temporada_actual(datetime.date(2026, 10, 25)) == (26, 27)
+    assert TU.temporada_actual(datetime.date(2026, 5, 3)) == (25, 26)
+    assert TU.temporada_actual(datetime.date(2026, 7, 1)) == (26, 27)
+
+
+def test_de_otra_temporada(octubre_2026):
+    assert TU.de_otra_temporada(_ANTIGUA) == "25-26"
+    assert TU.de_otra_temporada(_ACTUAL) is None
+    assert TU.de_otra_temporada("Liga 2024/2025") == "24-25" and TU.de_otra_temporada("liga 2025-2026") == "25-26"
+    assert TU.de_otra_temporada("https://www.movistarplus.es/programacion-tv/daznli/2026-10-25") is None    # una fecha no es una temporada
+    assert TU.de_otra_temporada("Stranger Things") is None
+
+
+def test_la_ficha_de_la_temporada_pasada_no_vale(octubre_2026):
+    r = TU.pagina_que_no_es(_abre(_ANTIGUA), _PARTIDO, lambda c: False)
+    assert r and "temporada 25-26" in r[1] and "26-27" in r[1]
+    assert TU.pagina_que_no_es(_abre(_ACTUAL), _PARTIDO, lambda c: False) is None
+
+
+def test_los_resultados_de_otra_temporada_van_marcados(monkeypatch, octubre_2026):
+    from lina.nucleo import ia as IA
+
+    class _R:
+        ok = True
+
+        def json(self):
+            return {"results": [{"title": "Jornada 35: Barcelona - Sevilla (2026)", "url": _ANTIGUA, "content": "Mayo"},
+                                {"title": "Ver Jornada 10: Barcelona - Sevilla (2026)", "url": _ACTUAL, "content": "Hoy 21:00"}]}
+    monkeypatch.setattr(IA.CL, "obtener", lambda nombre: "clave-de-prueba")
+    monkeypatch.setattr(IA.requests, "post", lambda *a, **k: _R())
+    r = IA.buscar_tavily("barcelona sevilla ficha", "movistarplus.es")
+    antigua, actual = r.split("[2]")
+    assert "OJO: es de la temporada 25-26, NO de la actual (26-27)" in antigua and "OJO" not in actual
+
+
+def test_abrir_la_ficha_antigua_hace_insistir_con_el_modelo_rapido(monkeypatch, octubre_2026):
+    A, a, enviadas = _asistente(_PARTIDO, _abre(_ANTIGUA))
+    grupos = []
+    a._gemini = lambda modo, modelo, texto, *x, **k: (grupos.append(modo), enviadas.append(texto), "Te abro el partido de esta temporada.")[2]
+    a._avisar_voz = MagicMock()
+    monkeypatch.setattr(A, "verificar_cumplimiento", MagicMock(side_effect=AssertionError("no hace falta el revisor")))
+    r, origen = a._insistir_si_hace_falta("Abro el partido en Movistar Plus.", "m", "rapido", "p", None, [], "s")
+    assert r == "Te abro el partido de esta temporada." and grupos == ["rapido"] and "insistió" in origen
+    assert "temporada 25-26" in enviadas[0]
+    a._avisar_voz.assert_not_called()                              # sin «lo pienso a fondo»: es rápido
+
+
+# ---------- noticias, varias competiciones y la plataforma que prefieres ----------
+def test_una_noticia_no_es_la_pagina_para_verlo():
+    r = TU.pagina_que_no_es(_abre("https://www.dazn.com/es-ES/news/futbol/clasico-laliga-barcelona-sevilla/1mrs35"), _PARTIDO, lambda c: False)
+    assert r and "noticia" in r[1]
+
+
+def test_competicion_de_y_varias_de_ahora(octubre_2026):
+    laliga = "https://www.movistarplus.es/deportes/futbol-espanol/laliga-ea-sports-26-27/fc-barcelona-sevilla/ficha?id=1"
+    ligaf = "https://www.movistarplus.es/deportes/futbol-espanol/liga-f-26-27/barcelona-sevilla/ficha?id=2"
+    assert TU.competicion_de(laliga) == "laliga-ea-sports" and TU.competicion_de(ligaf) == "liga-f" and TU.competicion_de("https://x.es/serie") is None
+    assert TU.competiciones_de_ahora([laliga, ligaf, _ANTIGUA]) == ["laliga-ea-sports", "liga-f"]
+    assert TU.competiciones_de_ahora([laliga, _ANTIGUA]) == ["laliga-ea-sports"]
+
+
+def test_los_resultados_avisan_si_hay_varias_competiciones_de_ahora(monkeypatch, octubre_2026):
+    from lina.nucleo import ia as IA
+
+    class _R:
+        ok = True
+
+        def json(self):
+            return {"results": [{"title": "Ver Jornada 10: Barcelona - Sevilla", "url": _ACTUAL, "content": ""},
+                                {"title": "Ver Jornada 6: Barcelona - Sevilla", "url": "https://www.movistarplus.es/deportes/futbol-espanol/liga-f-26-27/"
+                                                                                     "barcelona-sevilla/ficha?id=2", "content": ""}]}
+    monkeypatch.setattr(IA.CL, "obtener", lambda nombre: "clave-de-prueba")
+    monkeypatch.setattr(IA.requests, "post", lambda *a, **k: _R())
+    r = IA.buscar_tavily("barcelona sevilla ficha", "movistarplus.es")
+    assert "competiciones distintas (laliga-ea-sports, liga-f)" in r and "pregúntaselo" in r
+
+
+def test_la_plataforma_que_prefieres_viene_al_caso_de_un_partido(tmp_path, monkeypatch):
+    from lina.nucleo import memoria as M
+    monkeypatch.setattr(M, "ARCHIVO", tmp_path / "memoria.json")
+    assert M.recordar("el fútbol lo veo en Movistar Plus")[0]
+    assert M.relevantes(_PARTIDO) == ["el fútbol lo veo en Movistar Plus"]
+    assert M.relevantes("¿cuándo es el Clásico?") == ["el fútbol lo veo en Movistar Plus"]
+    assert M.relevantes("sube el volumen") == []                     # y no se cuela en lo que no tiene que ver
+    assert M.recordar("las series las veo en Netflix")[0]
+    assert M.relevantes("Ponme el último capítulo de Stranger Things") == ["las series las veo en Netflix"]

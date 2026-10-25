@@ -83,9 +83,16 @@ def _id_nuevo(recuerdos):
     return f"m{n:04d}"
 
 
+# Palabras que hablan del mismo tema aunque no se parezcan: «el fútbol lo veo en Movistar Plus» viene al caso de «ponme el partido del Barça».
+_TEMAS = {**{p: "#futbol" for p in ("futbol", "partido", "partidos", "clasico", "liga", "laliga", "jornada", "derbi", "champions", "copa", "match", "football",
+                                    "soccer", "game")},
+          **{p: "#series" for p in ("serie", "series", "pelicula", "peliculas", "capitulo", "capitulos", "episodio", "episodios", "film", "movie", "episode")}}
+
+
 def _raices(texto):
-    """Las palabras con contenido de un texto, recortadas (así «jugar», «juego» y «jugando» coinciden)."""
-    return {t[:5] for t in normalizar(texto).split() if t not in _SIN_VALOR and len(t) >= 3}
+    """Las palabras con contenido de un texto, recortadas (así «jugar», «juego» y «jugando» coinciden), más el tema al que pertenecen si es uno conocido."""
+    palabras = [t for t in normalizar(texto).split() if t not in _SIN_VALOR and len(t) >= 3]
+    return {t[:5] for t in palabras} | {_TEMAS[t] for t in palabras if t in _TEMAS}
 
 
 # ======================= entender lo que dices =======================

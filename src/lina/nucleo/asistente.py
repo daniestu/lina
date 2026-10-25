@@ -1889,6 +1889,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         """Si el intento rápido terminó SIN poder comprobar el último cambio (⚠, ✘ o error), no se da por bueno: se vuelve a
         intentar una vez con el razonamiento a fondo y topes más amplios, contándole lo ya hecho. Devuelve (respuesta, modelo)."""
         pide = getattr(self, "pedir_profundo", "") if not self.ejecutor.duda else ""     # si hay una duda de verdad, manda la duda
+        rapido = False                                    # el código vio que no se hizo lo pedido (solo se informó, o se abrió otra página): basta el modelo rápido
         obst = getattr(self, "obstaculo", "") if not self.ejecutor.duda else ""
         if (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes
                 and solo_herramientas_meta(self.acciones_turno) and "?" not in str(respuesta)):
@@ -1904,7 +1905,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
               and solo_se_informo(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura")):
             obst = (f"el usuario pidió que HICIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}»), no que le informaras, y en esta "
                     f"petición solo se ha buscado o leído, sin hacer nada en el equipo; la respuesta fue: «{str(respuesta)[:200]}»")
-            log("Pidió hacer algo y solo se ha informado (lo dice el código, sin revisor): reintento a fondo")
+            log("Pidió hacer algo y solo se ha informado (lo dice el código, sin revisor): reintento con el modelo rápido")
+            rapido = True
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and "?" not in str(respuesta)
               and pide_contenido(str(getattr(self, "pregunta_pura", "") or pregunta))
               and pagina_que_no_es(self.acciones_turno, str(getattr(self, "pregunta_pura", "") or pregunta), lambda c: H.clasificar(c)[0] == "lectura")):
@@ -1912,9 +1914,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             web = dominio_valido(url) or url
             obst = (f"el usuario pidió que le PUSIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») y {por_que}: busca DENTRO de esa web "
                     f"(buscar_web con dominio «{web}», en su idioma, con el nombre de ese contenido y palabras como «ficha» o «ver», no «canal» ni «programación») "
-                    "y abre con xdg-open el resultado cuyo título o dirección NOMBRE ese contenido y sea de la fecha y la temporada de ahora; nunca una guía de "
+                    "y abre con xdg-open el resultado cuyo título o dirección NOMBRE ese contenido y sea de la fecha y la temporada de ahora (nunca uno marcado «OJO: "
+                    "es de la temporada…»); si hay varios de esta temporada de competiciones distintas, el de la competición y la jornada que dijeron las "
+                    "noticias (pon la competición y la jornada en la búsqueda), y si no lo sabes, pregúntaselo en una frase; nunca una guía de "
                     "programación, un calendario ni una agenda. Si de verdad no está, díselo")
-            log(f"Pidió poner algo y {por_que} (lo dice el código): reintento a fondo")
+            log(f"Pidió poner algo y {por_que} (lo dice el código): reintento con el modelo rápido")
+            rapido = True
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
               and not self._acciones_comprobadas() and verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, respuesta,
                                                      bool(imagen is not None or self.pantalla_adjunta))):
@@ -1935,7 +1940,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.t_tarea = time.time()
         timeout_insistir = TIMEOUT_PROFUNDO
         plazo, espera = None, None
-        if pide:                                          # lo pidió la IA (o tú, con otras palabras): pensar con calma, no insistir a ciegas
+        if rapido:                                        # no hace falta pensar a fondo para elegir bien un enlace o hacer lo que solo se contó
+            self.max_tiempo = TIEMPO_INSISTIR_SIN_AJUSTES
+            timeout_insistir = TIMEOUT_INSISTIR_SIN_AJUSTES
+            plazo = time.time() + TIEMPO_INSISTIR_SIN_AJUSTES
+            log(f"Insisto con el modelo rápido ({pide[:120]})")
+        elif pide:                                        # lo pidió la IA (o tú, con otras palabras): pensar con calma, no insistir a ciegas
             self.max_tiempo = TIEMPO_PENSAR_A_FONDO
             timeout_insistir = TIMEOUT_PENSAR_A_FONDO
             plazo = time.time() + PLAZO_PENSAR_A_FONDO
@@ -1985,11 +1995,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                     "petición: si la frase del usuario parece mal transcrita o no sabes qué quiere, NO sigas: di en una frase que no le has "
                     "entendido y pídele que lo repita.]")
         try:
-            for m in IAC.modelos("profundo"):
+            grupo = "rapido" if rapido else "profundo"
+            for m in IAC.modelos(grupo):
                 self.paso_guion = 0
-                r = self._gemini("profundo", m, pregunta + nota, imagen, self.historial, herramientas=herramientas,
+                r = self._gemini(grupo, m, pregunta + nota, imagen, self.historial, herramientas=herramientas,
                                      ejecutar_herramienta=self.ejecutar_herramienta, sistema=sistema,
-                                     nivel=nivel_razonamiento(m, "profundo"), revisor=self.revisar_respuesta, max_pasos=MAX_PASOS_PROFUNDO,
+                                     nivel=nivel_razonamiento(m, grupo), revisor=self.revisar_respuesta, max_pasos=MAX_PASOS_PROFUNDO,
                                      esperar_cuota=True, timeout=timeout_insistir, plazo=plazo,
                                      al_esperar=lambda: self._avisar_voz(T("Google me pide esperar un momento por el límite de uso; sigo en cuanto pueda.")))
                 if r and pide and parece_promesa(r):
@@ -2001,11 +2012,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                                  and not verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, r,
                                                                 bool(imagen is not None or self.pantalla_adjunta)))
                         self._cerrar_receta_interfaz(bueno)
-                    return r, f"{m} ({'a fondo' if pide else 'insistió a fondo'})"
+                    return r, f"{m} ({'insistió' if rapido else 'a fondo' if pide else 'insistió a fondo'})"
         finally:
             if espera:
                 espera.cancel()
-        if pide:                                          # NUNCA se entrega la frase de «lo voy a pensar» como si fuera la respuesta
+        if pide and not rapido:                           # NUNCA se entrega la frase de «lo voy a pensar» como si fuera la respuesta
             return self._respuesta_directa(pregunta, imagen, herramientas, sistema)
         return respuesta, modelo                       # el segundo intento tampoco respondió: se queda la respuesta rápida
 

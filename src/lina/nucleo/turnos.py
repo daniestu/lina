@@ -112,7 +112,8 @@ _PALABRAS_DE_RELLENO = {
 }
 _SINONIMOS = {"barca": "barcelona", "atleti": "atletico"}
 # Páginas que no son el contenido aunque lo nombren: guías de programación, calendarios, agendas.
-_PAGINA_DE_GUIA = re.compile(r"(?:^|[/_-])(?:programacion(?:-tv)?|parrilla|guia(?:-tv)?|calendario|agenda|horarios?|schedule|tv-guide|fixtures)(?:[/_.-]|$)")
+_PAGINA_DE_GUIA = re.compile(r"(?:^|[/_-])(?:programacion(?:-tv)?|parrilla|guia(?:-tv)?|calendario|agenda|horarios?|schedule|tv-guide|fixtures|"
+                             r"news|noticias?|blog|articulos?|article|comunicacion|prensa)(?:[/_.-]|$)")
 
 
 def palabras_distintivas(texto):
@@ -149,7 +150,7 @@ def pagina_que_no_es(acciones, pregunta, es_lectura):
             if distintivas and any(d in C.normalizar(p.netloc).replace(" ", "") for d in distintivas):
                 return None                                   # «ponme Movistar Plus»: su portada es justo lo pedido
             continue
-        if _PAGINA_DE_GUIA.search(p.path.lower()):
+        if _PAGINA_DE_GUIA.search(p.path.lower()) or de_otra_temporada(u):
             continue
         texto_url = C.normalizar(f"{p.netloc} {p.path} {p.query}").replace(" ", "")
         titulo = C.normalizar(titulos.get(u.rstrip("/"), "")).split()
@@ -160,5 +161,55 @@ def pagina_que_no_es(acciones, pregunta, es_lectura):
     if p.path in ("", "/") and not p.query and not p.fragment:
         return u, f"solo se ha abierto la portada de {p.netloc}"
     if _PAGINA_DE_GUIA.search(p.path.lower()):
-        return u, f"lo que se abrió ({u}) es una guía de programación o un calendario, no la página de ese contenido"
+        return u, f"lo que se abrió ({u}) es una guía de programación, un calendario o una noticia, no la página para verlo"
+    if de_otra_temporada(u):
+        a, b = temporada_actual()
+        return u, f"lo que se abrió ({u}) es de la temporada {de_otra_temporada(u)}, no de la actual ({a:02d}-{b:02d})"
     return u, f"lo que se abrió ({u}) no nombra lo que pidió ({', '.join(sorted(distintivas))})"
+
+
+# Temporadas deportivas en direcciones y títulos: «25-26», «2025-26», «2025/2026». La actual va de julio a junio.
+_TEMPORADA = re.compile(r"(?<!\d)(?:20)?(\d{2})[-/_](?:20)?(\d{2})(?!\d)")
+
+
+def temporada_actual(hoy=None):
+    """(26, 27) en octubre de 2026; (25, 26) en mayo de 2026 (la temporada empieza en julio)."""
+    import datetime
+    hoy = hoy or datetime.date.today()
+    inicio = hoy.year if hoy.month >= 7 else hoy.year - 1
+    return inicio % 100, (inicio + 1) % 100
+
+
+def temporadas_en(texto):
+    """Las temporadas que aparecen en un texto, como (25, 26). Solo pares seguidos (25-26), para no confundirlas con fechas (2026-10-25)."""
+    return {(int(a), int(b)) for a, b in _TEMPORADA.findall(str(texto or "")) if (int(a) + 1) % 100 == int(b)}
+
+
+def de_otra_temporada(texto, hoy=None):
+    """La temporada («25-26») si el texto es de una temporada que NO es la actual; None si es la actual o no dice ninguna."""
+    vistas = temporadas_en(texto)
+    actual = temporada_actual(hoy)
+    if not vistas or actual in vistas:
+        return None
+    a, b = sorted(vistas)[-1]
+    return f"{a:02d}-{b:02d}"
+
+
+
+def competicion_de(url):
+    """«laliga-ea-sports» de «…/laliga-ea-sports-26-27/…»: el trozo de la dirección que lleva la temporada, sin ella (o None si no lleva temporada)."""
+    from urllib.parse import urlparse
+    for trozo in urlparse(str(url or "")).path.split("/"):
+        if temporadas_en(trozo):
+            return _TEMPORADA.sub("", trozo).strip("-_") or None
+    return None
+
+
+def competiciones_de_ahora(urls, hoy=None):
+    """Las competiciones distintas entre las direcciones de la temporada actual (para avisar si hay varias que encajan: LaLiga y Liga F…)."""
+    vistas = []
+    for u in urls:
+        c = competicion_de(u)
+        if c and not de_otra_temporada(u, hoy) and c not in vistas:
+            vistas.append(c)
+    return vistas
