@@ -65,3 +65,38 @@ def solo_se_informo(acciones, es_lectura):
             continue
         return False
     return True
+
+
+# Órdenes de PONER algo para verlo u oírlo: abrir solo la portada de la plataforma no es ponerlo.
+_CONTENIDO_ES = re.compile(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:pon|ponme|ponlo|ponla|ponmelo|ponmela|reproduce|reproduceme|"
+                           r"quiero ver|dejame ver)\b")
+_CONTENIDO_EN = re.compile(r"^(?:(?:hey|ok|please|can you|could you)\s+)*(?:put on|put|play|i want to watch|let me watch)\b")
+_URL = re.compile(r"https?://[^\s'\"]+")
+
+
+def pide_contenido(texto):
+    """¿Pide que le PONGAS algo (un partido, una serie, un vídeo), y no solo abrir un programa o una web?"""
+    from lina.nucleo import idioma as IDI
+    return bool((_CONTENIDO_EN if IDI.actual() == "en" else _CONTENIDO_ES).match(C.normalizar(texto)))
+
+
+def solo_portadas(acciones, es_lectura):
+    """La portada que se abrió (p. ej. «www.movistarplus.es») si, aparte de buscar y leer, lo único que se hizo fue abrir portadas de webs (sin ruta ni
+    parámetros); None si se abrió una página concreta, se hizo otra cosa o no se abrió nada."""
+    from urllib.parse import urlparse
+    portada = None
+    for nombre, args, _ in acciones or []:
+        if nombre in HERRAMIENTAS_DE_INFORMAR:
+            continue
+        comando = str((args or {}).get("comando", "")) if nombre == "ejecutar_comando" else ""
+        if nombre == "ejecutar_comando" and es_lectura(comando):
+            continue
+        urls = _URL.findall(comando)
+        if not urls or len(comando.split()) > 1 + len(urls):
+            return None
+        for u in urls:
+            p = urlparse(u)
+            if p.path not in ("", "/") or p.query or p.fragment:
+                return None
+            portada = p.netloc
+    return portada

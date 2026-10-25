@@ -139,20 +139,35 @@ HERRAMIENTA_BUSCAR = {"functionDeclarations": [{
     "name": "buscar_web",
     "description": "Busca información actualizada en internet (wikis de videojuegos, guías, documentación técnica).",
     "parameters": {"type": "object",
-                   "properties": {"consulta": {"type": "string", "description": "Texto de búsqueda corto y concreto"}},
+                   "properties": {"consulta": {"type": "string", "description": "Texto de búsqueda corto y concreto"},
+                                  "dominio": {"type": "string", "description": ("Opcional: busca solo dentro de esa web (p. ej. «movistarplus.es»), para dar "
+                                                                                "con la página concreta de un contenido en su plataforma.")}},
                    "required": ["consulta"]},
 }]}
 
 
-def buscar_tavily(consulta):
-    """Busca en la web con Tavily y devuelve los resultados como texto para que la IA los lea."""
+def dominio_valido(dominio):
+    """«movistarplus.es» a partir de lo que diga la IA (con o sin https://, www. o ruta), o None si no es un nombre de dominio."""
+    d = str(dominio or "").strip().lower()
+    d = re.sub(r"^[a-z]+://", "", d).split("/")[0].split("?")[0].removeprefix("www.")
+    return d if re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}", d) else None
+
+
+def buscar_tavily(consulta, dominio=None):
+    """Busca en la web con Tavily y devuelve los resultados como texto para que la IA los lea. Con `dominio`, solo dentro de esa web."""
     if not CL.obtener("tavily"):
         return "La búsqueda web no está configurada."
+    pedido = {"query": consulta[:380], "search_depth": "basic", "max_results": 5}
+    if dominio:
+        d = dominio_valido(dominio)
+        if not d:
+            return f"«{str(dominio)[:60]}» no es un nombre de web válido (por ejemplo: movistarplus.es). Vuelve a buscar con un dominio correcto o sin él."
+        pedido["include_domains"] = [d]
     inicio = time.time()
     try:
         r = requests.post("https://api.tavily.com/search",
                           headers={"Authorization": f"Bearer {CL.obtener('tavily')}"},
-                          json={"query": consulta[:380], "search_depth": "basic", "max_results": 5},
+                          json=pedido,
                           timeout=12)
     except requests.RequestException as e:
         log(f"Tavily: sin conexión ({e})")
@@ -164,7 +179,7 @@ def buscar_tavily(consulta):
         resultados = r.json().get("results", [])
     except ValueError:
         resultados = []
-    log(f"Búsqueda «{consulta}»: {len(resultados)} resultados ({time.time() - inicio:.1f} s)")
+    log(f"Búsqueda «{consulta}»{' en ' + pedido['include_domains'][0] if 'include_domains' in pedido else ''}: {len(resultados)} resultados ({time.time() - inicio:.1f} s)")
     if not resultados:
         return "La búsqueda no ha encontrado nada."
     lineas = []

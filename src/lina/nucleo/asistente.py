@@ -55,7 +55,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, pide_accion, solo_herramientas_meta, solo_se_informo
+from lina.nucleo.turnos import HERRAMIENTAS_META, pide_accion, pide_contenido, solo_herramientas_meta, solo_portadas, solo_se_informo
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -1519,7 +1519,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             if self.busquedas_turno >= getattr(self, "max_busquedas", MAX_BUSQUEDAS):
                 return "No hagas más búsquedas: responde con lo que ya tienes o di que no lo has encontrado."
             self.busquedas_turno += 1
-            resultado = buscar_tavily(consulta)
+            resultado = buscar_tavily(consulta, args.get("dominio") or None)
             self.ejecutor.contaminar("búsqueda web")      # A2e: lo que trae internet puede traer instrucciones escondidas
             return resultado
         if nombre == "ejecutar_comando":
@@ -1905,6 +1905,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             obst = (f"el usuario pidió que HICIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}»), no que le informaras, y en esta "
                     f"petición solo se ha buscado o leído, sin hacer nada en el equipo; la respuesta fue: «{str(respuesta)[:200]}»")
             log("Pidió hacer algo y solo se ha informado (lo dice el código, sin revisor): reintento a fondo")
+        elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and "?" not in str(respuesta)
+              and pide_contenido(str(getattr(self, "pregunta_pura", "") or pregunta))
+              and solo_portadas(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura")):
+            portada = solo_portadas(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura")
+            obst = (f"el usuario pidió que le PUSIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») y solo se ha abierto la portada "
+                    f"de {portada}, no ese contenido: busca DENTRO de esa web (buscar_web con dominio «{portada.removeprefix('www.')}») la página de lo que pidió, "
+                    "comprueba que la fecha y la temporada son las de ahora y ábrela con xdg-open; si de verdad no está, díselo")
+            log(f"Pidió poner algo y solo se ha abierto la portada de {portada} (lo dice el código): reintento a fondo")
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
               and not self._acciones_comprobadas() and verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, respuesta,
                                                      bool(imagen is not None or self.pantalla_adjunta))):

@@ -70,7 +70,7 @@ def test_una_pregunta_con_solo_busqueda_no_se_reintenta(monkeypatch):
 
 
 def test_si_ya_lo_abrio_no_se_reintenta(monkeypatch):
-    A, a, enviadas = _asistente("Ponme el partido del Barça", [("buscar_web", {}, "…"), ("ejecutar_comando", {"comando": "xdg-open https://www.dazn.com"}, "código de salida: 0")])
+    A, a, enviadas = _asistente("Ponme el partido del Barça", [("buscar_web", {}, "…"), ("ejecutar_comando", {"comando": "xdg-open https://www.dazn.com/es-ES/fixture/barcelona-sevilla"}, "código de salida: 0")])
     monkeypatch.setattr(A, "verificar_cumplimiento", lambda *x, **k: False)
     r, _ = a._insistir_si_hace_falta("Te abro DAZN en Brave.", "m", "rapido", "p", None, [], "s")
     assert r == "Te abro DAZN en Brave." and not enviadas
@@ -81,3 +81,84 @@ def test_la_pista_de_whisper_lleva_navegador():
         sys.modules.setdefault(m, MagicMock())
     from lina.nucleo import asistente as A
     assert "navegador" in A.prompt_whisper()
+
+
+# ---------- buscar dentro de la web de la plataforma y no quedarse en su portada ----------
+def test_la_regla_dice_buscar_dentro_de_la_plataforma_y_no_quedarse_en_la_portada():
+    assert "busca DENTRO de su web" in K.INSTRUCCIONES and "temporada" in K.INSTRUCCIONES and "pulse «Ver»" in K.INSTRUCCIONES
+    assert "search INSIDE its website" in K.INSTRUCCIONES_EN and "season" in K.INSTRUCCIONES_EN
+
+
+@pytest.mark.parametrize("entrada, esperado", [("movistarplus.es", "movistarplus.es"), ("https://www.movistarplus.es/deportes", "movistarplus.es"),
+                                               ("WWW.DAZN.COM", "dazn.com"), ("ver.movistarplus.es", "ver.movistarplus.es"),
+                                               ("no es un dominio", None), ("javascript:alert(1)", None), ("", None), ("localhost", None)])
+def test_dominio_valido(entrada, esperado):
+    from lina.nucleo import ia as IA
+    assert IA.dominio_valido(entrada) == esperado
+
+
+def test_la_busqueda_dentro_de_una_web_se_lo_pide_a_tavily(monkeypatch):
+    from lina.nucleo import ia as IA
+    enviado = {}
+
+    class _R:
+        ok = True
+
+        def json(self):
+            return {"results": [{"title": "Ver Jornada 10: Barcelona - Sevilla", "url": "https://www.movistarplus.es/deportes/ficha?id=1", "content": "Hoy"}]}
+    monkeypatch.setattr(IA.CL, "obtener", lambda nombre: "clave-de-prueba")
+    monkeypatch.setattr(IA.requests, "post", lambda url, headers=None, json=None, timeout=None: (enviado.update(json), _R())[1])
+    r = IA.buscar_tavily("barcelona sevilla jornada 10", "https://www.movistarplus.es/")
+    assert enviado["include_domains"] == ["movistarplus.es"] and "ficha?id=1" in r
+    enviado.clear()
+    IA.buscar_tavily("barcelona sevilla")
+    assert "include_domains" not in enviado
+
+
+def test_un_dominio_mal_formado_no_busca(monkeypatch):
+    from lina.nucleo import ia as IA
+    monkeypatch.setattr(IA.CL, "obtener", lambda nombre: "clave-de-prueba")
+    monkeypatch.setattr(IA.requests, "post", MagicMock(side_effect=AssertionError("no debía buscar")))
+    assert "no es un nombre de web válido" in IA.buscar_tavily("x", "no es un dominio")
+
+
+def test_buscar_web_pasa_el_dominio(monkeypatch):
+    A, a, _ = _asistente("x", [])
+    a.busquedas_turno, a.max_busquedas = 0, 2
+    pedidas = []
+    monkeypatch.setattr(A, "buscar_tavily", lambda consulta, dominio=None: pedidas.append((consulta, dominio)) or "ok")
+    a._ejecutar_herramienta("buscar_web", {"consulta": "barcelona sevilla", "dominio": "movistarplus.es"})
+    assert pedidas == [("barcelona sevilla", "movistarplus.es")]
+
+
+def test_solo_portadas():
+    leer = lambda c: False
+    assert TU.solo_portadas([("buscar_web", {}, ""), ("ejecutar_comando", {"comando": "xdg-open https://www.movistarplus.es"}, "")], leer) == "www.movistarplus.es"
+    assert TU.solo_portadas([("ejecutar_comando", {"comando": "xdg-open https://www.dazn.com/"}, "")], leer) == "www.dazn.com"
+    assert TU.solo_portadas([("ejecutar_comando", {"comando": "xdg-open https://www.movistarplus.es/deportes/ficha?id=1"}, "")], leer) is None
+    assert TU.solo_portadas([("ejecutar_comando", {"comando": "xdg-open https://www.movistarplus.es/?q=barça"}, "")], leer) is None
+    assert TU.solo_portadas([("abrir_app", {"nombre": "Brave"}, "")], leer) is None
+    assert TU.solo_portadas([("buscar_web", {}, "")], leer) is None
+
+
+def test_abrir_solo_la_portada_tras_ponme_hace_insistir(monkeypatch):
+    A, a, enviadas = _asistente("Ponme el partido del Barça en el navegador",
+                                [("buscar_web", {}, "…"), ("ejecutar_comando", {"comando": "xdg-open https://www.movistarplus.es"}, "código de salida: 0")])
+    monkeypatch.setattr(A, "verificar_cumplimiento", MagicMock(side_effect=AssertionError("no hace falta el revisor")))
+    a._insistir_si_hace_falta("El partido lo emite Movistar Plus, te he abierto la plataforma.", "m", "rapido", "p", None, [], "s")
+    assert enviadas and "PUSIERAS" in enviadas[0] and "«movistarplus.es»" in enviadas[0]
+
+
+def test_abrir_la_ficha_no_hace_insistir(monkeypatch):
+    A, a, enviadas = _asistente("Ponme el partido del Barça", [("buscar_web", {}, "…"), ("ejecutar_comando", {
+        "comando": "xdg-open 'https://www.movistarplus.es/deportes/futbol-espanol/laliga/fc-barcelona-sevilla/ficha?tipo=E&id=1'"}, "código de salida: 0")])
+    monkeypatch.setattr(A, "verificar_cumplimiento", lambda *x, **k: False)
+    a._insistir_si_hace_falta("Te abro el partido; si no empieza solo, pulsa Ver.", "m", "rapido", "p", None, [], "s")
+    assert not enviadas
+
+
+def test_abrir_una_web_que_se_pidio_abrir_no_hace_insistir(monkeypatch):
+    A, a, enviadas = _asistente("Abre YouTube", [("ejecutar_comando", {"comando": "xdg-open https://www.youtube.com"}, "código de salida: 0")])
+    monkeypatch.setattr(A, "verificar_cumplimiento", lambda *x, **k: False)
+    a._insistir_si_hace_falta("Abierto.", "m", "rapido", "p", None, [], "s")
+    assert not enviadas
