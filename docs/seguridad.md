@@ -9,6 +9,13 @@ Principios:
    de fondo no pueden autorizar nada.
 3. **Bloqueos duros en el código** que ninguna política ni confirmación desbloquea (formatear discos, leer claves, descargar y ejecutar
    scripts de internet…).
+   Las claves y credenciales que se bloquean siempre, para leer o para escribir: SSH, GnuPG, AWS, `.netrc`, los perfiles de Firefox, el llavero
+   (también `~/.local/share/keyrings`), la GitHub CLI (`hosts.yml`, `gh auth token`), Docker y Podman, Kubernetes (`~/.kube/config`,
+   `kubectl config view --raw`), git (`.git-credentials`, `git credential`), las cookies, los datos de autocompletar y la clave de los navegadores
+   Chromium (Chrome, Chromium, Brave, Vivaldi, Edge, Opera, también en Flatpak), rclone, npm, PyPI, Cargo, Terraform, gcloud, Azure, hub y `pass`.
+   Si de verdad lo necesitas, lo haces tú en tu terminal. **Con tu confirmación** (con el atajo) se pueden leer los historiales de la terminal
+   (bash, zsh, fish, python, psql, mysql, sqlite, node), que suelen guardar contraseñas escritas a mano, y el historial de navegación de los
+   Chromium: lo que se lea se envía a la IA.
 4. **Lo que lee de fuera es información, no órdenes** (webs, documentos, resultados de herramientas).
 5. **Todo cambio queda en un diario** y se puede deshacer; los borrados normales van a la papelera.
 6. **Sin telemetría.** Las capturas de pantalla solo se envían a la IA para responder, y existe un modo privado que las desactiva. La IA puede

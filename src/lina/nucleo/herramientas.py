@@ -45,7 +45,7 @@ from lina.nucleo.clasificador import (  # noqa: F401
     _SECRETOS, _SHELLS, _SUDOERS, _SUDO_LECTURA, _SUSTITUCION_A_SHELL, _apps_instaladas, _bloqueado, _bloqueado_hostil,
     _codigo_en_linea, _critico_extra, _descarga_y_ejecuta, _disco_de_datos, _es_inocuo, _es_interprete, _es_lanzamiento,
     _es_lectura, _es_objetivo_peligroso, _limpiar_escapes, _nombres_descargados, _normalizar_ruta, _que_ejecuta, _quitar_prefijos,
-    _ruta_abrible, _segmento_lectura, _segmentos, _sin_acentos, _tokens, analizar_instalacion, destruccion_total,
+    _ruta_abrible, _segmento_lectura, _segmentos, _sin_acentos, _tokens, analizar_instalacion, destruccion_total, lectura_sensible,
 )
 from lina.nucleo.procesos import _fuera_del_servicio  # noqa: F401
 from lina.nucleo.registro import ARCHIVO_ACCIONES, MAX_REGISTRO_ACCIONES, anotar, log, notificar  # noqa: F401
@@ -467,6 +467,9 @@ def clasificar(comando):
         return ("critico", motivo) if nivel == "critico" else ("instalar", "")
     if _es_lanzamiento(comando):
         return "lanzar", ""
+    sensible = lectura_sensible(comando)                       # historiales: leerlos vale, pero con tu confirmación (lo leído va a la IA)
+    if sensible:
+        return "critico", sensible
     if _es_inocuo(comando):
         return "inocuo", ""
     if _es_lectura(comando):

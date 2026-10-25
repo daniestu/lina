@@ -61,6 +61,36 @@ _SECRETOS = [r"\.config/lina", r"\.ssh\b", r"\.gnupg", r"/etc/shadow", r"/etc/gs
              r"\bid_(rsa|ed25519|ecdsa|dsa)\b", r"\.netrc", r"\.aws/", r"logins\.json", r"key4\.db",
              r"cookies\.sqlite", r"login data", r"\.mozilla", r"\.pgpass", r"\.key\b",
              r"/proc/(?:self|thread-self|\d+|\*)/(?:environ|mem|maps)", r"\bsecret-tool\b", r"\bkwallet(?:cli|-query)\b", r"\bkeyctl\b", r"gnome-keyring"]
+# Más credenciales (fase 17, S4): archivos que guardan tokens y órdenes que los imprimen. Los archivos que empiezan por punto se buscan como ruta (tras /, ~,
+# espacio o comillas: los comandos se ejecutan en tu carpeta personal, así que «cat .npmrc» también cuenta), no dentro de una dirección web («x.azure.com»).
+_P = r"(?:^|[\s/'\"=<])"
+_NAVEGADORES_CHROMIUM = r"(?:google-chrome(?:-beta|-unstable)?|chromium|bravesoftware|vivaldi|microsoft-edge(?:-beta|-dev)?|opera)"
+_SECRETOS += [
+    r"\.config/gh/hosts\.yml", r"\bgh\s+auth\s+token\b", r"\bgh\s+auth\s+status\b[^;|&\n]*(?:\s-t\b|--show-token)",                       # GitHub CLI
+    r"\.docker/config\.json", r"\bdocker-credential-", r"containers/auth\.json",                                                       # Docker, Podman
+    r"\.kube/config\b", r"\bkubectl\s+config\s+view\b[^;|&\n]*--raw",                                                                 # Kubernetes
+    _P + r"\.git-credentials", r"\.config/git/credentials", r"\bgit\s+(?:-[cC]\s+\S+\s+)*credential(?:-store|-cache)?\b",                # git
+    _NAVEGADORES_CHROMIUM + r"[^;|&\n]*\b(?:cookies|web\\?\s?data|local\\?\s?state)\b",                                               # sesiones, tarjetas y su clave
+    r"rclone/rclone\.conf", _P + r"\.npmrc\b", _P + r"\.pypirc\b", r"\.cargo/credentials", r"\.terraform\.d/credentials",
+    r"\.config/gcloud\b", _P + r"\.azure(?:/|\s|$|['\"])", r"\.config/hub\b", r"\.local/share/keyrings",
+    r"(?:^|[;&|(`]|\$\()\s*(?:sudo\s+(?:-\S+\s+)*)?pass\s+\S",                                                                       # pass (y pass show/otp) imprime contraseñas
+]
+# Se pueden leer, pero con tu confirmación: suelen guardar contraseñas escritas a mano (historiales de la shell) o dicen qué webs visitas (navegación).
+_LECTURA_SENSIBLE = [
+    (_P + r"\.(?:bash_history|zsh_history|zhistory|python_history|psql_history|mysql_history|sqlite_history|node_repl_history)\b|fish/fish_history\b",
+     "es un historial de la terminal y puede contener contraseñas que escribiste; lo que lea se enviará a la IA"),
+    (_NAVEGADORES_CHROMIUM + r"[^;|&\n]*\bhistory\b",
+     "es el historial de navegación (dice qué webs visitas); lo que lea se enviará a la IA"),
+]
+
+
+def lectura_sensible(comando):
+    """Si el comando lee algo que solo se lee con tu confirmación (historiales), el motivo; si no, None."""
+    bajo = str(comando).lower()
+    for patron, motivo in _LECTURA_SENSIBLE:
+        if re.search(patron, bajo):
+            return motivo
+    return None
 _PROPIO = (r"(?:^|/)lina/(?:nucleo|voz|escritorio|modulos|mcp|datos)/|site-packages/lina|/src/lina/|\.config/lina|\.local/share/lina|\.local/state/lina|"
           r"lina\.service|systemd/user/lina|systemctl[^;|&\n]*\blina\b|mcp\.json|mcp_estado|"
           r"\b(?:politica|comandos|activacion|presupuesto|paquetes_confiables|alias|vocabulario|disco_datos)\.txt|config\.toml|mcp_claves|"
@@ -301,7 +331,7 @@ def _bloqueado(comando, _profundidad=0):
         return "descargaría y ejecutaría un script de internet sin revisarlo"
     for patron in _SECRETOS:
         if re.search(patron, bajo):
-            return "toca claves, contraseñas o credenciales"
+            return "toca claves, contraseñas o credenciales (si de verdad lo necesitas, el usuario puede hacerlo él mismo en su terminal)"
     if re.search(_PROPIO, bajo):
         return "tocaría mi propio código o mi servicio"
     if re.search(_SUDOERS, bajo):
