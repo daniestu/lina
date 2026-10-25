@@ -45,6 +45,7 @@ from lina.nucleo import modelos as MODELOS
 from lina.nucleo import reproductor as REPRO
 from lina.voz import atenuador as ATE
 from lina.voz import piper_residente as PIPER_RES
+from lina.voz import turno as TURNO
 from lina.voz import voces as VOC
 
 import numpy as np
@@ -132,7 +133,7 @@ from lina.nucleo.constantes import (  # noqa: F401
     MODELOS_PROFUNDO, MODELO_LOCAL, MODELO_WHISPER, NO_VE_PANTALLA, OLLAMA, PANTALLA_SESION_SEG, PAUSA_BUSQUEDA_SEG,
     PAUSA_MODELO_SEG, PLAZO_PENSAR_A_FONDO, PRIORIDAD, PROMPT_WHISPER_CARACTERES, REINTENTOS_SERVIDOR, SESION_MINUTOS,
     SIN_RESPUESTA, TIEMPO_INSISTIR_SIN_AJUSTES, TIEMPO_PENSAR_A_FONDO, TIMEOUT_CONFIRMACION, TIMEOUT_INSISTIR_SIN_AJUSTES,
-    TIMEOUT_PENSAR_A_FONDO, TIMEOUT_PRIMERA_CLAVE, TIMEOUT_PROFUNDO, VOZ, SOLTAR_LOCAL_PLAN_B,
+    TIMEOUT_PENSAR_A_FONDO, TIMEOUT_PRIMERA_CLAVE, TIMEOUT_PROFUNDO, VOZ, SOLTAR_LOCAL_PLAN_B, ESPERA_TURNO_VOZ,
 )
 
 
@@ -754,6 +755,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             log(f"Error al atender lo que dijiste mientras pensaba: {e!r}")
 
     def callar(self):
+        """«Cállate» (el atajo mientras habla): corta lo que suena y descarta lo que esperaba su turno para hablar."""
+        self._turno_voz().callar()
         if self.reproductor:
             self.reproductor.terminate()
 
@@ -927,6 +930,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self._atender(pregunta, inicio, crono, origen=ORIGEN_ATAJO)
 
     def _atender(self, pregunta, inicio, crono=None, nota_sistema="", profundidad=0, origen=None):
+        self._n_peticion = getattr(self, "_n_peticion", 0) + 1        # los avisos de espera de esta petición caducan cuando se dice su respuesta
         self.origen_voz_libre = _origen_valido(origen) != ORIGEN_ATAJO   # el de ESTA petición; sin origen, el restrictivo
         self.ejecutor.origen = ORIGEN_VOZ_LIBRE if self.origen_voz_libre else ORIGEN_ATAJO      # para retomarla con el mismo si pasa a segundo plano
         crono = crono or TIE.Cronometro()
@@ -1047,8 +1051,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if modo == "profundo":
             log(f"Modo a fondo ({motivo_modo})")
             if not confirmado:  # que sepas que va a tardar un poco más
-                aviso_voz = threading.Thread(target=self._hablar, args=(T("Vale, lo pienso con calma."),), daemon=True)
-                aviso_voz.start()
+                aviso_voz = self._avisar_voz(T("Vale, lo pienso con calma."))
         crono.sumar("previas", crono.total() - crono.fases.get("whisper", 0.0))
         self.crono = crono                                         # las herramientas suman aquí su tiempo
         t_ia = crono.reloj()
@@ -1761,13 +1764,18 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         return texto
 
     def _avisar_voz(self, texto):
-        """Dice algo en voz alta sin bloquear (y sin romper nada si el audio falla)."""
+        """Un aviso de espera («lo pienso a fondo», «Google está tardando…»), sin bloquear y sin romper nada si el audio falla. Es efímero: si cuando le
+        llega el turno ya se ha dicho la respuesta de su petición, no se dice. Devuelve el hilo."""
+        n = getattr(self, "_n_peticion", 0)
+
         def hablar():
             try:
-                self._hablar(texto)
+                self._hablar(texto, tipo="efimero", vigente=lambda: getattr(self, "_n_respondida", 0) < n)
             except Exception as e:
                 log(f"No he podido avisar por voz: {e!r}")
-        threading.Thread(target=hablar, daemon=True).start()
+        hilo = threading.Thread(target=hablar, daemon=True)
+        hilo.start()
+        return hilo
 
     def pista_de_voz(self, texto):
         """Si le pides abrir o cerrar algo y lo que se oyó suena casi como un programa instalado, esa pista; si no encaja con ninguno, la lista de
@@ -2076,10 +2084,37 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         return (r or SIN_RESPUESTA), "local (plan B)"
 
     def decir(self, texto):
-        self.estado = "hablando"
-        self._hablar(texto)
+        """La respuesta de la petición en curso. Si deja algo pendiente de tu «sí», es una pregunta de confirmación: no se puede perder en silencio."""
+        with (getattr(self, "cerrojo", None) or nullcontext()):
+            self.estado = "hablando"
+        ej = getattr(self, "ejecutor", None)
+        tipo = "confirmacion" if ej is not None and getattr(ej, "pendientes", None) and "?" in str(texto) else "normal"
+        n = getattr(self, "_n_peticion", 0)
+        self._hablar(texto, tipo=tipo, al_empezar=lambda: setattr(self, "_n_respondida", n))
 
-    def _hablar(self, texto, voz=None):
+    def _turno_voz(self):
+        if getattr(self, "turno_voz", None) is None:
+            self.turno_voz = TURNO.TurnoDeVoz()
+        return self.turno_voz
+
+    def _hablar(self, texto, voz=None, tipo="normal", vigente=None, al_empezar=None):
+        """Sintetiza y dice `texto`, esperando su turno (de una en una y en orden). `tipo`: normal, efimero (un aviso de espera), aviso (de segundo plano)
+        o confirmacion (pregunta con algo pendiente de tu «sí»). Si un aviso o una confirmación no llega a decirse (cállate, o se esperó demasiado), sale
+        como notificación del escritorio para que no se pierda."""
+        resultado = self._turno_voz().pedir(ESPERA_TURNO_VOZ, vigente=vigente)
+        if resultado != TURNO.TURNO:
+            log(f"Voz: no digo «{str(texto)[:80]}» ({ {TURNO.TOPE: 'esperó demasiado su turno', TURNO.DESCARTADA: 'me has mandado callar', TURNO.CADUCADA: 'ya se dijo la respuesta'}[resultado] })")
+            if tipo in ("aviso", "confirmacion") and resultado in (TURNO.TOPE, TURNO.DESCARTADA):
+                H.notificar(T("Lina: no te lo he dicho en voz alta"), limpiar_para_voz(texto))
+            return
+        try:
+            if al_empezar:
+                al_empezar()
+            self._hablar_ya(texto, voz)
+        finally:
+            self._turno_voz().soltar()
+
+    def _hablar_ya(self, texto, voz=None):
         texto = limpiar_para_voz(texto)
         texto = numeros_a_palabras(texto)
         voz = voz or VOC.voz_elegida() or VOZ                  # la elegida ahora mismo: cambiarla se nota al instante, sin reiniciar
@@ -2123,7 +2158,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return False
         log(f"Aviso por voz: {texto}")
         try:
-            self._hablar(texto)
+            self._hablar(texto, tipo="aviso")
         finally:
             self.estado = "esperando"
         return True

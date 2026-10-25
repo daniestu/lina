@@ -232,7 +232,7 @@ Lo que ya está bien: `rm` va a la papelera; `shred`, `truncate` y `dd` sobre tu
 ### Latencia y voz
 | # | Qué | Tamaño |
 |---|---|---|
-| V1 | **Cola de voz**: hoy `_hablar` usa un solo `respuesta.wav` y un solo `self.reproductor`; avisos sueltos («lo pienso a fondo», «Google está tardando», el estado) pueden coincidir, pisarse el audio, y «cállate» solo para uno. Un hablante cada vez, archivos propios por frase. | S |
+| V1 | **Cola de voz** *(hecha: turno en orden de llegada, «cállate» descarta lo que espera, avisos de espera que caducan y notificación para avisos y confirmaciones que no llegan a decirse)*: hoy `_hablar` usa un solo `respuesta.wav` y un solo `self.reproductor`; avisos sueltos («lo pienso a fondo», «Google está tardando», el estado) pueden coincidir, pisarse el audio, y «cállate» solo para uno. Un hablante cada vez, archivos propios por frase. | S |
 | V2 | **Captura de pantalla solo cuando haga falta**: hoy se hace en cada pulsación, también en modo privado o sin permiso. | S |
 | V3 | **Fin de frase por silencio con el atajo** (ajuste, apagado por defecto hasta medirlo): una pulsación en vez de dos, con el detector que ya usa el manos libres. Medir con `lina tiempos` y `probar-voz` que no corta frases. | M |
 | V4 | **Instrucciones más ligeras**: cada llamada lleva ~16 000 caracteres de instrucciones y 5 000–14 000 de herramientas, y se repiten en cada vuelta. Primero medir si la caché de Gemini se aprovecha (`cachedContentTokenCount` en el registro); después pasar las reglas de situaciones concretas (música, navegador…) a sus grupos. | M |

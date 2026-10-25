@@ -71,6 +71,7 @@ MAX_BUSQUEDAS = 2                           # búsquedas máximas por pregunta
 CONFIRMAR_ACCIONES = True                   # True: lo que cambia el sistema espera tu "sí"; False: modo libre (solo se bloquea lo catastrófico)
 MAX_CONTINUACIONES = 3                      # veces seguidas que se retoma una petición tras una tarea en segundo plano (para que no dé vueltas sin fin)
 MAX_PASOS = 10                              # llamadas a herramientas máximas por pregunta
+ESPERA_TURNO_VOZ = 60                       # segundos que una frase espera su turno para hablar; después se salta (y, si importa, sale como notificación)
 
 ARCHIVO_PID = RUT.PID
 CAPTURA = RUT.temporal("captura.png")
