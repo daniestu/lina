@@ -255,18 +255,18 @@ def limpiar(texto):
 # las variables de entorno (así «ShortcutKey=Meta+X» de un archivo de KDE no se toca). Va por trozos del nombre, a propósito de más: también tapa variables
 # inofensivas que los contengan (KEYMAP, GIT_AUTHOR_NAME…); a cambio no se escapa GITHUB_TOKEN ni MYAPIKEY.
 _NOMBRE_SECRETO = re.compile(r"TOKEN|SECRET|KEY|PASS|AUTH|CREDENTIAL")
-_ASIGNACION = re.compile(r"^(\s*(?:export\s+|declare\s+-\S+\s+)?)([A-Z_][A-Z0-9_]*)=(.+)$")
+# NOMBRE=valor en cualquier sitio de la línea (env, export, declare -x, o dentro de lo que se lee en una terminal): el valor, hasta un espacio o el cierre
+# de unas comillas. El nombre tiene que ir entero en mayúsculas y no venir pegado a otra palabra.
+_ASIGNACION = re.compile(r"(?<![A-Za-z0-9_])([A-Z_][A-Z0-9_]*)=(\"[^\"]*\"|'[^']*'|[^\s\"'«»,;]+)")
 
 
 def limpiar_para_ia(texto):
-    """Lo que sale de un comando, antes de dárselo a la IA: sin claves (como en el registro) y sin el valor de las variables con nombre de secreto."""
-    lineas = []
-    for linea in limpiar(texto).split("\n"):
-        m = _ASIGNACION.match(linea)
-        if m and _NOMBRE_SECRETO.search(m.group(2)) and m.group(3).strip() not in ("", "''", '""'):
-            linea = f"{m.group(1)}{m.group(2)}={TAPADA}"
-        lineas.append(linea)
-    return "\n".join(lineas)
+    """Lo que devuelve una herramienta, antes de dárselo a la IA: sin claves (como en el registro) y sin el valor de las variables con nombre de secreto."""
+    def tapar(m):
+        if not _NOMBRE_SECRETO.search(m.group(1)) or m.group(2) in ("''", '""'):
+            return m.group(0)
+        return f"{m.group(1)}={TAPADA}"
+    return _ASIGNACION.sub(tapar, limpiar(texto))
 
 
 class FiltroSalida:

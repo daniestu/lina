@@ -531,9 +531,21 @@ def _leer_valor(comando):
         return None
 
 
+_CLAVE_SECRETA = re.compile(r"password|passwd|passphrase|token|secret|api_?key", re.I)
+
+
+def valor_mostrable(clave, valor):
+    """El valor de una clave de configuración tal como se le enseña a la IA: si la clave tiene nombre de contraseña o token, tapado (en KDE nadie cambia
+    una contraseña así, y algún *rc la guarda en claro). Sin distinguir mayúsculas, porque aquí solo hay claves de configuración."""
+    if valor is None or not _CLAVE_SECRETA.search(str(clave or "")):
+        return valor
+    from lina.nucleo import claves as CL
+    return CL.TAPADA
+
+
 def _texto_cambio(c):
-    ant = "(no existía)" if c.get("antes") is None else c["antes"]
-    des = "(eliminada)" if c.get("despues") is None else c["despues"]
+    ant = "(no existía)" if c.get("antes") is None else valor_mostrable(c.get("clave"), c["antes"])
+    des = "(eliminada)" if c.get("despues") is None else valor_mostrable(c.get("clave"), c["despues"])
     return f"{c.get('archivo', '?')} {c.get('grupo', '')} {c.get('clave', '?')}: {ant} → {des}"
 
 
@@ -561,7 +573,8 @@ def observar_config(fase, carpeta=None):
         a, b = _parsear_ini(antes.get(n, "")), _parsear_ini(ahora.get(n, ""))
         for k in sorted(set(a) | set(b)):
             if a.get(k) != b.get(k):
-                cambios.append(f"- {n} {k[0]} {k[1]}: {a.get(k, '(no existía)')} → {b.get(k, '(eliminada)')}")
+                cambios.append(f"- {n} {k[0]} {k[1]}: {valor_mostrable(k[1], a.get(k)) if k in a else '(no existía)'} → "
+                               f"{valor_mostrable(k[1], b.get(k)) if k in b else '(eliminada)'}")
     if not cambios:
         return ("No ha cambiado ningún archivo de configuración de KDE. Puede que el usuario no haya pulsado Aplicar, o que ese ajuste "
                 "se guarde en otro sitio. Pídele que lo repita y vuelve a mirar.")
@@ -705,9 +718,11 @@ def buscar_ajuste_kde(consulta, valor=None):
             archivos.append(e["archivo"])
         tuyos = [(g, v) for g, k, v in ini.get(e["archivo"], []) if k == e["clave"]]
         if tuyos:
-            efectivo, ahora = tuyos[0][1], "ahora vale " + tuyos[0][1] + " (tu archivo: " + "; ".join(f"{g}={v}" for g, v in tuyos[:3]) + ")"
+            efectivo = tuyos[0][1]
+            ahora = ("ahora vale " + valor_mostrable(e["clave"], tuyos[0][1]) + " (tu archivo: "
+                     + "; ".join(f"{g}={valor_mostrable(e['clave'], v)}" for g, v in tuyos[:3]) + ")")
         elif e["defecto"]:
-            efectivo, ahora = e["defecto"], f"ahora vale {e['defecto']} (valor por defecto: no está en tu archivo)"
+            efectivo, ahora = e["defecto"], f"ahora vale {valor_mostrable(e['clave'], e['defecto'])} (valor por defecto: no está en tu archivo)"
         elif e.get("calculado"):
             efectivo, ahora = None, "valor por defecto calculado por el programa: no se puede saber leyendo el esquema (míralo en su panel con mirar_pantalla)"
         else:

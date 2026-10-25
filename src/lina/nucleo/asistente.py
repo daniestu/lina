@@ -991,7 +991,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 self._cerrar_directa(pregunta, repetida[0], repetida[1], inicio, crono)
                 return
             if self._nota_pasos:
-                nota_sistema += f"\n[SISTEMA: {self._nota_pasos}]"
+                nota_sistema += f"\n[SISTEMA: {CL.limpiar_para_ia(self._nota_pasos)}]"
         self.hilo_captura.join()
         imagen = preparar_imagen()
         self.pregunta_pura = pregunta
@@ -1403,7 +1403,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             resultado = self.ejecutor.confirmar_pendientes()
             self.acciones_confirmadas = [("ejecutar_comando", {"comando": c, "motivo": m}, r) for c, m, r in self.ejecutor.ultimas]
             return ("\n[SISTEMA: el usuario ha confirmado y las acciones pendientes ya se han ejecutado. Resultado:\n"
-                    f"{resultado}\nCuéntaselo con naturalidad y brevedad, sin volver a pedir confirmación.]"), True
+                    f"{CL.limpiar_para_ia(resultado)}\nCuéntaselo con naturalidad y brevedad, sin volver a pedir confirmación.]"), True
         if decision == "pregunta":
             self.ejecutor.t_pendiente = time.time()          # sigue esperando: tiene dudas, no ha dicho que no
             return ("\n[SISTEMA: hay una acción pendiente de confirmar y NO se ha ejecutado:\n" + descripcion + "\nEl usuario no la "
@@ -1486,6 +1486,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         crono = getattr(self, "crono", None)
         with (crono.medir("herramientas") if crono else nullcontext()):
             resultado = self._ejecutar_herramienta(nombre, args)
+        if isinstance(resultado, str):
+            resultado = CL.limpiar_para_ia(resultado)               # punto único: ninguna herramienta (comandos, documentos, KDE, interfaz, web, MCP) le pasa claves a la IA
         if crono:
             crono.herramientas += 1
         self.acciones_turno.append((nombre, args, resultado))
