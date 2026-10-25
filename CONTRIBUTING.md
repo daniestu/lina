@@ -16,7 +16,9 @@ Necesitas Python 3.11 o superior.
 
 ## Reglas
 
-- **Commits** con [Conventional Commits](https://www.conventionalcommits.org/es/v1.0.0/): `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`.
+- **Mensajes de commit**: una sola línea en español, con minúscula inicial y sin prefijo (`feat:`, `fix:`…), que diga qué cambia y, tras dos puntos, el
+  detalle que lo distingue. Por ejemplo: «directas tolera variantes que Whisper oye torcidas: renuda, entiende el bluetooth, conecto». Sin líneas de
+  coautoría (`Co-Authored-By`), sin pies del tipo «Generated with…» y sin ningún trailer.
 - **Código y mensajes al usuario en español**; nombres de variables y módulos también en español, como el resto del proyecto.
 - Cada cambio de comportamiento lleva su prueba. Las pruebas no deben tocar tu `$HOME` real: `tests/conftest.py` les da a todas una casa temporal en
   `tests/.casa-pruebas/` (con `HOME`, las carpetas XDG y `XDG_RUNTIME_DIR` dentro, sin bus de sesión ni `DISPLAY`/`WAYLAND_DISPLAY`) antes de importar
