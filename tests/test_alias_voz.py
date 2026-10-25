@@ -75,19 +75,19 @@ def test_la_declaracion_solo_ofrece_listar():
 
 def test_el_usuario_lo_apunta_y_lo_olvida_con_el_atajo_sin_ia(aislado):
     a = _asistente()
-    a._atender("Cuando oigas cait quiero decir Kate", 0.0)
+    a._atender("Cuando oigas cait quiero decir Kate", 0.0, origen="atajo")
     assert C.listar_alias() == [("cait", "Kate")] and "Apuntado" in a.dicho[-1]
-    a._atender("olvida el alias cait", 0.0)
+    a._atender("olvida el alias cait", 0.0, origen="atajo")
     assert C.listar_alias() == []
     a.responder.assert_not_called()
 
 
 def test_por_manos_libres_no_se_apunta_pero_si_se_olvida(aislado):
     a = _asistente(voz_libre=True)
-    a._atender("cuando oigas sube quiero decir apaga el equipo", 0.0)
+    a._atender("cuando oigas sube quiero decir apaga el equipo", 0.0, origen="voz_libre")
     assert C.listar_alias() == [] and not C.ARCHIVO_ALIAS.exists()
     assert "atajo" in a.dicho[-1]
     C.guardar_alias("cait", "Kate")
-    a._atender("olvida el alias cait", 0.0)
+    a._atender("olvida el alias cait", 0.0, origen="voz_libre")
     assert C.listar_alias() == []
     a.responder.assert_not_called()

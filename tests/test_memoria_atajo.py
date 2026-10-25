@@ -48,7 +48,7 @@ def _textos():
 
 def test_por_manos_libres_no_se_apunta():
     a = _asistente(voz_libre=True)
-    a._atender("Recuerda que mi navegador favorito es Brave", 0.0)
+    a._atender("Recuerda que mi navegador favorito es Brave", 0.0, origen="voz_libre")
     assert _textos() == [] and not M.ARCHIVO.exists()
     assert "atajo" in a.dicho[-1]
     a.responder.assert_not_called()
@@ -56,7 +56,7 @@ def test_por_manos_libres_no_se_apunta():
 
 def test_con_el_atajo_se_apunta():
     a = _asistente(voz_libre=False)
-    a._atender("Recuerda que mi navegador favorito es Brave", 0.0)
+    a._atender("Recuerda que mi navegador favorito es Brave", 0.0, origen="atajo")
     assert _textos() == ["mi navegador favorito es Brave"]
     a.responder.assert_not_called()
 
@@ -64,8 +64,8 @@ def test_con_el_atajo_se_apunta():
 def test_olvidar_y_listar_tambien_por_manos_libres():
     assert M.recordar("mi navegador favorito es Brave")[0]
     a = _asistente(voz_libre=True)
-    a._atender("¿Qué recuerdas de mí?", 0.0)
+    a._atender("¿Qué recuerdas de mí?", 0.0, origen="voz_libre")
     assert "Brave" in a.dicho[-1]
-    a._atender("Olvida lo de Brave", 0.0)
+    a._atender("Olvida lo de Brave", 0.0, origen="voz_libre")
     assert _textos() == []
     a.responder.assert_not_called()

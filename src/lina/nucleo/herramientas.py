@@ -1203,8 +1203,9 @@ class Ejecutor:
         self._ctx_fondo = None               # (id del diario, intenciones, deshacer) del comando que se está ejecutando
         self.paneles_abiertos = []           # ventanas de ajustes abiertas por el asistente
         self.pregunta_pura = ""              # lo que ha pedido el usuario (lo pone el asistente): las recetas automáticas guardan sus palabras
-        self.continuar = None                # lo pone el asistente: callable(peticion, motivo, profundidad, aviso) -> bool; retoma la petición al acabar un segundo plano
+        self.continuar = None                # lo pone el asistente: callable(peticion, motivo, profundidad, aviso, origen) -> bool; retoma la petición al acabar un segundo plano
         self.profundidad = 0                 # cuántas veces seguidas se ha retomado la misma petición (0 = la petición original)
+        self.origen = "voz_libre"            # de dónde vino la petición en curso («atajo» o «voz_libre»; lo pone el asistente): al retomarla se respeta
         self.nueva_tarea()
         if diario:
             try:
@@ -1911,7 +1912,8 @@ class Ejecutor:
                 anotar(f"[abierto, sigue en marcha] {comando}")
                 return ("El programa se ha abierto y sigue en marcha, que es lo normal en una aplicación con ventana. Ya está abierto: no hay nada "
                         "que esperar ni que avisar cuando se cierre.")
-            threading.Thread(target=self._vigilar, args=(proc, comando, motivo, self._ctx_fondo, self.pregunta_pura, self.profundidad), daemon=True).start()
+            threading.Thread(target=self._vigilar, args=(proc, comando, motivo, self._ctx_fondo, self.pregunta_pura, self.profundidad, self.origen),
+                             daemon=True).start()
             anotar(f"[segundo plano] {comando}")
             retomar = (" Cuando termine, el asistente RETOMARÁ SOLO la petición del usuario (no hace falta que la repita): dile en una frase qué estás "
                        "haciendo ahora y que después seguirás con lo que pidió." if self.continuar and self.pregunta_pura else "")
@@ -1958,7 +1960,7 @@ class Ejecutor:
         proc.wait()
         anotar(f"[fin rc={proc.returncode}] {comando}")
 
-    def _vigilar(self, proc, comando, motivo, ctx=None, peticion="", profundidad=0):
+    def _vigilar(self, proc, comando, motivo, ctx=None, peticion="", profundidad=0, origen="voz_libre"):
         try:
             salida, _ = proc.communicate(timeout=TIMEOUT_MAXIMO)
         except subprocess.TimeoutExpired:
@@ -1994,7 +1996,7 @@ class Ejecutor:
                 reiniciar = _es_actualizacion_completa(comando)
                 if peticion and self.continuar:               # lo que pidió el usuario no era «instalar», sino lo que viene después: se retoma
                     try:
-                        if self.continuar(peticion, motivo, profundidad, reiniciar):
+                        if self.continuar(peticion, motivo, profundidad, reiniciar, origen):     # con el origen de la petición, no el de quien hable ahora
                             return
                     except Exception as e:
                         log(f"No he podido retomar la petición tras «{motivo}»: {e!r}")

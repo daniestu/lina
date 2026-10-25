@@ -94,8 +94,9 @@ a._tarea=lambda fn,*args:lanzadas.append(args)
 ok(a.atender_manos_libres("abre firefox"),"atiende"); time.sleep(0.2)
 ok(a.estado=="pensando" and a.origen_voz_libre,"estado pensando y origen manos libres")
 ok(("abre firefox" in [x[0] for x in lanzadas if isinstance(x,tuple)]),"lanza _atender %s"%lanzadas)
-ints=[]; a._interrupcion_con_texto=lambda t,i,c=True:ints.append((t,c))
-a.atender_manos_libres("para"); time.sleep(0.2); ok(ints==[("para",False)],"mientras piensa → interrupción sin captura hecha %s"%ints)
+ok([x[-1] for x in lanzadas if isinstance(x,tuple) and x[0]=="abre firefox"]==["voz_libre"],"la petición nueva lleva su origen: manos libres %s"%lanzadas)
+ints=[]; a._interrupcion_con_texto=lambda t,i,c=True,o=None:ints.append((t,c,o))
+a.atender_manos_libres("para"); time.sleep(0.2); ok(ints==[("para",False,"voz_libre")],"mientras piensa → interrupción sin captura hecha, con origen manos libres %s"%ints)
 a.estado="grabando"; ok(a.atender_manos_libres("x") is False,"grabando: no")
 # confirmaciones por voz libre
 class Ej:

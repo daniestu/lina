@@ -486,6 +486,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     origen_voz_libre = False      # la petición en curso viene del manos libres: NO puede confirmar acciones (solo el atajo)
     manos_libres = None           # el oyente de «Oye Lina» (manos_libres.py)
     sustituida = False            # la tarea en curso se abandona porque has pedido otra cosa (no hace falta que diga «lo dejo»)
+    # De dónde viene cada petición. Va CON la petición (en la cola, al sustituir otra, al retomarla), nunca con quien hable el último: pulsar el atajo para
+    # interrumpir una tarea de «Oye Lina» no le da los permisos del atajo. Si algún camino llega sin origen, el restrictivo.
 
     def __init__(self):
         self.whisper = MODELOS.cargar_whisper(log, WhisperModel)
@@ -613,7 +615,6 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _iniciar_grabacion(self):
         """Abre el micrófono y hace la captura de lo que estás viendo (sin tocar el estado)."""
         self.bloques = []
-        self.origen_voz_libre = False                      # con el atajo sí puedes confirmar acciones
         self._preparar_contexto()
         self.microfono = sd.InputStream(
             samplerate=FRECUENCIA, channels=1, dtype="float32",
@@ -646,6 +647,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self._bajar_sonido()                               # antes del pitido: así el pitido no se baja
         pitido(880)
         self.estado = "grabando"
+        self.origen_voz_libre = False                      # una petición NUEVA con el atajo (al interrumpir no se toca: el origen es de la tarea en curso)
         self._iniciar_grabacion()
         log("Escuchando... (vuelve a pulsar el atajo para terminar)")
 
@@ -688,13 +690,15 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             if not texto:
                 log("No te he entendido: lo anterior sigue")
                 return
-            self._interrupcion_con_texto(texto, inicio)
+            self._interrupcion_con_texto(texto, inicio, origen=ORIGEN_ATAJO)
         except Exception as e:
             self.sustituida = False
             log(f"Error al atender lo que dijiste mientras pensaba: {e!r}")
 
-    def _interrupcion_con_texto(self, texto, inicio, captura_hecha=True):
-        """Lo que se hace con lo que dices mientras trabaja (por el atajo o por el manos libres, que no ha hecho aún la captura)."""
+    def _interrupcion_con_texto(self, texto, inicio, captura_hecha=True, origen=None):
+        """Lo que se hace con lo que dices mientras trabaja (por el atajo o por el manos libres, que no ha hecho aún la captura). `origen` es el de ESTA
+        frase: si sustituye a la tarea o se apunta para después, lo lleva consigo."""
+        origen = _origen_valido(origen)
         try:
             decision, via = self.decidir_interrupcion(texto)
             log(f"Lo que dijiste mientras trabajaba («{texto}») → {decision} ({via})")
@@ -718,7 +722,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 with self.cerrojo:
                     encolada = not self.fin_tarea.is_set()
                     if encolada:
-                        self._cola().append(texto)
+                        self._cola().append((texto, origen))
                 if encolada:
                     log(f"Apunto para después: «{texto}»")
                     self._hablar(T("Apuntado, lo hago en cuanto termine."))
@@ -744,7 +748,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             self.fin_tarea.clear()
             if not captura_hecha:
                 self._preparar_contexto()
-            self._tarea(self._atender, texto, inicio)
+            self._tarea(self._atender, texto, inicio, None, "", 0, origen)
         except Exception as e:
             self.sustituida = False
             log(f"Error al atender lo que dijiste mientras pensaba: {e!r}")
@@ -793,12 +797,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             else:
                 log(f"Manos libres: ahora estoy «{self.estado}», no atiendo «{texto}»")
                 return False
-        self.origen_voz_libre = True
         if nueva:
+            self.origen_voz_libre = True                   # una petición NUEVA por manos libres (si solo interrumpe, la tarea en curso conserva el suyo)
             self._preparar_contexto()
-            threading.Thread(target=self._tarea, args=(self._atender, texto, inicio), daemon=True).start()
+            threading.Thread(target=self._tarea, args=(self._atender, texto, inicio, None, "", 0, ORIGEN_VOZ_LIBRE), daemon=True).start()
         else:
-            threading.Thread(target=self._interrupcion_con_texto, args=(texto, inicio, False), daemon=True).start()
+            threading.Thread(target=self._interrupcion_con_texto, args=(texto, inicio, False, ORIGEN_VOZ_LIBRE), daemon=True).start()
         return True
 
     def _gestionar_manos_libres(self, orden):
@@ -897,14 +901,15 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                     self.estado = "grabando"                   # estás grabando algo: ese será tu siguiente pregunta
                     self.fin_tarea.set()
                 elif self._cola() and not cancelada:
-                    siguiente = self._cola().pop(0)            # había algo apuntado para después: sigue sin soltar el estado
+                    siguiente = self._cola().pop(0)            # había algo apuntado para después: sigue sin soltar el estado (con SU origen)
                     self.estado = "pensando"
                 else:
                     self.estado = "esperando"
                     self.fin_tarea.set()
             if siguiente:
-                log(f"Sigo con lo que apuntaste para después: «{siguiente}»")
-                threading.Thread(target=self._tarea, args=(self._atender, siguiente, time.time()), daemon=True).start()
+                texto, origen = siguiente if isinstance(siguiente, tuple) else (siguiente, None)
+                log(f"Sigo con lo que apuntaste para después: «{texto}»")
+                threading.Thread(target=self._tarea, args=(self._atender, texto, time.time(), None, "", 0, _origen_valido(origen)), daemon=True).start()
 
     def procesar(self, audio):
         self._tarea(self._voz_a_respuesta, audio)
@@ -919,9 +924,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if not pregunta:
             self.decir(T("No te he entendido."))
             return
-        self._atender(pregunta, inicio, crono)
+        self._atender(pregunta, inicio, crono, origen=ORIGEN_ATAJO)
 
-    def _atender(self, pregunta, inicio, crono=None, nota_sistema="", profundidad=0):
+    def _atender(self, pregunta, inicio, crono=None, nota_sistema="", profundidad=0, origen=None):
+        self.origen_voz_libre = _origen_valido(origen) != ORIGEN_ATAJO   # el de ESTA petición; sin origen, el restrictivo
+        self.ejecutor.origen = ORIGEN_VOZ_LIBRE if self.origen_voz_libre else ORIGEN_ATAJO      # para retomarla con el mismo si pasa a segundo plano
         crono = crono or TIE.Cronometro()
         recoger_llamadas()                                          # cuenta de cero las llamadas a la IA de esta petición (se apuntan en `lina tiempos`)
         self.ejecutor.profundidad = profundidad                     # >0: esta vuelta retoma una petición que esperó a una tarea en segundo plano
@@ -1237,7 +1244,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 return any(u and not es_seguimiento(u) for u in usuario[i + 1:])
         return False
 
-    def _continuar_peticion(self, peticion, motivo, profundidad, reiniciar=False):
+    def _continuar_peticion(self, peticion, motivo, profundidad, reiniciar=False, origen=None):
         """Una tarea en segundo plano (instalar, descargar…) ha terminado y la petición del usuario seguía sin cumplir: se retoma SOLA, sin que la repita.
         Espera a que no estés hablando con Lina; devuelve True si se hace cargo (entonces no hace falta el aviso de «ya ha terminado»)."""
         if profundidad >= MAX_CONTINUACIONES:
@@ -1264,7 +1271,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 "sigue sin cumplir salvo que ese paso fuese justo lo que pidió. Haz AHORA lo que falta (por ejemplo, abrir lo que se acaba de instalar) con tus herramientas, "
                 "sin volver a lanzar el paso previo, y cuéntale el resultado final en una frase. Si lo que pidió era precisamente esa tarea, di solo que ya está." +
                 (" Se ha actualizado TODO el sistema: recomiéndale reiniciar cuando pueda." if reiniciar else "") + "]")
-        threading.Thread(target=self._tarea, args=(self._atender, peticion, time.time(), None, nota, profundidad + 1), daemon=True).start()
+        threading.Thread(target=self._tarea, args=(self._atender, peticion, time.time(), None, nota, profundidad + 1, _origen_valido(origen)),
+                         daemon=True).start()
         return True
 
     def _anotar_tiempos(self, crono, origen, modo):
@@ -2117,6 +2125,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         finally:
             self.estado = "esperando"
         return True
+
+
+ORIGEN_ATAJO, ORIGEN_VOZ_LIBRE = "atajo", "voz_libre"
+
+
+def _origen_valido(origen):
+    """El origen de una petición; cualquier cosa que no sea exactamente «atajo» cuenta como manos libres (lo restrictivo)."""
+    return ORIGEN_ATAJO if origen == ORIGEN_ATAJO else ORIGEN_VOZ_LIBRE
 
 
 _residente: list[PIPER_RES.PiperResidente] = []

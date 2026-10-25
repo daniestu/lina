@@ -30,12 +30,15 @@ def ejecutor(continuar):
 
 # ---- al terminar bien: se retoma la petición original y NO se da el aviso de «ya ha terminado»
 llamadas = []
-e, avisos = ejecutor(lambda p, m, n, r: llamadas.append((p, m, n, r)) or True)
-e._vigilar(Proc(0), "flatpak install -y flathub com.stremio.Stremio", "instalar Stremio", None, "Abre Stremio", 0)
-ok(llamadas == [("Abre Stremio", "instalar Stremio", 0, False)] and not avisos, f"retoma y no avisa: {llamadas} {avisos}")
+e, avisos = ejecutor(lambda p, m, n, r, o: llamadas.append((p, m, n, r, o)) or True)
+e._vigilar(Proc(0), "flatpak install -y flathub com.stremio.Stremio", "instalar Stremio", None, "Abre Stremio", 0, "atajo")
+ok(llamadas == [("Abre Stremio", "instalar Stremio", 0, False, "atajo")] and not avisos, f"retoma, con el origen de la petición, y no avisa: {llamadas} {avisos}")
+llamadas.clear()
+e._vigilar(Proc(0), "flatpak install -y x", "instalar x", None, "Abre x", 0)
+ok(llamadas and llamadas[0][4] == "voz_libre", f"sin origen conocido, se retoma con el restrictivo: {llamadas}")
 
 # ---- si nadie se hace cargo (ocupada mucho rato), el aviso de siempre
-e, avisos = ejecutor(lambda p, m, n, r: False)
+e, avisos = ejecutor(lambda p, m, n, r, o: False)
 e._vigilar(Proc(0), "flatpak install -y flathub com.stremio.Stremio", "instalar Stremio", None, "Abre Stremio", 0)
 ok(len(avisos) == 1 and "Ya ha terminado" in avisos[0], f"sin retomar, avisa: {avisos}")
 
@@ -63,7 +66,7 @@ ok("Ya ha terminado" in avisos[0], "sin retomar: aviso normal")
 
 # ---- una actualización completa pasa «reiniciar» para que lo diga la vuelta que retoma
 llamadas = []
-e, avisos = ejecutor(lambda p, m, n, r: llamadas.append(r) or True)
+e, avisos = ejecutor(lambda p, m, n, r, o: llamadas.append(r) or True)
 e._vigilar(Proc(0), "sudo -n pacman -Syu --noconfirm", "actualizar el sistema", None, "actualiza el sistema", 0)
 ok(llamadas == [True], f"actualización completa: reiniciar=True {llamadas}")
 
@@ -83,9 +86,15 @@ time.sleep(0.2)
 ok(hecho is True and a.estado == "pensando" and not a.interrumpiendo and not a.fin_tarea.is_set(), "toma el estado")
 ok(len(lanzadas) == 1, f"lanza una tarea: {lanzadas}")
 if lanzadas:
-    f, pregunta, _, crono, nota, profundidad = lanzadas[0]
+    f, pregunta, _, crono, nota, profundidad, origen = lanzadas[0]
+    ok(origen == "voz_libre", "sin origen, se retoma con el restrictivo")
     ok(pregunta == "Abre Stremio" and crono is None and profundidad == 1, "retoma la petición original, una vuelta más")
     ok("YA HA TERMINADO" in nota and "instalar Stremio" in nota and "reiniciar" not in nota, "la nota dice qué terminó")
+
+a, lanzadas = falso_asistente("esperando")
+a._continuar_peticion("Abre Stremio", "instalar Stremio", 0, False, "atajo")
+time.sleep(0.2)
+ok(lanzadas and lanzadas[0][-1] == "atajo", f"pedida con el atajo, se retoma con el atajo: {lanzadas}")
 
 a, lanzadas = falso_asistente("esperando")
 a._continuar_peticion("actualiza", "actualizar", 0, True)

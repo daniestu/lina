@@ -88,7 +88,7 @@ def test_el_codigo_lo_quita_con_el_atajo_sin_llamar_a_la_ia(aislado):
     a = _asistente(privado=True)
     A.ARCHIVO_PRIVADO.parent.mkdir(parents=True)
     A.ARCHIVO_PRIVADO.write_text("1")
-    a._atender("Quita el modo privado", 0.0)
+    a._atender("Quita el modo privado", 0.0, origen="atajo")
     assert not a.modo_privado and not A.ARCHIVO_PRIVADO.exists()
     assert "quitado" in a.dicho[-1]
     a.responder.assert_not_called()
@@ -98,7 +98,7 @@ def test_por_manos_libres_no_se_quita(aislado):
     a = _asistente(privado=True, voz_libre=True)
     A.ARCHIVO_PRIVADO.parent.mkdir(parents=True)
     A.ARCHIVO_PRIVADO.write_text("1")
-    a._atender("quita el modo privado", 0.0)
+    a._atender("quita el modo privado", 0.0, origen="voz_libre")
     assert a.modo_privado and A.ARCHIVO_PRIVADO.exists()
     assert "atajo" in a.dicho[-1]
     a.responder.assert_not_called()
@@ -106,8 +106,8 @@ def test_por_manos_libres_no_se_quita(aislado):
 
 def test_activar_y_estado_por_el_codigo(aislado):
     a = _asistente(voz_libre=True)                                 # activarlo sí vale por manos libres: solo aprieta la privacidad
-    a._atender("activa el modo privado", 0.0)
+    a._atender("activa el modo privado", 0.0, origen="voz_libre")
     assert a.modo_privado and A.ARCHIVO_PRIVADO.exists()
-    a._atender("¿Estás en modo privado?", 0.0)
+    a._atender("¿Estás en modo privado?", 0.0, origen="voz_libre")
     assert "Estoy en modo privado" in a.dicho[-1]
     a.responder.assert_not_called()
