@@ -26,10 +26,11 @@ DEPENDEN_DEL_ENTORNO = {
 
 
 def _ejecutar(suite):
-    with tempfile.TemporaryDirectory() as casa:
+    with tempfile.TemporaryDirectory(prefix="suite-", dir=os.environ.get("LINA_PRUEBAS_BASE")) as casa:   # fuera de /tmp, como la del conftest
         env = {k: v for k, v in os.environ.items() if not k.startswith("XDG_")}
+        os.mkdir(os.path.join(casa, "run"), 0o700)
         env.update(HOME=casa, PYTHONPATH=str(SRC) + os.pathsep + env.get("PYTHONPATH", ""), PYTHONDONTWRITEBYTECODE="1",
-                   XDG_CURRENT_DESKTOP="KDE", XDG_SESSION_TYPE="wayland")
+                   XDG_CURRENT_DESKTOP="KDE", XDG_SESSION_TYPE="wayland", XDG_RUNTIME_DIR=os.path.join(casa, "run"))
         r = subprocess.run([sys.executable, suite.name], cwd=suite.parent, env=env, capture_output=True, text=True, timeout=600)
     salida = r.stdout + r.stderr
     malos = [l for l in salida.splitlines() if l.startswith("FALLO:") or l.startswith("FALLA ")]

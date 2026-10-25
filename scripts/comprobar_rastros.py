@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
-IGNORAR_DIRS = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", "build", "dist"}
+IGNORAR_DIRS = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", "build", "dist", ".casa-pruebas"}
 IGNORAR_NOMBRES = {".rastros-local"}
 EXT_BINARIAS = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".docx", ".pptx", ".xlsx", ".zip", ".gz", ".onnx", ".wav", ".mp3", ".pyc"}
 

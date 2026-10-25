@@ -7,6 +7,7 @@ dist/
 .venv/
 venv/
 .pytest_cache/
+tests/.casa-pruebas/
 .ruff_cache/
 .coverage
 htmlcov/

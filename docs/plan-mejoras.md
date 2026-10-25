@@ -15,7 +15,7 @@ Tamaños relativos: **S** pequeña, **M** media, **L** grande.
 | 13 | Memoria de preferencias *(hecha: falta probarla en el equipo de Dani)* | M | — |
 | 14 | Bluetooth completo y más diagnóstico de juegos *(hecha: falta probarla en el equipo de Dani)* | S | 12 (para sus órdenes directas) |
 | 15 | GPU y energía (módulo opcional) *(hecha: falta probarla en el equipo de Dani)* | M | — |
-| 17 | Revisión de octubre de 2026: seguridad, latencia y voz, autonomía y mantenimiento *(en curso: S1, S2 y S3 hechas)* | L | — |
+| 17 | Revisión de octubre de 2026: seguridad, latencia y voz, autonomía y mantenimiento *(en curso: S1, S2, S3 y M1 hechas)* | L | — |
 
 Fuera del plan, a propósito: excluir monitores de las capturas (Lina captura todos), una ventana de chat con historial (Lina es de voz) y quitar las
 confirmaciones por atajo (es una decisión de seguridad, no una carencia).
@@ -251,7 +251,7 @@ Lo que ya está bien: `rm` va a la papelera; `shred`, `truncate` y `dd` sobre tu
 ### Mantenimiento
 | # | Qué | Tamaño |
 |---|---|---|
-| M1 | **Las pruebas no deben tocar el `$HOME` real**: importar `comandos.py` ya llama a `rutas.editable("comandos.txt")`, que copia el archivo de fábrica a `~/.config/lina` si falta, y el proceso de pytest no cambia `HOME` (las suites sí). `conftest.py` debería poner `HOME` y las XDG en una carpeta temporal antes de importar nada. A comprobar primero. | S |
+| M1 | **Las pruebas no deben tocar el `$HOME` real** *(hecha: casa temporal en `tests/.casa-pruebas/` desde `conftest.py`, y `test_aislamiento.py`)*: importar `comandos.py` ya llama a `rutas.editable("comandos.txt")`, que copia el archivo de fábrica a `~/.config/lina` si falta, y el proceso de pytest no cambia `HOME` (las suites sí). `conftest.py` debería poner `HOME` y las XDG en una carpeta temporal antes de importar nada. A comprobar primero. | S |
 | M2 | **Registro de herramientas**: `_ejecutar_herramienta` es una cadena de `if` de ~170 líneas; un diccionario `{nombre: función}` junto a cada declaración. | M |
 | M3 | **Estado de la petición en una clase** (`TareaActual`, reiniciada en `nueva_tarea`) en vez de 44 `getattr(self, …, defecto)`; cambiar `estado` siempre con el cerrojo (hoy `decir` y `avisar` no lo cogen). | M |
 | M4 | **Resultados con estructura** (`rc`, salida, comprobado, preparado) que se convierten en texto solo para la IA, en vez de comparar prefijos como `"código de salida: 0"` o `"COMPROBADO AHORA"`. Poco a poco, herramienta a herramienta. | L |
