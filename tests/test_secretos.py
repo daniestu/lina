@@ -89,3 +89,14 @@ def test_lo_normal_sigue_pasando(comando):
 
 def test_abrir_brave_sigue_siendo_abrir():
     assert H.clasificar("brave")[0] not in ("bloqueado", "critico")
+
+
+@pytest.mark.parametrize("comando", ["grep pass archivo", "grep pass ~/Documentos/notas.txt", "echo pass", "ls | grep pass", "ls|grep pass x",
+                                     "cat notas | grep -i pass"])
+def test_pass_como_palabra_suelta_no_se_bloquea(comando):
+    assert H.clasificar(comando)[0] == "lectura", comando
+
+
+@pytest.mark.parametrize("comando", ["true && pass x", "(pass x)", "$(pass x)", "echo $(pass show x)", "ls | pass x"])
+def test_pass_como_programa_si(comando):
+    assert H.clasificar(comando)[0] == "bloqueado", comando
