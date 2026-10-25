@@ -55,7 +55,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, solo_herramientas_meta
+from lina.nucleo.turnos import HERRAMIENTAS_META, pide_accion, solo_herramientas_meta, solo_se_informo
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -152,7 +152,7 @@ def prompt_whisper():
     except OSError:
         lineas = []
     terminos = [l for l in lineas if l and not l.startswith("#")][:60]
-    for extra in ("MangoHud", "GE-Proton", "barra de ruta"):                # palabras que Whisper suele destrozar y que usa B4
+    for extra in ("MangoHud", "GE-Proton", "barra de ruta") + (("navegador",) if IDI.actual() == "es" else ()):   # palabras que Whisper suele destrozar («rayador»)
         if C.normalizar(extra) not in {C.normalizar(x) for x in terminos}:
             terminos.append(extra)
     reinicio = C.prompt_reinicio()
@@ -1899,6 +1899,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 and fracaso_en_respuesta(respuesta, bool(self.acciones_turno))):
             obst = f"lo que pidió el usuario («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») no se ha cumplido; la respuesta fue: «{str(respuesta)[:200]}»"
             log("La respuesta dice que no se ha podido hacer lo pedido: reintento a fondo")
+        elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and "?" not in str(respuesta)
+              and pide_accion(str(getattr(self, "pregunta_pura", "") or pregunta))
+              and solo_se_informo(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura")):
+            obst = (f"el usuario pidió que HICIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}»), no que le informaras, y en esta "
+                    f"petición solo se ha buscado o leído, sin hacer nada en el equipo; la respuesta fue: «{str(respuesta)[:200]}»")
+            log("Pidió hacer algo y solo se ha informado (lo dice el código, sin revisor): reintento a fondo")
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
               and not self._acciones_comprobadas() and verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, respuesta,
                                                      bool(imagen is not None or self.pantalla_adjunta))):
@@ -1948,7 +1954,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                     "si ya hay un servidor que sirva, úsalo; si no, busca uno de un editor reconocido que funcione con lo que ya hay instalado y añádelo con mcp_servidores), "
                     "o el programa o paquete que haga falta; 3) si falla porque le falta algo, NO te rindas: lee el error, instala lo que falte con las herramientas del sistema "
                     "o elige otra vía que no lo necesite, y vuelve a probar; 4) comprueba que lo conseguido es EXACTAMENTE lo pedido y hazlo; 5) solo si de verdad nada "
-                    "funciona, cuenta qué probaste y por qué falló. Lo que el sistema te pida confirmar, pregúntaselo al usuario en una frase. Responde con el resultado, "
+                    "funciona, cuenta qué probaste y por qué falló. OJO, antes de explorar: si un nombre que pidió no existe en el equipo (ningún programa, archivo "
+                    "o cosa se llama así), lo primero es pensar que la voz lo oyó mal: busca la palabra conocida que suene parecido usando la conversación (por "
+                    "ejemplo, «en el rayador» justo después de hablar de un partido es «en el navegador») y sigue con ella; si no está claro, pregúntaselo en una "
+                    "frase en vez de buscar paquetes con ese nombre. Lo que el sistema te pida confirmar, pregúntaselo al usuario en una frase. Responde con el resultado, "
                     "no con promesas.]")
         elif pide:
             nota = ("\n[SISTEMA: tú mismo has pedido pensar esta petición a fondo (" + pide + "). Lo que ya se hizo hasta ahora:\n"
