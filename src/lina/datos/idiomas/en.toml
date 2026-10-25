@@ -795,3 +795,5 @@
 "Gemini no responde y el modelo local no cabe en la tarjeta gráfica sin pasar del límite de memoria. Inténtalo dentro de un rato." = "Gemini is not responding and the local model does not fit on the graphics card without going over the memory limit. Try again in a while."
 "Lo máximo de memoria de vídeo (MB) que Lina ocupa a la vez, contando Whisper. El modelo local de reserva (Ollama) solo se carga si cabe dentro de este tope." = "The most video memory (MB) Lina uses at once, counting Whisper. The local fallback model (Ollama) is only loaded if it fits within this cap."
 "Lina: no te lo he dicho en voz alta" = "Lina: I didn't say this out loud"
+"No he dado con la página para ver eso; te he dejado abierta la más parecida que he encontrado. Si me dices en qué plataforma lo ves, lo busco ahí." = "I couldn't find the page to watch that; I've left open the closest one I found. If you tell me which platform you watch it on, I'll look there."
+"Te abro el partido en {plataforma}. Si no empieza solo, pulsa «Ver»." = "I'm opening the match on {plataforma}. If it doesn't start by itself, press \"Ver\" (Watch)."

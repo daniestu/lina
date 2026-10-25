@@ -11,6 +11,14 @@ from lina.nucleo import constantes as K
 from lina.nucleo import turnos as TU
 
 
+@pytest.fixture(autouse=True)
+def idioma_del_equipo(monkeypatch):
+    """Las direcciones con país («es-ES») se comparan con el idioma del equipo: se fija para que dé igual dónde se pasen las pruebas."""
+    monkeypatch.setenv("LANG", "es_ES.UTF-8")
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LC_MESSAGES", raising=False)
+
+
 def test_las_instrucciones_dicen_que_ponme_es_abrirlo_en_la_plataforma_oficial():
     assert "PONGAS un partido" in K.INSTRUCCIONES and "plataforma OFICIAL" in K.INSTRUCCIONES and "emisiones no oficiales" in K.INSTRUCCIONES
     assert "nunca escribes contraseñas" in K.INSTRUCCIONES
@@ -270,7 +278,9 @@ def test_los_resultados_de_otra_temporada_van_marcados(monkeypatch, octubre_2026
 def test_abrir_la_ficha_antigua_hace_insistir_con_el_modelo_rapido(monkeypatch, octubre_2026):
     A, a, enviadas = _asistente(_PARTIDO, _abre(_ANTIGUA))
     grupos = []
-    a._gemini = lambda modo, modelo, texto, *x, **k: (grupos.append(modo), enviadas.append(texto), "Te abro el partido de esta temporada.")[2]
+    a._gemini = lambda modo, modelo, texto, *x, **k: (grupos.append(modo), enviadas.append(texto),
+                                                      a.acciones_turno.append(("ejecutar_comando", {"comando": f"xdg-open '{_ACTUAL}'"}, "Lanzado.")),
+                                                      "Te abro el partido de esta temporada.")[3]
     a._avisar_voz = MagicMock()
     monkeypatch.setattr(A, "verificar_cumplimiento", MagicMock(side_effect=AssertionError("no hace falta el revisor")))
     r, origen = a._insistir_si_hace_falta("Abro el partido en Movistar Plus.", "m", "rapido", "p", None, [], "s")
@@ -318,3 +328,90 @@ def test_la_plataforma_que_prefieres_viene_al_caso_de_un_partido(tmp_path, monke
     assert M.relevantes("sube el volumen") == []                     # y no se cuela en lo que no tiene que ver
     assert M.recordar("las series las veo en Netflix")[0]
     assert M.relevantes("Ponme el último capítulo de Stranger Things") == ["las series las veo en Netflix"]
+
+
+# ---------- «con el partido…» (mal oído) y comprobar también lo que se abre al insistir ----------
+def test_con_al_principio_es_pon_mal_oido_y_una_pregunta_no_es_una_orden():
+    assert TU.pide_contenido("con el partido del Barça contra el Sevilla.") and TU.pide_accion("con el partido del Barça contra el Sevilla.")
+    assert not TU.pide_contenido("con mucho gusto") and not TU.pide_contenido("con quién juega el Barça")
+    assert not TU.pide_contenido("¿con el volumen así está bien?") and not TU.pide_accion("¿Pon el volumen al 40?")
+
+
+def test_lo_que_se_abre_al_insistir_tambien_se_comprueba(octubre_2026):
+    A, a, _ = _asistente(_PARTIDO, _abre("https://www.dazn.com/es-ES/home"))
+    vueltas = []
+
+    def gemini(modo, modelo, texto, *x, **k):
+        vueltas.append(modo)
+        url = _ANTIGUA if len(vueltas) == 1 else _ACTUAL                  # primero otra página que no vale, luego la buena
+        a.acciones_turno.append(("ejecutar_comando", {"comando": f"xdg-open '{url}'"}, "Lanzado."))
+        return "Abierto."
+    a._gemini = gemini
+    assert a._asegurar_pagina_de_contenido("Te he abierto DAZN.", "p", None, [], "s") == "Abierto."
+    assert vueltas == ["rapido", "rapido"]
+
+
+def test_si_tras_insistir_sigue_sin_estar_lo_dice(octubre_2026):
+    A, a, _ = _asistente(_PARTIDO, _abre("https://www.dazn.com/es-ES/home"))
+    a._gemini = lambda *x, **k: (a.acciones_turno.append(("ejecutar_comando", {"comando": "xdg-open https://www.dazn.com/es-ES/home"}, "")), "Abierto.")[1]
+    r = a._asegurar_pagina_de_contenido("Te he abierto DAZN.", "p", None, [], "s")
+    assert "No he dado con la página" in r
+
+
+def test_si_ya_esta_bien_no_se_toca(octubre_2026):
+    A, a, _ = _asistente(_PARTIDO, _abre(_ACTUAL))
+    a._gemini = MagicMock(side_effect=AssertionError("no hace falta otra vuelta"))
+    assert a._asegurar_pagina_de_contenido("Abierto.", "p", None, [], "s") == "Abierto."
+
+
+def test_la_pista_de_whisper_lleva_ponme():
+    for m in ("sounddevice", "faster_whisper"):
+        sys.modules.setdefault(m, MagicMock())
+    from lina.nucleo import asistente as A
+    assert "Ponme" in A.prompt_whisper()
+
+
+
+# ---------- la versión de tu país, y probar en la otra plataforma ----------
+def test_mi_pais_web_y_de_otro_pais():
+    assert TU.mi_pais_web({"LANG": "es_ES.UTF-8"}) == "es-ES" and TU.mi_pais_web({"LANG": "C.UTF-8"}) is None
+    assert TU.de_otro_pais("https://www.dazn.com/en-US/fixture/ContentId:c3/c3") == "en-US"
+    assert TU.de_otro_pais("https://www.dazn.com/es-ES/fixture/ContentId:1l/1l/6g") is None
+    assert TU.de_otro_pais("https://www.movistarplus.es/deportes/x") is None
+    assert TU.de_otro_pais("https://www.dazn.com/en-US/fixture/x", entorno={"LANG": "C"}) is None    # sin saber el tuyo, no se juzga
+
+
+def test_la_ficha_de_otro_pais_no_vale_aunque_su_titulo_lo_nombre():
+    res = "RESULTADOS:\n\n[1] Barcelona vs. Sevilla - Soccer (dazn.com) https://www.dazn.com/en-US/fixture/ContentId:c3g/c3g\nx"
+    r = TU.pagina_que_no_es(_abre("https://www.dazn.com/en-US/fixture/ContentId:c3g/c3g", res), _PARTIDO, lambda c: False)
+    assert r and "otro país (en-US)" in r[1]
+
+
+def test_la_ficha_de_dazn_de_tu_pais_vale_si_su_titulo_lo_nombra():
+    url = "https://www.dazn.com/es-ES/fixture/ContentId:1lwb/1lwb/6g5e"
+    res = f"RESULTADOS:\n\n[1] FC Barcelona - Sevilla FC (dazn.com) {url}\nHoy"
+    assert TU.pagina_que_no_es(_abre(url, res), _PARTIDO, lambda c: False) is None
+
+
+def test_la_nota_al_insistir_dice_que_pruebe_en_la_otra_plataforma():
+    A, a, _ = _asistente(_PARTIDO, [])
+    nota = a._nota_pagina_de_contenido("https://www.dazn.com/es-ES/home", "solo se ha abierto la portada", "p")
+    assert "OTRA plataforma oficial" in nota and "otro país" in nota and "«dazn.com»" in nota
+    assert "versión de otro país" in K.INSTRUCCIONES and "otra plataforma oficial" in K.INSTRUCCIONES
+
+
+def test_una_seccion_de_la_portada_no_es_la_pagina_del_partido_aunque_el_titulo_lo_nombre():
+    url = "https://www.dazn.com/es-ES/home/7ghp10wewr0h2z2lm8g4pams"
+    res = f"RESULTADOS:\n\n[1] Barcelona - Sevilla (dazn.com) {url}\nx"
+    r = TU.pagina_que_no_es(_abre(url, res), _PARTIDO, lambda c: False)
+    assert r and "no nombra" in r[1]
+
+
+def test_si_el_codigo_ya_comprobo_la_pagina_el_revisor_sobra(octubre_2026):
+    A, a, _ = _asistente(_PARTIDO, _abre(_ACTUAL))
+    assert a._acciones_comprobadas.__class__ is not None
+    a._acciones_comprobadas = A.Asistente._acciones_comprobadas.__get__(a)
+    assert a._acciones_comprobadas()
+    b = _asistente(_PARTIDO, _abre("https://www.dazn.com/es-ES/home"))[1]
+    b._acciones_comprobadas = A.Asistente._acciones_comprobadas.__get__(b)
+    assert not b._acciones_comprobadas()

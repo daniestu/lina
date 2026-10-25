@@ -37,7 +37,8 @@ def peticion_de_receta(historial, actual):
 
 
 # Órdenes que piden HACER algo en el equipo (no una respuesta): con ellas, informar no es cumplir.
-_ACCION_ES = re.compile(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:pon|ponme|ponlo|ponla|ponmelo|ponmela|abre|abreme|reproduce|reproduceme|"
+_CON_POR_PON = r"con(?=\s+(?:el|la|los|las|un|una)\b)|"          # «con el partido del Barça»: Whisper oyó «con» donde dijiste «pon»
+_ACCION_ES = re.compile(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:" + _CON_POR_PON + r"pon|ponme|ponlo|ponla|ponmelo|ponmela|abre|abreme|reproduce|reproduceme|"
                         r"enciende|apaga|cierra|lanza|inicia|arranca|instala|descarga|activa|desactiva|conecta|desconecta|quiero ver|dejame ver)\b")
 _ACCION_EN = re.compile(r"^(?:(?:hey|ok|please|can you|could you)\s+)*(?:put on|put|play|open|turn on|turn off|start|launch|install|download|enable|disable|"
                         r"connect|disconnect|i want to watch|let me watch)\b")
@@ -50,6 +51,8 @@ HERRAMIENTAS_DE_INFORMAR = HERRAMIENTAS_META | {"buscar_web", "leer_web", "busca
 def pide_accion(texto):
     """¿La frase pide hacer algo («ponme el partido», «abre Steam») y no solo saber algo («¿a qué hora es el partido?»)?"""
     from lina.nucleo import idioma as IDI
+    if "?" in str(texto) or "¿" in str(texto):          # una pregunta («¿con el volumen así está bien?») no es una orden
+        return False
     t = C.normalizar(texto)
     return bool((_ACCION_EN if IDI.actual() == "en" else _ACCION_ES).match(t))
 
@@ -68,7 +71,7 @@ def solo_se_informo(acciones, es_lectura):
 
 
 # Órdenes de PONER algo para verlo u oírlo: abrir solo la portada de la plataforma no es ponerlo.
-_CONTENIDO_ES = re.compile(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:pon|ponme|ponlo|ponla|ponmelo|ponmela|reproduce|reproduceme|"
+_CONTENIDO_ES = re.compile(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:" + _CON_POR_PON + r"pon|ponme|ponlo|ponla|ponmelo|ponmela|reproduce|reproduceme|"
                            r"quiero ver|dejame ver)\b")
 _CONTENIDO_EN = re.compile(r"^(?:(?:hey|ok|please|can you|could you)\s+)*(?:put on|put|play|i want to watch|let me watch)\b")
 _URL = re.compile(r"https?://[^\s'\"]+")
@@ -77,6 +80,8 @@ _URL = re.compile(r"https?://[^\s'\"]+")
 def pide_contenido(texto):
     """¿Pide que le PONGAS algo (un partido, una serie, un vídeo), y no solo abrir un programa o una web?"""
     from lina.nucleo import idioma as IDI
+    if "?" in str(texto) or "¿" in str(texto):
+        return False
     return bool((_CONTENIDO_EN if IDI.actual() == "en" else _CONTENIDO_ES).match(C.normalizar(texto)))
 
 
@@ -107,10 +112,14 @@ _PALABRAS_DE_RELLENO = {
     "pon", "ponme", "ponlo", "ponla", "ponmelo", "ponmela", "reproduce", "reproduceme", "quiero", "ver", "dejame", "oye", "vale", "venga", "por", "favor",
     "puedes", "podrias", "el", "la", "los", "las", "un", "una", "del", "de", "en", "al", "a", "y", "o", "con", "contra", "que", "me", "mi", "hoy", "ahora",
     "partido", "partidazo", "encuentro", "navegador", "rayador", "brave", "firefox", "chrome", "directo", "vivo", "online", "television", "tele", "canal",
-    "serie", "pelicula", "capitulo", "episodio", "video", "temporada", "favor",
+    "serie", "pelicula", "capitulo", "episodio", "video", "temporada", "favor", "femenino", "femenina", "masculino", "masculina", "liga", "laliga",
     "put", "on", "play", "the", "match", "game", "in", "browser", "i", "want", "to", "watch", "let", "live", "now", "today", "please", "of", "vs", "versus",
 }
 _SINONIMOS = {"barca": "barcelona", "atleti": "atletico"}
+# Cómo suele llamarse la dirección de la página de UN contenido (ficha, partido, título, vídeo…). Si lo que se pidió solo sale en el título del resultado y
+# no en la dirección, la dirección tiene que parecerse a esto: una sección de la portada («/es-ES/home/…») no es la página del partido.
+_PAGINA_DE_CONTENIDO = re.compile(r"(?:^|[/_-])(?:ficha|fixture|event|evento|eventos|match|partido|watch|ver|title|titulo|video|player|play|episode|episodio|"
+                                  r"movie|pelicula|serie|series|show|programa|directo|live)(?:[/_.:?=-]|$)")
 # Páginas que no son el contenido aunque lo nombren: guías de programación, calendarios, agendas.
 _PAGINA_DE_GUIA = re.compile(r"(?:^|[/_-])(?:programacion(?:-tv)?|parrilla|guia(?:-tv)?|calendario|agenda|horarios?|schedule|tv-guide|fixtures|"
                              r"news|noticias?|blog|articulos?|article|comunicacion|prensa)(?:[/_.-]|$)")
@@ -150,11 +159,12 @@ def pagina_que_no_es(acciones, pregunta, es_lectura):
             if distintivas and any(d in C.normalizar(p.netloc).replace(" ", "") for d in distintivas):
                 return None                                   # «ponme Movistar Plus»: su portada es justo lo pedido
             continue
-        if _PAGINA_DE_GUIA.search(p.path.lower()) or de_otra_temporada(u):
+        if _PAGINA_DE_GUIA.search(p.path.lower()) or de_otra_temporada(u) or de_otro_pais(u):
             continue
         texto_url = C.normalizar(f"{p.netloc} {p.path} {p.query}").replace(" ", "")
         titulo = C.normalizar(titulos.get(u.rstrip("/"), "")).split()
-        if not distintivas or any(d in texto_url for d in distintivas) or any(d in {_SINONIMOS.get(t, t) for t in titulo} for d in distintivas):
+        lo_nombra_el_titulo = any(d in {_SINONIMOS.get(t, t) for t in titulo} for d in distintivas)
+        if not distintivas or any(d in texto_url for d in distintivas) or (lo_nombra_el_titulo and _PAGINA_DE_CONTENIDO.search(p.path.lower())):
             return None                                       # esta sí es la página de lo pedido (o no hay con qué comparar)
     u = abiertas[-1]
     p = urlparse(u)
@@ -162,6 +172,8 @@ def pagina_que_no_es(acciones, pregunta, es_lectura):
         return u, f"solo se ha abierto la portada de {p.netloc}"
     if _PAGINA_DE_GUIA.search(p.path.lower()):
         return u, f"lo que se abrió ({u}) es una guía de programación, un calendario o una noticia, no la página para verlo"
+    if de_otro_pais(u):
+        return u, f"lo que se abrió ({u}) es la versión de otro país ({de_otro_pais(u)}), no la tuya ({mi_pais_web()}): puede ser otro partido o no verse aquí"
     if de_otra_temporada(u):
         a, b = temporada_actual()
         return u, f"lo que se abrió ({u}) es de la temporada {de_otra_temporada(u)}, no de la actual ({a:02d}-{b:02d})"
@@ -213,3 +225,30 @@ def competiciones_de_ahora(urls, hoy=None):
         if c and not de_otra_temporada(u, hoy) and c not in vistas:
             vistas.append(c)
     return vistas
+
+
+
+_LOCALE_EN_RUTA = re.compile(r"^[a-z]{2}-[A-Z]{2}$")
+
+
+def mi_pais_web(entorno=None):
+    """«es-ES» a partir de LANG/LC_ALL («es_ES.UTF-8»), como lo escriben las webs en sus direcciones; None si no se sabe."""
+    import os
+    entorno = os.environ if entorno is None else entorno
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        m = re.match(r"([a-z]{2})_([A-Z]{2})", entorno.get(var, "") or "")
+        if m:
+            return f"{m.group(1)}-{m.group(2)}"
+    return None
+
+
+def de_otro_pais(url, entorno=None):
+    """El país de la dirección («en-US») si es la versión de otro país distinto del tuyo; None si es el tuyo, no lo dice o no se sabe el tuyo."""
+    from urllib.parse import urlparse
+    mio = mi_pais_web(entorno)
+    if not mio:
+        return None
+    for trozo in urlparse(str(url or "")).path.split("/"):
+        if _LOCALE_EN_RUTA.match(trozo) and trozo.lower() != mio.lower():
+            return trozo
+    return None

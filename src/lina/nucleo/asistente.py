@@ -18,6 +18,7 @@ import io
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -38,6 +39,7 @@ from lina.nucleo import privilegios as PRIV
 from lina.nucleo import rutas as RUT
 from lina.nucleo import tiempos as TIE
 from lina.nucleo import directas as DIR
+from lina.nucleo import contenido as CONT
 from lina.nucleo import cache_voz as CV
 from lina.escritorio import sesion as SES
 from lina.nucleo import memoria as MEM
@@ -152,7 +154,7 @@ def prompt_whisper():
     except OSError:
         lineas = []
     terminos = [l for l in lineas if l and not l.startswith("#")][:60]
-    for extra in ("MangoHud", "GE-Proton", "barra de ruta") + (("navegador",) if IDI.actual() == "es" else ()):   # palabras que Whisper suele destrozar («rayador»)
+    for extra in ("MangoHud", "GE-Proton", "barra de ruta") + (("Ponme", "navegador") if IDI.actual() == "es" else ()):   # palabras que Whisper suele destrozar («con», «rayador»)
         if C.normalizar(extra) not in {C.normalizar(x) for x in terminos}:
             terminos.append(extra)
     reinicio = C.prompt_reinicio()
@@ -999,6 +1001,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if directa:
             self._cerrar_directa(pregunta, directa[0], directa[1], inicio, crono)
             return
+        puesto = self._intentar_contenido(pregunta, crono) if not profundidad else None
+        if puesto:                                              # «ponme el partido…»: el código encontró su página y la ha abierto, sin IA
+            self._cerrar_directa(pregunta, puesto[0], puesto[1], inicio, crono)
+            return
         self._nota_pasos = ""
         if not profundidad and not self._hay_recuerdos_pertinentes(pregunta):   # fase 12b: algo que ya se cumplió antes con unos pasos que funcionaron se repite sin IA
             repetida = self._intentar_receta_pasos(pregunta, crono)
@@ -1150,6 +1156,45 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             log(f"Directa: fallo {e!r}; se lo dejo a la IA")
             return None
 
+    def _intentar_contenido(self, pregunta, crono):
+        """«Ponme el partido del Barça contra el Sevilla»: el código busca su página en las plataformas oficiales (primero la que dijiste que usas) y la
+        abre con xdg-open, por el ejecutor de siempre. Devuelve (frase, id) si lo hizo, o None (y lo intenta la IA, como siempre)."""
+        try:
+            aj = AJ.actuales(log=lambda m: None)
+            if not aj.get("directas", "activo") or self.ejecutor.pendientes:
+                return None
+            if not (pide_contenido(pregunta) and CONT.es_deporte(pregunta)):
+                return None
+            preferencias = MEM.relevantes(pregunta) if aj.get("memoria", "usar") else []
+            with crono.medir("herramientas"):
+                hallada = CONT.buscar(pregunta, preferencias)
+            if not hallada:
+                log("Contenido: no encuentro una página clara para verlo; se lo dejo a la IA")
+                return None
+            url, dominio, titulo = hallada
+            log(f"Contenido: «{titulo[:80]}» en {dominio}: {url}")
+            self.nueva_tarea()
+            self.pregunta_pura = self.ejecutor.pregunta_pura = pregunta
+            self.ejecutor.borrado_definitivo = False
+            self.ejecutor.contaminar("búsqueda web")             # la dirección viene de una búsqueda: lo que siga en esta tarea, con el freno de siempre
+            self.ejecutor.continuar = None
+            try:
+                with crono.medir("herramientas"):
+                    r = str(self.ejecutor.herramienta({"comando": f"xdg-open {shlex.quote(url)}", "motivo": f"poner lo que pediste en {dominio}"}))
+            finally:
+                self.ejecutor.continuar = self._continuar_peticion
+            if not (r.startswith("Lanzado") or r.startswith("código de salida: 0")):
+                log(f"Contenido: no se ha podido abrir ({r[:120]}); se lo dejo a la IA")
+                self.ejecutor.cancelar()
+                return None
+            return T("Te abro el partido en {plataforma}. Si no empieza solo, pulsa «Ver».", plataforma=CONT.NOMBRE_VISIBLE.get(dominio, dominio)), "contenido"
+        except Cancelado:
+            raise
+        except Exception as e:
+            self.ejecutor.continuar = self._continuar_peticion
+            log(f"Contenido: fallo {e!r}; se lo dejo a la IA")
+            return None
+
     def _ejecutar_directa(self, ident, datos):
         """Hace la orden directa con las herramientas de siempre y devuelve lo que se dirá, o None si no se pudo comprobar que se hizo."""
         if ident == "abrir_app":
@@ -1235,10 +1280,15 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self._anotar_tiempos(crono, f"directa:{ident}", "directa")
 
     def _acciones_comprobadas(self):
-        """¿Todo lo hecho en esta petición lo ha comprobado el código (el programa se abrió, el volumen quedó leído)? Entonces el revisor sobra."""
+        """¿Todo lo hecho en esta petición lo ha comprobado el código (el programa se abrió, el volumen quedó leído, se abrió la página de lo que pediste
+        poner)? Entonces el revisor sobra: con él, una página ya buena podía acabar sustituida por otra peor."""
         reales = [a for a in self.acciones_turno if a[0] not in HERRAMIENTAS_META]
         if not reales:
             return False
+        peticion = str(getattr(self, "pregunta_pura", "") or "")
+        if (pide_contenido(peticion) and any(a[0] == "ejecutar_comando" and "://" in str(a[1].get("comando", "")) for a in reales)
+                and not pagina_que_no_es(self.acciones_turno, peticion, lambda c: H.clasificar(c)[0] == "lectura")):
+            return True
         for nombre, _, res in reales:
             r = str(res)
             if nombre == "abrir_app" and re.match(r"(?:Abierto|Abriendo) «", r):
@@ -1911,13 +1961,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
               and pide_contenido(str(getattr(self, "pregunta_pura", "") or pregunta))
               and pagina_que_no_es(self.acciones_turno, str(getattr(self, "pregunta_pura", "") or pregunta), lambda c: H.clasificar(c)[0] == "lectura")):
             url, por_que = pagina_que_no_es(self.acciones_turno, str(getattr(self, "pregunta_pura", "") or pregunta), lambda c: H.clasificar(c)[0] == "lectura")
-            web = dominio_valido(url) or url
-            obst = (f"el usuario pidió que le PUSIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») y {por_que}: busca DENTRO de esa web "
-                    f"(buscar_web con dominio «{web}», en su idioma, con el nombre de ese contenido y palabras como «ficha» o «ver», no «canal» ni «programación») "
-                    "y abre con xdg-open el resultado cuyo título o dirección NOMBRE ese contenido y sea de la fecha y la temporada de ahora (nunca uno marcado «OJO: "
-                    "es de la temporada…»); si hay varios de esta temporada de competiciones distintas, el de la competición y la jornada que dijeron las "
-                    "noticias (pon la competición y la jornada en la búsqueda), y si no lo sabes, pregúntaselo en una frase; nunca una guía de "
-                    "programación, un calendario ni una agenda. Si de verdad no está, díselo")
+            obst = self._nota_pagina_de_contenido(url, por_que, pregunta)
             log(f"Pidió poner algo y {por_que} (lo dice el código): reintento con el modelo rápido")
             rapido = True
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
@@ -2007,6 +2051,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                     log(f"{m}: contestó con una promesa en vez de con la respuesta: la descarto")
                     continue
                 if r:
+                    r = self._asegurar_pagina_de_contenido(r, pregunta, imagen, herramientas, sistema)   # lo que se abre al insistir también se comprueba
                     if self.ejecutor.recetas_diferidas and not pide:      # tras el reintento, lo apuntado solo vale si ahora sí se cumplió lo pedido
                         bueno = (not self.ejecutor.duda and not self.ejecutor.pendientes and not fracaso_en_respuesta(r, True)
                                  and not verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, r,
@@ -2019,6 +2064,44 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if pide and not rapido:                           # NUNCA se entrega la frase de «lo voy a pensar» como si fuera la respuesta
             return self._respuesta_directa(pregunta, imagen, herramientas, sistema)
         return respuesta, modelo                       # el segundo intento tampoco respondió: se queda la respuesta rápida
+
+    def _nota_pagina_de_contenido(self, url, por_que, pregunta):
+        """Lo que se le dice a la IA cuando pidió PONER algo y lo que abrió no es la página para verlo (ver turnos.pagina_que_no_es)."""
+        web = dominio_valido(url) or url
+        return (f"el usuario pidió que le PUSIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») y {por_que}: busca DENTRO de esa web "
+                f"(buscar_web con dominio «{web}», en su idioma, con el nombre de ese contenido y palabras como «ficha» o «ver», no «canal» ni «programación») "
+                "y abre con xdg-open el resultado cuyo título o dirección NOMBRE ese contenido y sea de la fecha y la temporada de ahora (nunca uno marcado «OJO: "
+                "es de la temporada…»); si hay varios de esta temporada de competiciones distintas, el de la competición y la jornada que dijeron las "
+                "noticias (pon la competición y la jornada en la búsqueda), y si no lo sabes, pregúntaselo en una frase; nunca una guía de "
+                "programación, un calendario, una noticia, la portada ni la versión de otro país. Si en esa web no aparece, prueba en la OTRA "
+                "plataforma oficial que lo emite (las noticias suelen nombrar varias, p. ej. DAZN y Movistar Plus) antes de rendirte. Si de verdad no está, díselo")
+
+    def _asegurar_pagina_de_contenido(self, respuesta, pregunta, imagen, herramientas, sistema):
+        """Tras un reintento (rápido o a fondo): si se pidió PONER algo y sigue sin abrirse su página, hasta dos vueltas más con el modelo rápido. Si aun así
+        no está, la respuesta lo dice en vez de dar por abierto algo que no es."""
+        peticion = str(getattr(self, "pregunta_pura", "") or pregunta)
+        if not pide_contenido(peticion):
+            return respuesta
+        for _ in range(2):
+            mal = pagina_que_no_es(self.acciones_turno, peticion, lambda c: H.clasificar(c)[0] == "lectura")
+            if not mal:
+                return respuesta
+            log(f"Tras insistir, {mal[1]}: otra vuelta con el modelo rápido")
+            nota = "\n[SISTEMA: " + self._nota_pagina_de_contenido(mal[0], mal[1], pregunta) + ".]"
+            nueva = None
+            for m in IAC.modelos("rapido"):
+                self.paso_guion = 0
+                nueva = self._gemini("rapido", m, pregunta + nota, imagen, self.historial, herramientas=herramientas, ejecutar_herramienta=self.ejecutar_herramienta,
+                                     sistema=sistema, nivel=nivel_razonamiento(m, "rapido"), revisor=self.revisar_respuesta, timeout=TIMEOUT_INSISTIR_SIN_AJUSTES)
+                if nueva:
+                    break
+            if not nueva:
+                break
+            respuesta = nueva
+        if pagina_que_no_es(self.acciones_turno, peticion, lambda c: H.clasificar(c)[0] == "lectura"):
+            log("No he dado con la página de lo que pidió: se lo digo")
+            return T("No he dado con la página para ver eso; te he dejado abierta la más parecida que he encontrado. Si me dices en qué plataforma lo ves, lo busco ahí.")
+        return respuesta
 
     def _respuesta_directa(self, pregunta, imagen, herramientas, sistema):
         """Pedir pensar a fondo y que el modelo fuerte no responda a tiempo (Google saturado): se contesta AHORA con el rápido, y se dice."""

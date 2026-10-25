@@ -153,11 +153,11 @@ def dominio_valido(dominio):
     return d if re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}", d) else None
 
 
-def buscar_tavily(consulta, dominio=None):
-    """Busca en la web con Tavily y devuelve los resultados como texto para que la IA los lea. Con `dominio`, solo dentro de esa web."""
+def resultados_tavily(consulta, dominio=None, maximo=5):
+    """Los resultados en bruto de Tavily ([{title, url, content}]) o, si no se pudo buscar, el texto que lo explica. Con `dominio`, solo en esa web."""
     if not CL.obtener("tavily"):
         return "La búsqueda web no está configurada."
-    pedido = {"query": consulta[:380], "search_depth": "basic", "max_results": 5}
+    pedido = {"query": consulta[:380], "search_depth": "basic", "max_results": max(1, min(int(maximo), 20))}
     if dominio:
         d = dominio_valido(dominio)
         if not d:
@@ -180,6 +180,14 @@ def buscar_tavily(consulta, dominio=None):
     except ValueError:
         resultados = []
     log(f"Búsqueda «{consulta}»{' en ' + pedido['include_domains'][0] if 'include_domains' in pedido else ''}: {len(resultados)} resultados ({time.time() - inicio:.1f} s)")
+    return [x for x in resultados if isinstance(x, dict)]
+
+
+def buscar_tavily(consulta, dominio=None):
+    """Busca en la web con Tavily y devuelve los resultados como texto para que la IA los lea. Con `dominio`, solo dentro de esa web."""
+    resultados = resultados_tavily(consulta, dominio)
+    if isinstance(resultados, str):
+        return resultados
     if not resultados:
         return "La búsqueda no ha encontrado nada."
     from lina.nucleo import turnos as TU
