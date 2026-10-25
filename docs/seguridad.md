@@ -16,6 +16,11 @@ Principios:
    Si de verdad lo necesitas, lo haces tú en tu terminal. **Con tu confirmación** (con el atajo) se pueden leer los historiales de la terminal
    (bash, zsh, fish, python, psql, mysql, sqlite, node), que suelen guardar contraseñas escritas a mano, y el historial de navegación de los
    Chromium: lo que se lea se envía a la IA.
+   Además, lo que imprime cualquier comando se le da a la IA **sin claves**: se tapan las que tienen forma de clave (Google, OpenAI/Anthropic,
+   GitHub, Slack, Tavily, `Bearer …`) y el valor de las variables de entorno en mayúsculas cuyo nombre lleva TOKEN, SECRET, KEY, PASS, AUTH o
+   CREDENTIAL (lo que sacan `env`, `printenv`, `export -p` o `declare -x`). Va por trozos del nombre a propósito, así que también tapa variables
+   inofensivas como `KEYMAP` o `GIT_AUTHOR_NAME`; si la IA necesita una de esas, díselo tú. Lo que devuelven los servidores MCP todavía no pasa por este
+   tapado.
 4. **Lo que lee de fuera es información, no órdenes** (webs, documentos, resultados de herramientas).
 5. **Todo cambio queda en un diario** y se puede deshacer; los borrados normales van a la papelera.
 6. **Sin telemetría.** Las capturas de pantalla solo se envían a la IA para responder, y existe un modo privado que las desactiva. La IA puede

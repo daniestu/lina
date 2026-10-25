@@ -49,6 +49,7 @@ from lina.nucleo.clasificador import (  # noqa: F401
 )
 from lina.nucleo.procesos import _fuera_del_servicio  # noqa: F401
 from lina.nucleo.registro import ARCHIVO_ACCIONES, MAX_REGISTRO_ACCIONES, anotar, log, notificar  # noqa: F401
+from lina.nucleo import claves as CL
 from lina.nucleo import rutas as RUT
 from lina.nucleo.declaraciones import (  # noqa: F401
     DECLARACIONES,
@@ -1928,7 +1929,7 @@ class Ejecutor:
         anotar(f"[fin rc={rc}] {comando}")
         primera = next((l.strip() for l in salida.splitlines() if l.strip()), "(sin salida)")
         log(f"   resultado (código {rc}): {primera[:140]}")
-        texto = f"código de salida: {rc} ({segundos:.0f} s)\n{_recortar(salida)}"
+        texto = f"código de salida: {rc} ({segundos:.0f} s)\n{_recortar(CL.limpiar_para_ia(salida))}"      # ninguna clave que imprima un comando llega a la IA
         if rc == 0 and re.match(r"\s*(?:sudo\s+(?:-n\s+)?)?(?:gio\s+trash|trash-put)\b", comando):
             texto += ("\n[Esto ha MOVIDO a la papelera: NO se ha borrado de forma definitiva y se puede recuperar. Cuéntaselo así al "
                       "usuario. Solo si dice «definitivamente» se borra de verdad.]")

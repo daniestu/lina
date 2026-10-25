@@ -251,6 +251,24 @@ def limpiar(texto):
     return _CON_PREFIJO.sub(lambda m: m.group(1) + TAPADA, t)
 
 
+# Variables de entorno con nombre de secreto (lo que sacan env, printenv, export -p o declare -x): su valor no va a la IA. Solo nombres en MAYÚSCULAS, como
+# las variables de entorno (así «ShortcutKey=Meta+X» de un archivo de KDE no se toca). Va por trozos del nombre, a propósito de más: también tapa variables
+# inofensivas que los contengan (KEYMAP, GIT_AUTHOR_NAME…); a cambio no se escapa GITHUB_TOKEN ni MYAPIKEY.
+_NOMBRE_SECRETO = re.compile(r"TOKEN|SECRET|KEY|PASS|AUTH|CREDENTIAL")
+_ASIGNACION = re.compile(r"^(\s*(?:export\s+|declare\s+-\S+\s+)?)([A-Z_][A-Z0-9_]*)=(.+)$")
+
+
+def limpiar_para_ia(texto):
+    """Lo que sale de un comando, antes de dárselo a la IA: sin claves (como en el registro) y sin el valor de las variables con nombre de secreto."""
+    lineas = []
+    for linea in limpiar(texto).split("\n"):
+        m = _ASIGNACION.match(linea)
+        if m and _NOMBRE_SECRETO.search(m.group(2)) and m.group(3).strip() not in ("", "''", '""'):
+            linea = f"{m.group(1)}{m.group(2)}={TAPADA}"
+        lineas.append(linea)
+    return "\n".join(lineas)
+
+
 class FiltroSalida:
     """Envuelve stdout/stderr para tapar claves en todo lo que se imprima (y por tanto en el registro de journalctl)."""
 
