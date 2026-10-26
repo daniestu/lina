@@ -122,7 +122,8 @@ _PAGINA_DE_CONTENIDO = re.compile(r"(?:^|[/_-])(?:ficha|fixture|event|evento|eve
                                   r"movie|pelicula|serie|series|show|programa|directo|live)(?:[/_.:?=-]|$)")
 # Páginas que no son el contenido aunque lo nombren: guías de programación, calendarios, agendas.
 _PAGINA_DE_GUIA = re.compile(r"(?:^|[/_-])(?:programacion(?:-tv)?|parrilla|guia(?:-tv)?|calendario|agenda|horarios?|schedule|tv-guide|fixtures|"
-                             r"news|noticias?|blog|articulos?|article|comunicacion|prensa)(?:[/_.-]|$)")
+                             r"news|noticias?|blog|articulos?|articles?|comunicacion|prensa|tudum|collections?|colecciones|coleccion|browse|"
+                             r"categor(?:y|ies|ia|ias))(?:[/_.-]|$)")
 
 
 def palabras_distintivas(texto):
@@ -242,13 +243,31 @@ def mi_pais_web(entorno=None):
     return None
 
 
+# Webs que ponen el país como primer trozo de la dirección y el idioma como segundo («max.com/ar/es/…»): solo se reconocen estos países, para no confundir
+# otras rutas de dos letras.
+_PAISES = set(("ad ae af ag ai al am ao aq ar as at au aw ax az ba bb bd be bf bg bh bi bj bl bm bn bo bq br bs bt bv bw by bz ca cc cd cf cg ch ci ck cl "
+                "cm cn co cr cu cv cw cx cy cz de dj dk dm do dz ec ee eg eh er es et fi fj fk fm fo fr ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk "
+                "hm hn hr ht hu id ie il im in io iq ir is it je jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mf mg mh mk "
+                "ml mm mn mo mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pe pf pg ph pk pl pm pn pr ps pt pw py qa re ro rs ru rw sa "
+                "sb sc sd se sg sh si sj sk sl sm sn so sr ss st sv sx sy sz tc td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug um us uy uz va vc ve vg vi vn vu "
+                "wf ws ye yt za zm zw uk").split())
+
+
 def de_otro_pais(url, entorno=None):
-    """El país de la dirección («en-US») si es la versión de otro país distinto del tuyo; None si es el tuyo, no lo dice o no se sabe el tuyo."""
+    """El país de la dirección («en-US», «ar») si es la versión de otro país distinto del tuyo; None si es el tuyo, no lo dice o no se sabe el tuyo."""
     from urllib.parse import urlparse
     mio = mi_pais_web(entorno)
     if not mio:
         return None
-    for trozo in urlparse(str(url or "")).path.split("/"):
+    trozos = [t for t in urlparse(str(url or "")).path.split("/") if t]
+    for trozo in trozos:
         if _LOCALE_EN_RUTA.match(trozo) and trozo.lower() != mio.lower():
             return trozo
+    pais = mio.split("-")[1].lower()
+    if len(trozos) >= 2 and re.fullmatch(r"[a-z]{2}", trozos[0]) and re.fullmatch(r"[a-z]{2}", trozos[1]) and trozos[0] != pais:
+        return trozos[0]                                      # «max.com/ad/es/…»: país e idioma (Andorra, aunque esté en español)
+    if trozos and re.fullmatch(r"[a-z]{2}-[a-z]{2}", trozos[0]) and trozos[0][:2] != pais:
+        return trozos[0]                                      # «netflix.com/tt-es/…»: país-idioma (Trinidad y Tobago, en español)
+    if trozos and trozos[0] in _PAISES and trozos[0] != pais:
+        return trozos[0]                                      # «netflix.com/us/…»
     return None

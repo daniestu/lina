@@ -1157,26 +1157,35 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return None
 
     def _intentar_contenido(self, pregunta, crono):
-        """«Ponme el partido del Barça contra el Sevilla»: el código busca su página en las plataformas oficiales (primero la que dijiste que usas) y la
-        abre con xdg-open, por el ejecutor de siempre. Devuelve (frase, id) si lo hizo, o None (y lo intenta la IA, como siempre)."""
+        """«Ponme el partido de hoy», «ponme el capítulo 3 de…», «ponme la película…»: entiende la IA (una consulta corta) y elige el código (contenido.py),
+        que solo abre una página que pueda comprobar, con xdg-open y el ejecutor de siempre. Si es un partido y hoy no hay, lo dice. Devuelve (frase, id) si
+        lo resolvió, o None (y lo intenta la IA, como siempre)."""
         try:
             aj = AJ.actuales(log=lambda m: None)
-            if not aj.get("directas", "activo") or self.ejecutor.pendientes:
-                return None
-            if not (pide_contenido(pregunta) and CONT.es_deporte(pregunta)):
+            if not aj.get("directas", "activo") or self.ejecutor.pendientes or not pide_contenido(pregunta) or not self.clave:
                 return None
             preferencias = MEM.relevantes(pregunta) if aj.get("memoria", "usar") else []
             with crono.medir("herramientas"):
-                hallada = CONT.buscar(pregunta, preferencias)
-            if not hallada:
-                log("Contenido: no encuentro una página clara para verlo; se lo dejo a la IA")
+                que = self._con_claves("mini", CONT.entender, pregunta, preferencias)
+            if not que or que["tipo"] not in CONT.PLATAFORMAS:
+                log(f"Contenido: {('es ' + que['tipo']) if que else 'no lo he entendido'}; se lo dejo a la IA")
                 return None
-            url, dominio, titulo = hallada
-            log(f"Contenido: «{titulo[:80]}» en {dominio}: {url}")
+            lo = " - ".join(que["terminos"]) or T("eso")
+            log(f"Contenido: {que['tipo']} «{lo}»{' (' + que['torneo'] + ')' if que['torneo'] else ''}, fecha={que['fecha_evento']}, plataformas={que['plataformas']}")
             self.nueva_tarea()
             self.pregunta_pura = self.ejecutor.pregunta_pura = pregunta
             self.ejecutor.borrado_definitivo = False
-            self.ejecutor.contaminar("búsqueda web")             # la dirección viene de una búsqueda: lo que siga en esta tarea, con el freno de siempre
+            self.ejecutor.contaminar("búsqueda web")             # lo que viene de una búsqueda: lo que siga en esta tarea, con el freno de siempre
+            hoy = datetime.now().date()
+            if que["tipo"] == "evento" and que["fecha_evento"] and que["fecha_evento"] > hoy:      # la fecha la compara el código, no la IA
+                return T("Hoy no veo {lo}; es {cuando}.", lo=lo, cuando=CONT.fecha_hablada(que["fecha_evento"])), "contenido"
+            with crono.medir("herramientas"):
+                hallada = CONT.elegir(que, pregunta, preferencias)
+            if not hallada:
+                log("Contenido: no encuentro una página que pueda comprobar; se lo dejo a la IA")
+                return None
+            url, dominio, titulo, es_el_capitulo = hallada
+            log(f"Contenido: «{titulo[:80]}» en {dominio}: {url}")
             self.ejecutor.continuar = None
             try:
                 with crono.medir("herramientas"):
@@ -1187,13 +1196,36 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 log(f"Contenido: no se ha podido abrir ({r[:120]}); se lo dejo a la IA")
                 self.ejecutor.cancelar()
                 return None
-            return T("Te abro el partido en {plataforma}. Si no empieza solo, pulsa «Ver».", plataforma=CONT.NOMBRE_VISIBLE.get(dominio, dominio)), "contenido"
+            plataforma = CONT.NOMBRE_VISIBLE.get(dominio, dominio)
+            if que["tipo"] == "evento":
+                return T("Te abro {lo} en {plataforma}. Si no empieza solo, pulsa «Ver».", lo=lo, plataforma=plataforma), "contenido"
+            if que["tipo"] == "capitulo" and es_el_capitulo:
+                return T("Te abro ese capítulo de {lo} en {plataforma}.", lo=lo, plataforma=plataforma), "contenido"
+            if que["tipo"] == "capitulo":
+                ep = (T("la temporada {t}, capítulo {e}", t=que["temporada"], e=que["episodio"]) if que["temporada"] and que["episodio"] else T("el capítulo"))
+                return T("Te abro {lo} en {plataforma}; no encuentro el enlace directo al capítulo, así que elige {ep}.", lo=lo, plataforma=plataforma,
+                         ep=ep), "contenido"
+            return T("Te abro {lo} en {plataforma}.", lo=lo, plataforma=plataforma), "contenido"
         except Cancelado:
             raise
         except Exception as e:
             self.ejecutor.continuar = self._continuar_peticion
             log(f"Contenido: fallo {e!r}; se lo dejo a la IA")
             return None
+
+    def _otra_pagina_de_mas(self, comando):
+        """Al «poner» algo, una sola página por petición: no se abre otra vez la misma, ni otra si ya hay abierta una que es la de lo pedido."""
+        peticion = str(getattr(self, "pregunta_pura", "") or "")
+        if not comando.strip().startswith(("xdg-open ", "xdg-open\t")) or "://" not in comando or not pide_contenido(peticion):
+            return None
+        nueva = comando.split(None, 1)[1].strip().strip("'\"")
+        abiertas = [str(a[1].get("comando", "")).split(None, 1)[1].strip().strip("'\"") for a in getattr(self, "acciones_turno", [])
+                    if a[0] == "ejecutar_comando" and str(a[1].get("comando", "")).strip().startswith("xdg-open ") and "://" in str(a[1].get("comando", ""))]
+        if nueva in abiertas:
+            return "Esa página ya está abierta: no la abro otra vez. Si es la buena, díselo al usuario en una frase; si no, busca otra."
+        if abiertas and not pagina_que_no_es(self.acciones_turno, peticion, lambda c: H.clasificar(c)[0] == "lectura"):
+            return "Ya hay abierta una página que es la de lo que pidió: no abro otra. Díselo al usuario en una frase."
+        return None
 
     def _ejecutar_directa(self, ident, datos):
         """Hace la orden directa con las herramientas de siempre y devuelve lo que se dirá, o None si no se pudo comprobar que se hizo."""
@@ -1573,6 +1605,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             self.ejecutor.contaminar("búsqueda web")      # A2e: lo que trae internet puede traer instrucciones escondidas
             return resultado
         if nombre == "ejecutar_comando":
+            otra = self._otra_pagina_de_mas(str(args.get("comando", "")))
+            if otra:
+                return otra
             return self.ejecutor.herramienta(args)
         if nombre == "disenar_documento":
             return H.disenar_documento(args)
