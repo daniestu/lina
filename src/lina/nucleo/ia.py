@@ -20,7 +20,7 @@ from lina.nucleo import proveedor_gemini as PG
 from lina.nucleo import proveedor_anthropic as PAN  # noqa: F401  (los proveedores se registran al importarse)
 from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
-from lina.nucleo.constantes import (BUSQUEDA, ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
+from lina.nucleo.constantes import (ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
                                     MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, PAUSA_RED_SEG, TIMEOUT_REVISOR, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, ESTIMACION_VRAM_LOCAL)
 from lina.nucleo.opcionales import PRES
@@ -153,9 +153,19 @@ def dominio_valido(dominio):
     return d if re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}", d) else None
 
 
+def modo_busqueda():
+    """La búsqueda en internet que has elegido (ia.busqueda en config.toml, se relee si cambia): tavily, google o ninguna."""
+    return AJ.actuales(log=lambda m: None).get("ia", "busqueda")
+
+
+def hay_busqueda_tavily():
+    """¿Se puede buscar con Tavily? Solo si la búsqueda elegida es tavily y hay clave."""
+    return modo_busqueda() == "tavily" and bool(CL.obtener("tavily"))
+
+
 def resultados_tavily(consulta, dominio=None, maximo=5):
     """Los resultados en bruto de Tavily ([{title, url, content}]) o, si no se pudo buscar, el texto que lo explica. Con `dominio`, solo en esa web."""
-    if not CL.obtener("tavily"):
+    if not hay_busqueda_tavily():
         return "La búsqueda web no está configurada."
     pedido = {"query": consulta[:380], "search_depth": "basic", "max_results": max(1, min(int(maximo), 20))}
     if dominio:
@@ -546,7 +556,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
         return None
     mensajes = [{"rol": h["rol"], "texto": h["texto"]} for h in historial]
     mensajes.append({"rol": "user", "texto": pregunta, "imagen": imagen})
-    nativa = bool(proveedor.busqueda_nativa and BUSQUEDA == "google" and time.time() >= _pausa_busqueda[0])
+    nativa = bool(proveedor.busqueda_nativa and modo_busqueda() == "google" and time.time() >= _pausa_busqueda[0])
     if nativa:
         ejecutar_herramienta = None                  # la búsqueda va dentro del modelo (cuenta de pago): no hay herramientas nuestras
     con_herramientas = bool(nativa or (herramientas and ejecutar_herramienta))

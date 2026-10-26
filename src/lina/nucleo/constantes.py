@@ -66,7 +66,6 @@ TIMEOUT_PRIMERA_CLAVE = 8                    # con dos claves, segundos que se e
 TIMEOUT_REVISOR = 4                         # segundos que espera el revisor «¿se cumplió lo pedido?» (y solo prueba un modelo): no merece frenar la respuesta
 PAUSA_MODELO_SEG = 180                      # tras un 503/429 o un timeout, se salta ese modelo este tiempo
 PAUSA_BUSQUEDA_SEG = 1800                   # si la búsqueda de Google da error de cuota, se prueba sin ella este tiempo
-BUSQUEDA = "tavily"                         # "tavily": búsqueda propia (gratis) | "google": la de Gemini (pide cuenta de pago) | "ninguna"
 MAX_BUSQUEDAS = 2                           # búsquedas máximas por pregunta
 CONFIRMAR_ACCIONES = True                   # True: lo que cambia el sistema espera tu "sí"; False: modo libre (solo se bloquea lo catastrófico)
 MAX_CONTINUACIONES = 3                      # veces seguidas que se retoma una petición tras una tarea en segundo plano (para que no dé vueltas sin fin)

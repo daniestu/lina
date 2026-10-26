@@ -66,7 +66,7 @@ def ia(monkeypatch):
     monkeypatch.setattr(IA, "PRES", pres)
     monkeypatch.setattr(IA, "_dormir", lambda s: esperas.append(s))
     monkeypatch.setattr(IA, "log", lambda m: None)
-    monkeypatch.setattr(IA, "BUSQUEDA", "tavily")
+    monkeypatch.setattr(IA, "modo_busqueda", lambda: "tavily")
     IA._pausa_modelo.clear()
     IA._abortar.clear()
 

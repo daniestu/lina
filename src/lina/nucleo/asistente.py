@@ -127,7 +127,7 @@ except ImportError:  # sin la librería evdev el asistente funciona igual, pero 
     evdev = None  # type: ignore[assignment]
 
 from lina.nucleo.constantes import (  # noqa: F401
-    ANCHO_MAX_CAPTURA, ARCHIVO_PID, ARCHIVO_PRIVADO, ARCHIVO_VOCABULARIO, AUDIO_RESPUESTA, AVISO_ESPERA_A_FONDO, BUSQUEDA,
+    ANCHO_MAX_CAPTURA, ARCHIVO_PID, ARCHIVO_PRIVADO, ARCHIVO_VOCABULARIO, AUDIO_RESPUESTA, AVISO_ESPERA_A_FONDO,
     CAPTURA, CAPTURA_MIRAR, CONFIRMACION_IA, CONFIRMAR_ACCIONES, ESPERA_CUOTA_MAX, ESPERA_PARAR_MAXIMA, ESPERA_PARAR_TAREA,
     ESPERA_REINTENTO, FRECUENCIA, INSTRUCCIONES, INSTRUCCION_LOCAL, instrucciones, INTERRUPCION_IA, MAX_BUSQUEDAS, MAX_BUSQUEDAS_PROFUNDO,
     MAX_CONTINUACIONES, MAX_ESPERAS_CUOTA, MAX_MIRADAS, MAX_MIRADAS_PROFUNDO, MAX_PASOS, MAX_PASOS_PROFUNDO, MAX_TIEMPO_TAREA,
@@ -450,7 +450,7 @@ from lina.nucleo.ia import (  # noqa: F401
     Cancelado, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
-    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily,
+    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily, hay_busqueda_tavily,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
     cabe_modelo_local, dominio_valido,
@@ -1165,6 +1165,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         try:
             aj = AJ.actuales(log=lambda m: None)
             if not aj.get("directas", "activo") or self.ejecutor.pendientes or not pide_contenido(pregunta) or not self.clave:
+                return None
+            if not hay_busqueda_tavily():                         # sin búsqueda propia no hay nada que comprobar: lo intenta la IA, sin gastar la consulta
+                log("Contenido: sin búsqueda Tavily (ia.busqueda o sin clave); se lo dejo a la IA")
                 return None
             preferencias = MEM.relevantes(pregunta) if aj.get("memoria", "usar") else []
             with crono.medir("herramientas"):
@@ -2213,7 +2216,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if self.clave:
             grupos = self._preparar_grupos_mcp(self.elegir_grupos(pregunta))
             herramientas = G.herramientas(H.DECLARACIONES, grupos)
-            if BUSQUEDA == "tavily" and CL.obtener("tavily"):
+            if hay_busqueda_tavily():
                 herramientas = HERRAMIENTA_BUSCAR["functionDeclarations"] + herramientas
             self.herramientas_turno = herramientas        # la misma lista que usa Gemini: mas_herramientas la amplía en sitio
             self.grupos_turno = set(grupos)
@@ -2245,7 +2248,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         pregunta_local = pregunta + ("\n[Nota: ahora mismo no tienes herramientas porque Gemini no responde. Si te piden una acción "
                                      "en el PC, di en una sola frase que ahora no puedes ejecutarla y que lo intente dentro de un "
                                      "rato. No des instrucciones ni comandos salvo que te los pidan.]")
-        if BUSQUEDA == "tavily" and CL.obtener("tavily") and self.contexto.get("tipo") == "juego":
+        if hay_busqueda_tavily() and self.contexto.get("tipo") == "juego":
             consulta = f"{self.contexto['nombre'] or ''} {self.pregunta_pura}".strip()
             pregunta_local = f"{pregunta_local}\n\n{buscar_tavily(consulta)}"
         r = preguntar_local(pregunta_local, imagen, permitir_escalar=False, historial=self.historial,

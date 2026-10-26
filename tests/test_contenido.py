@@ -208,6 +208,7 @@ def _asistente(monkeypatch, que, hallada, resultado="Lanzado."):
     a.nueva_tarea = lambda: None
     a._con_claves = lambda modo, funcion, *args: que
     monkeypatch.setattr(A.CONT, "elegir", lambda que, peticion, preferencias=(): hallada)
+    monkeypatch.setattr(A, "hay_busqueda_tavily", lambda: True)      # la casa de pruebas no tiene clave de Tavily
     monkeypatch.setattr(A, "datetime", type("DT", (), {"now": staticmethod(lambda: datetime.datetime(2026, 10, 25, 20, 0))}))
     return A, a
 
