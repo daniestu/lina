@@ -33,7 +33,7 @@ Todo lo que se crea queda apuntado en `~/.local/state/lina/instalacion.json`. El
 | Comando | Para qué |
 |---|---|
 | `lina bienvenida` | repetir la configuración guiada |
-| `lina doctor` | comprobar que todo está en su sitio y cómo arreglar lo que falle (`--red` prueba también la conexión y la clave; `--informe` lo da sin datos personales para pegar en una incidencia) |
+| `lina doctor` | comprobar que todo está en su sitio y cómo arreglar lo que falle, también si Lina puede buscar en internet (`--red` prueba también la conexión y la clave; `--informe` lo da sin datos personales para pegar en una incidencia) |
 | `lina update` | actualizar (te enseña qué trae y pregunta; `--comprobar` solo mira; `--volver` deshace la última actualización) |
 | `lina atajo [TECLA]` | crear el atajo global si no lo hay |
 | `lina modelos` | descargar o comprobar los modelos de voz |

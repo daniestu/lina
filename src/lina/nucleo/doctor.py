@@ -70,6 +70,10 @@ class Sondas:
     def llavero(self):
         return CL.llavero_disponible()
 
+    def busqueda(self):
+        """(ia.busqueda, dónde está la clave de Tavily, dónde está la clave de pago de Gemini). Solo mira: no gasta consultas."""
+        return AJ.actuales(log=lambda m: None).get("ia", "busqueda"), CL.donde_esta("tavily"), CL.donde_esta("gemini_pago")
+
     def servicio(self):
         """'activo' | 'inactivo' | 'sin_systemd'."""
         if PL.detectar_init() != "systemd":
@@ -196,6 +200,21 @@ def comprobar(s=None, red=False):
         cl = "sin clave"
     else:
         a(MAL, T("Clave de {nombre}", nombre=nombre), T("no hay ninguna: Lina no puede responder"), T("lina bienvenida   (la clave es gratuita)") if nombre == "Gemini" else f"lina clave {proveedor}")
+    bus = _seguro(getattr(s, "busqueda", lambda: None))
+    if isinstance(bus, Exception):
+        a(AVISO, T("Búsqueda en internet"), T("no he podido mirarla ({bus})", bus=bus))
+    elif bus:
+        modo, tavily, pago = bus
+        if modo == "tavily":
+            a(OK, T("Búsqueda en internet"), T("Tavily, clave guardada en {cl}", cl=tavily) if tavily else T("Tavily, pero sin clave: sin datos de hoy (resultados, horarios, noticias)"),
+              "" if tavily else T("lina clave tavily   (gratis en tavily.com)"))
+        elif modo == "google" and nombre != "Gemini":
+            a(AVISO, T("Búsqueda en internet"), T("google solo existe con Gemini: ahora no hay búsqueda"), T("lina config   (cambia ia.busqueda a tavily)"))
+        elif modo == "google":
+            a(OK if pago else AVISO, T("Búsqueda en internet"), T("la de Gemini, con tu clave de pago") if pago else T("la de Gemini, pero no hay clave de pago: no funcionará"),
+              "" if pago else T("lina clave gemini_pago   (o cambia ia.busqueda a tavily:  lina config)"))
+        else:
+            a(OK, T("Búsqueda en internet"), T("desactivada en ia.busqueda"))
     if not _seguro(s.llavero, False):
         a(AVISO, T("Llavero del sistema"), T("no disponible: las claves van a un archivo solo tuyo (600)"), T("Opcional: instala libsecret (secret-tool) y un llavero (GNOME Keyring o KWallet)"))
     serv = _seguro(s.servicio)

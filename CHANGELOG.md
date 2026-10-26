@@ -4,6 +4,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Añadido
+- **`lina doctor` dice cómo está la búsqueda en internet.** Una línea nueva indica si Lina busca con Tavily (y dónde está la clave), con la de Gemini o con ninguna. Sin clave de Tavily avisa de que no habrá datos de hoy (resultados, horarios, noticias) y da el comando para ponerla, sin contarlo como problema. Si eliges `google` sin clave de pago de Gemini, o con otra IA, sale como aviso, porque así no funcionará. No gasta consultas: no prueba la clave de Tavily.
+
 ### Cambiado
 - **La búsqueda en internet es un ajuste.** Antes era una constante del código; ahora es `ia.busqueda` en `config.toml`: `tavily` (de fábrica, como hasta ahora, con tu clave de `lina clave tavily`), `google` (la de Gemini, solo con clave de pago) o `ninguna`, y se aplica en la siguiente petición, sin reiniciar. Con `ninguna` Lina no busca aunque haya clave, y «ponme…» sin búsqueda se lo deja a la IA directamente, sin gastar una consulta en entender qué querías.
 - **Un «sí» vale para toda la tarea.** Al instalar algo que pedía confirmación (por ejemplo un programa del AUR), Lina volvía a preguntar en cada reintento: otro nombre del paquete tras un 404, `paru -Syu`, activar su servicio… Ahora, tras tu «sí», los pasos de la misma clase para conseguirlo se hacen sin volver a preguntar durante 15 minutos, en esa petición y en lo que retoma sola, y Lina dice lo que va haciendo («Sigo sin preguntarte: …»; si va a actualizar todo el sistema, lo avisa antes). Siguen preguntando siempre discos, arranque y kernel, cuentas, dinero y gasto, el código libre con sudo, un paquete suelto y ejecutar lo descargado; si la tarea ha leído algo de internet, solo pasa lo que nombra lo mismo que confirmaste. Con el perfil *prudente* todo sigue como antes.

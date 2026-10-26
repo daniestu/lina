@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Lina contributors
+import pytest
+
 from lina.nucleo import doctor as D
 
 
@@ -14,6 +16,7 @@ class Todo(D.Sondas):
     def modelos(self): return {"whisper": True, "voz": "es_MX-claude-high", "voz_integra": True}
     def clave(self): return "llavero"
     def llavero(self): return True
+    def busqueda(self): return "tavily", "llavero", ""
     def servicio(self): return "activo"
     def proceso(self): return True
     def atajo(self): return True
@@ -123,3 +126,57 @@ def test_aviso_de_gnome_wayland_sale_como_aviso():
         def escritorio(self):
             return "GNOME (wayland)", {"ventana": ("xdotool", "solo ven XWayland"), "captura": ("gnome-screenshot", ""), "portapapeles": ("wl-copy", "")}, []
     assert estados(D.comprobar(Gnome()))["Ventana activa"] == D.AVISO
+
+
+class _IA:
+    def __init__(self, nombre, local=False):
+        self.nombre, self.local, self.rapido = nombre, local, ["m"]
+    def listo(self): return True, ""
+    def servidor(self): return ("ejemplo.test", 443)
+
+
+@pytest.mark.parametrize("modo, tavily, pago, ia, estado, con_arreglo, texto", [
+    ("tavily", "llavero", "", "gemini", D.OK, False, "llavero"),
+    ("tavily", "", "", "gemini", D.OK, True, "sin datos de hoy"),
+    ("google", "", "archivo", "gemini", D.OK, False, "clave de pago"),
+    ("google", "llavero", "", "gemini", D.AVISO, True, "no funcionará"),
+    ("google", "", "archivo", "ollama", D.AVISO, True, "solo existe con Gemini"),
+    ("ninguna", "", "", "gemini", D.OK, False, "desactivada"),
+])
+def test_linea_de_la_busqueda(modo, tavily, pago, ia, estado, con_arreglo, texto):
+    class Con(Todo):
+        def busqueda(self): return modo, tavily, pago
+        def ia(self): return _IA(ia, local=ia == "ollama")
+    linea = [r for r in D.comprobar(Con()) if r[1] == "Búsqueda en internet"]
+    assert len(linea) == 1
+    est, _, det, arreglo = linea[0]
+    assert est == estado and texto in det
+    assert bool(arreglo) == con_arreglo
+    if modo == "tavily" and not tavily:
+        assert "lina clave tavily" in arreglo
+    if modo == "google" and ia == "gemini" and not pago:
+        assert "gemini_pago" in arreglo and "ia.busqueda" in arreglo
+
+
+def test_sin_tavily_sigue_todo_en_orden():
+    class SinTavily(Todo):
+        def busqueda(self): return "tavily", "", ""
+    assert D.principal([], SinTavily(), salida=lambda t: None) == 0
+
+
+def test_la_busqueda_que_revienta_no_tumba_el_diagnostico():
+    class Explota(Todo):
+        def busqueda(self): raise ValueError("config rota")
+    e = {tema: est for est, tema, *_ in D.comprobar(Explota())}
+    assert e["Búsqueda en internet"] == D.AVISO and "Servicio" in e
+
+
+def test_la_sonda_lee_el_ajuste_y_no_las_claves(monkeypatch):
+    vistas = []
+    monkeypatch.setattr(D.CL, "donde_esta", lambda n: vistas.append(n) or "")
+    monkeypatch.setattr(D.CL, "obtener", lambda n: pytest.fail("no debe leer la clave"))
+    class Aj:
+        def get(self, s, k): return {("ia", "busqueda"): "ninguna"}[(s, k)]
+    monkeypatch.setattr(D.AJ, "actuales", lambda log=None: Aj())
+    assert D.Sondas().busqueda() == ("ninguna", "", "")
+    assert vistas == ["tavily", "gemini_pago"]
