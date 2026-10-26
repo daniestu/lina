@@ -21,7 +21,7 @@ con `--simular` dice todo lo que haría sin tocar nada.
 5. **`lina preparar`**: el comando `lina` en `~/.local/bin`, los modelos (Whisper para oírte y la voz de Lina, unos 500 MB la primera vez),
    el servicio de usuario `lina.service` (o, sin systemd, el arranque automático de la sesión) y el atajo global (`Meta+Espacio` en KDE,
    `Ctrl+Alt+Espacio` en GNOME; con `--atajo TECLA` eliges otro).
-6. **`lina bienvenida`**: te guía por la clave de Gemini (gratuita), el micrófono, el nombre, la libertad de Lina y la privacidad.
+6. **`lina bienvenida`**: te guía por la clave de Gemini (gratuita), el micrófono, el nombre, la libertad de Lina, la privacidad y, si quieres, la búsqueda en internet (clave gratuita de Tavily).
 
 Opciones: `--simular`, `-y` (responde sí a todo menos a lo que da permisos de administrador), `--sin-sistema`, `--sin-bienvenida`, `--entrada`
 (prepara el control de programas con la pantalla), `--atajo TECLA`, `--quitar`.

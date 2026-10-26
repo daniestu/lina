@@ -10,7 +10,7 @@ Lina has no telemetry: she sends no statistics or usage data to anyone. The only
 - **Screenshots of your screen, only if you allow it** (`lina privacidad si`) and only when needed: in a game, if you talk about what you see, or if the AI asks for it.
   Never with **private mode** on, nor with **sensitive** windows (banks, billing, password managers…), nor while you haven't decided.
 - **The result of the commands and tools** the AI uses to help you (for example, the list of installed programs or the text of a page you ask it to read).
-- If you have set a **Tavily** key, the text of the web searches you make.
+- If you have set a **Tavily** key, the text of each web search, which is sent to Tavily. It may include what you ask or the name of a program or game you have open; Tavily does not receive your voice, screenshots or files.
 
 ## What is NOT sent
 

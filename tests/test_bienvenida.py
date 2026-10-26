@@ -2,6 +2,7 @@
 # Copyright (C) 2026 Lina contributors
 from types import SimpleNamespace
 
+import pytest
 import requests
 
 from lina.nucleo import ajustes as AJ
@@ -122,9 +123,12 @@ def test_privacidad_en_la_bienvenida_pregunta_y_respeta_el_no(tmp_path):
 
 def test_recorrido_completo_y_marca(tmp_path, monkeypatch):
     claves_falsas(monkeypatch)
-    c = charla(tmp_path, Teclas("s", "", "2", "s"), ["AIzaOK"], grabar=lambda s: 0.3)
+    c = charla(tmp_path, Teclas("s", "", "2", "s", ""), ["AIzaOK"], grabar=lambda s: 0.3)
     marca = tmp_path / "marca.json"
     assert B.principal([], c, marca) == 0 and B.ya_hecha(marca)
+    assert c.resultado["busqueda"] == "saltado"
+    assert any("seis cosas" in t for t in c.texto) and any("6. Búsqueda en internet" in t for t in c.texto)
+    assert any("Búsqueda: saltado" in t for t in c.texto) and any("lina clave tavily" in t for t in c.texto)
     assert c.aj.get("autonomia", "perfil") == "equilibrado" and c.aj.get("privacidad", "capturas") == "si"
 
 
@@ -266,3 +270,88 @@ def test_un_microfono_normal_no_se_toca(tmp_path):
     c, estado = _charla_con_micro(tmp_path, [0.5])
     c.paso_microfono()
     assert c.resultado["microfono"] == "bien" and estado["puestos"] == []
+
+
+# ---------------------------------------------------------------- paso 6: la clave de Tavily (opcional)
+def red_prohibida(*a, **k):
+    raise AssertionError("el paso de Tavily no debe llamar a la red (gastaría cupo)")
+
+
+def charla_tavily(tmp_path, monkeypatch, entrada, secretos=(), modo=None, guardadas=None):
+    g = claves_falsas(monkeypatch, guardadas)
+    reinicios = []
+    monkeypatch.setattr(B.CL, "reiniciar_servicio", lambda ej: reinicios.append(ej) or True)
+    monkeypatch.setattr(B.requests, "post", red_prohibida)
+    monkeypatch.setattr(B.requests, "get", red_prohibida)
+    c = charla(tmp_path, entrada, secretos, enviar=red_prohibida)
+    c.ejecutar = lambda *a, **k: None
+    if modo:
+        c.aj.establecer("ia", "busqueda", modo)
+    return c, g, reinicios
+
+
+@pytest.mark.parametrize("modo, resultado", [("ninguna", "desactivada"), ("google", "google")])
+def test_sin_tavily_elegido_no_se_pregunta(tmp_path, monkeypatch, modo, resultado):
+    c, g, _ = charla_tavily(tmp_path, monkeypatch, Teclas(), modo=modo)
+    c.paso_busqueda()
+    assert c.resultado["busqueda"] == resultado and g == {}
+    assert any("ia.busqueda" in t for t in c.texto)
+
+
+def test_con_clave_de_tavily_ya_guardada_no_se_pregunta_ni_se_comprueba(tmp_path, monkeypatch):
+    c, g, _ = charla_tavily(tmp_path, monkeypatch, Teclas(), guardadas={"tavily": "tvly-YAESTABA0123456789"})
+    c.paso_busqueda()
+    assert c.resultado["busqueda"] == "ya estaba" and g == {"tavily": "tvly-YAESTABA0123456789"}
+
+
+@pytest.mark.parametrize("respuesta", ["", "n"])
+def test_intro_o_no_se_salta_el_paso(tmp_path, monkeypatch, respuesta):
+    c, g, reinicios = charla_tavily(tmp_path, monkeypatch, Teclas(respuesta))
+    c.paso_busqueda()
+    assert c.resultado["busqueda"] == "saltado" and g == {} and not reinicios
+    assert any("lina clave tavily" in t for t in c.texto)
+
+
+def test_si_pero_intro_en_la_clave_tambien_se_salta(tmp_path, monkeypatch):
+    c, g, _ = charla_tavily(tmp_path, monkeypatch, Teclas("s"), [""])
+    c.paso_busqueda()
+    assert c.resultado["busqueda"] == "saltado" and g == {}
+
+
+def test_una_clave_de_tavily_se_guarda_sin_aviso_y_reinicia(tmp_path, monkeypatch):
+    clave = "tvly-dev-ABCDEFGHIJ0123456789"
+    c, g, reinicios = charla_tavily(tmp_path, monkeypatch, Teclas("s"), [f"\x1b[200~'{clave}'\x1b[201~"])
+    c.paso_busqueda()
+    assert g == {"tavily": clave} and c.resultado["busqueda"] == "guardada" and reinicios
+    assert not any("No parece" in t for t in c.texto)
+    assert not any(clave in t for t in c.texto)
+
+
+@pytest.mark.parametrize("clave", ["otraforma-ABCDEFGHIJ0123456789", "tvly-corta", "tvly-con espacio-0123456789"])
+def test_una_clave_que_no_lo_parece_se_avisa_pero_se_guarda(tmp_path, monkeypatch, clave):
+    c, g, _ = charla_tavily(tmp_path, monkeypatch, Teclas("s"), [clave])
+    c.paso_busqueda()
+    assert g == {"tavily": clave} and c.resultado["busqueda"] == "guardada"
+    assert any("No parece una clave de Tavily" in t and "La guardo igualmente" in t for t in c.texto)
+    assert not any(clave in t for t in c.texto)
+
+
+def test_si_no_se_puede_guardar_se_dice_y_se_sigue(tmp_path, monkeypatch):
+    c, _, reinicios = charla_tavily(tmp_path, monkeypatch, Teclas("s"), ["tvly-ABCDEFGHIJ0123456789"])
+    def rechaza(n, v, *a):
+        raise ValueError("lleva un salto de línea")
+    monkeypatch.setattr(B.CL, "guardar", rechaza)
+    c.paso_busqueda()
+    assert c.resultado["busqueda"] == "saltado" and not reinicios
+    assert any("No la he guardado" in t for t in c.texto)
+
+
+def test_se_explica_que_se_envia_a_tavily_y_donde_se_consigue(tmp_path, monkeypatch):
+    c, _, _ = charla_tavily(tmp_path, monkeypatch, Teclas(""))
+    c.paso_busqueda()
+    texto = "\n".join(c.texto)
+    assert B.ENLACE_TAVILY in texto and "plan gratuito" in texto
+    assert "solo el texto de cada búsqueda" in texto and "programa o juego" in texto
+    assert "No se envían tu voz, capturas de pantalla ni archivos" in texto
+    assert "nada de tu equipo" not in texto
+    assert "1000" not in texto and "1.000" not in texto                       # sin cifras del plan: cambian y el texto envejecería

@@ -5,6 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- **`lina bienvenida` ofrece configurar la búsqueda en internet.** Un sexto paso, opcional (Intro lo salta), explica para qué sirve Tavily, qué se le envía (solo el texto de cada búsqueda, que puede incluir lo que preguntas o el nombre de un programa o juego abierto; nunca tu voz, capturas ni archivos) y dónde se consigue la clave gratuita. La clave se guarda aunque no empiece por `tvly-` (solo se avisa) y no se comprueba contra Tavily, para no gastar cupo. Si ya hay clave o has elegido `google` o `ninguna` en `ia.busqueda`, no pregunta. El manual de privacidad dice lo mismo sobre lo que recibe Tavily.
 - **`lina doctor` dice cómo está la búsqueda en internet.** Una línea nueva indica si Lina busca con Tavily (y dónde está la clave), con la de Gemini o con ninguna. Sin clave de Tavily avisa de que no habrá datos de hoy (resultados, horarios, noticias) y da el comando para ponerla, sin contarlo como problema. Si eliges `google` sin clave de pago de Gemini, o con otra IA, sale como aviso, porque así no funcionará. No gasta consultas: no prueba la clave de Tavily.
 
 ### Cambiado

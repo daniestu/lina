@@ -3,7 +3,7 @@
 """`lina bienvenida`: la primera conversación con Lina, en la terminal y en español.
 
 Deja lista la parte que solo puede hacer el usuario: la clave de Gemini (gratuita), comprobar que el micrófono funciona, cómo se llama el
-asistente, cuánta libertad tiene y si puede enviar capturas de pantalla. Cada paso se puede saltar y se puede repetir cuando se quiera.
+asistente, cuánta libertad tiene, si puede enviar capturas de pantalla y, si quiere, la clave de Tavily para buscar en internet. Cada paso se puede saltar y se puede repetir cuando se quiera.
 Nada se decide por el usuario: lo que da permisos (autonomía, capturas) se pregunta con su explicación.
 """
 import json
@@ -32,6 +32,15 @@ TEXTO_PEDIR_CLAVE = N_(
     "       Si te pide elegir un proyecto, vale cualquiera.\n"
     "    4) Te sale un texto largo de letras y números (suele empezar por «AIza» o «AQ.»). Cópialo y pégalo aquí abajo con Ctrl+Mayús+V.\n"
     "       Al pegarlo no se ve nada: es normal. Pulsa Intro.")
+ENLACE_TAVILY = "https://app.tavily.com"
+TEXTO_TAVILY = N_(
+    "  Opcional. Sin búsqueda en internet no tengo datos de hoy (resultados, horarios, noticias) y «ponme el partido» no sabe dónde verlo.\n"
+    "  La búsqueda la hace Tavily, un buscador para asistentes, con una clave tuya. Tiene un plan gratuito.\n\n"
+    "  Qué se envía a Tavily: solo el texto de cada búsqueda. Puede incluir lo que preguntas o el nombre de un programa o juego\n"
+    "  que tengas abierto. No se envían tu voz, capturas de pantalla ni archivos.\n\n"
+    "    1) Abre esta página:  {ENLACE_TAVILY}\n"
+    "    2) Regístrate y copia tu clave (suele empezar por «tvly-»).\n"
+    "    3) Pégala aquí abajo con Ctrl+Mayús+V. Al pegarla no se ve nada: es normal. Pulsa Intro.")
 MARCA = "bienvenida.json"
 AVISO_SIN_CLAVE = (N_("Todavía no tengo clave de Gemini, así que no puedo responderte. Es gratis: abre una terminal y escribe lina bienvenida, "
                    "o directamente lina clave gemini."))
@@ -264,12 +273,51 @@ class Charla:
         PRIV.principal([], entrada=self.entrada, salida=self.salida, ajustes=self.aj, es_terminal=self.terminal)
         self.resultado["capturas"] = PRIV.estado(self.aj)
 
+    # 6
+    def paso_busqueda(self):
+        """Opcional: la clave de Tavily. No se valida contra Tavily (gastaría cupo) y se guarda aunque no lo parezca."""
+        self.titulo(6, T("Búsqueda en internet (opcional)"))
+        modo = self.aj.get("ia", "busqueda")
+        if modo == "ninguna":
+            self.salida(T("  La búsqueda está desactivada (ia.busqueda = ninguna); no te pregunto."))
+            self.resultado["busqueda"] = "desactivada"
+            return
+        if modo == "google":
+            self.salida(T("  Usas la búsqueda de Gemini (ia.busqueda = google)."))
+            self.resultado["busqueda"] = "google"
+            return
+        if CL.obtener("tavily"):
+            self.salida(T("  ✔ Ya hay una clave de Tavily guardada."))
+            self.resultado["busqueda"] = "ya estaba"
+            return
+        self.salida(T(TEXTO_TAVILY, ENLACE_TAVILY=ENLACE_TAVILY))
+        clave = limpiar_pegado(self.secreto(T("  Clave de Tavily (Intro para saltar este paso): "))) if self.si_no(T("  ¿La configuras ahora?"), False) else ""
+        if not clave:
+            self.salida(T("  Vale. Cuando la tengas:  lina clave tavily"))
+            self.resultado["busqueda"] = "saltado"
+            return
+        self.salida(T("  Recibida ({n} caracteres).", n=len(clave)))
+        if not clave.startswith("tvly-") or len(clave) < 20 or re.search(r"\s", clave):
+            self.salida(T("  ! No parece una clave de Tavily (suelen empezar por «tvly-»). La guardo igualmente."))
+        try:
+            _, donde = CL.guardar("tavily", clave)
+        except ValueError as e:
+            self.salida(T("  ✘ No la he guardado: {e}. Cuando quieras:  lina clave tavily", e=e))
+            self.resultado["busqueda"] = "saltado"
+            return
+        self.salida(T("  ✔ Clave de Tavily guardada en {donde}.", donde=donde))
+        if self.ejecutar and CL.reiniciar_servicio(self.ejecutar):
+            self.salida(T("  ✔ He reiniciado a Lina para que la use."))
+        self.resultado["busqueda"] = "guardada"
+
     def contar(self):
         s = self.resultado
         self.salida(T("\nListo. Resumen:"))
-        self.salida(T("  Clave de Gemini: {v1} · Micrófono: {v2} · Perfil: {v3} · Capturas: {v4}", v1=s.get('clave', '-'), v2=s.get('microfono', '-'), v3=s.get('perfil', '-'), v4=s.get('capturas', '-')))
+        self.salida(T("  Clave de Gemini: {v1} · Micrófono: {v2} · Perfil: {v3} · Capturas: {v4}", v1=s.get('clave', '-'), v2=s.get('microfono', '-'), v3=s.get('perfil', '-'), v4=s.get('capturas', '-')) + T(" · Búsqueda: {v5}", v5=s.get('busqueda', '-')))
         if s.get("clave") in ("saltado", "fallida"):
             self.salida(T("  Falta la clave de Gemini: sin ella no puedo responder.  →  lina clave gemini"))
+        if s.get("busqueda") == "saltado":
+            self.salida(T("  Sin búsqueda no tengo datos de hoy.  →  lina clave tavily"))
         atajo = atajo_pendiente()
         if atajo:
             self.salida(T("  Tu atajo {tecla} se activa cuando cierres sesión y vuelvas a entrar (KDE no lo carga antes). Hasta entonces, di «Oye {v1}».", tecla=atajo["tecla"], v1=s.get('nombre', 'Lina')))
@@ -327,16 +375,16 @@ def ya_hecha(ruta=None):
 
 def principal(argv, charla=None, ruta_marca=None):
     if "-h" in argv or "--help" in argv:
-        print(T("lina bienvenida   te acompaña para dejar Lina lista: clave de Gemini, micrófono, nombre, autonomía y privacidad. Se puede repetir."))
+        print(T("lina bienvenida   te acompaña para dejar Lina lista: clave de Gemini, micrófono, nombre, autonomía, privacidad y búsqueda en internet (opcional). Se puede repetir."))
         return 0
     import sys
     c = charla or Charla(terminal=sys.stdin.isatty(), ejecutar=subprocess.run)
     if not c.terminal:
         c.salida(T("La bienvenida es una conversación: ábrela en una terminal con  lina bienvenida"))
         return 2
-    c.salida(T("¡Hola! Soy Lina. Vamos a dejarme lista (cinco cosas, un par de minutos). Intro en cualquier pregunta = lo que está entre corchetes."))
+    c.salida(T("¡Hola! Soy Lina. Vamos a dejarme lista (seis cosas, un par de minutos). Intro en cualquier pregunta = lo que está entre corchetes."))
     try:
-        for paso in (c.paso_clave, c.paso_microfono, c.paso_nombre, c.paso_autonomia, c.paso_privacidad):
+        for paso in (c.paso_clave, c.paso_microfono, c.paso_nombre, c.paso_autonomia, c.paso_privacidad, c.paso_busqueda):
             paso()
     except KeyboardInterrupt:
         c.salida(T("\nLo dejamos aquí. Cuando quieras seguir:  lina bienvenida"))
