@@ -446,9 +446,12 @@ _ACTUALIZAR_TODO = re.compile(
     r"\bzypper\s+(?:-\S+\s+)*(?:update|up|dist-upgrade|dup)\s*(?:-\S+\s*)*(?:$|[;&|])")
 
 
+_ACTUALIZAR_ARCH_SUELTO = re.compile(r"\b(?:pacman|paru|yay)\b(?=[^;&|]*\s-[a-zA-Z]*S)(?=[^;&|]*\s-[a-zA-Z]*u)")
+
+
 def es_actualizacion_completa(comando):
-    """¿Actualiza TODO el sistema? (pacman -Syu, apt upgrade, dnf upgrade, zypper dup…)"""
-    return bool(_ACTUALIZAR_TODO.search(str(comando)))
+    """¿Actualiza TODO el sistema? (pacman -Syu, también con las letras sueltas como «-Sy -u»; apt upgrade, dnf upgrade, zypper dup…)"""
+    return bool(_ACTUALIZAR_TODO.search(str(comando)) or _ACTUALIZAR_ARCH_SUELTO.search(str(comando)))
 
 
 # ----- comprobar e investigar paquetes -----

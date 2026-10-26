@@ -100,7 +100,7 @@ a.atender_manos_libres("para"); time.sleep(0.2); ok(ints==[("para",False,"voz_li
 a.estado="grabando"; ok(a.atender_manos_libres("x") is False,"grabando: no")
 # confirmaciones por voz libre
 class Ej:
-    pendientes=[{"comando":"rm x"}]; t_pendiente=0
+    pendientes=[{"comando":"rm x"}]; t_pendiente=0; permiso=None
     def caducado(s): return False
     def exige_cantidad(s): return False
     def confirmar_pendientes(s): raise AssertionError("no debe ejecutar")

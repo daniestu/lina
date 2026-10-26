@@ -30,6 +30,7 @@ from pathlib import Path
 import fnmatch
 
 from lina.escritorio import sesion as SES
+from lina.nucleo import ajustes as AJ
 from lina.nucleo import comandos
 from lina.nucleo import dependencias as DEP
 from lina.nucleo import ejecucion as EJ
@@ -118,6 +119,9 @@ LIMITE_RESPALDO_MB = 20        # no se guarda copia de archivos más pesados que
 CADUCA_PENDIENTE_SEG = 120     # una acción pendiente caduca si no la confirmas a tiempo
 INSTALAR_SIN_PREGUNTAR = True  # True: instala paquetes oficiales al momento; False: antes espera tu "sí"
 MAX_PENDIENTES = 5
+PERMISO_TAREA_SEG = 900        # tu «sí» vale para el resto de esa tarea (reintentos, otra fuente, el servicio…) durante este tiempo
+MOTIVO_CONTRASENA = "necesita permisos de administrador y tu contraseña (la pide el sistema, no yo)"
+DIR_MODULOS = Path("/usr/lib/modules")
 
 MENSAJE_PREPARADO = ("PREPARADO, NO EJECUTADO: todavía NO se ha hecho nada. Díselo al usuario en futuro y como pregunta, nombrando "
                      "exactamente QUÉ vas a hacer con los nombres reales que salen en esta acción (no inventes ni cambies nada). No uses el "
@@ -256,6 +260,73 @@ def categoria_de_motivo(razon):
         if sec["motivo"] == razon:
             return sec["nombre"]
     return ""
+
+
+def _secciones_de(comando, _prof=0):
+    """Las secciones de politica.txt en las que encaja el comando, contando TODOS sus trozos (no solo el primero que encaja). Lleva "" si algo de él no se
+    puede cubrir con un «sí» anterior: código libre con sudo, un paquete suelto (archivo o URL), o ejecutar lo descargado (Descargas, .run, .AppImage)."""
+    datos, secciones = _politica(), set()
+    for seg in _segmentos(comando):
+        if _es_lectura(seg):
+            continue
+        t = _tokens(seg)
+        resto = _quitar_prefijos(t) if t else None
+        if not resto:
+            continue
+        base, args = os.path.basename(resto[0]), resto[1:]
+        if base in _SHELLS and "-c" in args:
+            i = args.index("-c")
+            secciones |= _secciones_de(args[i + 1], _prof + 1) if _prof < 3 and i + 1 < len(args) else {""}
+            continue
+        if (_es_interprete(base) and _con_sudo(seg)) or (base in PL.GESTORES_PAQUETES and PL.interpretar(base, args)[0] == "local"):
+            secciones.add("")
+        for sec in datos["secciones"]:
+            if not _regla_coincide(sec, base, args, resto, datos):
+                continue
+            secciones.add(sec["nombre"])
+            de_lo_bajado = [(tipo, v) for tipo, v in sec["reglas"] if tipo == "ejecutar_desde" or (tipo == "programa" and v in ("*.AppImage", "*.run"))]
+            if de_lo_bajado and _regla_coincide({"nombre": sec["nombre"], "reglas": de_lo_bajado}, base, args, resto, datos):
+                secciones.add("")
+    return secciones
+
+
+_PALABRAS_SIN_OBJETIVO = {"sudo", "install", "remove", "enable", "disable", "now", "start", "restart", "stop", "status", "reload", "needed", "noconfirm",
+                          "bin", "git", "svc", "cli", "lib", "libs", "dev", "devel", "common", "data", "utils", "tools", "service", "daemon", "python",
+                          "usr", "etc", "conf", "config", "the", "and", "for"}
+
+
+def objetivo_de(comando):
+    """Las palabras que dicen SOBRE QUÉ actúa un comando (paquetes, servicios, nombres), sin programas, opciones ni palabras de relleno:
+    «sudo paru -S cloudflare-warp-bin» → {cloudflare, warp}. Sirve para saber si un paso sigue siendo de la tarea que confirmaste."""
+    palabras = set()
+    for seg in _segmentos(comando):
+        t = _tokens(seg)
+        resto = _quitar_prefijos(t) if t else None
+        for a in (resto or [])[1:]:
+            if a.startswith("-"):
+                continue
+            palabras |= {p for p in re.split(r"[^a-z0-9]+", a.lower()) if len(p) >= 3 and not p.isdigit() and p not in _PALABRAS_SIN_OBJETIVO}
+    return palabras
+
+
+def modulos_del_kernel_presentes():
+    """¿Siguen en el disco los módulos del kernel en marcha? Tras actualizar el kernel sin reiniciar, no: cargar un módulo falla hasta reiniciar."""
+    return not DIR_MODULOS.is_dir() or (DIR_MODULOS / platform.release()).is_dir()
+
+
+def _carga_modulos(comando):
+    """¿Carga módulos del kernel (modprobe sin -r, insmod)?"""
+    for seg in _segmentos(comando):
+        t = _tokens(seg)
+        resto = _quitar_prefijos(t) if t else None
+        if resto and (os.path.basename(resto[0]) == "insmod" or (os.path.basename(resto[0]) == "modprobe"
+                                                                  and not any(a in ("-r", "--remove") for a in resto[1:]))):
+            return True
+    return False
+
+
+AVISO_KERNEL_CAMBIADO = ("NO SE HA HECHO NADA: el kernel se ha actualizado y el equipo sigue con el anterior, cuyos módulos ya no están en el disco, así que cargar "
+                         "módulos fallaría hasta reiniciar. No lo prepares ni lo intentes de otra forma: dile al usuario que reinicie y que después se puede seguir.")
 
 
 def _limpiar_para_ia(texto, maximo=400):
@@ -462,7 +533,7 @@ def clasificar(comando):
         return "bloqueado", motivo
     paquetes = analizar_instalacion(comando)
     if PRIV.pide_contrasena(comando, paquetes):                  # sin permiso para sudo: se confirma con el atajo y la contraseña la pide el sistema
-        return "critico", "necesita permisos de administrador y tu contraseña (la pide el sistema, no yo)"
+        return "critico", MOTIVO_CONTRASENA
     if paquetes:
         nivel, motivo = evaluar_paquetes(paquetes)
         return ("critico", motivo) if nivel == "critico" else ("instalar", "")
@@ -1210,6 +1281,7 @@ class Ejecutor:
         self.continuar = None                # lo pone el asistente: callable(peticion, motivo, profundidad, aviso, origen) -> bool; retoma la petición al acabar un segundo plano
         self.profundidad = 0                 # cuántas veces seguidas se ha retomado la misma petición (0 = la petición original)
         self.origen = "voz_libre"            # de dónde vino la petición en curso («atajo» o «voz_libre»; lo pone el asistente): al retomarla se respeta
+        self.permiso = None                  # lo que tu último «sí» deja hacer sin volver a preguntar en esa misma tarea (ver dar_permiso); sobrevive a sus continuaciones
         self.nueva_tarea()
         if diario:
             try:
@@ -1248,6 +1320,8 @@ class Ejecutor:
 
     def contaminar(self, origen):
         """En esta tarea se ha leído contenido de fuera: podría traer instrucciones escondidas (A2e)."""
+        if self.permiso:
+            self.permiso["web"] = True               # desde ahora, el permiso solo cubre lo que siga siendo de la tarea que confirmaste
         if not self.contaminado:
             self.contaminado = origen
             frena = _politica().get("frenar_contenido_de_fuera", True)
@@ -1357,6 +1431,20 @@ class Ejecutor:
             return self._con_red(self._canonico_instalar(comando), motivo, "instalar")
         if not self.confirmar:
             return self._con_red(comando, motivo, "libre")
+        if _carga_modulos(comando) and not modulos_del_kernel_presentes():
+            anotar(f"[kernel-cambiado] {comando}")
+            return AVISO_KERNEL_CAMBIADO
+        if self._cubre_el_permiso(comando, razon):
+            tope = self._tope_de_comandos("autonomo")
+            if tope:
+                return tope
+            anotar(f"[permiso-de-tarea] {comando}  # {motivo} (lo cubre tu «sí» de antes)")
+            log(f"Acción cubierta por tu «sí» de antes: {comando}")
+            if _es_actualizacion_completa(comando):
+                self.avisar(T("Voy a actualizar todo el sistema para poder seguir; cuando acabe, conviene reiniciar."))
+            else:
+                self.avisar(T("Sigo sin preguntarte: {motivo}.", motivo=motivo))
+            return self._con_red(comando, motivo, "confirmado")       # (no se apunta como paquete de confianza: eso solo con tu «sí» a ese paquete)
         rechazada = self._ya_rechazada(comando)
         if rechazada:
             return rechazada
@@ -1364,7 +1452,7 @@ class Ejecutor:
             return MENSAJE_PREPARADO
         if len(self.pendientes) >= MAX_PENDIENTES:
             return "Hay demasiadas acciones pendientes. Pide confirmación de las que hay antes de preparar más."
-        self.pendientes.append({"comando": comando, "motivo": motivo, "razon": razon, "categoria": categoria_de_motivo(razon)})
+        self.pendientes.append({"comando": comando, "motivo": motivo, "razon": razon, "categoria": categoria_de_motivo(razon), "web": bool(self.contaminado)})
         self.t_pendiente = time.time()
         con_sudo = T(" (con permisos de administrador)") if re.search(r"\bsudo\b", comando) else ""
         notificar(T("Asistente: pendiente de tu confirmación") + con_sudo, f"{comando}\n" + T("(Motivo: {razon})", razon=razon))
@@ -1655,6 +1743,8 @@ class Ejecutor:
             anotar(f"[cancelado] {len(self.pendientes)} acción(es) pendiente(s)")
             if rechazar:
                 self.rechazadas = {_clave_rechazo(p["comando"]) for p in self.pendientes}
+        if rechazar:
+            self.retirar_permiso()
         self.pendientes = []
 
     def _ya_rechazada(self, descripcion):
@@ -1664,8 +1754,55 @@ class Ejecutor:
                     "Si en su frase pedía OTRA cosa distinta, hazla; si no, dile que no harás nada y, como mucho, pregúntale qué prefiere en su lugar.")
         return ""
 
+    def dar_permiso(self, pendientes):
+        """Tu «sí» vale para toda la tarea: lo de la misma clase que confirmaste (instalar de fuera, activar servicios…) ya no vuelve a preguntar en esa
+        petición ni en sus continuaciones, durante PERMISO_TAREA_SEG. Nunca cubre discos, arranque, cuentas, dinero ni gasto (AJ.SIEMPRE_CONFIRMAN), ni el
+        modo prudente. Si la tarea ha leído algo de fuera, solo cubre lo que nombre lo mismo que lo confirmado (ver _cubre_el_permiso)."""
+        comandos_ = [p["comando"] for p in pendientes if not p.get("funcion")]
+        secciones = set().union(*(_secciones_de(c) for c in comandos_)) if comandos_ else set()
+        if any(p.get("razon") == MOTIVO_CONTRASENA for p in pendientes):
+            secciones.add("contrasena")
+        secciones -= {""} | set(AJ.SIEMPRE_CONFIRMAN)
+        if not secciones or _politica()["modo"] == "prudente":
+            self.permiso = None
+            return
+        objetivo = set().union(*(objetivo_de(c) for c in comandos_))
+        self.permiso = {"secciones": secciones, "objetivo": objetivo, "hasta": time.time() + PERMISO_TAREA_SEG,
+                        "web": bool(self.contaminado) or any(p.get("web") for p in pendientes)}
+        anotar(f"[permiso-de-tarea] tu «sí» cubre el resto de la tarea: {', '.join(sorted(secciones))}")
+
+    def retirar_permiso(self):
+        if self.permiso:
+            anotar("[permiso-de-tarea] retirado")
+        self.permiso = None
+
+    def _cubre_el_permiso(self, comando, razon):
+        """¿Este paso crítico lo cubre tu «sí» de antes? Solo si es de las mismas secciones de politica.txt que confirmaste (o solo pide tu contraseña), nada
+        de él es de lo que se confirma siempre ni de lo que no se puede ver (código libre con sudo, un paquete suelto, ejecutar lo descargado), y, si la tarea
+        ha leído algo de fuera, nombra lo mismo que lo confirmado (o actualiza el sistema entero). Así una web no puede colar «instala también X». Además cubre
+        activar el servicio de lo confirmado (persistencia que nombra lo mismo)."""
+        p = self.permiso
+        if not p or time.time() > p["hasta"] or _politica()["modo"] == "prudente":
+            return False
+        if razon != MOTIVO_CONTRASENA and not categoria_de_motivo(razon):
+            return False                                 # crítico por otra cosa (historiales, el bus del sistema, código que borra…)
+        if lectura_sensible(comando) or _critico_sistema(comando) or _critico_extra(comando):
+            return False
+        secciones = _secciones_de(comando)
+        if "" in secciones or secciones & set(AJ.SIEMPRE_CONFIRMAN):
+            return False
+        otras = secciones - p["secciones"]               # activar el servicio de lo que instalaste (warp-svc tras cloudflare-warp) también es la tarea
+        if otras and not (otras == {"persistencia"} and objetivo_de(comando) & p["objetivo"]):
+            return False
+        if not secciones and "contrasena" not in p["secciones"] and razon == MOTIVO_CONTRASENA:
+            return False
+        if (p["web"] or self.contaminado) and not (objetivo_de(comando) & p["objetivo"]):
+            return _es_actualizacion_completa(comando) and not objetivo_de(comando)      # actualizar el sistema entero no nombra nada
+        return True
+
     def confirmar_pendientes(self):
         pend, self.pendientes = self.pendientes, []
+        self.dar_permiso(pend)
         self.ultimas = []
         partes = []
         for i, p in enumerate(pend):
@@ -1901,6 +2038,7 @@ class Ejecutor:
         if fuente:
             self.contaminar(fuente)                  # lo que devuelva puede traer instrucciones: ver A2e
         cmd = PRIV.adaptar(self.normalizar_sudo(comando), analizar_instalacion(comando))      # según el permiso que haya: ayudante de root, pkexec o tal cual
+        kernel_antes = modulos_del_kernel_presentes()                   # para avisar si este comando cambia el kernel (hay que reiniciar)
         inicio = time.time()
         try:
             proc = subprocess.Popen(["bash", "-c", cmd], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -1916,14 +2054,19 @@ class Ejecutor:
                 anotar(f"[abierto, sigue en marcha] {comando}")
                 return ("El programa se ha abierto y sigue en marcha, que es lo normal en una aplicación con ventana. Ya está abierto: no hay nada "
                         "que esperar ni que avisar cuando se cierre.")
-            threading.Thread(target=self._vigilar, args=(proc, comando, motivo, self._ctx_fondo, self.pregunta_pura, self.profundidad, self.origen),
-                             daemon=True).start()
+            threading.Thread(target=self._vigilar, args=(proc, comando, motivo, self._ctx_fondo, self.pregunta_pura, self.profundidad, self.origen,
+                                                         kernel_antes), daemon=True).start()
             anotar(f"[segundo plano] {comando}")
             retomar = (" Cuando termine, el asistente RETOMARÁ SOLO la petición del usuario (no hace falta que la repita): dile en una frase qué estás "
                        "haciendo ahora y que después seguirás con lo que pidió." if self.continuar and self.pregunta_pura else "")
             return (f"SIGUE EN SEGUNDO PLANO (lleva más de {TIMEOUT_ESPERA} s). El asistente avisará por voz al terminar.{retomar} "
                     f"Todavía NO ha terminado: no digas que ya está hecho, ni que has cumplido la petición.")
-        return self._resultado(proc.returncode, salida, time.time() - inicio, comando)
+        resultado = self._resultado(proc.returncode, salida, time.time() - inicio, comando)
+        if kernel_antes and not modulos_del_kernel_presentes():
+            anotar(f"[kernel-cambiado] {comando}")
+            resultado += ("\nAVISO: con esto se ha actualizado el kernel. Hasta reiniciar no se pueden cargar módulos nuevos (modprobe fallará): díselo al "
+                          "usuario y recomiéndale reiniciar.")
+        return resultado
 
     def _resultado(self, rc, salida, segundos, comando):
         anotar(f"[fin rc={rc}] {comando}")
@@ -1964,7 +2107,7 @@ class Ejecutor:
         proc.wait()
         anotar(f"[fin rc={proc.returncode}] {comando}")
 
-    def _vigilar(self, proc, comando, motivo, ctx=None, peticion="", profundidad=0, origen="voz_libre"):
+    def _vigilar(self, proc, comando, motivo, ctx=None, peticion="", profundidad=0, origen="voz_libre", kernel_antes=False):
         try:
             salida, _ = proc.communicate(timeout=TIMEOUT_MAXIMO)
         except subprocess.TimeoutExpired:
@@ -1997,14 +2140,18 @@ class Ejecutor:
             elif verificacion and "⚠" in verificacion:
                 self.avisar(T("Ha terminado {motivo}, pero no puedo asegurar que haya funcionado. Está el detalle en el registro de acciones.", motivo=motivo))
             else:
-                reiniciar = _es_actualizacion_completa(comando)
+                kernel = kernel_antes and not modulos_del_kernel_presentes()
+                if kernel:
+                    anotar(f"[kernel-cambiado] {comando}")
+                reiniciar = _es_actualizacion_completa(comando) or kernel
                 if peticion and self.continuar:               # lo que pidió el usuario no era «instalar», sino lo que viene después: se retoma
                     try:
                         if self.continuar(peticion, motivo, profundidad, reiniciar, origen):     # con el origen de la petición, no el de quien hable ahora
                             return
                     except Exception as e:
                         log(f"No he podido retomar la petición tras «{motivo}»: {e!r}")
-                self.avisar(T("Ya ha terminado: {motivo}.", motivo=motivo) + (T(" Como se ha actualizado todo el sistema, conviene reiniciar el equipo cuando puedas.")
+                self.avisar(T("Ya ha terminado: {motivo}.", motivo=motivo) + (T(" Ha cambiado el kernel: reinicia el equipo antes de seguir con nada que lo necesite.")
+                                                                              if kernel else T(" Como se ha actualizado todo el sistema, conviene reiniciar el equipo cuando puedas.")
                                                                               if reiniciar else ""))
         else:
             self.avisar(T("Ha fallado una tarea: {motivo}. Está el detalle en el registro de acciones.", motivo=motivo))

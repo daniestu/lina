@@ -1022,6 +1022,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.nueva_tarea()
         imagen = self._decidir_pantalla(imagen, pregunta)
         nota, confirmado = self.resolver_pendientes(pregunta)
+        if not confirmado and not profundidad:
+            self.ejecutor.retirar_permiso()                         # una petición nueva: el «sí» de la anterior ya no vale para ella
         if confirmado:
             modo, motivo_modo = self.ultimo_modo, "continúa la tarea"
         else:
@@ -1367,7 +1369,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         nota = (f"\n[SISTEMA: esta petición se quedó esperando a una tarea en segundo plano ({motivo}) y YA HA TERMINADO. La petición original del usuario es la de arriba y "
                 "sigue sin cumplir salvo que ese paso fuese justo lo que pidió. Haz AHORA lo que falta (por ejemplo, abrir lo que se acaba de instalar) con tus herramientas, "
                 "sin volver a lanzar el paso previo, y cuéntale el resultado final en una frase. Si lo que pidió era precisamente esa tarea, di solo que ya está." +
-                (" Se ha actualizado TODO el sistema: recomiéndale reiniciar cuando pueda." if reiniciar else "") + "]")
+                (" Se ha actualizado el sistema (quizá el kernel): recomiéndale reiniciar cuando pueda y no intentes cargar módulos del kernel hasta entonces."
+                 if reiniciar else "") + "]")
         threading.Thread(target=self._tarea, args=(self._atender, peticion, time.time(), None, nota, profundidad + 1, _origen_valido(origen)),
                          daemon=True).start()
         return True
@@ -1426,6 +1429,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         en_cola = len(self._cola())
         self._cola().clear()                                      # lo apuntado para después era de ESTA tarea: ya no vale
         self.ejecutor.cancelar()
+        self.ejecutor.retirar_permiso()                           # y el «sí» que se dio para ella, tampoco
         log("Tarea cancelada por el usuario" + (f"; ya se había hecho: {'; '.join(hecho)}" if hecho else ""))
         nota = "[Interrumpido por el usuario]" + (f" Antes de parar ya se había hecho: {'; '.join(hecho)}." if hecho else " No llegó a hacerse nada.")
         self.guardar_en_historial(getattr(self, "pregunta_pura", "") or "(petición interrumpida)", nota)
@@ -1499,8 +1503,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             log("Confirmado: ejecuto las acciones pendientes")
             resultado = self.ejecutor.confirmar_pendientes()
             self.acciones_confirmadas = [("ejecutar_comando", {"comando": c, "motivo": m}, r) for c, m, r in self.ejecutor.ultimas]
+            permiso = (" Ese «sí» vale para TODA la tarea: si algo falla (un 404, un paquete que no se encuentra, otro nombre, falta activar el servicio), "
+                       "busca otra forma y sigue hasta que funcione, sin volver a preguntarle; lo poco que aún necesite su confirmación (discos, arranque, "
+                       "cuentas, dinero, ejecutar algo descargado) quedará preparado como siempre." if self.ejecutor.permiso else "")
             return ("\n[SISTEMA: el usuario ha confirmado y las acciones pendientes ya se han ejecutado. Resultado:\n"
-                    f"{CL.limpiar_para_ia(resultado)}\nCuéntaselo con naturalidad y brevedad, sin volver a pedir confirmación.]"), True
+                    f"{CL.limpiar_para_ia(resultado)}\nCuéntaselo con naturalidad y brevedad, sin volver a pedir confirmación.{permiso}]"), True
         if decision == "pregunta":
             self.ejecutor.t_pendiente = time.time()          # sigue esperando: tiene dudas, no ha dicho que no
             return ("\n[SISTEMA: hay una acción pendiente de confirmar y NO se ha ejecutado:\n" + descripcion + "\nEl usuario no la "

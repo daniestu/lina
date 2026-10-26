@@ -7,6 +7,12 @@ Principios:
    archivos de paquetes).
 2. **Las acciones críticas solo se confirman con el atajo de teclado**, nunca por voz en manos libres: una frase mal oída o un vídeo
    de fondo no pueden autorizar nada.
+   **Un «sí» vale para toda la tarea**: tras confirmar, por ejemplo, instalar un programa del AUR, los pasos de la misma clase para conseguirlo (otro nombre
+   del paquete tras un 404, actualizar el sistema para poder instalarlo, activar el servicio de ese mismo programa) ya no vuelven a preguntar durante
+   15 minutos, en esa petición y en lo que retoma sola; Lina dice lo que va haciendo y queda en el diario. No cubre nunca discos, arranque y kernel,
+   cuentas, dinero ni gasto, ni el código libre con sudo, un paquete suelto (un archivo o una URL) o ejecutar lo descargado; si la tarea ha leído algo de
+   fuera, solo cubre lo que nombra lo mismo que lo confirmado (una web no puede colar «instala también X»). Lo instalado así no queda como paquete de
+   confianza. Se retira con otra petición, al decir que no o al pararla, y en el perfil *prudente* no existe.
 3. **Bloqueos duros en el código** que ninguna política ni confirmación desbloquea (formatear discos, leer claves, descargar y ejecutar
    scripts de internet…).
    Las claves y credenciales que se bloquean siempre, para leer o para escribir: SSH, GnuPG, AWS, `.netrc`, los perfiles de Firefox, el llavero
