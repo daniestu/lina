@@ -115,3 +115,39 @@ def test_sin_git_usa_pip(tmp_path, monkeypatch):
     c.manifiesto.quitar("instalado")
     assert ACT.principal([], c) == 0
     assert any("lina-asistente" in o for o in map(str, c.ordenes))
+
+
+# ---------------------------------------------------------------- S8a: dependencias fijadas
+def test_con_requisitos_fijados_instala_con_hashes_y_luego_lina_sin_dependencias(tmp_path, monkeypatch):
+    origen, clon, c = escenario(tmp_path, monkeypatch)
+    (origen / "packaging").mkdir()
+    nuevo_commit(origen, "packaging/requisitos.txt", "numpy==2.0.0 --hash=sha256:aa")
+    assert ACT.principal([], c) == 0
+    pips = [o for o in c.ordenes if o[1:3] == ["-m", "pip"]]
+    assert pips[0][3:6] == ["install", "-q", "--require-hashes"] and pips[0][-1].endswith("packaging/requisitos.txt")
+    assert pips[1][3:] == ["install", "-q", "--no-deps", "-e", str(clon)]
+
+
+def test_sin_archivo_de_requisitos_instala_como_antes(tmp_path):
+    assert ACT.ordenes_de_instalacion("py", tmp_path) == [["py", "-m", "pip", "install", "-q", "-e", str(tmp_path)]]
+
+
+def test_si_las_dependencias_nuevas_no_se_instalan_se_queda_la_version_anterior(tmp_path, monkeypatch):
+    origen, clon, c = escenario(tmp_path, monkeypatch)
+    antes = git(clon, "rev-parse", "HEAD")
+    (origen / "packaging").mkdir()
+    nuevo_commit(origen, "packaging/requisitos.txt", "paquete-sin-rueda==1.0 --hash=sha256:aa")
+    ejecutar_antes = c.ejecutar
+
+    def pip_falla(orden, **k):
+        if orden[1:3] == ["-m", "pip"]:
+            c.ordenes.append(orden)
+            return SimpleNamespace(returncode=1, stdout="", stderr="ERROR: No matching distribution found for paquete-sin-rueda")
+        return ejecutar_antes(orden, **k)
+    c.ejecutar = pip_falla
+    assert ACT.principal([], c) == 1
+    assert git(clon, "rev-parse", "HEAD") == antes and not (clon / "packaging" / "requisitos.txt").exists()
+    assert ["systemctl", "--user", "restart", "lina.service"] not in c.ordenes
+    texto = "\n".join(c.texto)
+    assert "No matching distribution" in texto and "versión anterior" in texto
+    assert not (RUT.ESTADO / ACT.ARCHIVO).exists()                   # no se apunta como actualización hecha

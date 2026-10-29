@@ -16,6 +16,11 @@ Para quien mantiene el proyecto. Nada de esto lo hace Lina sola: etiquetar, publ
    `lina uninstall`. Anotar en la hoja de ruta lo que falle.
 6. Versión en `pyproject.toml` y `src/lina/__init__.py`: `0.2.0b1` (PEP 440); en `packaging/aur/PKGBUILD`, `pkgver=0.2.0b1` y `_tag=v0.2.0-beta`; y en `CHANGELOG.md` pasar «Sin publicar» a `[0.2.0-beta] - AAAA-MM-DD`, dejando un «Sin publicar» vacío encima.
 7. Cambiar el clasificador `Development Status` si procede (hoy «3 - Alpha»).
+8. **Fijar las dependencias:** `scripts/fijar_dependencias.sh` (necesita `uv` y red) regenera `packaging/requisitos.txt` con versiones exactas y hashes para
+   Python 3.11 a 3.14, y falla si a algún paquete le falta rueda binaria para alguna de esas versiones (salvo `evdev`, que siempre se compila). Revisa el diff
+   (qué sube de versión), y que el CI con las dependencias fijadas siga en verde. El trabajo «Dependencias más recientes» del CI es informativo: si se pone en
+   rojo, alguna versión nueva rompería Lina y conviene no fijarla todavía. `uv.lock` es una herramienta local y no se sube: lo único que reciben los usuarios es
+   `requisitos.txt`.
 
 ## Etiquetar
 

@@ -3,8 +3,9 @@
 """`lina update`: actualiza Lina sin romper nada y permite volver atrás.
 
 Si Lina se instaló desde un clon de git (lo normal con install.sh), actualiza con `git pull --ff-only`: nunca pisa cambios tuyos (si hay,
-no toca nada), guarda la versión anterior para `lina update --volver` y reinstala dependencias solo si cambiaron. Si se instaló con pip,
-usa pip. Después reinicia el servicio si estaba activo. Antes de cambiar nada enseña qué cambia y pregunta.
+no toca nada), guarda la versión anterior para `lina update --volver` y reinstala dependencias solo si cambiaron. Las dependencias son las
+fijadas en packaging/requisitos.txt (versiones exactas con hash, S8a); si no se pueden instalar (por ejemplo, no hay ruedas para tu Python), deja
+la versión anterior. Si se instaló con pip, usa pip. Después reinicia el servicio si estaba activo. Antes de cambiar nada enseña qué cambia y pregunta.
 """
 import json
 import subprocess
@@ -17,6 +18,7 @@ from lina.nucleo.idioma import N_, T
 
 ARCHIVO = "actualizacion.json"
 PAQUETE_PIP = "lina-asistente"
+REQUISITOS = "packaging/requisitos.txt"           # dependencias fijadas, con hash: lo único que se instala junto a Lina
 AYUDA = N_("""lina update [--comprobar] [--si] [--volver]
     Actualiza Lina. Antes de cambiar nada te enseña qué trae y pregunta.
     --comprobar   solo dice si hay novedades, sin cambiar nada
@@ -57,12 +59,28 @@ def _fuente(ctx):
     return f if v.get("fuente") and (f / ".git").exists() else None
 
 
+def ordenes_de_instalacion(python, fuente):
+    """Las órdenes de pip que instalan Lina: las dependencias fijadas con sus hashes y luego Lina sin dependencias. Sin el archivo (una copia
+    anterior a S8a), como antes."""
+    requisitos = Path(fuente) / REQUISITOS
+    if requisitos.exists():
+        return [[python, "-m", "pip", "install", "-q", "--require-hashes", "-r", str(requisitos)],
+                [python, "-m", "pip", "install", "-q", "--no-deps", "-e", str(fuente)]]
+    return [[python, "-m", "pip", "install", "-q", "-e", str(fuente)]]
+
+
+def _cambian_dependencias(cambios):
+    nombres = cambios.split()
+    return "pyproject.toml" in nombres or REQUISITOS in nombres
+
+
 def _reinstalar(ctx, fuente):
     ctx.salida(T("  · Actualizo las dependencias de Python…"))
-    r = ctx.ejecutar([sys.executable, "-m", "pip", "install", "-q", "-e", str(fuente)], capture_output=True, text=True)
-    if r.returncode != 0:
-        ctx.salida(T("  ✘ pip ha fallado: ") + (r.stderr or r.stdout or "sin detalle").strip()[-200:])
-        return False
+    for orden in ordenes_de_instalacion(sys.executable, fuente):
+        r = ctx.ejecutar(orden, capture_output=True, text=True)
+        if r.returncode != 0:
+            ctx.salida(T("  ✘ pip ha fallado: ") + (r.stderr or r.stdout or "sin detalle").strip()[-200:])
+            return False
     return True
 
 
@@ -100,7 +118,7 @@ def _git_actualizar(ctx, fuente, comprobar, volver, estado, git=None):
         if c != 0:
             ctx.salida(f"  ✘ {e[:150]}")
             return 1
-        ok = _reinstalar(ctx, fuente) if "pyproject.toml" in cambios.split() else True
+        ok = _reinstalar(ctx, fuente) if _cambian_dependencias(cambios) else True
         _guardar(estado, {"anterior": actual})              # y se puede volver a «adelante» con otra vuelta
         _reiniciar(ctx)
         ctx.salida(T("  ✔ Vuelto a la versión anterior.") if ok else T("  ! Vuelto, pero fallaron las dependencias: repite  pip install -e ") + str(fuente))
@@ -133,11 +151,17 @@ def _git_actualizar(ctx, fuente, comprobar, volver, estado, git=None):
     if c != 0:
         ctx.salida(T("  ✘ No se ha podido actualizar sin pisar nada ({v1}). Tu copia sigue como estaba.", v1=e[:150]))
         return 1
+    if _cambian_dependencias(cambios) and not _reinstalar(ctx, fuente):
+        c, e = git("reset", "--hard", actual)               # código y dependencias van juntos: si las nuevas no se instalan, se queda la versión de antes
+        ctx.salida(T("  ✘ No he podido instalar las dependencias de la versión nueva con tu Python {v1}.{v2} (¿no hay paquetes para él?).",
+                     v1=sys.version_info[0], v2=sys.version_info[1]))
+        ctx.salida(T("  He dejado la versión anterior, que sigue funcionando.") if c == 0 else
+                   T("  ! Y no he podido volver a la anterior ({v1}): repite  lina update --volver", v1=e[:150]))
+        return 1
     _guardar(estado, {"anterior": actual})
-    ok = _reinstalar(ctx, fuente) if "pyproject.toml" in cambios.split() else True
     _reiniciar(ctx)
-    ctx.salida(T("  ✔ Actualizada. Si algo va mal:  lina update --volver") if ok else T("  ! Actualizada, pero fallaron las dependencias. Repite:  pip install -e ") + str(fuente) + T("   (o  lina update --volver)"))
-    return 0 if ok else 1
+    ctx.salida(T("  ✔ Actualizada. Si algo va mal:  lina update --volver"))
+    return 0
 
 
 def _pip_actualizar(ctx, comprobar):

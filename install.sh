@@ -85,6 +85,8 @@ command -v python3 >/dev/null || fallo "Falta Python 3. Instálalo con el gestor
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' \
   || fallo "Hace falta Python 3.11 o superior (tienes $(python3 -V 2>&1)). En Ubuntu 22.04 o Debian 11 usa una versión más nueva de la distribución."
 ok "$(python3 -V)"
+python3 -c 'import sys; sys.exit(0 if sys.version_info < (3, 15) else 1)' \
+  || aviso "Las dependencias de Lina están fijadas y comprobadas para Python 3.11 a 3.14; con $(python3 -V 2>&1) puede que alguna no tenga paquete todavía."
 [ -r /etc/os-release ] && . /etc/os-release
 ok "${PRETTY_NAME:-Linux}${XDG_SESSION_TYPE:+ · sesión $XDG_SESSION_TYPE}${XDG_CURRENT_DESKTOP:+ · $XDG_CURRENT_DESKTOP}"
 [ "$(uname -m)" = "x86_64" ] || aviso "Arquitectura $(uname -m): lo probado es x86_64; algún paquete de Python podría tardar en compilarse."
@@ -123,7 +125,15 @@ paso "4/6 Entorno de Python aislado"
 hacer mkdir -p "$DATOS"
 [ -d "$VENV" ] || hacer python3 -m venv "$VENV"
 hacer "$VENV/bin/pip" install --quiet --upgrade pip
-hacer "$VENV/bin/pip" install --quiet -e "$FUENTE"
+REQUISITOS="$FUENTE/packaging/requisitos.txt"
+if [ -f "$REQUISITOS" ]; then
+  # Versiones exactas y comprobadas con su hash (S8a): lo que se probó, no lo último que haya en PyPI ese día
+  hacer "$VENV/bin/pip" install --quiet --require-hashes -r "$REQUISITOS" \
+    || fallo "No he podido instalar las dependencias fijadas con $(python3 -V 2>&1). Están comprobadas para Python 3.11 a 3.14: si tu Python es otro, instala uno de esos y repite."
+  hacer "$VENV/bin/pip" install --quiet --no-deps -e "$FUENTE"
+else
+  hacer "$VENV/bin/pip" install --quiet -e "$FUENTE"
+fi
 ok "Lina instalada en $VENV (modo editable: «lina update» la actualiza)"
 
 # ---------------------------------------------------------------- 5. modelos, servicio y atajo

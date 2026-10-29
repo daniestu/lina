@@ -33,3 +33,9 @@ def test_sintaxis_valida():
 def test_opcion_desconocida_se_rechaza(tmp_path):
     r = ejecutar(tmp_path, "--no-existe")
     assert r.returncode != 0 and list(tmp_path.rglob("*")) == []
+
+
+def test_la_simulacion_instala_las_dependencias_fijadas_con_hash(tmp_path):
+    r = ejecutar(tmp_path, "--simular", "-y", "--sin-bienvenida")
+    salida = r.stdout + r.stderr
+    assert "--require-hashes -r" in salida and "--no-deps -e" in salida, salida

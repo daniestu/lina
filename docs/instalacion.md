@@ -17,7 +17,7 @@ con `--simular` dice todo lo que haría sin tocar nada.
 2. **Consigue el código**: usa la carpeta desde la que lo ejecutas o clona el repositorio en `~/.local/share/lina/fuente`.
 3. **Paquetes del sistema** (Python con venv y pip, un compilador, git, PortAudio, libnotify): enseña la orden exacta
    y la ejecuta con `sudo` solo si lo aceptas. Si no, la deja escrita para que la ejecutes tú.
-4. **Entorno de Python** en `~/.local/share/lina/venv` e instalación de Lina.
+4. **Entorno de Python** en `~/.local/share/lina/venv` e instalación de Lina, con las dependencias **fijadas** en `packaging/requisitos.txt` (versiones exactas y comprobadas con su hash, para Python 3.11 a 3.14): se instala lo que se probó, no lo último que haya en PyPI ese día. Si una versión nueva de Lina trae dependencias que no se pueden instalar con tu Python, `lina update` deja la versión anterior.
 5. **`lina preparar`**: el comando `lina` en `~/.local/bin`, los modelos (Whisper para oírte y la voz de Lina, unos 500 MB la primera vez),
    el servicio de usuario `lina.service` (o, sin systemd, el arranque automático de la sesión) y el atajo global (`Meta+Espacio` en KDE,
    `Ctrl+Alt+Espacio` en GNOME; con `--atajo TECLA` eliges otro).
