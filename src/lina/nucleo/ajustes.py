@@ -73,6 +73,10 @@ ESQUEMA: dict = {
         "sensibilidad": (0.012, "float", (0.001, 0.5), N_("Volumen mínimo para considerar que hablas. Mídelo con:  lina manos-libres nivel")),
         "eco": ("auto", "opcion", ("auto", "no"), N_("auto: cancela el eco si está instalado. no: apagado.")),
         "parecido": (0.78, "float", (0.3, 1.0), N_("Lo parecido que tiene que sonar el nombre (0-1). Más bajo = acepta más variantes (y más falsos avisos).")),
+        "fin_por_silencio": (False, "bool", None, N_("true: con el atajo basta una pulsación; deja de escucharte al quedarte callado (la segunda pulsación sigue "
+                                                     "terminando antes). false: pulsa otra vez para terminar.")),
+        "silencio_atajo": (1.0, "float", (0.5, 3.0), N_("Con fin_por_silencio: segundos callado que dan la frase por terminada. Mídelo con:  lina probar-voz silencio")),
+        "espera_atajo": (6, "int", (2, 20), N_("Con fin_por_silencio: segundos que espera a que empieces a hablar antes de decir «No te he oído».")),
     },
     "autonomia": {
         "perfil": ("autonomo", "opcion", PERFILES, N_("autonomo: actúa solo salvo lo crítico · equilibrado: además frena los cambios tras leer contenido "

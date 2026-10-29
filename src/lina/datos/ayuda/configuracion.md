@@ -85,6 +85,9 @@ que no se pueden desactivar. Los perfiles se aplican encima de `politica.txt`: p
 | `sensibilidad` | `0.012` | Volumen mínimo para considerar que hablas. Mídelo con:  lina manos-libres nivel |
 | `eco` | `"auto"` | auto: cancela el eco si está instalado. no: apagado. |
 | `parecido` | `0.78` | Lo parecido que tiene que sonar el nombre (0-1). Más bajo = acepta más variantes (y más falsos avisos). |
+| `fin_por_silencio` | `false` | `true`: con el atajo basta **una** pulsación: deja de escucharte cuando te quedas callado (con el pitido de siempre), y la segunda pulsación sigue terminando antes. `false`: pulsa otra vez para terminar, como siempre. Si no te oye empezar en `espera_atajo` segundos, dice «No te he oído»; si nunca te oye callar (música alta, ruido), deja de escucharte a los 60 s. |
+| `silencio_atajo` | `1.0` | Con `fin_por_silencio`: segundos callado que dan la frase por terminada (0,5–3). Con 1 s no se cortó ninguna frase en las pruebas; más bajo responde antes pero puede cortarte en una pausa. Mídelo con tus grabaciones: `lina probar-voz silencio`. |
+| `espera_atajo` | `6` | Con `fin_por_silencio`: segundos que espera a que empieces a hablar antes de decir «No te he oído» (2–20). |
 
 ### [autonomia] Autonomía: qué hace solo y qué te pregunta
 

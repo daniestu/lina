@@ -3,6 +3,9 @@
 ## Hablarle
 
 - **Con el atajo** (`Meta+Espacio` en KDE, `Ctrl+Alt+Espacio` en GNOME): lo pulsas, hablas y lo vuelves a pulsar. Pulsarlo mientras habla la calla.
+  Si prefieres pulsar **una sola vez**, `lina config poner activacion.fin_por_silencio true`: deja de escucharte cuando te quedas callado un segundo
+  (`activacion.silencio_atajo`), con el mismo pitido de siempre, y la segunda pulsación sigue valiendo para terminar antes. Viene apagado: tarda casi un
+  segundo más que pulsar, y con música alta puede no oír que has callado (entonces pulsas, o para sola a los 60 s).
 - **Sin manos**: «Oye Lina, …» (el nombre lo eliges tú). No escucha mientras juegas, salvo que se lo pidas. Se prueba con `lina manos-libres probar "oye lina abre firefox"`.
 - Si le dices algo mientras trabaja, te escucha igualmente: «para» o «cancela eso» lo dejan; otra cosa distinta, la atiende en lugar de lo anterior.
 

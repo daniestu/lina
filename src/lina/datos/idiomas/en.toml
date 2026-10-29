@@ -901,3 +901,6 @@
 "  hecho en {s:.0f} s" = "  done in {s:.0f} s"
 "antes de tu Intro" = "before your Enter"
 "  · antes de tu Intro: corta dentro de tu grabación, en un silencio tuyo (si no, corta en la cola sintética, cuando ya habías terminado)." = "  · before your Enter: it cuts inside your recording, in a silence of yours (otherwise it cuts in the synthetic tail, when you had already finished)."
+"true: con el atajo basta una pulsación; deja de escucharte al quedarte callado (la segunda pulsación sigue terminando antes). false: pulsa otra vez para terminar." = "true: one press of the shortcut is enough; it stops listening when you go quiet (a second press still ends it earlier). false: press again to finish."
+"Con fin_por_silencio: segundos callado que dan la frase por terminada. Mídelo con:  lina probar-voz silencio" = "With fin_por_silencio: seconds of silence that end the phrase. Measure it with:  lina probar-voz silencio"
+"Con fin_por_silencio: segundos que espera a que empieces a hablar antes de decir «No te he oído»." = "With fin_por_silencio: seconds it waits for you to start speaking before saying «I did not hear you»."

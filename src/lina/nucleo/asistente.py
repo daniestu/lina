@@ -48,6 +48,7 @@ from lina.nucleo import memoria as MEM
 from lina.nucleo import modelos as MODELOS
 from lina.nucleo import reproductor as REPRO
 from lina.voz import atenuador as ATE
+from lina.voz import fin_de_frase as FDF
 from lina.voz import piper_residente as PIPER_RES
 from lina.voz import turno as TURNO
 from lina.voz import voces as VOC
@@ -186,6 +187,10 @@ def prompt_whisper():
     except Exception as e:
         log(f"No he podido añadir los programas a la pista de voz: {e!r}")
     return (", ".join(terminos) + ". " if terminos else "") + reinicio
+
+
+TOPE_ATAJO_SEG = 60              # con fin por silencio: si el detector nunca corta (música, ruido), deja de escucharte a los 60 s
+MARGEN_TRAS_CORTE = 1.0          # tras un corte por silencio, una pulsación en este margen era para terminar (ya terminó): no empieza otra escucha
 
 
 def pitido(frecuencia):
@@ -495,6 +500,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     canal_voz = False             # con «lina di --voz»: además lo dice en voz alta
     manos_libres = None           # el oyente de «Oye Lina» (manos_libres.py)
     sustituida = False            # la tarea en curso se abandona porque has pedido otra cosa (no hace falta que diga «lo dejo»)
+    _grabacion_n = 0              # qué grabación del atajo está en curso: un corte por silencio que llega tarde no cierra la siguiente
+    _corte_pedido = False         # el detector ya pidió terminar esta grabación (solo se pide una vez)
+    _corte_t = -1e9               # cuándo terminó la última grabación por silencio (para el margen de MARGEN_TRAS_CORTE)
+    _reloj = staticmethod(time.monotonic)
     # De dónde viene cada petición. Va CON la petición (en la cola, al sustituir otra, al retomarla), nunca con quien hable el último: pulsar el atajo para
     # interrumpir una tarea de «Oye Lina» no le da los permisos del atajo. Si algún camino llega sin origen, el restrictivo.
 
@@ -603,6 +612,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     # --- Qué hacer cada vez que se pulsa el atajo ---
     def pulsacion(self):
         with self.cerrojo:
+            if self.estado != "grabando" and self._reloj() - self._corte_t < MARGEN_TRAS_CORTE:
+                log("Pulsación justo después de que dejara de escucharte por silencio: ya había terminado, la ignoro")
+                return
             if self.estado == "esperando":
                 self.empezar_grabacion()
             elif self.estado == "grabando":
@@ -627,14 +639,55 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             ident = ""
         self._preparar_captura({"id": ident, "titulo": self.titulo, "clase": clase})
 
-    def _iniciar_grabacion(self):
-        """Abre el micrófono y hace la captura de lo que estás viendo (sin tocar el estado)."""
+    def _iniciar_grabacion(self, detector=None):
+        """Abre el micrófono y hace la captura de lo que estás viendo (sin tocar el estado). Con `detector` (fin por silencio, V3), cada bloque pasa por él
+        y, cuando te quedas callado, no dices nada a tiempo o se llega al tope, pide terminar la grabación una sola vez."""
         self.bloques = []
         self._preparar_contexto()
-        self.microfono = sd.InputStream(
-            samplerate=FRECUENCIA, channels=1, dtype="float32",
-            callback=lambda datos, *_: self.bloques.append(datos.copy()))
+        if detector is None:
+            self.microfono = sd.InputStream(
+                samplerate=FRECUENCIA, channels=1, dtype="float32",
+                callback=lambda datos, *_: self.bloques.append(datos.copy()))
+            self.microfono.start()
+            return
+        n, tope = self._grabacion_n, int(TOPE_ATAJO_SEG / FDF.SEG_BLOQUE)
+
+        def recibir(datos, *_):
+            self.bloques.append(datos.copy())
+            if self._corte_pedido:
+                return
+            motivo = detector.alimentar(datos[:, 0]) or ("tope" if detector.n >= tope else None)
+            if motivo:
+                self._corte_pedido = True
+                self._pedir_corte(n, motivo)
+        self.microfono = sd.InputStream(samplerate=FRECUENCIA, channels=1, dtype="float32", blocksize=FDF.BLOQUE, callback=recibir)
         self.microfono.start()
+
+    def _pedir_corte(self, n, motivo):
+        """Desde el hilo del micrófono no se puede cerrar el propio micrófono: lo hace otro hilo."""
+        threading.Thread(target=self._cortar, args=(n, motivo), daemon=True).start()
+
+    def _cortar(self, n, motivo):
+        """El detector pide terminar la grabación `n`. Si ya la terminó tu pulsación (o es de una grabación anterior), no hace nada: la frase se
+        procesa una sola vez."""
+        with self.cerrojo:
+            if self.estado != "grabando" or n != self._grabacion_n or self.interrumpiendo:
+                log(f"Fin por silencio ({motivo}): la grabación ya había terminado")
+                return
+            self._corte_t = self._reloj()
+            self.terminar_grabacion(motivo)
+
+    def _detector_del_atajo(self):
+        """El detector de fin de frase si activacion.fin_por_silencio está activo; si no (o los ajustes no se pueden leer), None: doble pulsación, como siempre."""
+        try:
+            aj = AJ.actuales(log=lambda m: None)
+            if not aj.get("activacion", "fin_por_silencio"):
+                return None
+            return FDF.FinDeFrase(silencio_fin=float(aj.get("activacion", "silencio_atajo")), umbral_min=float(aj.get("activacion", "sensibilidad")),
+                                  espera_inicial=float(aj.get("activacion", "espera_atajo")))
+        except Exception as e:
+            log(f"Fin por silencio: no he podido prepararlo ({e!r}); termina pulsando otra vez")
+            return None
 
     def _bajar_sonido(self, dueno="atajo"):
         """Mientras te escucha, baja lo que suena en el ordenador (como el coche) para oírte bien. Nunca estorba: si falla, sigue todo igual."""
@@ -663,10 +716,15 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         pitido(880)
         self.estado = "grabando"
         self.origen_voz_libre = False                      # una petición NUEVA con el atajo (al interrumpir no se toca: el origen es de la tarea en curso)
-        self._iniciar_grabacion()
-        log("Escuchando... (vuelve a pulsar el atajo para terminar)")
+        self._grabacion_n += 1
+        self._corte_pedido = False
+        detector = self._detector_del_atajo()
+        self._iniciar_grabacion(detector)
+        log("Escuchando... " + ("(termino cuando te quedes callado, o vuelve a pulsar el atajo)" if detector else "(vuelve a pulsar el atajo para terminar)"))
 
-    def terminar_grabacion(self):
+    def terminar_grabacion(self, motivo="pulsacion"):
+        """Deja de escucharte: por tu pulsación, por silencio («fin»), porque no dijiste nada («nada») o por el tope. Siempre igual: primero se cierra el
+        micrófono (para que no oiga el pitido), se devuelve el sonido y suena el pitido de 520 Hz."""
         self.microfono.stop()
         self.microfono.close()
         self._subir_sonido()
@@ -674,7 +732,13 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.estado = "pensando"
         self.interrumpiendo = False
         self.fin_tarea.clear()
-        audio = np.concatenate(self.bloques)[:, 0] if self.bloques else np.zeros(0, np.float32)
+        if motivo != "pulsacion":
+            log({"fin": "Dejo de escucharte: te has quedado callado", "nada": "Dejo de escucharte: no te he oído empezar",
+                 "tope": f"Dejo de escucharte: llevo {TOPE_ATAJO_SEG} s escuchando"}.get(motivo, f"Dejo de escucharte ({motivo})"))
+        if motivo == "nada":                               # sin voz no se le da nada a Whisper (con silencio se inventa frases): «No te he oído»
+            audio = np.zeros(0, np.float32)
+        else:
+            audio = np.concatenate(self.bloques)[:, 0] if self.bloques else np.zeros(0, np.float32)
         threading.Thread(target=self.procesar, args=(audio,), daemon=True).start()
 
     def _empezar_interrupcion(self):
