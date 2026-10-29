@@ -24,7 +24,7 @@ AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
   lina privacidad [si|no]    qué se envía a la IA y qué no, y si permites enviar capturas de tu pantalla
   lina olvidar [QUÉ]         borra lo que Lina guarda de ti: diario, registro de acciones, recetas, tiempos, registro del sistema (antes enseña qué y cuánto)
   lina directas [probar F]   las órdenes que Lina hace sin llamar a la IA (abrir un programa, volumen…); «probar» dice qué haría con una frase
-  lina memoria [borrar ID|todas]   lo que le has pedido recordar («recuerda que…»): verlo y borrarlo
+  lina memoria [borrar ID|todas|medir]   lo que le has pedido recordar («recuerda que…»): verlo y borrarlo; «medir» compara cómo se eligen (--mios: con los tuyos, solo números)
   lina recetas [probar F|borrar ID]   lo que Lina ha aprendido a hacer y repite sin llamar a la IA; «probar» dice qué haría con una frase
   lina musica ORDEN          controla la música que pone Lina con mpv: poner "Queen" · pausar · reanudar · siguiente · anterior · detener
   lina probar-voz [--completo|mas|grande]  graba unas frases tuyas y mide qué Whisper te entiende mejor (motor, modelo, CPU o tarjeta gráfica); «mas» mide ayudas sin VRAM y Ollama, «grande» lo hace con ~95 frases tuyas; no cambia nada

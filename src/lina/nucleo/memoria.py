@@ -223,7 +223,10 @@ def nota_para_la_ia(texto):
 
 # ======================= lina memoria =======================
 def principal(argv, salida=print):
-    """`lina memoria` (ver lo que recuerda) y `lina memoria borrar ID|todas`."""
+    """`lina memoria` (ver lo que recuerda), `lina memoria borrar ID|todas` y `lina memoria medir [--mios]` (A1: solo mide, no cambia nada)."""
+    if argv[:1] == ["medir"]:
+        from lina.nucleo import medir_memoria
+        return medir_memoria.principal(argv[1:], salida)
     if argv[:1] == ["borrar"]:
         if len(argv) != 2:
             salida(T("Uso:  lina memoria borrar m0001   |   lina memoria borrar todas"))
