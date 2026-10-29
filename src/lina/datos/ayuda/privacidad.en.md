@@ -32,6 +32,8 @@ With the **free** key, according to Google's current terms, what is sent may be 
 | What you ask me to remember («remember that…»; only you write it, with the hotkey, never the AI nor Lina on its own, and never passwords or keys; the AI only receives what is relevant to each request) | `~/.local/share/lina/memoria.json` | `lina memoria` (view and delete one), `lina olvidar memoria` |
 | Learned recipes (what you already asked me that went well: the phrase, the steps and how it was checked; never passwords) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` or `lina recetas borrar todas` |
 | Timings of each request (numbers only, never what you say; `lina tiempos` summarises them) | `~/.local/state/lina/tiempos.jsonl` (trims itself at ~200 KB) | `lina olvidar tiempos` |
+| How each shortcut listen ended (by silence, by your press…), with the day without the time and timings; never audio or text (`lina tiempos escucha`) | `~/.local/state/lina/escuchas.jsonl` (last 5000) | `lina olvidar tiempos` |
+| Tokens and duration of each AI call, with the model, the day without the time and a fingerprint of the fixed prefix (to know whether the cache is used); never what you ask or what it answers (`lina tiempos ia`) | `~/.local/state/lina/llamadas_ia.jsonl` (last 5000) | `lina olvidar tiempos` |
 | System log (what you say and I answer, unless you turn it off) | `journalctl --user -u lina` | `lina olvidar registro` |
 
 So that what you say and I answer doesn't stay in the log: `lina config poner privacidad.registrar_preguntas false`.

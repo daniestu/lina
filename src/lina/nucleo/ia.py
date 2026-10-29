@@ -2,6 +2,7 @@
 # Copyright (C) 2026 Lina contributors
 """Hablar con la IA: Gemini (con reintentos, pausas por cuota y topes de gasto), el modelo local de Ollama, la búsqueda web y las
 mini-consultas que entienden si dices «sí» o interrumpes. Aquí no hay nada de audio ni de ejecución de herramientas."""
+import hashlib
 import json
 import re
 import threading
@@ -21,6 +22,7 @@ from lina.nucleo import proveedor_gemini as PG
 from lina.nucleo import proveedor_anthropic as PAN  # noqa: F401  (los proveedores se registran al importarse)
 from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
+from lina.nucleo import tiempos as TIE
 from lina.nucleo.constantes import (ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
                                     MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, PAUSA_RED_SEG, TIMEOUT_REVISOR, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, ESTIMACION_VRAM_LOCAL)
@@ -269,7 +271,42 @@ def _turno_medido(proveedor, clave, modelo, *args, **kwargs):
     with _cerrojo_llamadas:
         if len(_llamadas) < MAX_LLAMADAS_ANOTADAS:
             _llamadas.append((round(segundos, 3), resultado))
+    _apuntar_llamada(clave, modelo, args, kwargs, r, segundos, resultado)
     return r
+
+
+_huellas: dict = {}                    # huella del principio → cuándo se usó por última vez (para saber si se repite; no sale de la memoria)
+_cerrojo_huellas = threading.Lock()
+
+
+def huella_principio(sistema, herramientas):
+    """(tamaño en caracteres, huella de 8 caracteres) de lo que va delante de la conversación: las instrucciones y las herramientas. Es lo que la caché
+    de Gemini puede aprovechar si se repite idéntico. De su contenido no se guarda nada más."""
+    prefijo = str(sistema or "") + json.dumps(herramientas or [], ensure_ascii=False, default=str)
+    return len(prefijo), hashlib.sha256(prefijo.encode("utf-8")).hexdigest()[:8]
+
+
+def _apuntar_llamada(clave, modelo, args, kwargs, r, segundos, resultado):
+    """La línea de esta llamada en llamadas_ia.jsonl (V4a): tokens, tiempo, tamaño y huella del principio. Si registrar_tiempos está apagado, nada.
+    Nunca estorba a la llamada."""
+    try:
+        if not AJ.actuales(log=lambda m: None).get("privacidad", "registrar_tiempos"):
+            return
+        sistema = args[0] if args else kwargs.get("sistema", "")
+        mensajes = args[1] if len(args) > 1 else kwargs.get("mensajes", [])
+        pref, huella = huella_principio(sistema, kwargs.get("herramientas"))
+        conv = sum(len(str(m.get("texto") or "")) for m in mensajes if isinstance(m, dict))
+        ahora = time.monotonic()
+        with _cerrojo_huellas:
+            antes = _huellas.get(huella)
+            _huellas[huella] = ahora
+            if len(_huellas) > 200:
+                del _huellas[min(_huellas, key=_huellas.get)]
+        repite = ahora - antes if antes is not None and ahora - antes < TIE.REPITE_SEG else None
+        TIE.apuntar_llamada(TIE.registro_llamada(getattr(r, "modelo_real", None) or modelo, resultado, segundos, uso=getattr(r, "uso", None), pref=pref,
+                                                 conv=conv, huella=huella, repite=repite, pago=PRES.nombre_de(clave) == "pago"))
+    except Exception as e:
+        log(f"Llamadas a la IA: no he podido apuntarla ({e!r})")
 
 
 def recoger_llamadas():

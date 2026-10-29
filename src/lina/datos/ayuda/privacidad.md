@@ -32,6 +32,8 @@ Con la clave **gratuita**, según las condiciones de Google vigentes, lo que se 
 | Lo que me pides recordar («recuerda que…»; solo lo escribes tú, con el atajo, nunca la IA ni Lina por su cuenta, y nunca contraseñas ni claves; a la IA solo le llega lo que viene al caso de cada petición) | `~/.local/share/lina/memoria.json` | `lina memoria` (verlo y borrar uno), `lina olvidar memoria` |
 | Recetas aprendidas (lo que ya me pediste y salió bien: la frase, los pasos y cómo se comprobó; nunca contraseñas) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` o `lina recetas borrar todas` |
 | Tiempos de cada petición (solo números, nunca lo que dices; `lina tiempos` los resume) | `~/.local/state/lina/tiempos.jsonl` (se recorta solo al llegar a ~200 KB) | `lina olvidar tiempos` |
+| Cómo termina cada escucha del atajo (por silencio, por tu pulsación…), con el día sin hora y tiempos; nunca audio ni texto (`lina tiempos escucha`) | `~/.local/state/lina/escuchas.jsonl` (últimas 5000) | `lina olvidar tiempos` |
+| Tokens y duración de cada llamada a la IA, con el modelo, el día sin hora y una huella del principio fijo (para saber si la caché se aprovecha); nunca lo que preguntas ni lo que contesta (`lina tiempos ia`) | `~/.local/state/lina/llamadas_ia.jsonl` (últimas 5000) | `lina olvidar tiempos` |
 | Registro del sistema (lo que dices y contesto, si no lo desactivas) | `journalctl --user -u lina` | `lina olvidar registro` |
 
 Para que lo que dices y contesto no quede en el registro: `lina config poner privacidad.registrar_preguntas false`.
