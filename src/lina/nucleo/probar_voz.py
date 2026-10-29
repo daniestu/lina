@@ -239,6 +239,9 @@ def principal(argv, salida=print, entrada=input, grabar=grabar_una, cargador=car
     if argv[:1] == ["grande"]:
         from lina.nucleo import probar_voz_grande
         return probar_voz_grande.principal(argv[1:], salida=salida, entrada=entrada, grabar=grabar)
+    if argv[:1] == ["silencio"]:
+        from lina.nucleo import probar_silencio
+        return probar_silencio.principal(argv[1:], salida=salida)
     if argv[:1] == ["mas"]:
         from lina.nucleo import probar_voz_mas
         return probar_voz_mas.principal(argv[1:], salida=salida, entrada=entrada)

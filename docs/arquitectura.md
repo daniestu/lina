@@ -40,7 +40,7 @@ src/lina/
     contenido.py        «ponme el partido…»: busca y elige la ficha en las plataformas oficiales, sin IA
     plataforma.py       distribución (Arch, Debian, Fedora, openSUSE), gestor de paquetes y capacidades del equipo
     rutas.py            carpetas XDG y archivos de fábrica
-  voz/                manos libres («Oye Lina»), voces de Piper (`lina voz`) e indicador visual de escucha
+  voz/                manos libres («Oye Lina»), voces de Piper (`lina voz`), indicador visual de escucha y fin de frase por silencio del atajo (`fin_de_frase.py`, V3)
   escritorio/         control de programas: accesibilidad (AT-SPI), D-Bus de KDE, visión
   modulos/            sistema, web, notas, oficina, organización, recordatorios, juegos
   mcp/                cliente y servidor MCP (herramientas externas)
