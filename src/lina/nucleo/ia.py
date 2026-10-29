@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import requests
 
 from lina.nucleo import ajustes as AJ
+from lina.nucleo import aviso_busqueda as AVB
 from lina.nucleo import claves as CL
 from lina.nucleo import herramientas as H
 from lina.nucleo import ia_activa as IAC
@@ -146,6 +147,24 @@ HERRAMIENTA_BUSCAR = {"functionDeclarations": [{
 }]}
 
 
+# Sin búsqueda (tavily elegido y sin clave): la IA dice cuándo le faltan datos de hoy y el código avisa (A10). Mínima a propósito: ~160 caracteres.
+HERRAMIENTA_SIN_BUSQUEDA = {"functionDeclarations": [{
+    "name": "necesito_datos_actuales",
+    "description": "Llámala si para responder hacen falta datos de hoy (resultados, horarios, noticias, precios) y no los tienes.",
+    "parameters": {"type": "object", "properties": {}},
+}]}
+
+
+def declaraciones_de_busqueda():
+    """Lo que se le da a la IA para buscar: buscar_web con Tavily y clave; necesito_datos_actuales si elegiste Tavily y falta la clave; nada con
+    google (la búsqueda va dentro del modelo) ni con ninguna (lo elegiste tú)."""
+    if hay_busqueda_tavily():
+        return list(HERRAMIENTA_BUSCAR["functionDeclarations"])
+    if modo_busqueda() == "tavily":
+        return list(HERRAMIENTA_SIN_BUSQUEDA["functionDeclarations"])
+    return []
+
+
 def dominio_valido(dominio):
     """«movistarplus.es» a partir de lo que diga la IA (con o sin https://, www. o ruta), o None si no es un nombre de dominio."""
     d = str(dominio or "").strip().lower()
@@ -184,6 +203,9 @@ def resultados_tavily(consulta, dominio=None, maximo=5):
         return "La búsqueda web no está disponible ahora mismo."
     if not r.ok:
         log(f"Tavily: error {r.status_code} ({r.text[:200]})")
+        if r.status_code in AVB.POR_CODIGO:                  # 432: el plan llegó a su límite; 433: el tope de gasto que pusiste (el 429 es de ritmo)
+            AVB.apuntar(AVB.POR_CODIGO[r.status_code])
+            return AVB.PARA_LA_IA_LIMITE
         return "La búsqueda web no está disponible ahora mismo."
     try:
         resultados = r.json().get("results", [])

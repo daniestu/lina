@@ -29,6 +29,7 @@ from datetime import datetime
 from pathlib import Path
 
 from lina.nucleo import ajustes as AJ
+from lina.nucleo import aviso_busqueda as AVB
 from lina.nucleo.registro import log
 from lina.nucleo import claves as CL
 from lina.nucleo import ia_activa as IAC
@@ -450,7 +451,7 @@ from lina.nucleo.ia import (  # noqa: F401
     Cancelado, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
-    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily, hay_busqueda_tavily,
+    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
     cabe_modelo_local, dominio_valido,
@@ -894,9 +895,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         """Una tarea de voz con su manejo común: «para» (Cancelado), errores, lo que apuntaste para después, y devolver el estado a su sitio."""
         self.fin_tarea.clear()
         cancelada = False
+        AVB.descartar()
         try:
             funcion(*args)
             self._dar_avisos_de_gasto()
+            self._dar_avisos_de_busqueda()
         except Cancelado:
             cancelada = True
             self._cancelada()
@@ -1614,6 +1617,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             resultado = buscar_tavily(consulta, args.get("dominio") or None)
             self.ejecutor.contaminar("búsqueda web")      # A2e: lo que trae internet puede traer instrucciones escondidas
             return resultado
+        if nombre == "necesito_datos_actuales":
+            AVB.apuntar(AVB.SIN_BUSQUEDA)
+            return AVB.PARA_LA_IA_SIN_BUSQUEDA
         if nombre == "ejecutar_comando":
             otra = self._otra_pagina_de_mas(str(args.get("comando", "")))
             if otra:
@@ -1930,6 +1936,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 return r
         return None
 
+    def _dar_avisos_de_busqueda(self):
+        """Falta la búsqueda (una vez) o Tavily llegó a su límite (una vez al mes): corto por voz, si no estás hablando tú, y el comando en una notificación."""
+        dichos = set()
+        for hablado, titulo, texto in AVB.pendientes(AJ.actuales(log=lambda m: None).get("ia", "busqueda")):
+            log(f"Aviso de búsqueda: {texto}")
+            H.notificar(titulo, texto)
+            if hablado not in dichos and not (self.sustituida or self.interrumpiendo):
+                dichos.add(hablado)
+                self.decir(hablado)
+
     def _dar_avisos_de_gasto(self):
         """Los avisos del 50, 80 y 100 % del tope: por voz (si no estás hablando tú) y con una notificación."""
         for aviso in PRES.avisos_pendientes():
@@ -2216,8 +2232,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if self.clave:
             grupos = self._preparar_grupos_mcp(self.elegir_grupos(pregunta))
             herramientas = G.herramientas(H.DECLARACIONES, grupos)
-            if hay_busqueda_tavily():
-                herramientas = HERRAMIENTA_BUSCAR["functionDeclarations"] + herramientas
+            herramientas = declaraciones_de_busqueda() + herramientas     # sin clave de Tavily: necesito_datos_actuales, y el código avisa una vez
             self.herramientas_turno = herramientas        # la misma lista que usa Gemini: mas_herramientas la amplía en sitio
             self.grupos_turno = set(grupos)
             sistema = G.sistema(instrucciones(), H.hechos_sistema(), G.ordenar(grupos))

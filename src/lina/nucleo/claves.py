@@ -176,9 +176,11 @@ def guardar(nombre, valor, ejecutar=subprocess.run):
     if _quiere_llavero() and llavero_guardar(nombre, valor, ejecutar):
         archivo_borrar(nombre)                                       # que no quede una copia en claro
         _cache[nombre] = valor
+        _olvidar_avisos(nombre)
         return "llavero", T("el llavero del sistema")
     ruta = archivo_guardar(nombre, valor)
     _cache[nombre] = valor
+    _olvidar_avisos(nombre)
     return "archivo", T("{ruta} (solo lo puedes leer tú; no he encontrado un llavero del sistema que funcione)", ruta=ruta)
 
 
@@ -192,9 +194,17 @@ def reiniciar_servicio(ejecutar=subprocess.run):
         return False
 
 
+def _olvidar_avisos(nombre):
+    """Con la clave de Tavily nueva (o sin ella), lo que se avisó de la búsqueda deja de valer."""
+    if nombre == "tavily":
+        from lina.nucleo import aviso_busqueda
+        aviso_busqueda.olvidar()
+
+
 def borrar(nombre, ejecutar=subprocess.run):
     nombre = normalizar(nombre)
     _cache.pop(nombre, None)
+    _olvidar_avisos(nombre)
     a = llavero_borrar(nombre, ejecutar) if _quiere_llavero() else False
     b = archivo_borrar(nombre)
     return a or b

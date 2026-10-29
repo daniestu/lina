@@ -45,7 +45,7 @@ _ACCION_EN = re.compile(r"^(?:(?:hey|ok|please|can you|could you)\s+)*(?:put on|
 # Herramientas que solo informan (buscan, leen, miran): no hacen nada en el equipo.
 HERRAMIENTAS_DE_INFORMAR = HERRAMIENTAS_META | {"buscar_web", "leer_web", "buscar_youtube", "mirar_pantalla", "ver_pantalla", "buscar_ajuste_kde",
                                                 "buscar_clave_en_binarios", "observar_config", "ver_diario", "ver_recetas", "ver_juegos", "ver_gasto",
-                                                "mis_ajustes", "ver_papelera", "usar_receta"}
+                                                "mis_ajustes", "ver_papelera", "usar_receta", "necesito_datos_actuales"}
 
 
 def pide_accion(texto):
