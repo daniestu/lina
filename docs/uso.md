@@ -42,6 +42,9 @@ lina voz                             # voces disponibles
 lina ia                              # con qué IA habla
 lina privacidad                      # qué se envía y si se envían capturas
 lina doctor                          # si algo no va
+lina di "¿qué tiempo hace?"           # decirle algo por escrito; la respuesta sale en la terminal (--voz: también en voz alta)
 ```
+
+Con `lina di` lo que pide confirmación no se confirma: queda pendiente hasta que pulses el atajo y digas «sí» (ver [seguridad](seguridad.md)).
 
 Más en [configuración](configuracion.md), [proveedores de IA](proveedores-ia.md), [idiomas](idiomas.md) y [seguridad](seguridad.md).

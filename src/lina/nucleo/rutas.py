@@ -43,6 +43,7 @@ EJECUCION = _ejecucion()
 
 VOCES = DATOS / "voces"
 PID = EJECUCION / "lina.pid"
+SOCKET = EJECUCION / "lina.sock"           # lina di: hablarle por texto a la Lina en marcha (canal.py)
 REGISTRO_ACCIONES = ESTADO / "acciones.log"
 
 

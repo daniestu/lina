@@ -44,9 +44,10 @@ aj.establecer("autonomia", "borrado", "confirmar")
 ok(nivel("rm /home/x/algo.txt") == "critico", "borrado = confirmar recupera las reglas de fábrica")
 # la IA no puede cambiar sus propios permisos, gasto ni claves por el terminal
 for c in ("lina config poner autonomia.perfil autonomo", "lina config perfil autonomo", "lina config poner gasto.tope_mensual_eur 5000",
-          "python -m lina config poner autonomia.borrado libre", "cd ~ && lina config poner voz.velocidad 2", "lina clave GITHUB_TOKEN", "lina voz es_ES-sharvard-medium-1"):
+          "python -m lina config poner autonomia.borrado libre", "cd ~ && lina config poner voz.velocidad 2", "lina clave GITHUB_TOKEN", "lina voz es_ES-sharvard-medium-1",
+          "lina pulsar", 'lina di "sí"'):                         # A4: la IA no se da órdenes a sí misma
     ok(H.clasificar(c)[0] == "bloqueado", "bloqueado para la IA: " + c)
-for c in ("lina config", "lina config ver voz.velocidad", "lina config comprobar", "lina voz", "lina pulsar"):
+for c in ("lina config", "lina config ver voz.velocidad", "lina config comprobar", "lina voz"):
     ok(H.clasificar(c)[0] != "bloqueado", "permitido (solo mira): " + c)
 
 # Lina se consulta y se configura sola con la herramienta mis_ajustes; el origen (atajo o «Oye Lina») y lo leído de fuera limitan lo sensible

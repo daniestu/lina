@@ -1280,7 +1280,7 @@ class Ejecutor:
         self.pregunta_pura = ""              # lo que ha pedido el usuario (lo pone el asistente): las recetas automáticas guardan sus palabras
         self.continuar = None                # lo pone el asistente: callable(peticion, motivo, profundidad, aviso, origen) -> bool; retoma la petición al acabar un segundo plano
         self.profundidad = 0                 # cuántas veces seguidas se ha retomado la misma petición (0 = la petición original)
-        self.origen = "voz_libre"            # de dónde vino la petición en curso («atajo» o «voz_libre»; lo pone el asistente): al retomarla se respeta
+        self.origen = "voz_libre"            # de dónde vino la petición en curso («atajo», «texto» o «voz_libre»; lo pone el asistente): al retomarla se respeta
         self.permiso = None                  # lo que tu último «sí» deja hacer sin volver a preguntar en esa misma tarea (ver dar_permiso); sobrevive a sus continuaciones
         self.nueva_tarea()
         if diario:

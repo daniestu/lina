@@ -99,7 +99,11 @@ _PROPIO = (r"(?:^|/)lina/(?:nucleo|voz|escritorio|modulos|mcp|datos)/|site-packa
 _SUDOERS = r"/etc/sudoers|\bvisudo\b|sudoers\.d"
 # Órdenes de Lina que cambian sus propios permisos, gasto, voz o claves: las da el usuario en su terminal o con el atajo, nunca la IA
 _ORDEN_PROPIA = (r"(?:^|[\s;&|(`/])(?:lina|python3?\s+-m\s+lina(?:\.__main__)?)\s+"
-                 r"(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S|privilegios\s+(?:instalar|total|quitar)\b|privacidad\s+(?:si|no|preguntar|sí)\b|olvidar\b|memoria\b)")
+                 r"(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S|privilegios\s+(?:instalar|total|quitar)\b|privacidad\s+(?:si|no|preguntar|sí)\b|olvidar\b|memoria\b|"
+                 r"di\b|pulsar\b)")
+# El canal de «lina di» (y la carpeta donde vive): hablarle directamente al socket (socat, nc -U, python) sería rodear el bloqueo de «lina di».
+# Es una capa más: la barrera de verdad es que lo que llega por ese canal no puede confirmar acciones ni subir el tope de gasto.
+_CANAL = r"lina\.sock\b|(?:/run/user/\d+|xdg_runtime_dir\}?)/lina\b"
 # El ayudante de root y todo lo que lo activa: solo se usa instalando paquetes (la forma exacta que reconoce analizar_instalacion)
 _AYUDANTE_ROOT = r"/usr/lib/lina\b|org\.lina\.instalar|sudoers\.d/lina|nucleo/raiz\b|\braiz\.py|\bprivilegios\.py"
 
@@ -339,7 +343,9 @@ def _bloqueado(comando, _profundidad=0):
     if re.search(_AYUDANTE_ROOT, bajo) and not analizar_instalacion(comando):
         return "tocaría el ayudante con el que instalo paquetes como administrador"
     if re.search(_ORDEN_PROPIA, bajo):
-        return "cambiaría mis propios ajustes de permisos, gasto o claves (eso lo haces tú, o con el atajo)"
+        return "cambiaría mis propios ajustes de permisos, gasto o claves, o me daría órdenes a mí misma (eso lo haces tú, o con el atajo)"
+    if re.search(_CANAL, bajo):
+        return "me daría órdenes a mí misma por el canal de «lina di» (eso lo haces tú, desde tu terminal)"
     motivo = _bloqueado_hostil(comando)
     if motivo:
         return motivo

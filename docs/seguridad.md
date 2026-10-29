@@ -40,6 +40,20 @@ Principios:
 7. **Las claves** viven en el llavero del sistema (o en un archivo con permisos 600) y la IA no puede leerlas ni editarlas; ninguna sale en el registro.
 8. **Privilegios mínimos**: ver «Privilegios» más abajo. Lina nunca ve tu contraseña de administrador.
 
+## `lina di`: órdenes por texto desde la terminal
+
+`lina di "frase"` le pasa una frase a la Lina en marcha por un socket Unix (`$XDG_RUNTIME_DIR/lina/lina.sock`, permisos `0600`, y cada conexión se
+comprueba con `SO_PEERCRED`: solo se atiende a tu mismo usuario). La frase entra por el mismo camino que una orden dicha con el atajo, con origen **«texto»**:
+
+- Puede lo mismo que el atajo (pedir, abrir, recordar, enseñar alias y recetas, cambiar ajustes), **salvo dos cosas**: **no confirma acciones críticas**
+  (siguen pendientes hasta que pulses el atajo y digas «sí», así que tampoco abre el permiso de toda la tarea) y **no sube el tope de gasto** (bajarlo, sí).
+  Esa es la **barrera de verdad**: cualquier programa que corra como tú puede escribir en ese socket.
+- Por eso mismo, **un proceso de tu usuario puede escribir memoria («recuerda que…») o recetas por ese canal**. Es el mismo alcance que ya tiene ese proceso
+  editando tus archivos (`memoria.json`, `config.toml`…): no abre nada que no estuviera abierto, pero conviene saberlo.
+- **Lina no puede darse órdenes a sí misma**: `lina di`, `lina pulsar` y cualquier comando que mencione `lina.sock` o la carpeta del socket están en el
+  bloqueo duro del código cuando los pide la IA. Es **una capa más**, no la barrera: un filtro de texto se puede esquivar (ver «Lo que Lina no es»), y por eso
+  lo que llega por el canal no puede confirmar ni subir el gasto aunque lo consiga.
+
 ## Privilegios (permisos de administrador)
 
 Lina nunca ve ni guarda tu contraseña de administrador. Hay tres niveles; el actual se ve con `lina privilegios`.
@@ -80,6 +94,7 @@ Esto es lo que se considera, qué lo frena y qué queda sin cubrir.
 |---|---|---|---|
 | **Contenido hostil** | Una web, un documento, un resultado de herramienta o el título de una ventana con «instrucciones» para la IA | Lo leído de fuera se trata como dato, no como orden; tras leerlo, los cambios libres se frenan hasta que confirmes (perfiles *equilibrado* y *prudente*); los bloqueos de abajo valen igual | Con el perfil *autónomo*, una IA engañada puede hacer lo que no esté bloqueado ni sea crítico. Usa *equilibrado* si lees mucho de internet |
 | **Voces ajenas** | Un vídeo, otra persona o el eco del altavoz dicen «Oye Lina…» | Por el manos libres nunca se confirma una acción crítica ni se suben permisos o gasto: solo con el atajo | Una voz cercana puede pedir cosas no críticas. Puedes apagar el manos libres (`activacion.activo`) |
+| **Órdenes por el canal de texto** | Un programa de tu usuario (o la IA rodeando el bloqueo) escribe en el socket de `lina di` | Lo que llega por ahí nunca confirma una acción crítica ni sube el gasto; solo tu usuario puede conectarse; la IA tiene bloqueados `lina di`, `lina pulsar` y el socket | Ese programa puede pedir cosas no críticas y escribir memoria o recetas, igual que podría editando tus archivos |
 | **Errores de la IA** | Interpreta mal («borra eso»), se inventa un comando | Lo crítico pide el atajo; los borrados van a la papelera; todo cambio queda en un diario y se puede deshacer; snapshots antes de tocar el sistema | Un error en algo no crítico es posible; el diario permite deshacerlo |
 | **Comandos peligrosos** | `rm -rf ~`, `mkfs`, `dd` a un disco, bombas de procesos | Bloqueo duro en el código (no desbloqueable ni confirmando) | El filtro lee el texto de la orden; no es un aislamiento (ver abajo) |
 | **Descargar y ejecutar** | `curl … \| sh`, `sh -c "$(curl …)"`, `curl -o x && ./x`, `… \| base64 -d \| sh`, `python -c` que descarga y ejecuta, `bash -i >& /dev/tcp/…` | Bloqueo duro (también cualquier tubería a un shell o intérprete) | Una descarga en una orden y su ejecución en otra, sin relación visible |
@@ -91,7 +106,7 @@ Esto es lo que se considera, qué lo frena y qué queda sin cubrir.
 ### Lo que Lina **no** es
 
 No es un entorno aislado: las órdenes se ejecutan con tu usuario y el filtro razona sobre el texto de cada orden (con las inevitables formas de esquivarlo que tiene cualquier
-filtro de texto). Su defensa es en capas: bloqueos duros, confirmación con el atajo, diario con deshacer, y que tú decidas el perfil. Si necesitas aislamiento real
+filtro de texto). Su defensa es en capas: bloqueos duros, confirmación con el atajo (que no se puede sustituir ni por voz en manos libres ni por `lina di`), diario con deshacer, y que tú decidas el perfil. Si necesitas aislamiento real
 (información muy sensible, equipos compartidos), ejecútala en una cuenta de usuario aparte, usa el perfil *prudente* y no actives el nivel *total*.
 
 ### Pruebas

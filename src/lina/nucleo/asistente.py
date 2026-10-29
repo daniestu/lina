@@ -30,6 +30,7 @@ from pathlib import Path
 
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import aviso_busqueda as AVB
+from lina.nucleo import canal as CANAL
 from lina.nucleo.registro import log
 from lina.nucleo import claves as CL
 from lina.nucleo import ia_activa as IAC
@@ -489,6 +490,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     interrumpiendo = False        # ¿estás grabando una frase mientras sigue trabajando en la anterior?
     atenuador = None              # quien baja lo que suena mientras te escucha (se crea la primera vez que hace falta)
     origen_voz_libre = False      # la petición en curso viene del manos libres: NO puede confirmar acciones (solo el atajo)
+    origen_texto = False          # la petición en curso viene de «lina di»: como el atajo, pero NO confirma acciones ni sube el tope de gasto
+    canal_salida = None           # con «lina di»: a dónde va lo que diría (la terminal); None = solo la voz
+    canal_voz = False             # con «lina di --voz»: además lo dice en voz alta
     manos_libres = None           # el oyente de «Oye Lina» (manos_libres.py)
     sustituida = False            # la tarea en curso se abandona porque has pedido otra cosa (no hace falta que diga «lo dejo»)
     # De dónde viene cada petición. Va CON la petición (en la cola, al sustituir otra, al retomarla), nunca con quien hable el último: pulsar el atajo para
@@ -947,14 +951,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _atender(self, pregunta, inicio, crono=None, nota_sistema="", profundidad=0, origen=None):
         self._n_peticion = getattr(self, "_n_peticion", 0) + 1        # los avisos de espera de esta petición caducan cuando se dice su respuesta
-        self.origen_voz_libre = _origen_valido(origen) != ORIGEN_ATAJO   # el de ESTA petición; sin origen, el restrictivo
-        self.ejecutor.origen = ORIGEN_VOZ_LIBRE if self.origen_voz_libre else ORIGEN_ATAJO      # para retomarla con el mismo si pasa a segundo plano
+        origen = _origen_valido(origen)                                  # el de ESTA petición; sin origen, el restrictivo
+        self.origen_voz_libre = origen == ORIGEN_VOZ_LIBRE
+        self.origen_texto = origen == ORIGEN_TEXTO
+        self.ejecutor.origen = origen                                    # para retomarla con el mismo si pasa a segundo plano
         crono = crono or TIE.Cronometro()
         recoger_llamadas()                                          # cuenta de cero las llamadas a la IA de esta petición (se apuntan en `lina tiempos`)
         self.ejecutor.profundidad = profundidad                     # >0: esta vuelta retoma una petición que esperó a una tarea en segundo plano
         euros = PRES.entender_tope(pregunta)
         if euros is not None:                                   # solo TÚ cambias el tope de gasto: lo hace el código ante una frase tuya, nunca la IA
-            self.decir(PRES.subir_tope(euros, voz_libre=self.origen_voz_libre))
+            self.decir(PRES.subir_tope(euros, voz_libre=self.origen_voz_libre, texto=self.origen_texto))
             return
         if H.destruccion_total(pregunta):                         # formatear el ordenador, borrar el sistema…: ni se ofrece ni se prepara
             log("Petición de destrucción total (formatear/borrar el sistema): bloqueada sin llamar a la IA")
@@ -1493,6 +1499,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         decision, via, menciona = self.decidir_confirmacion(texto, descripcion)
         log(f"Tu respuesta a la confirmación ({via}): {decision} ← «{texto}»")
         H.anotar(f"[respuesta-a-confirmacion] {decision} ({via}) <- «{texto}»")
+        if decision == "confirma" and self.origen_texto:
+            self.ejecutor.t_pendiente = time.time()
+            log("Un «sí» escrito con lina di no confirma acciones: sigue pendiente (hay que usar el atajo)")
+            return ("\n[SISTEMA: hay una acción pendiente de confirmar y NO se ha ejecutado. El usuario te ha escrito con «lina di» y por "
+                    "seguridad lo que necesita confirmación solo se confirma pulsando el atajo (cualquier programa del equipo podría escribir). "
+                    "Dile, brevemente, que pulse el atajo y diga «sí» para confirmar, o «cancela» para descartarla.]"), False
         if decision == "confirma" and self.origen_voz_libre:
             self.ejecutor.t_pendiente = time.time()
             log("Un «sí» por manos libres no confirma acciones: sigue pendiente (hay que usar el atajo)")
@@ -2287,7 +2299,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _hablar(self, texto, voz=None, tipo="normal", vigente=None, al_empezar=None):
         """Sintetiza y dice `texto`, esperando su turno (de una en una y en orden). `tipo`: normal, efimero (un aviso de espera), aviso (de segundo plano)
         o confirmacion (pregunta con algo pendiente de tu «sí»). Si un aviso o una confirmación no llega a decirse (cállate, o se esperó demasiado), sale
-        como notificación del escritorio para que no se pierda."""
+        como notificación del escritorio para que no se pierda. Con «lina di», va a la terminal y solo se dice en voz alta con --voz."""
+        salida = self.canal_salida if self.origen_texto else None
+        if salida is not None:
+            salida(limpiar_para_voz(texto))
+            if not self.canal_voz:
+                if al_empezar:
+                    al_empezar()
+                return
         resultado = self._turno_voz().pedir(ESPERA_TURNO_VOZ, vigente=vigente)
         if resultado != TURNO.TURNO:
             log(f"Voz: no digo «{str(texto)[:80]}» ({ {TURNO.TOPE: 'esperó demasiado su turno', TURNO.DESCARTADA: 'me has mandado callar', TURNO.CADUCADA: 'ya se dijo la respuesta'}[resultado] })")
@@ -2333,6 +2352,40 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         finally:
             self.reproductor = None
 
+    # --- lina di "frase": por texto, desde la terminal (canal.py) ---
+    def empezar_texto(self, texto, voz, enviar):
+        """Una frase escrita con «lina di»: el mismo camino que una orden hablada con el atajo, ya transcrita, con origen «texto». Si estoy con otra
+        cosa no la atiendo (False): ni interrumpe ni se encola, para que las pruebas por texto sean reproducibles."""
+        with self.cerrojo:
+            if self.estado != "esperando":
+                log(f"lina di: ahora estoy «{self.estado}», no atiendo «{texto}»")
+                return False
+            self.estado = "pensando"
+            self.interrumpiendo = False
+            self.fin_tarea.clear()
+            self.canal_salida, self.canal_voz = enviar, bool(voz)
+        log_nueva_peticion()
+        log("Petición escrita con lina di" + (" (y en voz alta)" if voz else ""))
+        try:
+            self._preparar_contexto()
+        except Exception as e:
+            log(f"lina di: no he podido mirar la ventana activa ({e!r})")
+        threading.Thread(target=self._tarea, args=(self._atender, texto, time.time(), None, "", 0, ORIGEN_TEXTO), daemon=True).start()
+        return True
+
+    def esperar_texto(self, segundos):
+        return self.fin_tarea.wait(segundos)
+
+    def parar_texto(self):
+        """Ctrl+C en la terminal de «lina di»: lo mismo que decir «para»."""
+        if not self.fin_tarea.is_set():
+            _abortar.set()
+
+    def fin_texto(self):
+        pendiente = bool(getattr(self.ejecutor, "pendientes", None))
+        self.canal_salida, self.canal_voz = None, False
+        return {"pendiente": pendiente}
+
     def avisar(self, texto):
         """Habla desde segundo plano (por ejemplo al terminar una instalación), esperando a que no estés usando el asistente."""
         for _ in range(240):
@@ -2351,12 +2404,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         return True
 
 
-ORIGEN_ATAJO, ORIGEN_VOZ_LIBRE = "atajo", "voz_libre"
+ORIGEN_ATAJO, ORIGEN_VOZ_LIBRE, ORIGEN_TEXTO = "atajo", "voz_libre", "texto"
 
 
 def _origen_valido(origen):
-    """El origen de una petición; cualquier cosa que no sea exactamente «atajo» cuenta como manos libres (lo restrictivo)."""
-    return ORIGEN_ATAJO if origen == ORIGEN_ATAJO else ORIGEN_VOZ_LIBRE
+    """El origen de una petición: «atajo», «texto» (lina di) o, cualquier otra cosa, manos libres (lo restrictivo)."""
+    return origen if origen in (ORIGEN_ATAJO, ORIGEN_TEXTO) else ORIGEN_VOZ_LIBRE
 
 
 _residente: list[PIPER_RES.PiperResidente] = []
@@ -2391,6 +2444,7 @@ def main():
     evento = threading.Event()
     signal.signal(signal.SIGUSR1, lambda *_: evento.set())
     ARCHIVO_PID.write_text(str(os.getpid()))
+    canal = CANAL.servir(RUT.SOCKET, asistente, log=log)            # lina di "frase"
     if evdev:
         threading.Thread(target=escuchar_mandos, args=(evento.set,), daemon=True).start()
     else:
@@ -2430,6 +2484,7 @@ def main():
         if asistente.mcp:
             asistente.mcp.cerrar()
         ARCHIVO_PID.unlink(missing_ok=True)
+        CANAL.cerrar(canal, RUT.SOCKET)
 
 
 if __name__ == "__main__":

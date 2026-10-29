@@ -34,6 +34,7 @@ src/lina/
     recetas.py          lo que ya se comprobó que funciona
     diario.py           registro de cambios y «deshacer»
     presupuesto.py      control del gasto de la clave de pago
+    canal.py            lina di: socket Unix con la Lina en marcha (origen «texto»: no confirma ni sube el tope)
     aviso_busqueda.py   avisos de la búsqueda en internet: que falta (una vez) y el límite de Tavily (432/433, una vez al mes)
     comandos.py         palabras y frases con significado fijo (sí/no, cancelar…)
     contenido.py        «ponme el partido…»: busca y elige la ficha en las plataformas oficiales, sin IA
