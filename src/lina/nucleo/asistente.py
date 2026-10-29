@@ -503,6 +503,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     _grabacion_n = 0              # qué grabación del atajo está en curso: un corte por silencio que llega tarde no cierra la siguiente
     _corte_pedido = False         # el detector ya pidió terminar esta grabación (solo se pide una vez)
     _corte_t = -1e9               # cuándo terminó la última grabación por silencio (para el margen de MARGEN_TRAS_CORTE)
+    _ultimo_fin = ""              # cómo terminó la última escucha del atajo (para «posible corte a destiempo» en lina tiempos escucha)
+    _detector_atajo = None        # el detector de la escucha en curso (None: doble pulsación)
+    _tras_corte = None            # esta escucha empezó poco después de un corte por silencio: cuántos segundos después
     _reloj = staticmethod(time.monotonic)
     # De dónde viene cada petición. Va CON la petición (en la cola, al sustituir otra, al retomarla), nunca con quien hable el último: pulsar el atajo para
     # interrumpir una tarea de «Oye Lina» no le da los permisos del atajo. Si algún camino llega sin origen, el restrictivo.
@@ -614,6 +617,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         with self.cerrojo:
             if self.estado != "grabando" and self._reloj() - self._corte_t < MARGEN_TRAS_CORTE:
                 log("Pulsación justo después de que dejara de escucharte por silencio: ya había terminado, la ignoro")
+                self._anotar_escucha("pulsacion_ignorada")
                 return
             if self.estado == "esperando":
                 self.empezar_grabacion()
@@ -718,7 +722,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.origen_voz_libre = False                      # una petición NUEVA con el atajo (al interrumpir no se toca: el origen es de la tarea en curso)
         self._grabacion_n += 1
         self._corte_pedido = False
-        detector = self._detector_del_atajo()
+        desde_corte = self._reloj() - self._corte_t
+        self._tras_corte = desde_corte if self._ultimo_fin == "fin" and desde_corte < TIE.TRAS_CORTE_MAX else None
+        detector = self._detector_atajo = self._detector_del_atajo()
         self._iniciar_grabacion(detector)
         log("Escuchando... " + ("(termino cuando te quedes callado, o vuelve a pulsar el atajo)" if detector else "(vuelve a pulsar el atajo para terminar)"))
 
@@ -735,11 +741,26 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if motivo != "pulsacion":
             log({"fin": "Dejo de escucharte: te has quedado callado", "nada": "Dejo de escucharte: no te he oído empezar",
                  "tope": f"Dejo de escucharte: llevo {TOPE_ATAJO_SEG} s escuchando"}.get(motivo, f"Dejo de escucharte ({motivo})"))
+        self._ultimo_fin = motivo
+        det = self._detector_atajo
+        self._anotar_escucha({"fin": "silencio", "pulsacion": "pulsacion", "nada": "nada", "tope": "tope"}.get(motivo, "pulsacion"), ajuste=det is not None,
+                             silencio=det.silencio_fin if det else None, dur=sum(len(b) for b in self.bloques) / FRECUENCIA,
+                             espera=det.espera() if det and motivo != "nada" else None, tras_corte=self._tras_corte)
         if motivo == "nada":                               # sin voz no se le da nada a Whisper (con silencio se inventa frases): «No te he oído»
             audio = np.zeros(0, np.float32)
         else:
             audio = np.concatenate(self.bloques)[:, 0] if self.bloques else np.zeros(0, np.float32)
         threading.Thread(target=self.procesar, args=(audio,), daemon=True).start()
+
+    def _anotar_escucha(self, fin, **datos):
+        """Cómo terminó esta escucha del atajo, en escuchas.jsonl (V3c): solo el modo, el día y tiempos. Si registrar_tiempos está apagado, nada. Nunca
+        estorba: va después del pitido y un fallo solo queda en el registro."""
+        try:
+            if not AJ.actuales(log=lambda m: None).get("privacidad", "registrar_tiempos"):
+                return
+            TIE.apuntar_escucha(TIE.registro_escucha(fin, **datos))
+        except Exception as e:
+            log(f"Escuchas: no he podido apuntarla ({e!r})")
 
     def _empezar_interrupcion(self):
         """Has pulsado el atajo mientras piensa. Te escucha sin dejar lo que hace: si dices solo «para», lo cancela; si pides otra cosa,

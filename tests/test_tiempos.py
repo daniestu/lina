@@ -155,3 +155,90 @@ def test_cada_llamada_a_la_ia_se_mide(monkeypatch):
     ia._turno_medido(Falso(), "k", "malo", "s", [])
     hechas = ia.recoger_llamadas()
     assert [r for _, r in hechas] == ["ok", "429"] and all(s >= 0 for s, _ in hechas) and ia.recoger_llamadas() == []
+
+
+# ---------------------------------------------------------------- V3c: escuchas del atajo
+import datetime  # noqa: E402
+
+import pytest  # noqa: E402
+
+HOY = datetime.date(2026, 11, 14)
+
+
+def _apuntar(archivo, dia, fin, **datos):
+    TIE.apuntar_escucha(TIE.registro_escucha(fin, hoy=dia, **datos), archivo)
+
+
+def test_el_registro_de_una_escucha_solo_tiene_el_dia_el_modo_y_numeros():
+    r = TIE.registro_escucha("silencio", ajuste=True, silencio=1.0, dur=3.456, espera=1.02, hoy=HOY)
+    assert r == {"dia": "2026-11-14", "fin": "silencio", "ajuste": True, "silencio": 1.0, "dur": 3.46, "espera": 1.02}
+    with pytest.raises(ValueError):
+        TIE.registro_escucha("lo que dijiste")
+
+
+def test_apuntar_descarta_lo_que_no_sea_un_campo_permitido_y_recorta(tmp_path, monkeypatch):
+    archivo = tmp_path / "e.jsonl"
+    TIE.apuntar_escucha({"dia": "2026-11-14", "fin": "nada", "texto": "abre el banco", "hora": "12:30"}, archivo)
+    assert json.loads(archivo.read_text(encoding="utf-8")) == {"dia": "2026-11-14", "fin": "nada"}
+    monkeypatch.setattr(TIE, "MAX_LINEAS_ESCUCHAS", 5)
+    for _ in range(20):
+        _apuntar(archivo, HOY, "pulsacion", ajuste=False, dur=2.0)
+    assert len(archivo.read_text(encoding="utf-8").splitlines()) == 5
+    assert TIE.apuntar_escucha({"fin": "nada"}, tmp_path / "no" / "\0") is False       # nunca falla
+
+
+def test_leer_por_dias_e_ignorar_lineas_rotas(tmp_path):
+    archivo = tmp_path / "e.jsonl"
+    _apuntar(archivo, HOY - datetime.timedelta(days=20), "silencio", ajuste=True)
+    _apuntar(archivo, HOY - datetime.timedelta(days=13), "silencio", ajuste=True)
+    _apuntar(archivo, HOY, "nada", ajuste=True)
+    with open(archivo, "a", encoding="utf-8") as f:
+        f.write("{roto\n" + json.dumps({"dia": "2026-11-14", "fin": "otra cosa"}) + "\n")
+    assert [e["fin"] for e in TIE.leer_escuchas(archivo, 14, HOY)] == ["silencio", "nada"]
+    assert len(TIE.leer_escuchas(archivo, 30, HOY)) == 3
+
+
+def test_lina_tiempos_escucha_resume_lo_que_importa(tmp_path):
+    archivo = tmp_path / "e.jsonl"
+    salida = []
+    assert TIE.principal_escucha([], salida.append, archivo, HOY) == 0 and "Todavía no hay escuchas" in salida[0]
+    for _ in range(6):
+        _apuntar(archivo, HOY, "silencio", ajuste=True, silencio=1.0, dur=3, espera=1.0)
+    _apuntar(archivo, HOY, "silencio", ajuste=True, silencio=1.0, dur=3, espera=1.1, tras_corte=4.0)
+    _apuntar(archivo, HOY, "pulsacion", ajuste=True, silencio=1.0, dur=2, espera=0.4)
+    _apuntar(archivo, HOY, "nada", ajuste=True, silencio=1.0, dur=6)
+    _apuntar(archivo, HOY, "tope", ajuste=True, silencio=1.0, dur=60)
+    _apuntar(archivo, HOY, "pulsacion_ignorada")
+    _apuntar(archivo, HOY, "silencio", ajuste=True, silencio=1.5, dur=3, espera=1.5)
+    _apuntar(archivo, HOY, "pulsacion", ajuste=False, dur=3.0)
+    _apuntar(archivo, HOY, "pulsacion", ajuste=False, dur=5.0)
+    salida.clear()
+    assert TIE.principal_escucha([], salida.append, archivo, HOY) == 0
+    texto = "\n".join(salida)
+    assert "últimos 14 días: 13" in texto
+    assert "Con fin por silencio (1,0 s): 10" in texto and "Con fin por silencio (1,5 s): 1" in texto
+    assert "cortó solo al callarte          7  (70 %)" in texto and "mediana 1,0 s" in texto
+    assert "acabaste pulsando               1  (10 %)   pulsaste 0,4 s" in texto
+    assert "«No te he oído»                 1  (10 %)" in texto and "tope de 60 s                    1  (10 %)" in texto
+    assert "posibles cortes a destiempo     1" in texto
+    assert "(ignoradas): 1" in texto and "Con doble pulsación: 2   duración media 4,0 s" in texto
+    assert "lina olvidar tiempos" in texto
+
+
+def test_lina_tiempos_escucha_rechaza_dias_raros_y_remite_desde_lina_tiempos(tmp_path):
+    for malo in ("abc", "0", "1000"):
+        salida = []
+        assert TIE.principal(["escucha", malo], salida.append, archivo_escuchas=tmp_path / "e.jsonl") == 2 and "Uso:" in salida[0]
+    archivo, escuchas = tmp_path / "t.jsonl", tmp_path / "e.jsonl"
+    c = TIE.Cronometro(Reloj())
+    c.sumar("ia", 1.0)
+    TIE.guardar(c.registro("g"), archivo)
+    _apuntar(escuchas, datetime.date.today(), "silencio", ajuste=True, silencio=1.0)
+    salida = []
+    TIE.principal([], salida.append, archivo, escuchas)
+    assert any("lina tiempos escucha" in t for t in salida)
+
+
+def test_olvidar_tiempos_borra_tambien_las_escuchas():
+    rutas = OLV.QUE["tiempos"][1]()
+    assert TIE.ARCHIVO_ESCUCHAS.name in [r.name for r in rutas] and TIE.ARCHIVO.name in [r.name for r in rutas]

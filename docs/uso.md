@@ -6,6 +6,8 @@
   Si prefieres pulsar **una sola vez**, `lina config poner activacion.fin_por_silencio true`: deja de escucharte cuando te quedas callado un segundo
   (`activacion.silencio_atajo`), con el mismo pitido de siempre, y la segunda pulsación sigue valiendo para terminar antes. Viene apagado: tarda casi un
   segundo más que pulsar, y con música alta puede no oír que has callado (entonces pulsas, o para sola a los 60 s).
+  `lina tiempos escucha` te dice, con tu uso real, cuántas veces cortó solo, cuántas acabaste pulsando y si te cortó a destiempo (guarda solo el modo de
+  terminar, el día y tiempos; nunca audio ni texto).
 - **Sin manos**: «Oye Lina, …» (el nombre lo eliges tú). No escucha mientras juegas, salvo que se lo pidas. Se prueba con `lina manos-libres probar "oye lina abre firefox"`.
 - Si le dices algo mientras trabaja, te escucha igualmente: «para» o «cancela eso» lo dejan; otra cosa distinta, la atiende en lugar de lo anterior.
 

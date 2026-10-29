@@ -29,7 +29,7 @@ AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
   lina musica ORDEN          controla la música que pone Lina con mpv: poner "Queen" · pausar · reanudar · siguiente · anterior · detener
   lina probar-voz [--completo|mas|grande|silencio]  graba unas frases tuyas y mide qué Whisper te entiende mejor (motor, modelo, CPU o tarjeta gráfica); «mas» mide ayudas sin VRAM y Ollama, «grande» lo hace con ~95 frases tuyas, «silencio» si el fin de frase por silencio del atajo cortaría alguna; no cambia nada
   lina probar-ponme [N]                 pasa una tanda de «ponme el partido / el capítulo…» por tu Lina sin abrir nada y mide si acierta, cuánto tarda y cuántas páginas abre
-  lina tiempos [N]           en qué fase se va el tiempo de tus últimas N peticiones (solo números, nada de lo que dices)
+  lina tiempos [N|escucha]   en qué fase se va el tiempo de tus últimas N peticiones (solo números, nada de lo que dices); «escucha»: cómo termina el atajo de escucharte
   lina manos-libres ORDEN    probar "frase" · eco · nivel   (ajustes del manos libres)
   lina indicador probar      enseña el resplandor de escucha
   lina interfaz ORDEN        diagnostico · preparar · estado   (control de programas con la pantalla)

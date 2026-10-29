@@ -33,6 +33,8 @@ class AjFalso:
     def get(self, seccion, clave):
         if seccion == "activacion" and clave in self.activacion:
             return self.activacion[clave]
+        if (seccion, clave) == ("privacidad", "registrar_tiempos") and "registrar_tiempos" in self.activacion:
+            return self.activacion["registrar_tiempos"]
         return AJ.ESQUEMA[seccion][clave][0]
 
 
@@ -54,9 +56,10 @@ def A(monkeypatch):
 
 
 @pytest.fixture
-def entorno(A, monkeypatch):
-    """(asistente, eventos, micrófonos, procesados, poner_ajuste)."""
+def entorno(A, monkeypatch, tmp_path):
+    """(asistente, eventos, micrófonos, procesados, poner_ajuste). Las escuchas (V3c) se apuntan en tmp_path/escuchas.jsonl."""
     eventos, micros, procesados = [], [], []
+    monkeypatch.setattr(A.TIE, "ARCHIVO_ESCUCHAS", tmp_path / "escuchas.jsonl")
 
     class Micro:
         def __init__(self, **k):
@@ -239,3 +242,126 @@ def test_ajustes_de_fabrica_y_rangos():
     assert esq["espera_atajo"][0] == 6 and esq["espera_atajo"][2] == (2, 20)
     with pytest.raises(ValueError):
         AJ.validar("activacion", "silencio_atajo", 0.2)
+
+
+# ---------------------------------------------------------------- V3c: cómo termina cada escucha (lina tiempos escucha)
+def _escuchas(A):
+    import json
+    try:
+        return [json.loads(l) for l in A.TIE.ARCHIVO_ESCUCHAS.read_text(encoding="utf-8").splitlines()]
+    except OSError:
+        return []
+
+
+@pytest.mark.parametrize("ajuste, audio, fin, con_espera", [
+    (True, lambda: np.concatenate([silencio(0.5), voz(1), silencio(2)]), "silencio", True),
+    (True, lambda: silencio(3), "nada", False),
+])
+def test_cada_final_por_si_solo_deja_su_linea(entorno, A, ajuste, audio, fin, con_espera):
+    a, eventos, micros, procesados, poner = entorno
+    poner(fin_por_silencio=ajuste, espera_atajo=2)
+    a.pulsacion()
+    micros[0].dar(audio())
+    [e] = _escuchas(A)
+    assert e["fin"] == fin and e["ajuste"] is True and e["silencio"] == 1.0 and e["dur"] > 0
+    assert ("espera" in e) == con_espera
+    if con_espera:
+        assert e["espera"] == pytest.approx(1.0, abs=0.05)
+
+
+def test_el_tope_deja_su_linea(entorno, A, monkeypatch):
+    a, eventos, micros, procesados, poner = entorno
+    monkeypatch.setattr(A, "TOPE_ATAJO_SEG", 2)
+    poner(fin_por_silencio=True)
+    a.pulsacion()
+    micros[0].dar(np.concatenate([silencio(0.5), voz(3, nivel=0.05)]))
+    assert _escuchas(A)[0]["fin"] == "tope"
+
+
+def test_terminar_pulsando_dice_cuanto_esperaste_y_sin_ajuste_no_hay_espera(entorno, A):
+    a, eventos, micros, procesados, poner = entorno
+    poner(fin_por_silencio=True)
+    a.pulsacion()
+    micros[0].dar(np.concatenate([silencio(0.5), voz(1), silencio(0.4)]))
+    a.pulsacion()
+    e = _escuchas(A)[-1]
+    assert e["fin"] == "pulsacion" and e["ajuste"] is True and e["espera"] == pytest.approx(0.4, abs=0.05)
+    poner(fin_por_silencio=False)
+    a.estado = "esperando"
+    a.pulsacion()
+    micros[-1].dar(np.concatenate([silencio(0.5), voz(1)]))
+    a.pulsacion()
+    e = _escuchas(A)[-1]
+    assert e["fin"] == "pulsacion" and e["ajuste"] is False and "espera" not in e and "silencio" not in e
+
+
+def test_solo_se_guarda_el_modo_el_dia_y_numeros(entorno, A):
+    a, eventos, micros, procesados, poner = entorno
+    poner(fin_por_silencio=True)
+    a.titulo = "Banco: mi cuenta"                                           # nada de lo que haya alrededor puede colarse
+    a.pulsacion()
+    micros[0].dar(np.concatenate([silencio(0.5), voz(1), silencio(2)]))
+    for e in _escuchas(A):
+        assert set(e) <= set(A.TIE.CAMPOS_ESCUCHA)
+        assert e["fin"] in A.TIE.FINES and len(e["dia"]) == 10 and "T" not in e["dia"]    # el día, sin hora
+        assert all(isinstance(v, (int, float, bool)) for k, v in e.items() if k not in ("dia", "fin"))
+    texto = A.TIE.ARCHIVO_ESCUCHAS.read_text(encoding="utf-8")
+    assert "Banco" not in texto and ":" not in texto.replace('": ', "").replace('":', "")   # ni texto ni horas
+
+
+def test_con_registrar_tiempos_apagado_no_se_apunta_nada(entorno, A):
+    a, eventos, micros, procesados, poner = entorno
+    poner(fin_por_silencio=True, registrar_tiempos=False)
+    a.pulsacion()
+    micros[0].dar(np.concatenate([silencio(0.5), voz(1), silencio(2)]))
+    assert len(procesados) == 1 and not A.TIE.ARCHIVO_ESCUCHAS.exists()
+
+
+def test_pulsacion_ignorada_y_posible_corte_a_destiempo(entorno, A):
+    a, eventos, micros, procesados, poner = entorno
+    ahora = [100.0]
+    a._reloj = lambda: ahora[0]
+    poner(fin_por_silencio=True)
+    a.pulsacion()
+    micros[0].dar(np.concatenate([silencio(0.5), voz(1), silencio(2)]))      # corta por silencio
+    ahora[0] += 0.5
+    a.pulsacion()                                                            # dentro del margen: ignorada
+    assert _escuchas(A)[-1] == {"dia": _escuchas(A)[-1]["dia"], "fin": "pulsacion_ignorada"}
+    ahora[0] += 3
+    a.estado = "esperando"
+    a.pulsacion()                                                            # 3,5 s después del corte: posible corte a destiempo
+    micros[-1].dar(np.concatenate([silencio(0.5), voz(1), silencio(2)]))
+    assert _escuchas(A)[-1]["tras_corte"] == pytest.approx(3.5)
+    ahora[0] += 20
+    a.estado = "esperando"
+    a.pulsacion()                                                            # mucho después: no
+    micros[-1].dar(np.concatenate([silencio(0.5), voz(1), silencio(2)]))
+    assert "tras_corte" not in _escuchas(A)[-1]
+
+
+def test_tras_una_escucha_terminada_pulsando_no_hay_corte_a_destiempo(entorno, A):
+    a, eventos, micros, procesados, poner = entorno
+    ahora = [100.0]
+    a._reloj = lambda: ahora[0]
+    poner(fin_por_silencio=True)
+    a.pulsacion()
+    micros[0].dar(np.concatenate([silencio(0.5), voz(1), silencio(2)]))      # corte por silencio
+    ahora[0] += 2
+    a.estado = "esperando"
+    a.pulsacion()
+    a.pulsacion()                                                            # esta termina pulsando
+    ahora[0] += 2
+    a.estado = "esperando"
+    a.pulsacion()
+    micros[-1].dar(np.concatenate([silencio(0.5), voz(1), silencio(2)]))
+    assert "tras_corte" not in _escuchas(A)[-1]
+
+
+def test_si_apuntar_falla_la_escucha_termina_igual(entorno, A, monkeypatch):
+    a, eventos, micros, procesados, poner = entorno
+    monkeypatch.setattr(A.TIE, "apuntar_escucha", MagicMock(side_effect=OSError("disco lleno")))
+    poner(fin_por_silencio=True)
+    a.pulsacion()
+    micros[0].dar(np.concatenate([silencio(0.5), voz(1), silencio(2)]))
+    assert _cierre(eventos) == ["parar", "cerrar", "subir", "pitido 520"] and len(procesados) == 1
+

@@ -21,6 +21,7 @@ FIN, NADA = "fin", "nada"
 class FinDeFrase:
     def __init__(self, silencio_fin=1.2, umbral_min=0.012, ignorar_inicio=0.3, espera_inicial=6.0, min_voz=0.25):
         self.umbral_min = umbral_min
+        self.silencio_fin = silencio_fin
         self.bloques_silencio = max(1, round(silencio_fin / SEG_BLOQUE))
         self.bloques_ignorados = max(0, round(ignorar_inicio / SEG_BLOQUE))
         self.bloques_espera = max(1, round(espera_inicial / SEG_BLOQUE))
