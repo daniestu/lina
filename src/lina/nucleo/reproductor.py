@@ -8,6 +8,7 @@ Aquí está el segundo camino, que también sirve desde la terminal:  lina music
 import json
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import time
@@ -19,8 +20,8 @@ ACCIONES = ("pausar", "reanudar", "siguiente", "anterior", "detener")
 _ORDENES_MPV = {"pausar": [["set_property", "pause", True]], "reanudar": [["set_property", "pause", False]], "siguiente": [["playlist-next"]],
                 "anterior": [["playlist-prev"]], "detener": [["quit"]], "vivo": [["get_property", "pause"]]}
 ESPERA_SEG = 1.5
-ESPERA_BUSCAR_SEG = 40          # lo que puede tardar yt-dlp en encontrar la canción
-ESPERA_ARRANQUE_SEG = 15        # lo que puede tardar mpv en estar listo y respondiendo
+ESPERA_ARRANQUE_SEG = 30        # lo que puede tardar yt-dlp en encontrar la canción y mpv en empezar a sonar
+MIN_SONANDO_SEG = 0.5           # «Sonando» solo cuando ya se ha reproducido esto de verdad (mpv vivo no basta)
 
 
 def ruta_mpv():
@@ -34,6 +35,8 @@ def enviar_mpv(accion, ruta=None, espera=ESPERA_SEG):
     if not ordenes:
         return False
     ruta = ruta or ruta_mpv()
+    if accion == "detener":
+        cerrar_descarga(ruta)
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
             s.settimeout(espera)
@@ -58,66 +61,122 @@ def enviar_mpv(accion, ruta=None, espera=ESPERA_SEG):
         return False
 
 
+def propiedad_mpv(nombre, ruta=None, espera=1.0):
+    """El valor de una propiedad del mpv de Lina (por ejemplo «playback-time»), o None si no hay mpv o aún no la tiene."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(espera)
+            s.connect(str(ruta or ruta_mpv()))
+            lector = s.makefile("r", encoding="utf-8")
+            s.sendall((json.dumps({"command": ["get_property", nombre], "request_id": 8}) + "\n").encode("utf-8"))
+            for linea in lector:
+                try:
+                    r = json.loads(linea)
+                except ValueError:
+                    continue
+                if r.get("request_id") == 8:
+                    return r.get("data") if r.get("error") == "success" else None
+    except (OSError, ValueError):
+        return None
+    return None
+
+
 def _cola(texto, n=3):
     lineas = [l.strip() for l in str(texto or "").splitlines() if l.strip()]
     return " | ".join(lineas[-n:])[:300]
 
 
-def poner(consulta, ruta=None, salida=print, buscar_seg=ESPERA_BUSCAR_SEG, arranque_seg=ESPERA_ARRANQUE_SEG):
-    """Pone música con mpv (con su socket de control) y SOLO dice que suena si mpv está vivo y contesta; si algo falla, cuenta qué (sin mpv, sin yt-dlp, no se
-    encuentra, mpv se cierra…). Una búsqueda («Queen») o un enlace. Devuelve 0 si suena."""
+def poner(consulta, ruta=None, salida=print, arranque_seg=ESPERA_ARRANQUE_SEG, reloj=time.monotonic, dormir=time.sleep):
+    """Pone música (una búsqueda, «Queen», o un enlace) y SOLO dice que suena si el audio avanza de verdad. Si algo falla, cuenta qué (sin mpv, sin yt-dlp,
+    no se encuentra, YouTube no deja descargarlo…). Devuelve 0 si suena.
+
+    yt-dlp descarga el audio y se lo pasa a mpv por una tubería: YouTube ya no deja que otro programa descargue el enlace que extrae yt-dlp (mpv recibe un
+    403), ni con `yt-dlp -g` ni con mpv resolviendo la página. mpv sigue con su socket de control (pausar, reanudar, detener)."""
     consulta = " ".join(str(consulta).split())
     if not consulta:
         salida(T("Dime qué quieres escuchar:  lina musica poner \"Queen\""))
         return 2
-    mpv = shutil.which("mpv")
+    mpv, ytdlp = shutil.which("mpv"), shutil.which("yt-dlp")
     if not mpv:
         salida(T("No está instalado mpv, el reproductor que usa Lina para la música. Instálalo (por ejemplo el paquete «mpv») y vuelve a probar."))
         return 1
+    if not ytdlp:
+        salida(T("No está instalado yt-dlp, que busca las canciones en internet. Instálalo (el paquete «yt-dlp») y vuelve a probar."))
+        return 1
     ruta = ruta or ruta_mpv()
-    enviar_mpv("detener", ruta)                                     # lo que sonara antes de Lina se cierra: no se montan dos músicas
-    objetivo = consulta
-    if not consulta.lower().startswith(("http://", "https://")):
-        ytdlp = shutil.which("yt-dlp")
-        if not ytdlp:
-            salida(T("No está instalado yt-dlp, que busca las canciones en internet. Instálalo (el paquete «yt-dlp») y vuelve a probar."))
-            return 1
-        try:
-            r = subprocess.run([ytdlp, "-g", "-f", "bestaudio/best", "--no-playlist", "--no-warnings", f"ytsearch1:{consulta}"],
-                               capture_output=True, text=True, timeout=buscar_seg, stdin=subprocess.DEVNULL)
-        except subprocess.TimeoutExpired:
-            salida(T("yt-dlp no ha encontrado «{consulta}» a tiempo (¿sin internet?). No suena nada.", consulta=consulta))
-            return 1
-        enlaces = [l.strip() for l in r.stdout.splitlines() if l.strip().startswith("http")]
-        if r.returncode != 0 or not enlaces:
-            salida(T("yt-dlp no ha podido encontrar «{consulta}»: {motivo}. No suena nada.", consulta=consulta, motivo=_cola(r.stderr) or T("sin resultados")))
-            return 1
-        objetivo = enlaces[0]
+    enviar_mpv("detener", ruta)                                     # lo que sonara antes de Lina se cierra (y su descarga): no se montan dos músicas
+    objetivo = consulta if consulta.lower().startswith(("http://", "https://")) else f"ytsearch1:{consulta}"
+    carpeta = os.path.dirname(str(ruta))
     try:
-        os.makedirs(os.path.dirname(str(ruta)), mode=0o700, exist_ok=True)
-        registro = open(os.path.join(os.path.dirname(str(ruta)), "mpv.log"), "w+", encoding="utf-8")
-        proceso = subprocess.Popen([mpv, "--no-video", "--really-quiet", f"--input-ipc-server={ruta}", objetivo],
-                                   stdin=subprocess.DEVNULL, stdout=registro, stderr=registro, start_new_session=True)
+        os.makedirs(carpeta, mode=0o700, exist_ok=True)
+        registro_yt = open(os.path.join(carpeta, "yt-dlp.log"), "w+", encoding="utf-8")
+        registro_mpv = open(os.path.join(carpeta, "mpv.log"), "w+", encoding="utf-8")
+        descarga = subprocess.Popen([ytdlp, "-q", "--no-warnings", "--no-playlist", "-f", "bestaudio/best", "-o", "-", objetivo],
+                                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=registro_yt, start_new_session=True)
+        proceso = subprocess.Popen([mpv, "--no-video", "--msg-level=all=error", f"--input-ipc-server={ruta}", f"--force-media-title={consulta}", "-"],
+                                   stdin=descarga.stdout, stdout=registro_mpv, stderr=registro_mpv, start_new_session=True)
     except OSError as e:
         salida(T("No he podido arrancar mpv ({error}). No suena nada.", error=e))
         return 1
-    limite = time.time() + arranque_seg
-    while time.time() < limite:
+    descarga.stdout.close()                                         # así, si mpv se cierra, yt-dlp se entera y termina
+    _guardar_pid(ruta, descarga.pid)
+
+    def motivo():
+        registro_yt.seek(0)
+        registro_mpv.seek(0)
+        return _cola(registro_yt.read()) or _cola(registro_mpv.read()) or T("sin mensaje")
+    limite = reloj() + arranque_seg
+    while reloj() < limite:
         if proceso.poll() is not None:
-            registro.seek(0)
-            salida(T("mpv se ha cerrado nada más empezar: {motivo}. No suena nada.", motivo=_cola(registro.read()) or T("sin mensaje")))
+            salida(T("No ha llegado a sonar: {motivo}. No suena nada.", motivo=motivo()))
+            _cerrar(descarga)
             return 1
-        if enviar_mpv("vivo", ruta, espera=1):
-            time.sleep(1.5)                                          # si el enlace no vale, mpv se cierra enseguida
-            if proceso.poll() is None:
-                salida(T("Sonando: {consulta}.", consulta=consulta))
-                return 0
-        else:
-            time.sleep(0.3)
-    if proceso.poll() is None:
-        proceso.terminate()
-    salida(T("mpv no ha llegado a empezar a tiempo. No suena nada."))
+        tiempo = propiedad_mpv("playback-time", ruta)
+        if isinstance(tiempo, (int, float)) and tiempo >= MIN_SONANDO_SEG:
+            salida(T("Sonando: {consulta}.", consulta=consulta))
+            return 0
+        dormir(0.3)
+    _cerrar(proceso)
+    _cerrar(descarga)
+    salida(T("No ha empezado a sonar a tiempo: {motivo}. No suena nada.", motivo=motivo()))
     return 1
+
+
+def _ruta_pid(ruta):
+    return os.path.join(os.path.dirname(str(ruta or ruta_mpv())), "yt-dlp.pid")
+
+
+def _guardar_pid(ruta, pid):
+    try:
+        with open(_ruta_pid(ruta), "w", encoding="utf-8") as f:
+            f.write(str(pid))
+    except OSError:
+        pass
+
+
+def _cerrar(proceso):
+    try:
+        if proceso.poll() is None:
+            proceso.terminate()
+    except OSError:
+        pass
+
+
+def cerrar_descarga(ruta=None):
+    """Cierra el yt-dlp que estuviera descargando para la música de Lina (solo si de verdad es un yt-dlp: el número de proceso pudo reutilizarse)."""
+    archivo = _ruta_pid(ruta)
+    try:
+        with open(archivo, encoding="utf-8") as f:
+            pid = int(f.read().strip())
+        os.remove(archivo)
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            linea = f.read()
+        if b"yt-dlp" not in linea and b"yt_dlp" not in linea:
+            return False
+        os.killpg(pid, signal.SIGTERM)
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 def principal(argv, salida=print):

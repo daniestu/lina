@@ -91,60 +91,127 @@ def test_la_orden_lina_musica_es_inocua():
     assert H.clasificar("lina musica detener")[0] == "inocuo" and H.clasificar("lina musica pausar")[0] == "inocuo"
 
 
-# ---- lina musica poner: solo dice que suena si suena
+# ---- lina musica poner: yt-dlp descarga y se lo pasa a mpv; solo dice que suena si el audio avanza
 class _Proc:
-    def __init__(self, vivo=True):
-        self.vivo = vivo
+    """Un proceso falso: vive hasta que se le pide parar (o `muere_tras` comprobaciones)."""
+    def __init__(self, pid=4242, muere_tras=None):
+        self.pid, self.muere_tras, self.vueltas, self.parado = pid, muere_tras, 0, False
+        self.stdout = type("S", (), {"close": lambda self: None})()
+
     def poll(self):
-        return None if self.vivo else 1
+        self.vueltas += 1
+        if self.parado or (self.muere_tras is not None and self.vueltas > self.muere_tras):
+            return 1
+        return None
+
     def terminate(self):
-        self.vivo = False
+        self.parado = True
 
 
-def _preparar(monkeypatch, tmp_path, mpv="/usr/bin/mpv", ytdlp="/usr/bin/yt-dlp", busqueda=None, proc=None, responde=True):
+class _Reloj:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+    def dormir(self, s):
+        self.t += s
+
+
+def _preparar(monkeypatch, tmp_path, mpv="/usr/bin/mpv", ytdlp="/usr/bin/yt-dlp", tiempos=(None, 0.1, 0.8), mpv_proc=None, yt_proc=None, error_yt=""):
     monkeypatch.setattr(RP.shutil, "which", lambda n: {"mpv": mpv, "yt-dlp": ytdlp}.get(n))
-    lanzados = []
-    monkeypatch.setattr(RP.subprocess, "run", busqueda or (lambda *a, **k: subprocess.CompletedProcess(a, 0, "https://x/audio\n", "")))
-    monkeypatch.setattr(RP.subprocess, "Popen", lambda cmd, **k: lanzados.append(cmd) or (proc or _Proc()))
-    monkeypatch.setattr(RP, "enviar_mpv", lambda accion, ruta=None, espera=1: responde if accion == "vivo" else False)
-    monkeypatch.setattr(RP.time, "sleep", lambda s: None)
-    return lanzados, tmp_path / "mpv.sock"
+    lanzados, procesos = [], {"yt": yt_proc or _Proc(pid=111), "mpv": mpv_proc or _Proc(pid=222)}
+
+    def popen(cmd, **k):
+        lanzados.append((cmd, k))
+        if cmd[0] == ytdlp:
+            k["stderr"].write(error_yt)
+            k["stderr"].flush()
+            return procesos["yt"]
+        return procesos["mpv"]
+    monkeypatch.setattr(RP.subprocess, "Popen", popen)
+    valores = iter(tiempos)
+    monkeypatch.setattr(RP, "propiedad_mpv", lambda nombre, ruta=None, espera=1.0: next(valores, tiempos[-1]))
+    monkeypatch.setattr(RP, "enviar_mpv", lambda accion, ruta=None, espera=1: False)
+    reloj = _Reloj()
+    return lanzados, procesos, tmp_path / "mpv.sock", reloj
 
 
-def test_poner_suena(monkeypatch, tmp_path):
-    lanzados, ruta = _preparar(monkeypatch, tmp_path)
+def _poner(consulta, ruta, reloj, dicho, **k):
+    return RP.poner(consulta, ruta=ruta, salida=dicho.append, reloj=reloj, dormir=reloj.dormir, **k)
+
+
+def test_poner_suena_solo_cuando_el_audio_avanza(monkeypatch, tmp_path):
+    lanzados, procesos, ruta, reloj = _preparar(monkeypatch, tmp_path, tiempos=(None, 0.0, 0.2, 0.7))
     dicho = []
-    assert RP.poner("Queen", ruta=ruta, salida=dicho.append) == 0
-    assert dicho == ["Sonando: Queen."] and lanzados[0][0] == "/usr/bin/mpv" and f"--input-ipc-server={ruta}" in lanzados[0] and lanzados[0][-1] == "https://x/audio"
+    assert _poner("Queen", ruta, reloj, dicho) == 0 and dicho == ["Sonando: Queen."]
+    yt, mpv = lanzados[0], lanzados[1]
+    assert yt[0][0] == "/usr/bin/yt-dlp" and yt[0][-1] == "ytsearch1:Queen" and yt[0][yt[0].index("-o") + 1] == "-" and yt[1]["stdout"] is RP.subprocess.PIPE
+    assert mpv[0][0] == "/usr/bin/mpv" and mpv[0][-1] == "-" and f"--input-ipc-server={ruta}" in mpv[0] and mpv[1]["stdin"] is procesos["yt"].stdout
+    assert "--really-quiet" not in mpv[0]                                                  # sus errores tienen que quedar en el registro
+    assert (tmp_path / "yt-dlp.pid").read_text() == "111"
+
+
+def test_mpv_vivo_que_no_avanza_no_es_sonando(monkeypatch, tmp_path):
+    """El fallo del registro: mpv vivo y contestando mientras intenta abrir el enlace, y luego 403. Ya no basta con que esté vivo."""
+    lanzados, procesos, ruta, reloj = _preparar(monkeypatch, tmp_path, tiempos=(None,))
+    dicho = []
+    assert _poner("Queen", ruta, reloj, dicho, arranque_seg=5) == 1
+    assert dicho[0].startswith("No ha empezado a sonar a tiempo") and "No suena nada" in dicho[0]
+    assert procesos["mpv"].parado and procesos["yt"].parado                               # no se quedan procesos colgados
+
+
+def test_si_mpv_se_cierra_dice_el_motivo_de_yt_dlp(monkeypatch, tmp_path):
+    lanzados, procesos, ruta, reloj = _preparar(monkeypatch, tmp_path, tiempos=(None,), mpv_proc=_Proc(muere_tras=3),
+                                                error_yt="ERROR: [youtube] h5Cp: HTTP Error 403: Forbidden\n")
+    dicho = []
+    assert _poner("Queen", ruta, reloj, dicho) == 1
+    assert "No ha llegado a sonar" in dicho[0] and "403" in dicho[0] and "Sonando" not in dicho[0]
+
+
+def test_un_enlace_va_por_el_mismo_camino(monkeypatch, tmp_path):
+    lanzados, _, ruta, reloj = _preparar(monkeypatch, tmp_path)
+    assert _poner("https://www.youtube.com/watch?v=h5Cp_04sKDM", ruta, reloj, []) == 0
+    assert lanzados[0][0][-1] == "https://www.youtube.com/watch?v=h5Cp_04sKDM" and lanzados[1][0][-1] == "-"
 
 
 def test_poner_sin_mpv_o_sin_ytdlp(monkeypatch, tmp_path):
     for faltan in ({"mpv": None}, {"ytdlp": None}):
-        _, ruta = _preparar(monkeypatch, tmp_path, **faltan)
+        lanzados, _, ruta, reloj = _preparar(monkeypatch, tmp_path, **faltan)
         dicho = []
-        assert RP.poner("Queen", ruta=ruta, salida=dicho.append) == 1 and "No está instalado" in dicho[0]
-
-
-def test_poner_no_encuentra(monkeypatch, tmp_path):
-    _, ruta = _preparar(monkeypatch, tmp_path, busqueda=lambda *a, **k: subprocess.CompletedProcess(a, 1, "", "ERROR: no hay red\n"))
+        assert _poner("Queen", ruta, reloj, dicho) == 1 and "No está instalado" in dicho[0] and lanzados == []
     dicho = []
-    assert RP.poner("Queen", ruta=ruta, salida=dicho.append) == 1 and "no hay red" in dicho[0] and "No suena nada" in dicho[0]
+    assert RP.poner("   ", salida=dicho.append) == 2
 
 
-def test_poner_mpv_muere_o_no_responde(monkeypatch, tmp_path):
-    _, ruta = _preparar(monkeypatch, tmp_path, proc=_Proc(vivo=False))
-    dicho = []
-    assert RP.poner("Queen", ruta=ruta, salida=dicho.append) == 1 and "No suena nada" in dicho[0]
-    _, ruta = _preparar(monkeypatch, tmp_path, responde=False)
-    t = iter(range(0, 1000, 5))
-    monkeypatch.setattr(RP.time, "time", lambda: next(t))
-    dicho = []
-    assert RP.poner("Queen", ruta=ruta, salida=dicho.append, arranque_seg=12) == 1 and "No suena nada" in dicho[0]
+def test_detener_cierra_tambien_la_descarga(monkeypatch, tmp_path):
+    ruta = tmp_path / "mpv.sock"
+    proc = subprocess.Popen(["sleep", "30"], start_new_session=True)                       # hace de yt-dlp
+    (tmp_path / "yt-dlp.pid").write_text(str(proc.pid))
+    real_open = open
+
+    def abrir(archivo, *a, **k):                                                           # su /proc/PID/cmdline dice yt-dlp
+        if str(archivo) == f"/proc/{proc.pid}/cmdline":
+            import io
+            return io.BytesIO(b"/usr/bin/yt-dlp\x00-o\x00-\x00")
+        return real_open(archivo, *a, **k)
+    monkeypatch.setattr("builtins.open", abrir)
+    try:
+        RP.enviar_mpv("detener", ruta)
+        assert proc.wait(timeout=5) is not None and not (tmp_path / "yt-dlp.pid").exists()
+    finally:
+        if proc.poll() is None:
+            proc.kill()
 
 
-def test_poner_enlace_no_pasa_por_ytdlp(monkeypatch, tmp_path):
-    lanzados, ruta = _preparar(monkeypatch, tmp_path, ytdlp=None)
-    assert RP.poner("https://youtu.be/x", ruta=ruta, salida=lambda t: None) == 0 and lanzados[0][-1] == "https://youtu.be/x"
+def test_detener_no_mata_un_proceso_que_no_es_yt_dlp(tmp_path):
+    proc = subprocess.Popen(["sleep", "30"], start_new_session=True)                       # el número se reutilizó: ya no es yt-dlp
+    (tmp_path / "yt-dlp.pid").write_text(str(proc.pid))
+    try:
+        assert RP.cerrar_descarga(tmp_path / "mpv.sock") is False and proc.poll() is None
+    finally:
+        proc.kill()
 
 
 def test_poner_es_inocuo_y_persistente():
