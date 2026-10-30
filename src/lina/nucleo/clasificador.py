@@ -74,6 +74,9 @@ _SECRETOS += [
     r"rclone/rclone\.conf", _P + r"\.npmrc\b", _P + r"\.pypirc\b", r"\.cargo/credentials", r"\.terraform\.d/credentials",
     r"\.config/gcloud\b", _P + r"\.azure(?:/|\s|$|['\"])", r"\.config/hub\b", r"\.local/share/keyrings",
     r"(?:^|[;&|(`]|\$\()\s*(?:sudo\s+(?:-\S+\s+)*)?pass\s+\S",                                                                       # pass (y pass show/otp) imprime contraseñas
+    # Las cookies del navegador son tus sesiones abiertas: leerlas a través de otro programa (yt-dlp, gallery-dl, mpv, browser_cookie3…) es lo mismo que leer
+    # cookies.sqlite, también si se deja escrito en un archivo de configuración. Un archivo de cookies exportado por ti (--cookies archivo) no entra aquí.
+    r"cookies[-_]?from[-_]?browser", r"\bbrowser_cookie3\b",
 ]
 # Se pueden leer, pero con tu confirmación: suelen guardar contraseñas escritas a mano (historiales de la shell) o dicen qué webs visitas (navegación).
 _LECTURA_SENSIBLE = [
