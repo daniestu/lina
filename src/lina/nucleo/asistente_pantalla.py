@@ -121,13 +121,13 @@ class MixinPantalla:
         return imagen, ("" if imagen else "no se ha podido capturar la pantalla")
 
     def _quiere_pantalla(self, pregunta):
-        """(motivo, renovar): por qué esta petición necesita la captura, o ("", False) si no. En un juego, siempre; fuera, si hablas de lo que ves o seguías
-        pidiendo ayuda con la pantalla (seguir una ayuda no la alarga: si no, cada pregunta la mandaría para siempre)."""
+        """(motivo, renovar): por qué esta petición necesita la captura, o ("", False) si no. En un juego, siempre; fuera, si pides que mire con una expresión
+        clara o, con la pantalla ya en uso, si esta frase sigue hablando de ella (seguir una ayuda no la alarga: si no, cada pregunta la mandaría para siempre)."""
         if (self.contexto or {}).get("tipo") == "juego":
             return "estás en un juego", True
         if C.pide_mirar(pregunta):
             return "hablas de lo que ves", True
-        if time.time() - getattr(self, "ultima_pantalla_t", 0.0) < PANTALLA_SESION_SEG:
+        if time.time() - getattr(self, "ultima_pantalla_t", 0.0) < PANTALLA_SESION_SEG and C.sigue_mirando(pregunta):
             return "seguías pidiendo ayuda con la pantalla", False
         return "", False
 

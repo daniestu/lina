@@ -400,20 +400,32 @@ _RELLENO_CANCELAR_EN = {"it", "that", "this", "all", "please", "now", "thanks", 
 _RELLENO_CANCELAR = IDI.PorIdioma({"es": _RELLENO_CANCELAR_ES, "en": _RELLENO_CANCELAR_EN})
 
 
-_PANTALLA_CLARA_EN = {"this", "here", "screen", "window", "look", "see", "says", "shows", "appears", "these"}
-_PANTALLA_FRASES_EN = ("what do i do", "what do i click", "where do i click", "what does this mean", "what is that", "what is this", "what's this", "what's on", "what i see", "what you see")
-_PANTALLA_CLARA_ES = {"esto", "aqui", "ahi", "pantalla", "ventana", "mira", "mirar", "mirame", "ves", "veo", "pone", "dice", "salio", "sale", "aparece", "este", "estos"}
-_PANTALLA_FRASES_ES = ("que hago", "que pulso", "donde le doy", "donde pulso", "que significa", "que es eso", "que me sale", "que me aparece", "lo que veo", "lo que ves")
-
-
-_PANTALLA_CLARA = {"es": _PANTALLA_CLARA_ES, "en": _PANTALLA_CLARA_EN}
+# Para EMPEZAR a mirar hace falta una expresión clara: una palabra suelta («esto puedes hacerlo», «por aquí por este chat») mandaba capturas sin motivo.
+_PANTALLA_FRASES_ES = ("que pulso", "donde le doy", "donde pulso", "que hago aqui", "que hago ahora", "que significa esto", "que significa eso", "que es esto", "que es eso",
+                       "que pone", "que dice aqui", "que dice ahi", "que dice esto", "que me sale", "que me aparece", "que sale aqui", "que aparece aqui", "lo que veo", "lo que ves",
+                       "que ves", "que estoy viendo", "puedes ver", "mira esto", "mira eso", "mira aqui", "mirame esto", "mira esta", "mira este", "mira lo que", "mira la pantalla",
+                       "mira mi pantalla", "mirame la pantalla", "en pantalla", "en la pantalla", "en mi pantalla", "de mi pantalla", "en esta ventana", "de esta ventana",
+                       "aqui pone", "aqui dice", "aqui sale", "aqui aparece", "ahi pone", "ahi dice", "ahi sale", "este error", "este mensaje", "este boton", "esta imagen")
+_PANTALLA_FRASES_EN = ("what do i click", "where do i click", "what do i do here", "what do i do now", "what does this mean", "what does that mean", "what is this", "what is that",
+                       "what does this say", "what does it say here", "what i see", "what you see", "what do you see", "can you see", "look at this", "look at that", "look here",
+                       "look at the screen", "look at my screen", "on screen", "on the screen", "on my screen", "in this window", "this error", "this message", "this button", "this image")
+# Con la pantalla ya en uso (PANTALLA_SESION_SEG), para seguir con la ayuda basta una palabra suelta: «¿y aquí?», «¿y ahora?».
+_PANTALLA_SEGUIR_ES = {"esto", "eso", "aqui", "ahi", "pantalla", "ventana", "mira", "mirar", "mirame", "ves", "veo", "pone", "dice", "salio", "sale", "aparece", "este", "esta", "estos",
+                       "boton", "ahora", "siguiente", "luego", "despues"}
+_PANTALLA_SEGUIR_EN = {"this", "that", "here", "there", "screen", "window", "look", "see", "says", "shows", "appears", "these", "button", "now", "next", "then"}
 _PANTALLA_FRASES = {"es": _PANTALLA_FRASES_ES, "en": _PANTALLA_FRASES_EN}
+_PANTALLA_SEGUIR = {"es": _PANTALLA_SEGUIR_ES, "en": _PANTALLA_SEGUIR_EN}
 
 
 def pide_mirar(texto):
-    """¿Hablas de lo que ves en pantalla («esto», «aquí», «qué pone», «mira…»)? Es solo un atajo: si no lo detecta, la IA puede pedir la captura."""
-    solo = normalizar(texto)
-    return bool(set(solo.split()) & IDI.segun(_PANTALLA_CLARA)) or any(f in solo for f in IDI.segun(_PANTALLA_FRASES))
+    """¿Pides que mire lo que ves, con una expresión clara («qué pone aquí», «mira esto»)? Es solo un atajo: si no lo detecta, la IA puede pedir la captura."""
+    solo = f" {normalizar(texto)} "
+    return any(f" {f} " in solo for f in IDI.segun(_PANTALLA_FRASES))
+
+
+def sigue_mirando(texto):
+    """Con la pantalla ya en uso: ¿esta frase sigue hablando de ella? Una expresión clara o una palabra suelta; si habla de otra cosa, no se manda otra captura."""
+    return pide_mirar(texto) or bool(set(normalizar(texto).split()) & IDI.segun(_PANTALLA_SEGUIR))
 
 
 def ventana_sensible(titulo, clase=""):

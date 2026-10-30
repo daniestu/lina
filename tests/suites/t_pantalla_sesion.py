@@ -19,14 +19,15 @@ a.contexto = {"tipo": "general"}
 a._motivo_sin_pantalla = lambda: None
 IMG = object()
 
-# se habla de lo que se ve: se envía y se abre la ventana de ayuda
-ok(a._decidir_pantalla(IMG, "Maximiza esta ventana") is IMG, "se envía al hablar de lo que ves")
+# se pide mirar con una expresión clara: se envía y se abre la ventana de ayuda
+ok(a._decidir_pantalla(IMG, "Qué pone en esta ventana") is IMG, "se envía al hablar de lo que ves")
 t0 = a.ultima_pantalla_t
 ok(t0 > 0, "se apunta cuándo")
 
-# preguntas seguidas dentro de la ventana: se sigue enviando, pero SIN renovar el plazo
-ok(a._decidir_pantalla(IMG, "¿Qué hora es?") is IMG, "dentro de la ventana, se sigue enviando")
+# dentro de la ventana, si sigues hablando de la pantalla se sigue enviando, pero SIN renovar el plazo
+ok(a._decidir_pantalla(IMG, "¿Y ahí?") is IMG, "dentro de la ventana, se sigue enviando")
 ok(a.ultima_pantalla_t == t0, "seguir la ayuda no la alarga")
+ok(a._decidir_pantalla(IMG, "¿Qué tiempo va a hacer mañana?") is None, "dentro de la ventana, otra conversación no se lleva captura")
 
 # pasada la ventana: ya no se envía, por muchas preguntas que hayan ido seguidas
 a.ultima_pantalla_t = time.time() - A.PANTALLA_SESION_SEG - 1
