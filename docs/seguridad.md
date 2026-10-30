@@ -20,8 +20,8 @@ Principios:
    `kubectl config view --raw`), git (`.git-credentials`, `git credential`), las cookies, los datos de autocompletar y la clave de los navegadores
    Chromium (Chrome, Chromium, Brave, Vivaldi, Edge, Opera, también en Flatpak), rclone, npm, PyPI, Cargo, Terraform, gcloud, Azure, hub y `pass`.
    Si de verdad lo necesitas, lo haces tú en tu terminal. **Con tu confirmación** (con el atajo) se pueden leer los historiales de la terminal
-   (bash, zsh, fish, python, psql, mysql, sqlite, node), que suelen guardar contraseñas escritas a mano, y el historial de navegación de los
-   Chromium: lo que se lea se envía a la IA.
+   (bash, zsh, fish, python, psql, mysql, sqlite, node), que suelen guardar contraseñas escritas a mano, el historial de navegación de los
+   Chromium y el registro de la propia Lina (`journalctl -u lina`), que puede llevar tus preguntas anteriores: lo que se lea se envía a la IA.
    Además, lo que devuelve **cualquier herramienta** (comandos, documentos, ajustes de KDE, lo que se lee de una ventana, la web, los servidores MCP, y
    lo que se ejecuta al confirmar) se le da a la IA **sin claves**: se tapan las que tienen forma de clave (Google, OpenAI/Anthropic,
    GitHub, Slack, Tavily, `Bearer …`) y el valor de las variables de entorno en mayúsculas cuyo nombre lleva TOKEN, SECRET, KEY, PASS, AUTH o

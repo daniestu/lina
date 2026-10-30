@@ -28,6 +28,8 @@ def con(monkeypatch):
         monkeypatch.setattr(AJ, "actuales", lambda log=print: AjFalso(busqueda))
         monkeypatch.setattr(CL, "obtener", lambda nombre: clave if nombre == "tavily" else None)
     monkeypatch.setattr(requests, "post", MagicMock(side_effect=AssertionError("no debía ir a la red")))
+    monkeypatch.setattr(IA, "_pausa_tavily", [0.0])
+    monkeypatch.setattr(IA, "hay_reserva", lambda: False)           # la búsqueda de reserva tiene sus propias pruebas
     return poner
 
 

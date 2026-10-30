@@ -32,6 +32,8 @@ class AjFalso:
 @pytest.fixture(autouse=True)
 def estado(tmp_path, monkeypatch):
     monkeypatch.setattr(AVB.RUT, "ESTADO", tmp_path)
+    monkeypatch.setattr(IA, "_pausa_tavily", [0.0])                 # cada prueba empieza sin la pausa de un cupo agotado
+    monkeypatch.setattr(IA, "hay_reserva", lambda: False)           # la búsqueda de reserva tiene sus propias pruebas (test_busqueda_reserva.py)
     monkeypatch.setattr(requests, "post", MagicMock(side_effect=AssertionError("no debía ir a la red")))
     AVB.descartar()
     yield tmp_path
@@ -177,6 +179,7 @@ def test_guardar_otra_clave_no_olvida_los_avisos(claves_en_tmp, estado):
 # ---------------------------------------------------------------- el límite de Tavily (432 y 433)
 def _tavily_responde(con, monkeypatch, codigo):
     con("tavily", "tvly-de-prueba")
+    IA._pausa_tavily[0] = 0.0                                       # aquí se mide el aviso (una vez al mes), no la pausa tras un 432
     monkeypatch.setattr(requests, "post", MagicMock(return_value=MagicMock(ok=False, status_code=codigo, text="limit")))
     return IA.resultados_tavily("partido de hoy")
 
@@ -219,3 +222,12 @@ def test_un_estado_roto_no_rompe_nada(estado):
     (estado / AVB.ARCHIVO).write_text("{roto", encoding="utf-8")
     AVB.apuntar(AVB.SIN_BUSQUEDA)
     assert len(AVB.pendientes("tavily")) == 1
+
+
+def test_con_reserva_el_cupo_agotado_se_notifica_pero_no_se_dice(monkeypatch):
+    a, notas = _asistente(monkeypatch)
+    from lina.nucleo import asistente as A
+    monkeypatch.setattr(A, "hay_reserva", lambda: True)
+    AVB.apuntar(AVB.LIMITE_PLAN)
+    a._dar_avisos_de_busqueda()
+    assert a.dicho == [] and len(notas) == 1 and "DuckDuckGo" in notas[0][1]

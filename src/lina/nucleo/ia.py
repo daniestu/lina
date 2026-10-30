@@ -184,16 +184,98 @@ def hay_busqueda_tavily():
     return modo_busqueda() == "tavily" and bool(CL.obtener("tavily"))
 
 
+_pausa_tavily = [0.0]     # hasta cuándo no se llama a Tavily (agotó su cupo: hasta mañana)
+_pausa_reserva = [0.0]    # hasta cuándo no se pregunta a DuckDuckGo (nos ha tomado por un robot)
+RESERVA = "https://lite.duckduckgo.com/lite/"
+PAUSA_RESERVA_SEG = 1800
+
+
+def _manana():
+    """El principio del día siguiente (hora local), en segundos."""
+    t = time.localtime()
+    return time.mktime((t.tm_year, t.tm_mon, t.tm_mday + 1, 0, 0, 0, 0, 0, -1))
+
+
+def hay_reserva():
+    """¿Se puede buscar en DuckDuckGo cuando Tavily no responde o agota su cupo? (ia.busqueda_reserva)"""
+    return bool(AJ.actuales(log=lambda m: None).get("ia", "busqueda_reserva"))
+
+
+_ENLACE_RESERVA = re.compile(r"<a[^>]*href=[\"']([^\"']+)[\"'][^>]*class=[\"']result-link[\"'][^>]*>(.*?)</a>", re.S)
+_RESUMEN_RESERVA = re.compile(r"class=[\"']result-snippet[\"'][^>]*>(.*?)</td>", re.S)
+
+
+def _texto_html(t):
+    import html
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", t)).split())
+
+
+def leer_resultados_reserva(pagina, maximo=5):
+    """[{title, url, content}] de la página de resultados de DuckDuckGo (versión ligera). Los enlaces de redirección (/l/?uddg=…) se deshacen."""
+    from urllib.parse import parse_qs, unquote, urlparse as _u
+    enlaces = list(_ENLACE_RESERVA.finditer(pagina))
+    resumenes = [_texto_html(m.group(1)) for m in _RESUMEN_RESERVA.finditer(pagina)]
+    salida = []
+    for i, m in enumerate(enlaces):
+        url = _texto_html(m.group(1))
+        if "uddg=" in url:
+            url = unquote(parse_qs(_u(url).query).get("uddg", [url])[0])
+        if url.startswith("//"):
+            url = "https:" + url
+        if not url.startswith(("http://", "https://")) or "duckduckgo.com" in _u(url).netloc:
+            continue
+        salida.append({"title": _texto_html(m.group(2)), "url": url, "content": resumenes[i] if i < len(resumenes) else ""})
+        if len(salida) >= maximo:
+            break
+    return salida
+
+
+def resultados_reserva(consulta, dominio=None, maximo=5, post=None):
+    """Búsqueda de reserva, sin clave, en DuckDuckGo (versión ligera). Lista de resultados como los de Tavily, o el texto que explica por qué no."""
+    post = post or requests.post
+    if time.time() < _pausa_reserva[0]:
+        return "La búsqueda web no está disponible ahora mismo."
+    q = (f"site:{dominio} " if dominio else "") + consulta[:300]
+    inicio = time.time()
+    try:
+        r = post(RESERVA, data={"q": q}, timeout=12, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0"})
+    except requests.RequestException as e:
+        log(f"Búsqueda de reserva (DuckDuckGo): sin conexión ({e})")
+        return "La búsqueda web no está disponible ahora mismo."
+    if r.status_code == 202 or "anomaly" in r.text[:20000].lower():         # su detección de robots: insistir solo empeora el bloqueo
+        _pausa_reserva[0] = time.time() + PAUSA_RESERVA_SEG
+        log(f"Búsqueda de reserva (DuckDuckGo): me ha tomado por un robot; no vuelvo a preguntarle en {PAUSA_RESERVA_SEG // 60} min")
+        return "La búsqueda web no está disponible ahora mismo."
+    if not r.ok:
+        log(f"Búsqueda de reserva (DuckDuckGo): error {r.status_code}")
+        return "La búsqueda web no está disponible ahora mismo."
+    resultados = leer_resultados_reserva(r.text, maximo)
+    log(f"Búsqueda de reserva (DuckDuckGo) «{consulta}»{' en ' + dominio if dominio else ''}: {len(resultados)} resultados ({time.time() - inicio:.1f} s)")
+    return resultados
+
+
 def resultados_tavily(consulta, dominio=None, maximo=5):
-    """Los resultados en bruto de Tavily ([{title, url, content}]) o, si no se pudo buscar, el texto que lo explica. Con `dominio`, solo en esa web."""
+    """Los resultados en bruto de Tavily ([{title, url, content}]) o, si no se pudo buscar, el texto que lo explica. Con `dominio`, solo en esa web.
+    Si Tavily no responde o ha agotado su cupo, se busca en la reserva (DuckDuckGo, sin clave) salvo que ia.busqueda_reserva esté apagado. Tras un cupo
+    agotado (432/433) no se vuelve a llamar a Tavily hasta mañana: va directamente a la reserva."""
     if not hay_busqueda_tavily():
         return "La búsqueda web no está configurada."
-    pedido = {"query": consulta[:380], "search_depth": "basic", "max_results": max(1, min(int(maximo), 20))}
+    maximo = max(1, min(int(maximo), 20))
+    pedido = {"query": consulta[:380], "search_depth": "basic", "max_results": maximo}
+    d = None
     if dominio:
         d = dominio_valido(dominio)
         if not d:
             return f"«{str(dominio)[:60]}» no es un nombre de web válido (por ejemplo: movistarplus.es). Vuelve a buscar con un dominio correcto o sin él."
         pedido["include_domains"] = [d]
+
+    def reserva(si_no):
+        if not hay_reserva():
+            return si_no
+        r = resultados_reserva(consulta, d, maximo)
+        return r if isinstance(r, list) and r else si_no
+    if time.time() < _pausa_tavily[0]:
+        return reserva(AVB.PARA_LA_IA_LIMITE)
     inicio = time.time()
     try:
         r = requests.post("https://api.tavily.com/search",
@@ -202,13 +284,15 @@ def resultados_tavily(consulta, dominio=None, maximo=5):
                           timeout=12)
     except requests.RequestException as e:
         log(f"Tavily: sin conexión ({e})")
-        return "La búsqueda web no está disponible ahora mismo."
+        return reserva("La búsqueda web no está disponible ahora mismo.")
     if not r.ok:
         log(f"Tavily: error {r.status_code} ({r.text[:200]})")
         if r.status_code in AVB.POR_CODIGO:                  # 432: el plan llegó a su límite; 433: el tope de gasto que pusiste (el 429 es de ritmo)
             AVB.apuntar(AVB.POR_CODIGO[r.status_code])
-            return AVB.PARA_LA_IA_LIMITE
-        return "La búsqueda web no está disponible ahora mismo."
+            _pausa_tavily[0] = _manana()
+            log("Tavily: cupo agotado; hasta mañana busco en la reserva (DuckDuckGo)" if hay_reserva() else "Tavily: cupo agotado; no lo vuelvo a llamar hasta mañana")
+            return reserva(AVB.PARA_LA_IA_LIMITE)
+        return reserva("La búsqueda web no está disponible ahora mismo.")
     try:
         resultados = r.json().get("results", [])
     except ValueError:
@@ -606,6 +690,13 @@ AVISO_SIN_HERRAMIENTAS = (
     "NUNCA digas que lo has hecho ni inventes datos.]")
 
 
+class BucleDeHerramienta(Exception):
+    """La IA repite la misma herramienta con los mismos datos y el mismo resultado. `respuesta`: lo que se le dice al usuario."""
+    def __init__(self, respuesta):
+        super().__init__(respuesta)
+        self.respuesta = respuesta
+
+
 def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herramientas=None, ejecutar_herramienta=None,
                  sistema=None, nivel=None, revisor=None, max_pasos=None, esperar_cuota=False, al_esperar=None, timeout=20, plazo=None):
     """La pregunta con su bucle de herramientas, contra el proveedor dado: la IA pide herramientas, se ejecutan y se le devuelven los resultados
@@ -713,6 +804,9 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                 pasos += 1
                 try:
                     resultado = ejecutar_herramienta(llamada.nombre, llamada.args or {})
+                except BucleDeHerramienta as e:        # la misma llamada con el mismo resultado: seguir solo gasta. Termina el turno, con lo que diga el código
+                    log(f"{modelo}: {llamada.nombre} se repite sin cambiar nada: corto el bucle")
+                    return e.respuesta
                 except Exception as e:  # una herramienta rota no debe tumbar al asistente
                     log(f"Error en la herramienta {llamada.nombre}: {e!r}")
                     resultado = f"La herramienta ha fallado: {e!r}"

@@ -157,7 +157,7 @@ def test_mpv_vivo_que_no_avanza_no_es_sonando(monkeypatch, tmp_path):
     """El fallo del registro: mpv vivo y contestando mientras intenta abrir el enlace, y luego 403. Ya no basta con que esté vivo."""
     lanzados, procesos, ruta, reloj = _preparar(monkeypatch, tmp_path, tiempos=(None,))
     dicho = []
-    assert _poner("Queen", ruta, reloj, dicho, arranque_seg=5) == 1
+    assert _poner("Queen", ruta, reloj, dicho, arranque_seg=5, alternativas=False) == 1
     assert dicho[0].startswith("No ha empezado a sonar a tiempo") and "No suena nada" in dicho[0]
     assert procesos["mpv"].parado and procesos["yt"].parado                               # no se quedan procesos colgados
 
@@ -166,7 +166,7 @@ def test_si_mpv_se_cierra_dice_el_motivo_de_yt_dlp(monkeypatch, tmp_path):
     lanzados, procesos, ruta, reloj = _preparar(monkeypatch, tmp_path, tiempos=(None,), mpv_proc=_Proc(muere_tras=3),
                                                 error_yt="ERROR: [youtube] h5Cp: HTTP Error 403: Forbidden\n")
     dicho = []
-    assert _poner("Queen", ruta, reloj, dicho) == 1
+    assert _poner("Queen", ruta, reloj, dicho, alternativas=False) == 1
     assert "No ha llegado a sonar" in dicho[0] and "403" in dicho[0] and "Sonando" not in dicho[0]
 
 
@@ -212,6 +212,86 @@ def test_detener_no_mata_un_proceso_que_no_es_yt_dlp(tmp_path):
         assert RP.cerrar_descarga(tmp_path / "mpv.sock") is False and proc.poll() is None
     finally:
         proc.kill()
+
+
+# ---- M3: otras vías antes de rendirse (otro cliente de YouTube, SoundCloud, el navegador), sin cookies
+@pytest.fixture
+def cadena(monkeypatch, tmp_path):
+    """Simula cada intento: `sale[objetivo o cliente]` dice si suena. Devuelve (intentos, abiertos, poner)."""
+    monkeypatch.setattr(RP.shutil, "which", lambda n: "/usr/bin/" + n)
+    monkeypatch.setattr(RP, "enviar_mpv", lambda accion, ruta=None, espera=1: False)
+    intentos, abiertos, sale = [], [], {}
+
+    def sonar(mpv, ytdlp, objetivo, titulo, ruta, espera, reloj, dormir, extra=()):
+        clave = extra[-1].split("=")[-1] if extra else objetivo.split(":")[0]
+        intentos.append(clave)
+        return (True, None, None) if sale.get(clave) else (False, "ERROR: [youtube] Sign in to confirm you're not a bot", "cerrado")
+    monkeypatch.setattr(RP, "_sonar", sonar)
+    monkeypatch.setattr(RP, "_cliente_que_sirve", lambda ytdlp, objetivo: sale.get("cliente"))
+    monkeypatch.setattr(RP, "_enlace_youtube", lambda ytdlp, consulta: sale.get("enlace"))
+    monkeypatch.setattr(RP, "abrir_en_navegador", lambda url: abiertos.append(url) or sale.get("navegador", True))
+
+    def poner(consulta, **valores):
+        sale.clear()
+        sale.update(valores)
+        dicho = []
+        return RP.poner(consulta, ruta=tmp_path / "mpv.sock", salida=dicho.append), dicho
+    return intentos, abiertos, poner
+
+
+def test_si_youtube_no_deja_prueba_otro_cliente(cadena):
+    intentos, abiertos, poner = cadena
+    codigo, dicho = poner("La Fuga Jaleo", cliente="mweb", mweb=True)
+    assert codigo == 0 and dicho == ["Sonando: La Fuga Jaleo (por YouTube, con otro cliente)."] and intentos == ["ytsearch1", "mweb"] and abiertos == []
+
+
+def test_despues_soundcloud(cadena):
+    intentos, abiertos, poner = cadena
+    codigo, dicho = poner("La Fuga Jaleo", cliente=None, scsearch1=True)
+    assert codigo == 0 and "en SoundCloud" in dicho[0] and intentos == ["ytsearch1", "scsearch1"]
+
+
+def test_por_ultimo_el_navegador_y_lo_dice(cadena):
+    intentos, abiertos, poner = cadena
+    codigo, dicho = poner("La Fuga Jaleo", cliente="mweb", enlace="https://www.youtube.com/watch?v=h5Cp_04sKDM")
+    assert codigo == 0 and abiertos == ["https://www.youtube.com/watch?v=h5Cp_04sKDM"]
+    assert "Te la he abierto en el navegador" in dicho[0] and "no puedo comprobar" in dicho[0] and "Sign in" in dicho[0]
+
+
+def test_sin_enlace_abre_la_busqueda_y_no_dice_que_suene(cadena):
+    intentos, abiertos, poner = cadena
+    codigo, dicho = poner("La Fuga Jaleo")
+    assert codigo == 1 and abiertos == ["https://www.youtube.com/results?search_query=La+Fuga+Jaleo"]
+    assert "elige tú la canción" in dicho[0] and "No suena nada" in dicho[0]
+
+
+def test_si_nada_funciona_lo_dice_y_pide_no_improvisar(cadena):
+    intentos, abiertos, poner = cadena
+    codigo, dicho = poner("La Fuga Jaleo", navegador=False)
+    assert codigo == 1 and "He probado YouTube, otro cliente de YouTube, SoundCloud y el navegador" in dicho[0] and "no lo intentes por otra vía" in dicho[0]
+
+
+def test_un_enlace_que_no_es_de_youtube_no_prueba_clientes_ni_soundcloud(cadena):
+    intentos, abiertos, poner = cadena
+    codigo, dicho = poner("https://ejemplo.test/cancion.mp3", cliente="mweb")
+    assert intentos == ["https"] and abiertos == ["https://ejemplo.test/cancion.mp3"] and codigo == 0
+
+
+def test_cliente_que_sirve_prueba_en_orden_sin_descargar(monkeypatch):
+    probados = []
+
+    def run(cmd, **k):
+        cliente = cmd[cmd.index("--extractor-args") + 1].split("=")[-1]
+        probados.append(cliente)
+        assert "--print" in cmd and "-o" not in cmd                         # solo comprueba: no descarga nada
+        return subprocess.CompletedProcess(cmd, 0 if cliente == "android_vr" else 1, "18\n" if cliente == "android_vr" else "", "ERROR")
+    monkeypatch.setattr(RP.subprocess, "run", run)
+    assert RP._cliente_que_sirve("/usr/bin/yt-dlp", "ytsearch1:x") == "android_vr" and probados == ["web_embedded", "mweb", "android_vr"]
+
+
+def test_ninguna_via_usa_cookies():
+    import inspect
+    assert "cookies" not in inspect.getsource(RP).replace("sin tus cookies", "")
 
 
 def test_poner_es_inocuo_y_persistente():

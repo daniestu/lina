@@ -1871,6 +1871,8 @@ class Ejecutor:
             return (f"No hay ningún programa INSTALADO que encaje con «{nombre}» (he mirado los lanzadores del sistema, de Flatpak y del usuario). "
                     "Ahora sí: búscalo por tu cuenta como siempre (¿lo oyó mal el reconocimiento de voz?, ¿es una web?, ¿hay que instalarlo?, "
                     "recuerda que instalar pide confirmación) sin inventar nombres de comandos.")
+        por_id = [h for h in hallados if str(h[1].get("id", "")) == nombre]
+        hallados = por_id or hallados                                 # abrir_app con el id exacto (el que le pedimos a la IA al haber varios) no vuelve a empatar
         top = hallados[0]
         siguientes = [p for p, _ in hallados[1:]]
         claro = ((top[0] == 100 and (not siguientes or siguientes[0] < 100)) or (top[0] >= 60 and not siguientes)

@@ -30,6 +30,8 @@ NOTIFICACION = {SIN_BUSQUEDA: (N_("Lina: sin búsqueda en internet"),
                 LIMITE_GASTO: (N_("Lina: Tavily ha llegado a su límite"),
                                N_("Has llegado al límite de gasto que pusiste en Tavily; puedes subirlo en el panel (app.tavily.com)"))}
 
+MIENTRAS_RESERVA = N_("Mientras tanto busco en DuckDuckGo.")
+
 _pendientes: set = set()        # lo apuntado en la petición en curso
 
 
@@ -75,8 +77,9 @@ def olvidar():
         pass
 
 
-def pendientes(modo, ahora=None):
-    """[(hablado, título, texto)] de lo que toca avisar ahora, y lo marca como avisado. Con `ninguna` no se avisa de que falta la búsqueda."""
+def pendientes(modo, ahora=None, reserva=False):
+    """[(hablado, título, texto)] de lo que toca avisar ahora, y lo marca como avisado. Con `ninguna` no se avisa de que falta la búsqueda. Con la
+    búsqueda de reserva activa, el límite de Tavily no se dice en voz alta (se sigue buscando): solo la notificación, que lo cuenta."""
     hechos, d, mes = [], _leer(), _mes(ahora)
     for motivo in sorted(_pendientes):
         if motivo == SIN_BUSQUEDA:
@@ -88,7 +91,10 @@ def pendientes(modo, ahora=None):
         else:
             d[motivo] = mes
         titulo, texto = NOTIFICACION[motivo]
-        hechos.append((T(HABLADO[motivo]), T(titulo), T(texto)))
+        if reserva and motivo != SIN_BUSQUEDA:
+            hechos.append(("", T(titulo), T(texto) + " " + T(MIENTRAS_RESERVA)))
+        else:
+            hechos.append((T(HABLADO[motivo]), T(titulo), T(texto)))
     _pendientes.clear()
     if hechos:
         _escribir(d)

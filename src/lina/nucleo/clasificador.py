@@ -84,6 +84,8 @@ _LECTURA_SENSIBLE = [
      "es un historial de la terminal y puede contener contraseñas que escribiste; lo que lea se enviará a la IA"),
     (_NAVEGADORES_CHROMIUM + r"[^;|&\n]*\bhistory\b",
      "es el historial de navegación (dice qué webs visitas); lo que lea se enviará a la IA"),
+    (r"\bjournalctl\b[^;|&\n]*(?:-u|--unit|--user-unit)[=\s]*['\"]?lina\b",
+     "es el registro de Lina y puede llevar tus preguntas anteriores; lo que lea se enviará a la IA"),
 ]
 
 

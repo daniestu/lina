@@ -103,6 +103,7 @@ ESQUEMA: dict = {
         "razonamiento": (False, "bool", None, N_("Solo con «openai»: true si el modelo es de razonamiento (o3, gpt-5…) y admite indicar cuánto pensar.")),
         "busqueda": ("tavily", "opcion", ("tavily", "google", "ninguna"), N_("Búsqueda en internet para lo que cambia (resultados, horarios, noticias, «ponme el partido»): "
                      "tavily (gratis, con tu clave: lina clave tavily), google (la de Gemini, solo con clave de pago) o ninguna (Lina responde con lo que sabe y no avisa de que falta).")),
+        "busqueda_reserva": (True, "bool", None, N_("true: si Tavily no responde o agota su cupo, busca en DuckDuckGo (sin clave). false: sin reserva.")),
         "tope_vram_mb": (4096, "int", (512, 65536), N_("Lo máximo de memoria de vídeo (MB) que Lina ocupa a la vez, contando Whisper. El modelo local de reserva (Ollama) solo "
                          "se carga si cabe dentro de este tope.")),
     },

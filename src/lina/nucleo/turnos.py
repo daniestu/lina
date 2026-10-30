@@ -48,6 +48,48 @@ HERRAMIENTAS_DE_INFORMAR = HERRAMIENTAS_META | {"buscar_web", "leer_web", "busca
                                                 "mis_ajustes", "ver_papelera", "usar_receta", "necesito_datos_actuales"}
 
 
+# Para la última red de honestidad vale cualquier orden de hacer algo, no solo las que tienen reintento: «sube», «borra», «cambia», «crea», «reinicia»…
+_HACER_ES = re.compile(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:sube|baja|borra|elimina|mueve|copia|crea|cambia|pausa|quita|silencia|reinicia|actualiza|"
+                       r"desinstala|guarda|renombra|escribe|envia|manda|configura|ajusta|ejecuta|limpia|vacia|minimiza|maximiza|suspende)(?:me|lo|la|los|las|le|melo|mela)?\b")
+_HACER_EN = re.compile(r"^(?:(?:hey|ok|please|can you|could you)\s+)*(?:raise|lower|delete|remove|move|copy|create|change|pause|mute|restart|update|uninstall|save|rename|write|send|"
+                       r"configure|adjust|run|clean|empty|minimize|maximize|close|stop)\b")
+
+
+def pide_hacer(texto):
+    """¿La frase pide hacer CUALQUIER cosa en el equipo (no saber algo)? Más amplio que pide_accion, para no dar nada por hecho sin que conste."""
+    from lina.nucleo import idioma as IDI
+    if pide_accion(texto):
+        return True
+    if "?" in str(texto) or "¿" in str(texto):
+        return False
+    return bool((_HACER_EN if IDI.actual() == "en" else _HACER_ES).match(C.normalizar(texto)))
+
+
+# Lo que devuelve una herramienta cuando NO ha hecho lo que se le pedía
+_NO_HECHO = re.compile(r"^(?:BLOQUEADO|PREPARADO|TOPE ALCANZADO|No |Falta |Hay varios|Intenté |La herramienta ha fallado|Error|código de salida: [1-9])")
+
+
+def sin_efecto(acciones, es_lectura):
+    """(True, motivo) si en esta petición NINGUNA acción consta como hecha: no se hizo nada, solo se leyó, o todo lo intentado falló (motivo: lo que dijo
+    la última que falló, o ""). (False, "") si alguna hizo algo: una herramienta que no dice que ha fallado cuenta como hecha."""
+    motivo = ""
+    for nombre, args, resultado in acciones or []:
+        if nombre in HERRAMIENTAS_DE_INFORMAR or (nombre == "ejecutar_comando" and es_lectura(str((args or {}).get("comando", "")))):
+            continue
+        if not _NO_HECHO.match(str(resultado)):
+            return False, ""
+        motivo = str(resultado)
+    return True, motivo
+
+
+def motivo_corto(texto, maximo=160):
+    """La primera frase de lo que dijo una herramienta, para decirla en voz alta."""
+    t = " ".join(str(texto).split())
+    t = re.sub(r"^código de salida: \d+ \([^)]*\)\s*", "", t)
+    primera = re.split(r"(?<=[.:;])\s", t, maxsplit=1)[0].rstrip(".:; ")
+    return primera[:maximo]
+
+
 def pide_accion(texto):
     """¿La frase pide hacer algo («ponme el partido», «abre Steam») y no solo saber algo («¿a qué hora es el partido?»)?"""
     from lina.nucleo import idioma as IDI
@@ -124,6 +166,33 @@ _PAGINA_DE_CONTENIDO = re.compile(r"(?:^|[/_-])(?:ficha|fixture|event|evento|eve
 _PAGINA_DE_GUIA = re.compile(r"(?:^|[/_-])(?:programacion(?:-tv)?|parrilla|guia(?:-tv)?|calendario|agenda|horarios?|schedule|tv-guide|fixtures|"
                              r"news|noticias?|blog|articulos?|articles?|comunicacion|prensa|tudum|collections?|colecciones|coleccion|browse|"
                              r"categor(?:y|ies|ia|ias))(?:[/_.-]|$)")
+
+
+def enlace_sin_comprobar(acciones, plataformas, es_lectura, pregunta=""):
+    """La última ficha de una plataforma de vídeo (Netflix, Movistar…) que se ha ABIERTO en esta petición sin que su identificador haya salido de ningún
+    resultado (una búsqueda, una página leída, la salida de un comando) ni de lo que dijiste: un número que la IA ha sacado de su memoria (o inventado).
+    Devuelve (dirección, dominio) o None."""
+    from urllib.parse import urlparse
+    abierta, quien = None, None
+    for i, (nombre, args, _) in enumerate(acciones or []):
+        if nombre in HERRAMIENTAS_DE_INFORMAR or nombre != "ejecutar_comando":
+            continue
+        comando = str((args or {}).get("comando", ""))
+        if es_lectura(comando) or re.search(r"\b(?:curl|wget|python3?|grep)\b", comando):
+            continue                                              # leer una página no es abrirla
+        for u in _URL.findall(comando):
+            u = u.strip("'\"")
+            dominio = next((d for d in plataformas if urlparse(u).netloc == d or urlparse(u).netloc.endswith("." + d)), None)
+            if dominio:
+                abierta, quien = (u, dominio), i
+    if not abierta:
+        return None
+    vistos = " ".join(str(r) for i, (_, _, r) in enumerate(acciones) if i != quien) + " " + str(pregunta)     # lo que devolvió abrirla no cuenta
+    ruta = urlparse(abierta[0]).path
+    ids = re.findall(r"\d{4,}", ruta) or [s for s in ruta.strip("/").split("/")[-1:] if len(s) >= 6]
+    if not ids or all(i in vistos for i in ids):
+        return None
+    return abierta
 
 
 def palabras_distintivas(texto):

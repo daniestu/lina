@@ -773,6 +773,11 @@ def _app_preferida(qj, resultado, apps):
     return next((a for a in apps if ident and str(a.get("id", "")) == ident), None)
 
 
+def _se_llama(app, consulta):
+    """¿El programa se LLAMA así (nombre o nombre en español), y no solo coincide con su comando o su id?"""
+    return consulta.replace(" ", "") in {normalizar(n).replace(" ", "") for n in (app["nombre"], app.get("es", "")) if n}
+
+
 def buscar_app(consulta, apps=None):
     """Los programas INSTALADOS que encajan con lo que se ha dicho, de más a menos parecido: [(puntos 0-100, app)]. Mira nombre, nombre en
     español, comando, id del lanzador, tipo de programa y palabras clave, y tolera que el reconocimiento de voz haya oído otra cosa que suena igual.
@@ -800,6 +805,8 @@ def buscar_app(consulta, apps=None):
             puntos = int(80 * sonido) if sonido >= UMBRAL_PARECIDO else 0
         if puntos >= 55:
             resultado.append((puntos, a))
+    if any(_se_llama(a, qj) for p, a in resultado if p == 100):        # «Steam» es Steam, no los juegos que se lanzan con el comando `steam`
+        resultado = [(min(p, 84) if not _se_llama(a, qj) else p, a) for p, a in resultado]
     resultado.sort(key=lambda x: (-x[0], len(x[1]["nombre"]), normalizar(x[1]["nombre"])))
     elegida = _app_preferida(qj, resultado, apps)
     if elegida is not None:                                             # la tuya sube a 100; las demás coincidencias («Avahi Zeroconf Browser») quedan por debajo

@@ -60,7 +60,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, pagina_que_no_es, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
+from lina.nucleo.turnos import HERRAMIENTAS_META, enlace_sin_comprobar, motivo_corto, pagina_que_no_es, pide_hacer, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -190,6 +190,7 @@ def prompt_whisper():
 
 
 TOPE_ATAJO_SEG = 60              # con fin por silencio: si el detector nunca corta (música, ruido), deja de escucharte a los 60 s
+MAX_REPETICIONES = 2             # la misma herramienta, con los mismos datos y el mismo resultado: a la tercera no se ejecuta y se termina el turno
 MARGEN_TRAS_CORTE = 1.0          # tras un corte por silencio, una pulsación en este margen era para terminar (ya terminó): no empieza otra escucha
 
 
@@ -454,10 +455,10 @@ def escuchar_mandos(al_pulsar):
 
 
 from lina.nucleo.ia import (  # noqa: F401
-    Cancelado, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
+    BucleDeHerramienta, Cancelado, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
-    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily,
+    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
     cabe_modelo_local, dominio_valido,
@@ -1661,6 +1662,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.pasos_receta = []
         self.receta_interfaz_pendiente = None
         self.ultima_tecla = None
+        self._repetida = None                             # (llamada, resultado, veces seguidas): para cortar los bucles
         self.ejecutor.nueva_tarea()
 
     def tope_de_tarea(self):
@@ -1689,6 +1691,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         tope = self.tope_de_tarea()
         if tope:
             return tope
+        repetida = getattr(self, "_repetida", None)
+        if repetida and repetida[0] == clave and repetida[2] >= MAX_REPETICIONES and "sleep" not in clave[1]:     # esperar a que algo cambie sí se puede repetir
+            raise BucleDeHerramienta(self._frase_de_no_hecho(repetida[1]))
         del self.guion_herramientas[self.paso_guion:]   # ya no coincide: se descarta lo que sobraba del intento anterior
         crono = getattr(self, "crono", None)
         with (crono.medir("herramientas") if crono else nullcontext()):
@@ -1700,6 +1705,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.acciones_turno.append((nombre, args, resultado))
         self.guion_herramientas.append((clave, resultado))
         self.paso_guion += 1
+        veces = repetida[2] + 1 if repetida and repetida[0] == clave and repetida[1] == resultado else 1
+        self._repetida = (clave, resultado, veces)
         return resultado
 
     def _ejecutar_herramienta(self, nombre, args):
@@ -1962,11 +1969,36 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     _NO_AJUSTE = re.compile(r"^(?:rm|mv|cp|mkdir|rmdir|touch|tee|echo|git|python3?|bash|sh|zsh|fish|systemctl|kill|pkill|killall|xdg-open|notify-send|"
                             r"sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|curl|wget|ln|chmod|chown|kdotool|xdotool|spectacle|grim|scrot|steam|kcmshell[56])$")
 
+    def _frase_de_no_hecho(self, motivo):
+        """«No lo he abierto: …» (o «No lo he hecho: …»), con el motivo que dio la herramienta, escrita por el código."""
+        abrir = re.match(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:abre|abreme|abrir)\b", C.normalizar(str(getattr(self, "pregunta_pura", "") or "")))
+        motivo = motivo_corto(motivo) or T("no he llegado a hacer nada")
+        return T("No lo he abierto: {motivo}.", motivo=motivo) if abrir else T("No lo he hecho: {motivo}.", motivo=motivo)
+
+    def _enlace_sin_comprobar(self):
+        try:
+            plataformas = sorted({d for ds in CONT.PLATAFORMAS.values() for d in ds})
+            return enlace_sin_comprobar(self.acciones_turno, plataformas, lambda c: H.clasificar(c)[0] == "lectura", getattr(self, "pregunta_pura", ""))
+        except Exception as e:
+            log(f"Comprobar la ficha abierta: fallo {e!r}")
+            return None
+
     def asegurar_honestidad_final(self, texto):
         """Última red: si el último cambio sigue SIN comprobarse (⚠, ✘ o error) y la respuesta lo da por hecho sin reconocer la duda,
         el código añade la corrección. No se confía en que la IA lo diga."""
         if self.ejecutor.pendientes or not afirma_hecho(texto) or admite_duda(texto):
             return texto
+        peticion = str(getattr(self, "pregunta_pura", "") or "")
+        if pide_hacer(peticion):
+            nada, motivo = sin_efecto(getattr(self, "acciones_turno", None), lambda c: H.clasificar(c)[0] == "lectura")
+            if nada:                                               # sin confirmación no hay éxito: pase lo que pase con el revisor, no consta que se hiciera
+                log(f"La respuesta da por hecho algo que no consta: se sustituye («{str(texto)[:80]}»)")
+                return self._frase_de_no_hecho(motivo)
+        inventada = self._enlace_sin_comprobar()
+        if inventada:
+            log(f"La respuesta da por buena una ficha que no salió de ninguna búsqueda ({inventada[0]}): se corrige")
+            return texto.rstrip() + " " + T("Ojo, corrijo: la ficha de {plataforma} que he abierto no ha salido de ninguna búsqueda; puede no ser lo que pediste.",
+                                            plataforma=CONT.NOMBRE_VISIBLE.get(inventada[1], inventada[1]))
         if self.ejecutor.duda:
             log("La respuesta daba por hecho algo sin comprobar: se corrige")
             return texto.rstrip() + " " + T("Ojo, corrijo: no he podido comprobar que eso funcione ({duda}); no lo des por hecho.", duda=self.ejecutor.duda_corta())
@@ -2036,10 +2068,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _dar_avisos_de_busqueda(self):
         """Falta la búsqueda (una vez) o Tavily llegó a su límite (una vez al mes): corto por voz, si no estás hablando tú, y el comando en una notificación."""
         dichos = set()
-        for hablado, titulo, texto in AVB.pendientes(AJ.actuales(log=lambda m: None).get("ia", "busqueda")):
+        for hablado, titulo, texto in AVB.pendientes(AJ.actuales(log=lambda m: None).get("ia", "busqueda"), reserva=hay_reserva()):
             log(f"Aviso de búsqueda: {texto}")
             H.notificar(titulo, texto)
-            if hablado not in dichos and not (self.sustituida or self.interrumpiendo):
+            if hablado and hablado not in dichos and not (self.sustituida or self.interrumpiendo):
                 dichos.add(hablado)
                 self.decir(hablado)
 
