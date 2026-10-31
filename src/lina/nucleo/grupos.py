@@ -157,10 +157,25 @@ def _re(nombre):
     return _REGEX[clave]
 
 
+# Preguntas sobre la propia Lina: qué puede hacer, cómo funciona, si se le puede dar o dejar algo. Con ellas no vale contestar de memoria (ver autoconocimiento.resumen).
+_SOBRE_MI = {"es": r"\b(como funcionas|como funciona (la aplicacion|la app|lina|esto por dentro)|por dentro|como estas hecha|que puedes hacer|que sabes hacer|eres capaz de|"
+                   r"te puedo (dar|dejar|pasar|poner|decir|ensenar|configurar)|puedo (dejarte|darte|pasarte|ponerte)|yo te (doy|dejo|paso)|"
+                   r"(hay|tienes) (alguna )?(forma|manera) de|se (te )?puede hacer que|puedes (usar|aprender|acceder|recordar))\b",
+             "en": r"\b(how do you work|how does (the app|lina) work|under the hood|what can you do|what do you know how to do|are you able to|"
+                   r"can i (give|leave|pass|tell|teach|set) you|i (give|leave|pass) you|is there (a|any) way|can you (use|learn|access|remember))\b"}
+
+
+def pregunta_por_mi(texto):
+    """¿Preguntan por la propia Lina: qué puede hacer, cómo funciona, si se le puede dejar algo?"""
+    return bool(re.search(IDI.segun(_SOBRE_MI), _plano(texto)))
+
+
 def elegir(pregunta, previos=(), de_recetas=()):
     """Los grupos para esta petición, como conjunto. `previos`: grupos usados en la anterior; `de_recetas`: grupos que piden las recetas ofrecidas."""
     t = _plano(pregunta)
     grupos = {g for g in GRUPOS if g in _PALABRAS and _re(g).search(t)}
+    if pregunta_por_mi(pregunta):
+        grupos.add("yo")
     grupos |= {g for g in de_recetas if g in GRUPOS}
     if not grupos:
         if previos and len(t.split()) <= PALABRAS_CORTO:        # «sí», «ahora desactívala»: se sigue con lo mismo (solo si nada más ha encajado)

@@ -9,11 +9,32 @@ La IA decide qué hacer con esto (nada de frases fijas). Este módulo solo le da
 """
 
 from lina.nucleo import ajustes as AJ
+from lina.nucleo import grupos as G
 from lina.nucleo import rutas as RUT
 
 CARPETA = RUT.PAQUETE / "datos" / "ayuda"
 # Lo que la IA nunca cambia por su cuenta: dinero y claves (los cambia el usuario con su voz o en la terminal)
 INTOCABLES = {("gasto", "tope_mensual_eur"), ("gasto", "eur_por_usd"), ("gasto", "avisos_porcentaje"), ("privacidad", "almacen_claves"), ("privacidad", "capturas")}
+
+
+# Lo que NO se puede sacar de las herramientas. Una prueba comprueba que lo que se nombra aquí existe y que cada límite sigue siendo verdad en el código.
+LIMITES = (
+    "Solo puedes hacer lo que permiten tus herramientas y comandos: si algo no está aquí ni en mis_ajustes, no existe.",
+    "No hay ningún sitio donde el usuario pueda dejarte páginas o fuentes fijas. Lo que sí hay: leer_web lee una dirección y, si tienes buscar_web, con «dominio» busca "
+    "dentro de una web, en la petición en que te la den.",
+    "De una conversación a otra solo recuerdas lo que el usuario apunta diciendo «recuerda que…» con el atajo; tú no escribes en esa memoria.",
+    "Lo crítico solo se confirma con el atajo: ni con «Oye Lina» ni con lina di.",
+    "No puedes tocar claves, el tope de gasto ni tus propios permisos, ni leer contraseñas o cookies, ni cambiar tu propio código.",
+)
+
+
+def resumen(con_busqueda=True):
+    """La ayuda reducida que se inyecta cuando preguntan por Lina: lo que puede hacer sale de las herramientas de verdad, para que no se quede obsoleta."""
+    siempre = (["buscar_web"] if con_busqueda else []) + list(G.NUCLEO)
+    grupos = "; ".join(f"{g} ({d})" for g, d in G.DESCRIPCION.items() if g in G.GRUPOS)
+    return ("PREGUNTAN POR TI. Di SOLO lo que consta aquí o en mis_ajustes (accion=ayuda; manuales con tema: " + ", ".join(manuales()) + "). Si no consta, di que no lo sabes o que "
+            "no se puede: no lo supongas, no prometas nada y no inventes dónde dejar algo. Tus herramientas de siempre: " + ", ".join(siempre) + ". Por grupos: " + grupos
+            + ". Límites: " + " ".join(LIMITES))
 
 
 def manuales():

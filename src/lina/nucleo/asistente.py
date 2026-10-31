@@ -29,6 +29,7 @@ from datetime import datetime
 from pathlib import Path
 
 from lina.nucleo import ajustes as AJ
+from lina.nucleo import autoconocimiento as AUTO
 from lina.nucleo import aviso_busqueda as AVB
 from lina.nucleo import canal as CANAL
 from lina.nucleo.registro import log
@@ -1132,6 +1133,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if pista:
             pregunta += f"\n[SISTEMA: {pista}]"
         pregunta_sin_receta = pregunta                            # en el historial NO entra la nota de recetas (se reenviaría en todos los turnos siguientes)
+        pregunta += self._nota_sobre_mi(self.pregunta_pura)
         if not imagen and not self.pedir_pantalla:
             pregunta += ("\n[SISTEMA: esta petición NO lleva captura de pantalla: no sabes lo que hay en ella (solo el título de la ventana). "
                          "Si lo que te piden depende de verla, usa ver_pantalla; sin imagen NUNCA describas lo que se ve.]")
@@ -1968,6 +1970,13 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     _VERBO_INICIAL_POR_IDIOMA = {"es": _VERBO_INICIAL, "en": _VERBO_INICIAL_EN}
     _NO_AJUSTE = re.compile(r"^(?:rm|mv|cp|mkdir|rmdir|touch|tee|echo|git|python3?|bash|sh|zsh|fish|systemctl|kill|pkill|killall|xdg-open|notify-send|"
                             r"sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|curl|wget|ln|chmod|chown|kdotool|xdotool|spectacle|grim|scrot|steam|kcmshell[56])$")
+
+    def _nota_sobre_mi(self, peticion):
+        """Si preguntan por la propia Lina, su ayuda reducida va con la petición (no entra en el historial): lo decide el código, no que la IA se acuerde de consultarla."""
+        if not G.pregunta_por_mi(peticion):
+            return ""
+        log("Preguntan por mí: paso a la IA lo que consta sobre lo que puedo hacer")
+        return f"\n[SISTEMA: {AUTO.resumen(bool(declaraciones_de_busqueda()) and hay_busqueda_tavily())}]"
 
     def _frase_de_no_hecho(self, motivo):
         """«No lo he abierto: …» (o «No lo he hecho: …»), con el motivo que dio la herramienta, escrita por el código."""
