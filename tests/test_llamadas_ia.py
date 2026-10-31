@@ -205,3 +205,42 @@ def test_el_resumen_separa_por_motivo_y_las_lineas_antiguas_no_rompen(tmp_path):
     salida = []
     TIE.principal_ia([], salida.append, a, HOY, precio=lambda *x: 0.0)
     assert any("por motivo: normal 3 (20400 tokens) · reintento 2 (13600 tokens) · sin_motivo 1 (100 tokens)" in t for t in salida)
+
+
+# ---------------------------------------------------------------- las llamadas de `lina fuentes medir` no cuentan para el criterio
+def _uso(motivo, cache, n, repite=30, ent=6000):
+    return [TIE.registro_llamada("m", "ok", 1.0, {"promptTokenCount": ent, "cachedContentTokenCount": cache}, pref=24000, conv=500, huella="ab", repite=repite, hoy=HOY, motivo=motivo)
+            for _ in range(n)]
+
+
+def test_la_medida_no_cambia_el_porcentaje_de_cache_ni_la_decision():
+    real = _uso("normal", 500, 60)                                              # con el uso real, la caché va mal
+    solo_real, con_medida = TIE.resumir_ia(real)[0], TIE.resumir_ia(real + _uso("medida", 5500, 363))[0]
+    assert con_medida["decide_cache"] == solo_real["decide_cache"] == "arreglar"     # con las 363 de medida dentro saldría «bien»
+    for campo in ("n", "cache_total", "cache_repetidas", "ent_mediana", "principio", "motivos", "decide_tamano"):
+        assert con_medida[campo] == solo_real[campo], campo
+    assert con_medida["medida"] == 363 and "medida" not in con_medida["motivos"]
+
+
+def test_la_medida_no_llega_sola_al_minimo_para_decidir():
+    [m] = TIE.resumir_ia(_uso("normal", 500, 10) + _uso("medida", 500, 363))
+    assert m["n"] == 10 and m["decide_cache"] is None and m["decide_tamano"] is None
+
+
+def test_la_medida_se_muestra_aparte(tmp_path):
+    a = tmp_path / "l.jsonl"
+    for r in _uso("normal", 500, 3) + _uso("medida", 500, 2):
+        TIE.apuntar_llamada(r, a)
+    salida = []
+    TIE.principal_ia([], salida.append, a, HOY, precio=lambda *x: 0.0)
+    assert any("m: 3 llamadas" in t for t in salida) and any("aparte: 2 llamadas de medida" in t for t in salida)
+
+
+def test_un_modelo_con_solo_medida_no_rompe_ni_decide(tmp_path):
+    a = tmp_path / "l.jsonl"
+    for r in _uso("medida", 500, 4):
+        TIE.apuntar_llamada(r, a)
+    assert TIE.resumir_ia(TIE.leer_llamadas(a, 30, HOY)) == [{"modelo": "m", "n": 0, "medida": 4}]
+    salida = []
+    assert TIE.principal_ia([], salida.append, a, HOY, precio=lambda *x: 0.0) == 0
+    assert any("solo 4 llamadas de medida" in t for t in salida)

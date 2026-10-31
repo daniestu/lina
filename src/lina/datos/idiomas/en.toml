@@ -1002,3 +1002,5 @@
 "Esta medida necesita Gemini con su clave gratuita." = "This measurement needs Gemini with its free key."
 "Uso:  lina fuentes medir [--lanzar]" = "Usage:  lina fuentes medir [--lanzar]"
 "Tanda: {f} frases × {r} = {t} llamadas al modelo ligero con la clave gratuita, sin ejecutar nada. Hechas: {h}. Para lanzarla:  lina fuentes medir --lanzar" = "Set: {f} phrases × {r} = {t} calls to the light model with the free key, without running anything. Done: {h}. To launch it:  lina fuentes medir --lanzar"
+"solo {n} llamadas de medida, que no cuentan para decidir" = "only {n} measurement calls, which don't count for deciding"
+"aparte: {n} llamadas de medida, que no cuentan para decidir" = "apart: {n} measurement calls, which don't count for deciding"

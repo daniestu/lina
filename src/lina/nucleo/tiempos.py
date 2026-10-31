@@ -40,6 +40,7 @@ CAMPOS_LLAMADA = ("dia", "modelo", "res", "seg", "ent", "cache", "sal", "raz", "
 MOTIVOS = ("normal", "a_fondo", "hechos", "reintento", "pantalla", "comprobacion", "consulta", "resumen", "medida", "otro")
 REPITE_SEG = 300                     # el mismo principio en menos de esto: la caché debería aprovecharlo
 DIAS_IA = 30
+MOTIVO_APARTE = "medida"             # no es uso real: se enseña aparte y no cuenta para el criterio de V4
 MIN_LLAMADAS_CACHE = 50              # criterio de V4 (escrito antes de medir)
 MIN_LLAMADAS_TAMANO = 100
 UMBRAL_CACHE = 0.30
@@ -357,7 +358,12 @@ def resumir_ia(registros, precio=None):
         if r.get("res") == "ok" and isinstance(r.get("ent"), int) and r["ent"] > 0:
             por.setdefault(r.get("modelo", "?"), []).append(r)
     out = []
-    for modelo, rs in sorted(por.items(), key=lambda x: -len(x[1])):
+    for modelo, todas in sorted(por.items(), key=lambda x: -len(x[1])):
+        rs = [r for r in todas if r.get("motivo") != MOTIVO_APARTE]      # `lina fuentes medir`: cientos de llamadas seguidas con el mismo principio falsearían la caché y el tamaño
+        medida = len(todas) - len(rs)
+        if not rs:
+            out.append({"modelo": modelo, "n": 0, "medida": medida})
+            continue
         n = len(rs)
         rep = [r for r in rs if "repite" in r]
         nuevas = [r for r in rs if "repite" not in r]
@@ -390,11 +396,11 @@ def resumir_ia(registros, precio=None):
             caro = parte_entrada is not None and parte_entrada > UMBRAL_PARTE_ENTRADA
             decide_tamano = "aligerar" if lento or caro else "no tocar"
         motivos = {}
-        for r in rs:
+        for r in rs:                                                     # la medida no entra aquí: va aparte, en «medida»
             m = motivos.setdefault(r.get("motivo", "sin_motivo"), [0, 0])
             m[0] += 1
             m[1] += r["ent"]
-        out.append({"modelo": modelo, "n": n, "motivos": motivos, "con_cache": len(con), "cache_total": parte_cache(rs), "repetidas": len(rep), "cache_repetidas": cache_rep,
+        out.append({"modelo": modelo, "n": n, "medida": medida, "motivos": motivos, "con_cache": len(con), "cache_total": parte_cache(rs), "repetidas": len(rep), "cache_repetidas": cache_rep,
                     "nuevas": len(nuevas), "cache_nuevas": parte_cache(nuevas), "ent_mediana": statistics.median([r["ent"] for r in rs]),
                     "principio": principio, "tok_por_car": tok_por_car,
                     "seg_con": statistics.median([r["seg"] for r in con]) if con else None, "seg_sin": statistics.median([r["seg"] for r in sin]) if sin else None,
@@ -436,8 +442,13 @@ def principal_ia(argv, salida=print, archivo=None, hoy=None, precio=None):
         return 0
     salida(T("Llamadas a la IA, últimos {d} días (solo las que respondieron):", d=dias))
     for m in modelos:
+        if not m["n"]:
+            salida(f"  {m['modelo']}: " + T("solo {n} llamadas de medida, que no cuentan para decidir", n=m["medida"]))
+            continue
         salida(f"  {m['modelo']}: " + T("{n} llamadas · entrada mediana {ent} tokens · principio fijo ~{p} tokens ({c} tokens por carácter)",
                                        n=m["n"], ent=round(m["ent_mediana"]), p=round(m["principio"]), c=f"{m['tok_por_car']:.2f}".replace(".", ",")))
+        if m["medida"]:
+            salida("    " + T("aparte: {n} llamadas de medida, que no cuentan para decidir", n=m["medida"]))
         salida("    " + T("por motivo: {detalle}", detalle=" · ".join(f"{k} {v[0]} ({v[1]} tokens)" for k, v in sorted(m["motivos"].items(), key=lambda x: -x[1][1]))))
         salida("    " + T("caché: {con} llamadas la usaron · desde la caché {total} de los tokens de entrada", con=m["con_cache"], total=_pct(m["cache_total"])))
         salida("    " + T("    con el mismo principio en menos de 5 min: {n} llamadas, {pc} desde la caché", n=m["repetidas"], pc=_pct(m["cache_repetidas"])))
