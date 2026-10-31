@@ -33,7 +33,7 @@ With the **free** key, according to Google's current terms, what is sent may be 
 | Learned recipes (what you already asked me that went well: the phrase, the steps and how it was checked; never passwords) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` or `lina recetas borrar todas` |
 | Timings of each request (numbers only, never what you say; `lina tiempos` summarises them) | `~/.local/state/lina/tiempos.jsonl` (trims itself at ~200 KB) | `lina olvidar tiempos` |
 | How each shortcut listen ended (by silence, by your press…), with the day without the time and timings; never audio or text (`lina tiempos escucha`) | `~/.local/state/lina/escuchas.jsonl` (last 5000) | `lina olvidar tiempos` |
-| Tokens and duration of each AI call, with the model, the day without the time and a fingerprint of the fixed prefix (to know whether the cache is used); never what you ask or what it answers (`lina tiempos ia`) | `~/.local/state/lina/llamadas_ia.jsonl` (last 5000) | `lina olvidar tiempos` |
+| Tokens and duration of each AI call, with the model, its reason (normal, retry…), the day without the time and a fingerprint of the fixed prefix (to know whether the cache is used); never what you ask or what it answers (`lina tiempos ia`) | `~/.local/state/lina/llamadas_ia.jsonl` (last 5000) | `lina olvidar tiempos` |
 | System log (what you say and I answer, unless you turn it off) | `journalctl --user -u lina` | `lina olvidar registro` |
 
 So that what you say and I answer doesn't stay in the log: `lina config poner privacidad.registrar_preguntas false`.
@@ -50,3 +50,5 @@ lina privacidad no       never screenshots
 The AI can't change this decision on its own: you make it. If you left it on «preguntar» and, for what you ask, Lina needs to see your screen, she will ask you
 (explaining that the screenshot goes to Google) and it only turns on if you confirm by pressing the shortcut; hands-free voice doesn't count. If you said «no», she
 doesn't insist: only you change it, in a terminal.
+
+What just happened (your phrase, the tools used with their result and the answer of the last 4 requests) is kept in memory only for 15 minutes, to answer you if you ask what occurred, and it is then sent to the AI. In **private mode** none of this is kept, and turning it on deletes whatever there was.

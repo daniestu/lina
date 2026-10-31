@@ -7,6 +7,7 @@ from lina.nucleo import herramientas as H
 from lina.nucleo import ia_activa as IAC
 from lina.nucleo.constantes import NO_VE_PANTALLA
 from lina.nucleo.constantes import PANTALLA_SESION_SEG
+from lina.nucleo.ia import motivo_llamada
 from lina.nucleo.ia import nivel_razonamiento
 from lina.nucleo.ia import parece_promesa
 from lina.nucleo.registro import log
@@ -206,8 +207,9 @@ class MixinPantalla:
         grupo = "profundo" if modo == "profundo" else "rapido"
         for m in IAC.modelos("profundo" if modo == "profundo" else "rapido"):
             self.paso_guion = 0
-            r = self._gemini(grupo, m, pregunta + nota, self.captura_guardada, self.historial, herramientas=herr, ejecutar_herramienta=self.ejecutar_herramienta,
-                             sistema=sistema, nivel=nivel_razonamiento(m, modo), revisor=self.revisar_respuesta)
+            with motivo_llamada("pantalla"):
+                r = self._gemini(grupo, m, pregunta + nota, self.captura_guardada, self.historial, herramientas=herr, ejecutar_herramienta=self.ejecutar_herramienta,
+                                 sistema=sistema, nivel=nivel_razonamiento(m, modo), revisor=self.revisar_respuesta)
             if r and not parece_promesa(r):
                 self.pantalla_adjunta, self.ultima_pantalla_t = True, time.time()
                 return r, f"{m} (con la captura)"

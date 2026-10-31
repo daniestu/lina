@@ -943,3 +943,4 @@
 "no he llegado a hacer nada" = "I didn't get to do anything"
 "No lo he abierto: {motivo}." = "I haven't opened it: {motivo}."
 "No lo he hecho: {motivo}." = "I haven't done it: {motivo}."
+"por motivo: {detalle}" = "by reason: {detalle}"

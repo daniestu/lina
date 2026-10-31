@@ -162,3 +162,46 @@ def test_lina_tiempos_ia(tmp_path):
     assert "Tamaño: hacen falta al menos 100 llamadas" in texto and "lina olvidar tiempos" in texto
     for malo in ("x", "0", "400"):
         assert TIE.principal(["ia", malo], salida.append) == 2
+
+
+# ---------------------------------------------------------------- el motivo de cada llamada
+def test_cada_llamada_apunta_su_motivo_de_una_lista_cerrada(archivo):
+    p = Proveedor(PROV.Respuesta(uso=USO))
+    IA._turno_medido(p, "c", "m", SISTEMA, MENSAJES)
+    with IA.motivo_llamada("reintento"):
+        IA._turno_medido(p, "c", "m", SISTEMA, MENSAJES)
+        with IA.motivo_llamada("pantalla"):
+            IA._turno_medido(p, "c", "m", SISTEMA, MENSAJES)
+        IA._turno_medido(p, "c", "m", SISTEMA, MENSAJES)
+    with IA.motivo_llamada("lo que dijo el usuario"):
+        IA._turno_medido(p, "c", "m", SISTEMA, MENSAJES)
+    assert [r["motivo"] for r in _lineas(archivo)] == ["normal", "reintento", "pantalla", "reintento", "otro"]
+    assert all(r["motivo"] in TIE.MOTIVOS for r in _lineas(archivo))
+
+
+@pytest.mark.parametrize("etiqueta, motivo", [("si se cumplió lo pedido", "comprobacion"), ("resumir la página", "resumen"), ("mirar la pantalla", "pantalla"), ("qué quiere ver", "consulta")])
+def test_las_consultas_cortas_dicen_el_suyo_aunque_vayan_dentro_de_un_reintento(archivo, etiqueta, motivo):
+    with IA.motivo_llamada("reintento"):
+        IA._pedir_corto(Proveedor(PROV.Respuesta(uso=USO)), "c", "m", "s", MENSAJES, etiqueta, intentos=1, timeout=1)
+    assert _lineas(archivo)[0]["motivo"] == motivo
+
+
+def test_un_fallo_dentro_del_bloque_no_deja_el_motivo_puesto(archivo):
+    with pytest.raises(ValueError):
+        with IA.motivo_llamada("reintento"):
+            raise ValueError
+    assert IA._motivo_actual.get() == "normal"
+
+
+def test_el_resumen_separa_por_motivo_y_las_lineas_antiguas_no_rompen(tmp_path):
+    a = tmp_path / "l.jsonl"
+    for motivo, n in (("normal", 3), ("reintento", 2)):
+        for _ in range(n):
+            TIE.apuntar_llamada(TIE.registro_llamada("m", "ok", 1.0, USO, pref=100, conv=10, huella="ab", hoy=HOY, motivo=motivo), a)
+    with open(a, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"dia": HOY.isoformat(), "modelo": "m", "res": "ok", "seg": 1.0, "ent": 100, "pref": 10, "conv": 1}) + "\n")
+    [m] = TIE.resumir_ia(TIE.leer_llamadas(a, 30, HOY))
+    assert m["motivos"] == {"normal": [3, 20400], "reintento": [2, 13600], "sin_motivo": [1, 100]}
+    salida = []
+    TIE.principal_ia([], salida.append, a, HOY, precio=lambda *x: 0.0)
+    assert any("por motivo: normal 3 (20400 tokens) · reintento 2 (13600 tokens) · sin_motivo 1 (100 tokens)" in t for t in salida)

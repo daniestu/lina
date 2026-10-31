@@ -33,7 +33,7 @@ Con la clave **gratuita**, según las condiciones de Google vigentes, lo que se 
 | Recetas aprendidas (lo que ya me pediste y salió bien: la frase, los pasos y cómo se comprobó; nunca contraseñas) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` o `lina recetas borrar todas` |
 | Tiempos de cada petición (solo números, nunca lo que dices; `lina tiempos` los resume) | `~/.local/state/lina/tiempos.jsonl` (se recorta solo al llegar a ~200 KB) | `lina olvidar tiempos` |
 | Cómo termina cada escucha del atajo (por silencio, por tu pulsación…), con el día sin hora y tiempos; nunca audio ni texto (`lina tiempos escucha`) | `~/.local/state/lina/escuchas.jsonl` (últimas 5000) | `lina olvidar tiempos` |
-| Tokens y duración de cada llamada a la IA, con el modelo, el día sin hora y una huella del principio fijo (para saber si la caché se aprovecha); nunca lo que preguntas ni lo que contesta (`lina tiempos ia`) | `~/.local/state/lina/llamadas_ia.jsonl` (últimas 5000) | `lina olvidar tiempos` |
+| Tokens y duración de cada llamada a la IA, con el modelo, su motivo (normal, reintento…), el día sin hora y una huella del principio fijo (para saber si la caché se aprovecha); nunca lo que preguntas ni lo que contesta (`lina tiempos ia`) | `~/.local/state/lina/llamadas_ia.jsonl` (últimas 5000) | `lina olvidar tiempos` |
 | Registro del sistema (lo que dices y contesto, si no lo desactivas) | `journalctl --user -u lina` | `lina olvidar registro` |
 
 Para que lo que dices y contesto no quede en el registro: `lina config poner privacidad.registrar_preguntas false`.
@@ -50,3 +50,5 @@ lina privacidad no       nunca capturas
 La IA no puede cambiar esta decisión sola: la tomas tú. Si dejaste «preguntar» y para lo que le pides Lina necesita ver tu pantalla, te lo pedirá ella
 (explicando que la captura va a Google) y solo se activa si lo confirmas pulsando el atajo; con la voz de manos libres no vale. Si dijiste «no», no
 insiste: solo lo cambias tú en una terminal.
+
+Lo que acaba de pasar (tu frase, las herramientas usadas con su resultado y la respuesta de las últimas 4 peticiones) se guarda solo en memoria durante 15 minutos, para contestarte si preguntas qué ha ocurrido, y entonces se envía a la IA. En **modo privado** no se guarda nada de esto, y al activarlo se borra lo que hubiera.

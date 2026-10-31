@@ -35,7 +35,9 @@ DIAS_ESCUCHA = 14
 
 ARCHIVO_LLAMADAS = RUT.ESTADO / "llamadas_ia.jsonl"
 MAX_LINEAS_LLAMADAS = 5000
-CAMPOS_LLAMADA = ("dia", "modelo", "res", "seg", "ent", "cache", "sal", "raz", "pref", "conv", "huella", "repite", "pago")
+CAMPOS_LLAMADA = ("dia", "modelo", "res", "seg", "ent", "cache", "sal", "raz", "pref", "conv", "huella", "repite", "pago", "motivo")
+# Por qué se llamó a la IA, de esta lista y nada más: separa los reintentos de las llamadas normales al mirar la caché y el coste.
+MOTIVOS = ("normal", "a_fondo", "hechos", "reintento", "pantalla", "comprobacion", "consulta", "resumen", "otro")
 REPITE_SEG = 300                     # el mismo principio en menos de esto: la caché debería aprovecharlo
 DIAS_IA = 30
 MIN_LLAMADAS_CACHE = 50              # criterio de V4 (escrito antes de medir)
@@ -301,7 +303,7 @@ def principal_escucha(argv, salida=print, archivo=None, hoy=None):
 
 
 # ======================= llamadas a la IA y caché (V4a) =======================
-def registro_llamada(modelo, res, seg, uso=None, pref=0, conv=0, huella="", repite=None, pago=False, hoy=None):
+def registro_llamada(modelo, res, seg, uso=None, pref=0, conv=0, huella="", repite=None, pago=False, hoy=None, motivo="normal"):
     """La línea de una llamada: el modelo, cómo acabó y números. Nunca texto de la petición ni de las instrucciones (de ellas, solo el tamaño y la huella)."""
     uso = uso if isinstance(uso, dict) else {}
 
@@ -309,7 +311,7 @@ def registro_llamada(modelo, res, seg, uso=None, pref=0, conv=0, huella="", repi
         v = uso.get(k)
         return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
     reg = {"dia": (hoy or datetime.date.today()).isoformat(), "modelo": str(modelo)[:60], "res": str(res)[:12], "seg": round(float(seg), 3),
-           "pref": int(pref), "conv": int(conv), "huella": str(huella)[:8], "pago": bool(pago)}
+           "pref": int(pref), "conv": int(conv), "huella": str(huella)[:8], "pago": bool(pago), "motivo": motivo if motivo in MOTIVOS else "otro"}
     for campo, k in (("ent", "promptTokenCount"), ("cache", "cachedContentTokenCount"), ("sal", "candidatesTokenCount"), ("raz", "thoughtsTokenCount")):
         if entero(k) is not None:
             reg[campo] = entero(k)
@@ -387,7 +389,12 @@ def resumir_ia(registros, precio=None):
             lento = principio > UMBRAL_PRINCIPIO_TOKENS and dif is not None and dif >= UMBRAL_DIFERENCIA_SEG
             caro = parte_entrada is not None and parte_entrada > UMBRAL_PARTE_ENTRADA
             decide_tamano = "aligerar" if lento or caro else "no tocar"
-        out.append({"modelo": modelo, "n": n, "con_cache": len(con), "cache_total": parte_cache(rs), "repetidas": len(rep), "cache_repetidas": cache_rep,
+        motivos = {}
+        for r in rs:
+            m = motivos.setdefault(r.get("motivo", "sin_motivo"), [0, 0])
+            m[0] += 1
+            m[1] += r["ent"]
+        out.append({"modelo": modelo, "n": n, "motivos": motivos, "con_cache": len(con), "cache_total": parte_cache(rs), "repetidas": len(rep), "cache_repetidas": cache_rep,
                     "nuevas": len(nuevas), "cache_nuevas": parte_cache(nuevas), "ent_mediana": statistics.median([r["ent"] for r in rs]),
                     "principio": principio, "tok_por_car": tok_por_car,
                     "seg_con": statistics.median([r["seg"] for r in con]) if con else None, "seg_sin": statistics.median([r["seg"] for r in sin]) if sin else None,
@@ -431,6 +438,7 @@ def principal_ia(argv, salida=print, archivo=None, hoy=None, precio=None):
     for m in modelos:
         salida(f"  {m['modelo']}: " + T("{n} llamadas · entrada mediana {ent} tokens · principio fijo ~{p} tokens ({c} tokens por carácter)",
                                        n=m["n"], ent=round(m["ent_mediana"]), p=round(m["principio"]), c=f"{m['tok_por_car']:.2f}".replace(".", ",")))
+        salida("    " + T("por motivo: {detalle}", detalle=" · ".join(f"{k} {v[0]} ({v[1]} tokens)" for k, v in sorted(m["motivos"].items(), key=lambda x: -x[1][1]))))
         salida("    " + T("caché: {con} llamadas la usaron · desde la caché {total} de los tokens de entrada", con=m["con_cache"], total=_pct(m["cache_total"])))
         salida("    " + T("    con el mismo principio en menos de 5 min: {n} llamadas, {pc} desde la caché", n=m["repetidas"], pc=_pct(m["cache_repetidas"])))
         salida("    " + T("    con un principio nuevo: {n} llamadas, {pc} desde la caché", n=m["nuevas"], pc=_pct(m["cache_nuevas"])))

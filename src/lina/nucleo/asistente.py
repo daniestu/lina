@@ -458,7 +458,7 @@ def escuchar_mandos(al_pulsar):
 
 
 from lina.nucleo.ia import (  # noqa: F401
-    BucleDeHerramienta, Cancelado, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
+    BucleDeHerramienta, Cancelado, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva,
@@ -951,6 +951,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _poner_modo_privado(self, activo):
         """Activa o quita el modo privado y lo recuerda en disco (aunque Lina se reinicie)."""
         self.modo_privado = activo
+        if activo:
+            self.hechos_recientes = []                     # en privado no se conserva lo que ha pasado, ni lo de antes
         try:
             if activo:
                 ARCHIVO_PRIVADO.parent.mkdir(parents=True, exist_ok=True)
@@ -1185,7 +1187,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.crono = crono                                         # las herramientas suman aquí su tiempo
         t_ia = crono.reloj()
         try:
-            respuesta, origen = self.responder(pregunta, imagen, modo)
+            with motivo_llamada("hechos" if hechos else "a_fondo" if modo == "profundo" else "normal"):
+                respuesta, origen = self.responder(pregunta, imagen, modo)
         finally:
             self.crono = None
             crono.llamadas = recoger_llamadas()
@@ -1573,7 +1576,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.ultima_pregunta = time.time()
 
     def _apuntar_hechos(self, peticion, respuesta, hechos=None):
-        """Lo que consta que pasó en esta petición, para cuando preguntes por ello. Solo en memoria y solo las últimas: nunca estorba a la respuesta."""
+        """Lo que consta que pasó en esta petición, para cuando preguntes por ello. Solo en memoria, solo las últimas y nada en modo privado: nunca estorba a la respuesta."""
+        if self.modo_privado:
+            return
         try:
             if hechos is None:
                 hechos = hechos_de_peticion(getattr(self, "acciones_turno", None), lambda c: H.clasificar(c)[0] == "lectura", peticion)
@@ -1584,7 +1589,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _hechos_al_caso(self):
         """Lo que consta de las últimas peticiones, si esta pregunta va de lo que pasó; si no, []."""
-        if not pregunta_por_lo_anterior(getattr(self, "pregunta_pura", "")):
+        if self.modo_privado or not pregunta_por_lo_anterior(getattr(self, "pregunta_pura", "")):
             return []
         return [r for r in self.hechos_recientes if time.time() - r["t"] < HECHOS_VALEN_SEG]
 
@@ -2271,7 +2276,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             grupo = "rapido" if rapido else "profundo"
             for m in IAC.modelos(grupo):
                 self.paso_guion = 0
-                r = self._gemini(grupo, m, pregunta + nota, imagen, self.historial, herramientas=herramientas,
+                with motivo_llamada("reintento"):
+                    r = self._gemini(grupo, m, pregunta + nota, imagen, self.historial, herramientas=herramientas,
                                      ejecutar_herramienta=self.ejecutar_herramienta, sistema=sistema,
                                      nivel=nivel_razonamiento(m, grupo), revisor=self.revisar_respuesta, max_pasos=MAX_PASOS_PROFUNDO,
                                      esperar_cuota=True, timeout=timeout_insistir, plazo=plazo,
@@ -2320,8 +2326,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             nueva = None
             for m in IAC.modelos("rapido"):
                 self.paso_guion = 0
-                nueva = self._gemini("rapido", m, pregunta + nota, imagen, self.historial, herramientas=herramientas, ejecutar_herramienta=self.ejecutar_herramienta,
-                                     sistema=sistema, nivel=nivel_razonamiento(m, "rapido"), revisor=self.revisar_respuesta, timeout=TIMEOUT_INSISTIR_SIN_AJUSTES)
+                with motivo_llamada("reintento"):
+                    nueva = self._gemini("rapido", m, pregunta + nota, imagen, self.historial, herramientas=herramientas, ejecutar_herramienta=self.ejecutar_herramienta,
+                                         sistema=sistema, nivel=nivel_razonamiento(m, "rapido"), revisor=self.revisar_respuesta, timeout=TIMEOUT_INSISTIR_SIN_AJUSTES)
                 if nueva:
                     break
             if not nueva:
@@ -2339,7 +2346,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 "usuario, con cosas concretas, y sin prometer que lo vas a pensar ni llamar a nada más para ello.]")
         for m in IAC.modelos("rapido"):
             self.paso_guion = 0
-            r = self._gemini("rapido", m, pregunta + nota, imagen, self.historial, herramientas=herr, ejecutar_herramienta=self.ejecutar_herramienta,
+            with motivo_llamada("reintento"):
+                r = self._gemini("rapido", m, pregunta + nota, imagen, self.historial, herramientas=herr, ejecutar_herramienta=self.ejecutar_herramienta,
                                  sistema=sistema, nivel=nivel_razonamiento(m, "rapido"), revisor=self.revisar_respuesta)
             if r and not parece_promesa(r):
                 log(f"El modelo a fondo no respondió: contesto con {m}")

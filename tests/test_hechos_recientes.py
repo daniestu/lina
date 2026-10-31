@@ -103,3 +103,30 @@ def test_se_elige_el_modelo_a_fondo_y_la_nota_no_entra_en_el_historial():
     f = inspect.getsource(A.Asistente._atender)
     assert '"profundo", "preguntas por lo que ha pasado"' in f
     assert f.index("pregunta_sin_receta = pregunta") < f.index("nota_de_hechos(hechos)")
+
+
+# ---------------------------------------------------------------- correcciones tras el primer uso real
+@pytest.mark.parametrize("frase", ["Entonces si yo te pido alguna receta, tú miras en esa fuente y me dices cuál es.", "Entonces no quiero nada más."])
+def test_entonces_al_hablar_de_otra_cosa_no_es_preguntar_por_lo_anterior(frase):
+    assert not TU.pregunta_por_lo_anterior(frase)
+
+
+@pytest.mark.parametrize("frase", ["Entonces sí funcionó", "Entonces no ha servido de nada", "Entonces es que no lo abriste"])
+def test_entonces_sobre_lo_que_paso_si(frase):
+    assert TU.pregunta_por_lo_anterior(frase)
+
+
+def test_el_modo_privado_no_apunta_hechos_ni_los_da_y_borra_los_que_habia(a, tmp_path, monkeypatch):
+    from lina.nucleo import asistente as A
+    monkeypatch.setattr(A, "ARCHIVO_PRIVADO", tmp_path / "privado")
+    a.acciones_turno = PRIMERA
+    a._apuntar_hechos("Ábreme Steam.", "Abierto.")
+    a.pregunta_pura = "¿Qué ha pasado?"
+    assert a._hechos_al_caso()
+    a._poner_modo_privado(True)
+    assert a.hechos_recientes == [] and a._hechos_al_caso() == []
+    a._apuntar_hechos("Ábreme Steam.", "Abierto.")
+    assert a.hechos_recientes == []
+    a._poner_modo_privado(False)
+    a._apuntar_hechos("Ábreme Steam.", "Abierto.")
+    assert len(a.hechos_recientes) == 1

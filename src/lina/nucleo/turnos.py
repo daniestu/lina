@@ -91,7 +91,7 @@ def motivo_corto(texto, maximo=160):
 
 
 # Preguntas sobre lo que acaba de pasar, o afirmaciones que buscan tu acuerdo («…, ¿no?»): ahí no vale contestar de memoria ni dar la razón.
-_LO_ANTERIOR_ES = re.compile(r"\b(?:por que (?:ha|has|habia|habias|no|fallo|te|se)\b|que (?:ha|habia) pasado|que paso\b|que ha fallado|como es que|o sea que|entonces (?:si|no|es que)\b|"
+_LO_ANTERIOR_ES = re.compile(r"\b(?:por que (?:ha|has|habia|habias|no|fallo|te|se)\b|que (?:ha|habia) pasado|que paso\b|que ha fallado|como es que|o sea que|entonces es que\b|entonces (?:si|no) (?:que )?(?:funciono|ha|has|habia|fue|estaba)\b|"
                              r"lo has (?:hecho|abierto|puesto|cerrado|conseguido)|ha funcionado|funciono\b|seguro que)")
 _LO_ANTERIOR_EN = re.compile(r"\b(?:why (?:did|didn t|has|hasn t|was|wasn t)\b|what happened|what went wrong|so (?:it|you)\b|did (?:it|you) (?:work|open|do|manage)|are you sure)")
 _BUSCA_ACUERDO = re.compile(r"\b(?:no|verdad|cierto|right|correct)\s*\?\s*$", re.I)

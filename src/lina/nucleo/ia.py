@@ -2,11 +2,13 @@
 # Copyright (C) 2026 Lina contributors
 """Hablar con la IA: Gemini (con reintentos, pausas por cuota y topes de gasto), el modelo local de Ollama, la búsqueda web y las
 mini-consultas que entienden si dices «sí» o interrumpes. Aquí no hay nada de audio ni de ejecución de herramientas."""
+import contextvars
 import hashlib
 import json
 import re
 import threading
 import time
+from contextlib import contextmanager
 from urllib.parse import urlparse
 
 import requests
@@ -359,6 +361,19 @@ def _turno_medido(proveedor, clave, modelo, *args, **kwargs):
     return r
 
 
+_motivo_actual: contextvars.ContextVar = contextvars.ContextVar("motivo_llamada", default="normal")
+
+
+@contextmanager
+def motivo_llamada(motivo):
+    """Por qué se llama a la IA dentro de este bloque (uno de tiempos.MOTIVOS), para llamadas_ia.jsonl."""
+    marca = _motivo_actual.set(motivo)
+    try:
+        yield
+    finally:
+        _motivo_actual.reset(marca)
+
+
 _huellas: dict = {}                    # huella del principio → cuándo se usó por última vez (para saber si se repite; no sale de la memoria)
 _cerrojo_huellas = threading.Lock()
 
@@ -388,7 +403,7 @@ def _apuntar_llamada(clave, modelo, args, kwargs, r, segundos, resultado):
                 del _huellas[min(_huellas, key=_huellas.get)]
         repite = ahora - antes if antes is not None and ahora - antes < TIE.REPITE_SEG else None
         TIE.apuntar_llamada(TIE.registro_llamada(getattr(r, "modelo_real", None) or modelo, resultado, segundos, uso=getattr(r, "uso", None), pref=pref,
-                                                 conv=conv, huella=huella, repite=repite, pago=PRES.nombre_de(clave) == "pago"))
+                                                 conv=conv, huella=huella, repite=repite, pago=PRES.nombre_de(clave) == "pago", motivo=_motivo_actual.get()))
     except Exception as e:
         log(f"Llamadas a la IA: no he podido apuntarla ({e!r})")
 
@@ -404,8 +419,11 @@ def _pedir_corto(proveedor, clave, modelo, sistema, mensajes, etiqueta, *, inten
     """Una petición corta a UN modelo. Si da 400 se van quitando los ajustes opcionales de `degradar` (uno por intento).
     Devuelve la Respuesta o None (con el motivo ya anotado en el registro; los fallos de cuota y de servidor dejan el modelo en pausa)."""
     degradar = list(degradar)
+    motivo = ("resumen" if etiqueta.startswith("resumir") else "pantalla" if etiqueta == "mirar la pantalla" else
+              "comprobacion" if "se cumplió" in etiqueta else "consulta")
     for intento in range(intentos):
-        r = _turno_medido(proveedor, clave, modelo, sistema, mensajes, timeout=timeout, **ajustes)
+        with motivo_llamada(motivo):
+            r = _turno_medido(proveedor, clave, modelo, sistema, mensajes, timeout=timeout, **ajustes)
         if not isinstance(r, PROV.ErrorIA):
             _fallos_red.pop(_id_pausa(modelo, clave), None)
             return r
