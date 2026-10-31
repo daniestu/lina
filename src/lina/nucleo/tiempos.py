@@ -37,7 +37,7 @@ ARCHIVO_LLAMADAS = RUT.ESTADO / "llamadas_ia.jsonl"
 MAX_LINEAS_LLAMADAS = 5000
 CAMPOS_LLAMADA = ("dia", "modelo", "res", "seg", "ent", "cache", "sal", "raz", "pref", "conv", "huella", "repite", "pago", "motivo")
 # Por qué se llamó a la IA, de esta lista y nada más: separa los reintentos de las llamadas normales al mirar la caché y el coste.
-MOTIVOS = ("normal", "a_fondo", "hechos", "reintento", "pantalla", "comprobacion", "consulta", "resumen", "otro")
+MOTIVOS = ("normal", "a_fondo", "hechos", "reintento", "pantalla", "comprobacion", "consulta", "resumen", "medida", "otro")
 REPITE_SEG = 300                     # el mismo principio en menos de esto: la caché debería aprovecharlo
 DIAS_IA = 30
 MIN_LLAMADAS_CACHE = 50              # criterio de V4 (escrito antes de medir)
