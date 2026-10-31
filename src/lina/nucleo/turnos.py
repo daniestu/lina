@@ -90,6 +90,50 @@ def motivo_corto(texto, maximo=160):
     return primera[:maximo]
 
 
+# Preguntas sobre lo que acaba de pasar, o afirmaciones que buscan tu acuerdo («…, ¿no?»): ahí no vale contestar de memoria ni dar la razón.
+_LO_ANTERIOR_ES = re.compile(r"\b(?:por que (?:ha|has|habia|habias|no|fallo|te|se)\b|que (?:ha|habia) pasado|que paso\b|que ha fallado|como es que|o sea que|entonces (?:si|no|es que)\b|"
+                             r"lo has (?:hecho|abierto|puesto|cerrado|conseguido)|ha funcionado|funciono\b|seguro que)")
+_LO_ANTERIOR_EN = re.compile(r"\b(?:why (?:did|didn t|has|hasn t|was|wasn t)\b|what happened|what went wrong|so (?:it|you)\b|did (?:it|you) (?:work|open|do|manage)|are you sure)")
+_BUSCA_ACUERDO = re.compile(r"\b(?:no|verdad|cierto|right|correct)\s*\?\s*$", re.I)
+
+
+def pregunta_por_lo_anterior(texto):
+    """¿Pregunta qué pasó antes o por qué, o busca que le des la razón («…, ¿no?»)?"""
+    from lina.nucleo import idioma as IDI
+    return bool(_BUSCA_ACUERDO.search(str(texto)) or (_LO_ANTERIOR_EN if IDI.actual() == "en" else _LO_ANTERIOR_ES).search(C.normalizar(texto)))
+
+
+def hechos_de_peticion(acciones, es_lectura, peticion="", maximo=6):
+    """Lo que consta que pasó en una petición, escrito por el código: cada herramienta con su resultado (las iguales seguidas, juntas). Solo datos."""
+    lineas = []
+    for nombre, args, resultado in acciones or []:
+        if nombre in HERRAMIENTAS_META:
+            continue
+        args = args or {}
+        dato = str(args.get("comando") or args.get("nombre") or args.get("consulta") or args.get("url") or "")[:80]
+        r = str(resultado)
+        m = re.match(r"código de salida: (\d+)", r)
+        linea = f"{nombre} {dato}".strip() + " → " + (f"código {m.group(1)}: " if m else "") + motivo_corto(r, 100)
+        if lineas and lineas[-1][0] == linea:
+            lineas[-1][1] += 1
+        else:
+            lineas.append([linea, 1])
+    hechos = [t + (f" (×{n})" if n > 1 else "") for t, n in lineas[-maximo:]] or ["no se usó ninguna herramienta"]
+    if pide_hacer(peticion) and sin_efecto(acciones, es_lectura)[0]:
+        hechos.append("no consta que se hiciera lo pedido")
+    return hechos
+
+
+def nota_de_hechos(registros):
+    """El aviso para la IA con lo que consta de las últimas peticiones ('' si no hay ninguna)."""
+    if not registros:
+        return ""
+    lineas = [f"- {r['hora']} «{r['pedido']}»: {'; '.join(r['hechos'])}. Respondiste: «{r['dijo']}»." for r in registros]
+    return ("HECHOS REGISTRADOS POR EL CÓDIGO en las últimas peticiones. Es lo único que consta; lo que respondiste entonces NO es prueba de nada:\n" + "\n".join(lineas) +
+            "\nExplica solo lo que se deduzca de estos hechos o de lo que compruebes ahora. Si no consta la causa, di que no lo sabes: no la supongas. Si el usuario afirma algo que "
+            "estos hechos contradicen o no respaldan, díselo con claridad y no le des la razón.")
+
+
 def pide_accion(texto):
     """¿La frase pide hacer algo («ponme el partido», «abre Steam») y no solo saber algo («¿a qué hora es el partido?»)?"""
     from lina.nucleo import idioma as IDI

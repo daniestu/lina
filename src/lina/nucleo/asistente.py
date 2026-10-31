@@ -61,7 +61,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, enlace_sin_comprobar, motivo_corto, pagina_que_no_es, pide_hacer, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
+from lina.nucleo.turnos import HERRAMIENTAS_META, enlace_sin_comprobar, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -192,6 +192,8 @@ def prompt_whisper():
 
 TOPE_ATAJO_SEG = 60              # con fin por silencio: si el detector nunca corta (música, ruido), deja de escucharte a los 60 s
 MAX_REPETICIONES = 2             # la misma herramienta, con los mismos datos y el mismo resultado: a la tercera no se ejecuta y se termina el turno
+MAX_HECHOS = 4                   # peticiones de las que se guarda lo que consta que pasó
+HECHOS_VALEN_SEG = 900           # pasado esto, ya no son «lo que acaba de pasar»
 MARGEN_TRAS_CORTE = 1.0          # tras un corte por silencio, una pulsación en este margen era para terminar (ya terminó): no empieza otra escucha
 
 
@@ -509,6 +511,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     _detector_atajo = None        # el detector de la escucha en curso (None: doble pulsación)
     _tras_corte = None            # esta escucha empezó poco después de un corte por silencio: cuántos segundos después
     _reloj = staticmethod(time.monotonic)
+    hechos_recientes: list = []   # lo que consta que pasó en las últimas peticiones (solo en memoria; se reasigna, nunca se modifica en sitio)
     # De dónde viene cada petición. Va CON la petición (en la cola, al sustituir otra, al retomarla), nunca con quien hable el último: pulsar el atajo para
     # interrumpir una tarea de «Oye Lina» no le da los permisos del atajo. Si algún camino llega sin origen, el restrictivo.
 
@@ -1077,6 +1080,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return
         if self.quiere_reiniciar(pregunta):
             self.historial.clear()
+            self.hechos_recientes = []
             self.ejecutor.cancelar()
             log("Conversación reiniciada por voz")
             self.decir(T("Vale, empezamos de cero."))
@@ -1093,6 +1097,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if self.historial and time.time() - self.ultima_pregunta > SESION_MINUTOS * 60:
             log("Sesión caducada por inactividad: empiezo una conversación nueva")
             self.historial.clear()
+            self.hechos_recientes = []
         directa = self._intentar_directa(pregunta, crono)
         if directa:
             self._cerrar_directa(pregunta, directa[0], directa[1], inicio, crono)
@@ -1124,6 +1129,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             modo, motivo_modo = self.ultimo_modo, "continúa la tarea"
         else:
             modo, motivo_modo = self.elegir_modo(self.pregunta_pura)
+            if modo == "rapido" and self._hechos_al_caso():         # explicar qué pasó pide razonar, no contestar de corrido
+                modo, motivo_modo = "profundo", "preguntas por lo que ha pasado"
         self.ultimo_modo = modo
         etiqueta = etiqueta_contexto(self.contexto, self.titulo)
         if etiqueta:
@@ -1134,6 +1141,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             pregunta += f"\n[SISTEMA: {pista}]"
         pregunta_sin_receta = pregunta                            # en el historial NO entra la nota de recetas (se reenviaría en todos los turnos siguientes)
         pregunta += self._nota_sobre_mi(self.pregunta_pura)
+        hechos = self._hechos_al_caso()
+        if hechos:
+            log("Preguntas por lo que ha pasado: paso a la IA lo que consta")
+            pregunta += f"\n[SISTEMA: {nota_de_hechos(hechos)}]"
         if not imagen and not self.pedir_pantalla:
             pregunta += ("\n[SISTEMA: esta petición NO lleva captura de pantalla: no sabes lo que hay en ella (solo el título de la ventana). "
                          "Si lo que te piden depende de verla, usa ver_pantalla; sin imagen NUNCA describas lo que se ve.]")
@@ -1202,6 +1213,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         except Exception as e:                                     # aprender es un extra: nunca debe estropear la respuesta
             log(f"Receta automática: fallo {e!r}")
         self.guardar_en_historial(pregunta_sin_receta, respuesta)
+        self._apuntar_hechos(self.pregunta_pura, respuesta)
         if self.interrumpiendo:                                    # estás hablando: no le hablo encima (la respuesta queda en el historial)
             log("Estás hablando: no leo en voz alta la respuesta anterior")
         else:
@@ -1404,6 +1416,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         log(f"Directa [{ident}]: hecho sin llamar a la IA")
         log(f"Respuesta [directa]: {frase if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'} ({time.time() - inicio:.1f} s en total)")
         self.guardar_en_historial(pregunta, frase)
+        self._apuntar_hechos(pregunta, frase, [f"orden directa {ident}, hecha y comprobada por el código"])
         if self.interrumpiendo:
             log("Estás hablando: no leo en voz alta la respuesta anterior")
             return
@@ -1558,6 +1571,22 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.historial.append({"rol": "model", "texto": respuesta})
         self.historial = self.historial[-2 * MAX_TURNOS:]
         self.ultima_pregunta = time.time()
+
+    def _apuntar_hechos(self, peticion, respuesta, hechos=None):
+        """Lo que consta que pasó en esta petición, para cuando preguntes por ello. Solo en memoria y solo las últimas: nunca estorba a la respuesta."""
+        try:
+            if hechos is None:
+                hechos = hechos_de_peticion(getattr(self, "acciones_turno", None), lambda c: H.clasificar(c)[0] == "lectura", peticion)
+            registro = {"t": time.time(), "hora": time.strftime("%H:%M:%S"), "pedido": str(peticion)[:120], "hechos": hechos, "dijo": str(respuesta)[:120]}
+            self.hechos_recientes = [*self.hechos_recientes, registro][-MAX_HECHOS:]
+        except Exception as e:
+            log(f"Hechos de la petición: no he podido apuntarlos ({e!r})")
+
+    def _hechos_al_caso(self):
+        """Lo que consta de las últimas peticiones, si esta pregunta va de lo que pasó; si no, []."""
+        if not pregunta_por_lo_anterior(getattr(self, "pregunta_pura", "")):
+            return []
+        return [r for r in self.hechos_recientes if time.time() - r["t"] < HECHOS_VALEN_SEG]
 
     def elegir_modo(self, texto):
         """'profundo' (más razonamiento y modelo más fuerte) o 'rapido'. Las palabras están en comandos.txt."""
@@ -1858,6 +1887,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return self._mis_ajustes(args)
         if nombre == "empezar_de_cero":
             self.historial.clear()
+            self.hechos_recientes = []
             self.ejecutor.cancelar()
             log("Conversación reiniciada por la IA")
             return "Hecho: conversación reiniciada; ya no recuerdas nada de lo anterior. Díselo al usuario en una frase corta."
