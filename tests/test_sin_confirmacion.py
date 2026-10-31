@@ -175,3 +175,51 @@ def test_pide_hacer(frase, sale):
 def test_motivo_corto():
     assert TU.motivo_corto("código de salida: 1 (0 s)\n\nNo such key. Y más texto") == "No such key"
     assert len(TU.motivo_corto("x" * 500)) == 160
+
+
+# ---------------------------------------------------------------- las fuentes: decir que se ha guardado o quitado una no vale si no consta
+@pytest.fixture
+def fuentes(tmp_path, monkeypatch):
+    from lina.nucleo import fuentes as F
+    monkeypatch.setattr(F, "ARCHIVO", tmp_path / "fuentes.json")
+    return F
+
+
+@pytest.mark.parametrize("peticion, respuesta, empieza", [
+    ("Guárdame esta web como fuente para las recetas", "Hecho, he guardado esa web como fuente.", "No lo he guardado"),
+    ("Apunta esa fuente de No Man's Sky", "Fuente añadida.", "No lo he guardado"),
+    ("Quiero que uses esta página para las recetas", "Vale, página guardada.", "No lo he guardado"),
+    ("Quita la fuente de recetas", "Ya he quitado esa fuente.", "No lo he quitado"),
+    ("Borra todas mis fuentes", "Listo, fuentes borradas.", "No lo he quitado"),
+])
+def test_decir_que_cambio_una_fuente_sin_que_conste_se_sustituye(asistente, fuentes, peticion, respuesta, empieza):
+    asistente.pregunta_pura, asistente.acciones_turno = peticion, []
+    asistente._fuentes_antes = fuentes.firma()
+    assert asistente.asegurar_honestidad_final(respuesta).startswith(empieza)
+
+
+def test_si_la_lista_ha_cambiado_consta_y_no_se_toca(asistente, fuentes):
+    asistente.pregunta_pura, asistente.acciones_turno = "Guarda esa fuente", [("ejecutar_comando", {"comando": "x"}, "código de salida: 0 (0 s)")]
+    asistente._fuentes_antes = fuentes.firma()
+    fuentes.anadir("recetas", "https://a.es")
+    assert asistente.asegurar_honestidad_final("Fuente guardada.") == "Fuente guardada."
+
+
+@pytest.mark.parametrize("peticion, respuesta", [
+    ("Guarda esa fuente", "No la he guardado, no puedo hacerlo así."),                  # lo niega
+    ("Guarda esa fuente", "No he podido guardarla."),
+    ("¿Has guardado la fuente?", "Sí, está guardada esa fuente."),                      # es una pregunta
+    ("Cuéntame un dato", "He guardado un dato en la web."),                             # no va de fuentes
+    ("Usa esta página para resumirla", "Es una web sobre cocina."),                     # no dice haberlo hecho
+    ("Guarda el archivo de la web", "Archivo guardado."),                               # no habla de la fuente
+])
+def test_lo_que_no_afirma_haberlo_hecho_no_se_toca(asistente, fuentes, peticion, respuesta):
+    asistente.pregunta_pura, asistente.acciones_turno = peticion, [("ejecutar_comando", {"comando": "x"}, "código de salida: 0 (0 s)")]
+    asistente._fuentes_antes = fuentes.firma()
+    assert asistente.asegurar_honestidad_final(respuesta) == respuesta
+
+
+def test_pendiente_de_confirmar_no_se_sustituye_tampoco_por_las_fuentes(asistente, fuentes):
+    asistente.ejecutor.pendientes = ["algo"]
+    asistente.pregunta_pura, asistente._fuentes_antes = "Guarda esa fuente", fuentes.firma()
+    assert asistente.asegurar_honestidad_final("Fuente guardada.") == "Fuente guardada."

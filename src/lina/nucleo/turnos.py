@@ -82,6 +82,29 @@ def sin_efecto(acciones, es_lectura):
     return True, motivo
 
 
+_FUENTE_PIDE_ES = re.compile(r"\bfuentes?\b|\b(?:usa|uses|usar|utiliza|utilices|utilizar|guarda|guardes|guardar|apunta|apuntes|apuntar|anade|anadas|anadir|quita|quites|quitar|borra|borres|borrar|elimina|elimines|eliminar)\b.*\b(?:pagina|web|enlace|sitio)\b")
+_FUENTE_PIDE_EN = re.compile(r"\bsources?\b|\b(?:use|save|add|remove|delete)\b.*\b(?:page|website|site|link)\b")
+_FUENTE_OBJETO_ES = re.compile(r"\b(?:fuentes?|pagina|web|enlace|sitio)\b")
+_FUENTE_OBJETO_EN = re.compile(r"\b(?:sources?|page|website|site|link)\b")
+_FUENTE_HECHO_ES = re.compile(r"\b(?:(?:guardad|apuntad|anadid)[ao]s?|(?:quitad|borrad|eliminad)[ao]s?)\b")
+_FUENTE_HECHO_EN = re.compile(r"\b(?:saved|added|removed|deleted)\b")
+
+
+def afirma_fuente(peticion, respuesta):
+    """«guardar» o «quitar» si, ante una orden sobre una fuente, la respuesta dice haberlo hecho; None si no (también si lo niega o si solo se pregunta)."""
+    from lina.nucleo import idioma as IDI
+    if "?" in str(peticion) or "¿" in str(peticion):
+        return None
+    en = IDI.actual() == "en"
+    p, r = C.normalizar(peticion), C.normalizar(respuesta)
+    if not (_FUENTE_PIDE_EN if en else _FUENTE_PIDE_ES).search(p) or not (_FUENTE_OBJETO_EN if en else _FUENTE_OBJETO_ES).search(r):
+        return None
+    m = (_FUENTE_HECHO_EN if en else _FUENTE_HECHO_ES).search(r)
+    if not m or re.search(r"\b(?:no|not|n t)\b(?:\s+\S+){0,3}\s*$", r[:m.start()]):
+        return None
+    return "quitar" if m.group(0)[:3] in ("qui", "bor", "eli", "rem", "del") else "guardar"
+
+
 def motivo_corto(texto, maximo=160):
     """La primera frase de lo que dijo una herramienta, para decirla en voz alta."""
     t = " ".join(str(texto).split())

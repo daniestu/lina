@@ -62,7 +62,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, enlace_sin_comprobar, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
+from lina.nucleo.turnos import HERRAMIENTAS_META, afirma_fuente, enlace_sin_comprobar, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -1068,6 +1068,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if privado:                                             # «quita el modo privado»: lo hace el código, sin IA (la IA solo puede activarlo)
             self.decir(self._gestionar_modo_privado(privado))
             return
+        self._fuentes_antes = FUE.firma()
         fuente = FUE.entender(pregunta) if not profundidad else None
         if fuente:                                              # «para las recetas de refinería usa esta página»: lo hace el código, sin IA y solo con el atajo o lina di
             log(f"Fuentes: {fuente[0]}")
@@ -2036,9 +2037,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def asegurar_honestidad_final(self, texto):
         """Última red: si el último cambio sigue SIN comprobarse (⚠, ✘ o error) y la respuesta lo da por hecho sin reconocer la duda,
         el código añade la corrección. No se confía en que la IA lo diga."""
-        if self.ejecutor.pendientes or not afirma_hecho(texto) or admite_duda(texto):
+        if self.ejecutor.pendientes or admite_duda(texto):
             return texto
         peticion = str(getattr(self, "pregunta_pura", "") or "")
+        afirma = afirma_fuente(peticion, texto)                    # las fuentes solo las cambia el código: que la IA diga que lo ha hecho no vale
+        if afirma and FUE.firma() == getattr(self, "_fuentes_antes", None):
+            log(f"La respuesta dice haber cambiado una fuente y no consta: se sustituye («{str(texto)[:80]}»)")
+            return (T("No lo he guardado: las fuentes no las guardo así. Dime «para TEMA usa esta página…» con el atajo o con lina di, o usa lina fuentes añadir.") if afirma == "guardar"
+                    else T("No lo he quitado: las fuentes no las quito así. Dime «quita la última fuente» con el atajo o con lina di, o usa lina fuentes quitar."))
+        if not afirma_hecho(texto):
+            return texto
         if pide_hacer(peticion):
             nada, motivo = sin_efecto(getattr(self, "acciones_turno", None), lambda c: H.clasificar(c)[0] == "lectura")
             if nada:                                               # sin confirmación no hay éxito: pase lo que pase con el revisor, no consta que se hiciera

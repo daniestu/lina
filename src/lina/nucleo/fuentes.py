@@ -66,6 +66,11 @@ def listar():
     return _cargar()
 
 
+def firma():
+    """Lo que hay guardado, para saber si una petición lo ha cambiado."""
+    return tuple((f["id"], f["tema"], f["url"]) for f in _cargar())
+
+
 def validar_direccion(texto):
     """(dirección, dominio) de una web, con o sin https://; o ValueError con el motivo. Sin usuario ni contraseña, sin nada con pinta de clave y con un dominio de verdad."""
     from lina.nucleo.ia import dominio_valido

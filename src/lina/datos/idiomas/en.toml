@@ -974,3 +974,5 @@
 "No he podido leer el portapapeles. No he guardado nada." = "I couldn't read the clipboard. I haven't saved anything."
 "Lo que tienes copiado no es una dirección web válida. No he guardado nada." = "What you have copied is not a valid web address. I haven't saved anything."
 "Guardado: para {tema}, usaré {dominio}. Si no es así, dime «quita la última fuente», o en la terminal: lina fuentes quitar {id}." = "Saved: for {tema}, I'll use {dominio}. If that's wrong, say «remove the last source», or in the terminal: lina fuentes quitar {id}."
+"No lo he guardado: las fuentes no las guardo así. Dime «para TEMA usa esta página…» con el atajo o con lina di, o usa lina fuentes añadir." = "I haven't saved it: I don't save sources that way. Say «for TOPIC use this page…» with the shortcut or lina di, or use lina fuentes añadir."
+"No lo he quitado: las fuentes no las quito así. Dime «quita la última fuente» con el atajo o con lina di, o usa lina fuentes quitar." = "I haven't removed it: I don't remove sources that way. Say «remove the last source» with the shortcut or lina di, or use lina fuentes quitar."
