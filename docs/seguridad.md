@@ -48,7 +48,7 @@ comprueba con `SO_PEERCRED`: solo se atiende a tu mismo usuario). La frase entra
 - Puede lo mismo que el atajo (pedir, abrir, recordar, enseñar alias y recetas, cambiar ajustes), **salvo dos cosas**: **no confirma acciones críticas**
   (siguen pendientes hasta que pulses el atajo y digas «sí», así que tampoco abre el permiso de toda la tarea) y **no sube el tope de gasto** (bajarlo, sí).
   Esa es la **barrera de verdad**: cualquier programa que corra como tú puede escribir en ese socket.
-- Por eso mismo, **un proceso de tu usuario puede escribir memoria («recuerda que…») o recetas por ese canal**. Es el mismo alcance que ya tiene ese proceso
+- Por eso mismo, **un proceso de tu usuario puede escribir memoria («recuerda que…»), recetas o fuentes por ese canal**. Es el mismo alcance que ya tiene ese proceso
   editando tus archivos (`memoria.json`, `config.toml`…): no abre nada que no estuviera abierto, pero conviene saberlo.
 - **Lina no puede darse órdenes a sí misma**: `lina di`, `lina pulsar` y cualquier comando que mencione `lina.sock` o la carpeta del socket están en el
   bloqueo duro del código cuando los pide la IA. Es **una capa más**, no la barrera: un filtro de texto se puede esquivar (ver «Lo que Lina no es»), y por eso

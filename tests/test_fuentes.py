@@ -92,8 +92,140 @@ def test_la_ia_no_puede_tocarlas(comando):
 def test_ninguna_herramienta_escribe_fuentes_ni_se_usan_al_responder():
     assert not [d["name"] for d in H.DECLARACIONES if "fuente" in d["name"]]
     from pathlib import Path
-    assert "fuentes" not in Path(F.__file__).with_name("asistente.py").read_text(encoding="utf-8").replace("hechos", "")
+    fuente = Path(F.__file__).with_name("asistente.py").read_text(encoding="utf-8")
+    assert "FUE.listar" not in fuente and "FUE._cargar" not in fuente
 
 
 def test_olvidar():
     assert "fuentes" in OLV.QUE and "fuentes" in OLV.TODO and OLV.QUE["fuentes"][1]()[0].name == "fuentes.json"
+
+
+# ---------------------------------------------------------------- F2: añadirlas con una frase
+URL_FRASE = "https://nomanssky.fandom.com/wiki/Refining"
+
+
+@pytest.mark.parametrize("frase, esperado", [
+    (f"Para las recetas de refinería de No Man's Sky usa esta página {URL_FRASE}.", ("anadir", TEMA, URL_FRASE)),
+    (f"Para las recetas de refinería de No Man's Sky, usa esta página: {URL_FRASE}", ("anadir", TEMA, URL_FRASE)),
+    ("Para las recetas de refinería de No Man's Sky, usa la página que tengo copiada.", ("copiada", TEMA)),
+    ("Para las recetas de refinería de No Man's Sky usa el enlace que he copiado", ("copiada", TEMA)),
+    ("Usa nomanssky.fandom.com para las recetas de refinería", ("anadir", "recetas de refinería", "nomanssky.fandom.com")),
+    ("Cuando te pregunte por las recetas, usa la web nomanssky punto fandom punto com", ("anadir", "recetas", "nomanssky.fandom.com")),
+    ("Para las recetas usa siempre la página ejemplo.es/wiki", ("anadir", "recetas", "ejemplo.es/wiki")),
+    ("Para las recetas usa esta página", ("falta_web", "recetas")),
+    ("Usa esta página", ("falta_tema",)),
+    ("Para las recetas usa la web cosa rara", ("mala", "recetas")),
+    ("Quita la última fuente.", ("quitar_ultima",)),
+])
+def test_entender_las_frases(frase, esperado):
+    assert F.entender(frase) == esperado
+
+
+@pytest.mark.parametrize("frase", ["Para la música usa Spotify", "Para jugar usa Proton", "¿Para las recetas puedes usar esta página?", "Para las recetas no uses esta página",
+                                   "Recuerda que para las recetas uso esa web", "Usa esa web", "Abre No Man's Sky", "¿Cómo refino el ferrito?", "Quita la música", ""])
+def test_lo_que_no_es_una_fuente_sigue_su_camino(frase):
+    assert F.entender(frase) is None
+
+
+def _nada():
+    raise AssertionError("no debía mirar el portapapeles")
+
+
+def test_guardar_repite_el_tema_el_dominio_hablado_y_como_quitarla():
+    r = F.gestionar(("anadir", TEMA, URL_FRASE), "atajo", _nada)
+    assert TEMA in r and "nomanssky punto fandom punto com" in r and "quita la última fuente" in r and "lina fuentes quitar f1" in r
+    assert F.listar()[0]["url"] == URL_FRASE
+
+
+def test_por_escrito_el_dominio_va_tal_cual():
+    assert "nomanssky.fandom.com" in F.gestionar(("anadir", TEMA, URL_FRASE), "texto", _nada)
+
+
+def test_el_dominio_dictado_con_guion_se_oye_bien():
+    assert F.dominio_hablado("no-mans.ejemplo.es") == "no guion mans punto ejemplo punto es"
+
+
+@pytest.mark.parametrize("accion", [("anadir", TEMA, URL_FRASE), ("copiada", TEMA), ("quitar_ultima",)])
+@pytest.mark.parametrize("origen", ["voz_libre", None, "lo que sea"])
+def test_por_manos_libres_no_se_cambia_nada_ni_se_mira_el_portapapeles(accion, origen):
+    assert F.anadir("ya estaba", "https://a.es")[0]
+    r = F.gestionar(accion, origen, _nada)
+    assert "con el atajo o con lina di" in r and [f["tema"] for f in F.listar()] == ["ya estaba"]
+
+
+def test_el_portapapeles_con_el_atajo():
+    assert "nomanssky punto fandom punto com" in F.gestionar(("copiada", TEMA), "atajo", lambda: f"  {URL_FRASE}\n")
+    assert F.listar()[0]["url"] == URL_FRASE
+
+
+def test_con_lina_di_no_se_mira_el_portapapeles():
+    assert "escríbeme la dirección" in F.gestionar(("copiada", TEMA), "texto", _nada) and F.listar() == []
+
+
+@pytest.mark.parametrize("copiado", ["mi contraseña es Secreta123", "tvly-abcdefghijklmnopqrstuvwxyz", f"{URL_FRASE}\notra línea privada", "http://192.168.1.10/privado"])
+def test_lo_copiado_que_no_vale_no_se_repite_ni_se_guarda(copiado, archivo, capsys):
+    r = F.gestionar(("copiada", TEMA), "atajo", lambda: copiado)
+    assert r == "Lo que tienes copiado no es una dirección web válida. No he guardado nada." and not archivo.exists()
+    salida = capsys.readouterr()
+    assert copiado not in salida.out and copiado not in salida.err
+
+
+def test_portapapeles_vacio_o_que_falla():
+    def falla():
+        raise OSError("sin portapapeles")
+    assert "No he podido leer el portapapeles" in F.gestionar(("copiada", TEMA), "atajo", lambda: "")
+    assert "No he podido leer el portapapeles" in F.gestionar(("copiada", TEMA), "atajo", falla) and F.listar() == []
+
+
+def test_lo_incompleto_dice_que_falta_y_no_guarda():
+    assert "qué página" in F.gestionar(("falta_web", "recetas"), "atajo", _nada)
+    assert "qué tema" in F.gestionar(("falta_tema",), "atajo", _nada)
+    assert "No he guardado nada" in F.gestionar(("mala", "recetas"), "atajo", _nada) and F.listar() == []
+
+
+def test_quita_la_ultima():
+    F.anadir("uno", "https://a.es")
+    F.anadir("dos", "https://b.es")
+    assert F.gestionar(("quitar_ultima",), "texto", _nada) == "Quitada: dos." and [f["tema"] for f in F.listar()] == ["uno"]
+    F.quitar("todas")
+    assert "No hay ninguna" in F.gestionar(("quitar_ultima",), "atajo", _nada)
+
+
+@pytest.fixture
+def asistente():
+    import sys
+    import threading
+    from unittest.mock import MagicMock
+    for m in ("sounddevice", "faster_whisper"):
+        sys.modules.setdefault(m, MagicMock())
+    from lina.nucleo import asistente as A
+    a = A.Asistente.__new__(A.Asistente)
+    a.modo_privado, a.sustituida, a.interrumpiendo = False, False, False
+    a.estado, a.cerrojo, a.fin_tarea = "esperando", threading.Lock(), threading.Event()
+    a.dicho, a.historial = [], []
+    a.decir = a.dicho.append
+    a.ejecutor = MagicMock(pendientes=[])
+    a.responder = MagicMock(side_effect=AssertionError("no debía llamar a la IA"))
+    a._preparar_contexto = lambda: None
+    return a, A
+
+
+@pytest.mark.parametrize("origen, se_guarda", [("atajo", True), ("texto", True), ("voz_libre", False), (None, False)])
+def test_la_frase_entra_por_el_codigo_sin_ia_y_segun_el_origen(asistente, origen, se_guarda):
+    a, _ = asistente
+    a._atender(f"Para las recetas de refinería de No Man's Sky usa esta página {URL_FRASE}", 0.0, origen=origen)
+    assert bool(F.listar()) is se_guarda and len(a.dicho) == 1 and a.historial == []
+
+
+def test_al_retomar_una_tarea_no_se_vuelve_a_guardar(asistente, monkeypatch):
+    a, A = asistente
+
+    class Parar(Exception):
+        pass
+
+    def parar(frase):
+        raise Parar
+    monkeypatch.setattr(A.MEM, "entender", parar)                           # lo siguiente a las fuentes: de ahí no hace falta pasar
+    with pytest.raises(Parar):
+        a._atender(f"Para las recetas usa esta página {URL_FRASE}", 0.0, profundidad=1, origen="atajo")
+    assert F.listar() == [] and a.dicho == []

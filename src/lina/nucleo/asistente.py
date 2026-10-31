@@ -43,6 +43,7 @@ from lina.nucleo import rutas as RUT
 from lina.nucleo import tiempos as TIE
 from lina.nucleo import directas as DIR
 from lina.nucleo import contenido as CONT
+from lina.nucleo import fuentes as FUE
 from lina.nucleo import cache_voz as CV
 from lina.escritorio import sesion as SES
 from lina.nucleo import memoria as MEM
@@ -1066,6 +1067,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         privado = C.entender_modo_privado(pregunta)
         if privado:                                             # «quita el modo privado»: lo hace el código, sin IA (la IA solo puede activarlo)
             self.decir(self._gestionar_modo_privado(privado))
+            return
+        fuente = FUE.entender(pregunta) if not profundidad else None
+        if fuente:                                              # «para las recetas de refinería usa esta página»: lo hace el código, sin IA y solo con el atajo o lina di
+            log(f"Fuentes: {fuente[0]}")
+            self.decir(FUE.gestionar(fuente, origen, lambda: SES.actual().pegar()))
             return
         recuerdo = MEM.entender(pregunta)
         if recuerdo and C.entender_alias(pregunta) is None:     # «recuerda que mi juego favorito es…», «olvida lo de…», «¿qué recuerdas de mí?»: lo hace el código, la IA no escribe en la memoria

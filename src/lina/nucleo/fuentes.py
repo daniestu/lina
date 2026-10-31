@@ -3,10 +3,11 @@
 """Fuentes propias: para un tema concreto, una web concreta («para las recetas de refinería de No Man's Sky, usa esta página»).
 
 Reglas que no se saltan:
-  · Las escribe el usuario, en la terminal o con una frase suya. La IA no tiene ninguna herramienta que escriba aquí, y `lina fuentes` y este archivo están
+  · Las escribe el usuario, en la terminal o con una frase suya, solo con el atajo o con `lina di`: por «Oye Lina» podría decirlo otra voz. La IA no tiene ninguna herramienta que escriba aquí, y `lina fuentes` y este archivo están
     bloqueados para ella: como mucho elegirá un id de la lista. Así una página con instrucciones ocultas no puede colar una fuente.
   · Nada que parezca una clave ni direcciones con usuario, contraseña o tokens; solo webs con un dominio de verdad (ni IP ni nombres locales).
   · El tema es una frase libre, porque lo que encaja lo decidirá el significado, no unas palabras.
+  · El portapapeles solo se lee si lo pides con esas palabras y con el atajo, y lo copiado nunca se repite ni se registra: solo se guarda si es una dirección válida.
 De momento solo se guardan: todavía no se usan al responder.
 Se ve y se borra con  lina fuentes  (y  lina olvidar fuentes)."""
 import json
@@ -17,6 +18,7 @@ import time
 from urllib.parse import urlparse
 
 from lina.nucleo import claves as CLA
+from lina.nucleo import idioma as IDI
 from lina.nucleo import memoria as MEM
 from lina.nucleo import rutas as RUT
 from lina.nucleo.comandos import normalizar
@@ -128,6 +130,138 @@ def quitar(ident):
         else:
             ARCHIVO.unlink(missing_ok=True)
     return True, T("Quitada.")
+
+
+# ======================= lo que dices =======================
+_VERBO_ES = r"(?:usa|utiliza|consulta|mira en|busca en)(?:\s+(?:siempre|solo|s[oó]lo|solamente))?"
+_VERBO_EN = r"(?:use|check|look at|search)(?:\s+(?:always|only))?"
+_ES = {
+    "para": re.compile(r"^(?:por favor,?\s*)?para\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_ES + r"\s+(?P<web>.+)$", re.I),
+    "usa": re.compile(r"^(?:por favor,?\s*)?" + _VERBO_ES + r"\s+(?P<web>.+?)[,:]?\s+para\s+(?P<tema>.+)$", re.I),
+    "cuando": re.compile(r"^cuando\s+(?:te\s+)?pregunte\s+(?:por|sobre)\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_ES + r"\s+(?P<web>.+)$", re.I),
+    "sin_tema": re.compile(r"^(?:por favor,?\s*)?" + _VERBO_ES + r"\s+(?P<web>.+)$", re.I),
+    "copiada": re.compile(r"\b(?:copiad[oa]|has copiado|he copiado)\b", re.I),
+    "marca": re.compile(r"^(?:(?:esta|este|esa|ese|la|el)\s+)?(?:p[aá]gina(?:\s+web)?|web|sitio(?:\s+web)?|enlace|url|fuente|direcci[oó]n)\b[:,]?\s*(?P<resto>.*)$", re.I),
+    "esta_pagina": re.compile(r"^est[ae]\s+(?:p[aá]gina|web|enlace)$", re.I),
+    "punto": re.compile(r"\s+punto\s+", re.I),
+    "articulo": re.compile(r"^(?:(?:las|los|la|el|lo\s+de(?:l)?)\s+)", re.I),
+    "ultima": re.compile(r"^(?:por favor,?\s*)?(?:quita|borra|elimina)\s+la\s+[uú]ltima\s+fuente$", re.I),
+}
+_EN = {
+    "para": re.compile(r"^(?:please,?\s*)?for\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_EN + r"\s+(?P<web>.+)$", re.I),
+    "usa": re.compile(r"^(?:please,?\s*)?" + _VERBO_EN + r"\s+(?P<web>.+?)[,:]?\s+for\s+(?P<tema>.+)$", re.I),
+    "cuando": re.compile(r"^when\s+i\s+ask\s+(?:about|for)\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_EN + r"\s+(?P<web>.+)$", re.I),
+    "sin_tema": re.compile(r"^(?:please,?\s*)?" + _VERBO_EN + r"\s+(?P<web>.+)$", re.I),
+    "copiada": re.compile(r"\bcopied\b", re.I),
+    "marca": re.compile(r"^(?:(?:this|that|the)\s+)?(?:web\s*page|page|website|site|link|url|source|address)\b[:,]?\s*(?P<resto>.*)$", re.I),
+    "esta_pagina": re.compile(r"^this\s+(?:page|website|site|link)$", re.I),
+    "punto": re.compile(r"\s+dot\s+", re.I),
+    "articulo": re.compile(r"^(?:the\s+)", re.I),
+    "ultima": re.compile(r"^(?:please,?\s*)?(?:remove|delete)\s+the\s+last\s+source$", re.I),
+}
+_POR_IDIOMA = {"es": _ES, "en": _EN}
+_DIRECCION = re.compile(r"https?://\S+", re.I)
+_DOMINIO = re.compile(r"^[^\s/]+\.[a-z]{2,24}(?:/\S*)?$", re.I)
+
+
+def _web(web, p):
+    """(«copiada»,) / («direccion», texto) / («falta»,) / («mala»,) / None si lo que hay detrás del verbo no habla de una web («usa Spotify»)."""
+    web = web.strip().rstrip(".,;")
+    if p["copiada"].search(web):
+        return ("copiada",)
+    enlace = _DIRECCION.search(web)
+    if enlace:
+        return ("direccion", enlace.group(0).rstrip(".,;"))
+    marca = p["marca"].match(web)
+    resto = (marca.group("resto") if marca else web).strip()
+    if marca and not resto:
+        return ("falta",)
+    hablado = p["punto"].sub(".", resto)
+    if _DOMINIO.match(hablado):
+        return ("direccion", hablado)
+    return ("mala",) if marca else None
+
+
+def entender(texto):
+    """Lo que pides sobre las fuentes, o None: ('anadir', tema, dirección) / ('copiada', tema) / ('falta_web', tema) / ('falta_tema',) / ('mala', tema) / ('quitar_ultima',).
+    Solo frases claras, nunca preguntas: «para la música usa Spotify» no habla de una web y sigue su camino."""
+    frase = re.sub(r"\s+", " ", str(texto or "")).strip().rstrip("!")
+    if not frase or "?" in frase or "¿" in frase or len(frase.split()) > 40:
+        return None
+    p = IDI.segun(_POR_IDIOMA)
+    if p["ultima"].match(frase.rstrip(".")):
+        return ("quitar_ultima",)
+    for forma in ("para", "cuando", "usa"):
+        m = p[forma].match(frase)
+        if not m:
+            continue
+        web = _web(m.group("web"), p)
+        if web is None:
+            return None
+        tema = p["articulo"].sub("", m.group("tema").strip().rstrip(".,;:"), count=1)
+        if web[0] == "direccion":
+            return ("anadir", tema, web[1])
+        return {"copiada": ("copiada", tema), "falta": ("falta_web", tema)}.get(web[0], ("mala", tema))
+    m = p["sin_tema"].match(frase)
+    if m:
+        web = m.group("web").strip().rstrip(".,;")
+        if p["esta_pagina"].match(web) or p["copiada"].search(web) or _DIRECCION.search(web):
+            return ("falta_tema",)
+    return None
+
+
+def dominio_hablado(dominio):
+    """Para oírlo bien y detectar un error: «nomanssky punto fandom punto com»."""
+    return dominio.replace(".", f" {T('punto')} ").replace("-", f" {T('guion')} ")
+
+
+def quitar_ultima():
+    with _lock:
+        fuentes = _cargar()
+        if not fuentes:
+            return T("No hay ninguna fuente guardada.")
+        ultima = fuentes[-1]
+    hecho, frase = quitar(ultima["id"])
+    return T("Quitada: {tema}.", tema=ultima["tema"]) if hecho else frase
+
+
+def gestionar(accion, origen, leer_portapapeles):
+    """Hace lo que has pedido y devuelve lo que se dice. Por manos libres no se hace nada (ni se mira el portapapeles): podría decirlo otra voz.
+    `leer_portapapeles` solo se llama si lo pides, con el atajo; lo copiado nunca se repite: si no vale, se dice sin decir qué era."""
+    if origen not in ("atajo", "texto"):
+        return T("Las fuentes solo se cambian con el atajo o con lina di, por si lo dijera otra voz: púlsalo y dímelo otra vez.")
+    tipo = accion[0]
+    if tipo == "quitar_ultima":
+        return quitar_ultima()
+    if tipo == "falta_tema":
+        return T("¿Para qué tema? Dímelo entero: «para las recetas de refinería usa esta página».")
+    if tipo == "falta_web":
+        return T("No me has dicho qué página. Copia la dirección y dime «usa la página que tengo copiada», o dicta el dominio.")
+    if tipo == "mala":
+        return T("No he entendido la dirección. No he guardado nada.")
+    tema = accion[1]
+    if tipo == "copiada":
+        if origen != "atajo":
+            return T("Por aquí no miro lo que tienes copiado: escríbeme la dirección.")
+        try:
+            copiado = str(leer_portapapeles() or "").strip()
+        except Exception:
+            return T("No he podido leer el portapapeles. No he guardado nada.")
+        if not copiado:
+            return T("No he podido leer el portapapeles. No he guardado nada.")
+        try:
+            validar_direccion(copiado)
+        except ValueError:
+            return T("Lo que tienes copiado no es una dirección web válida. No he guardado nada.")
+        direccion = copiado
+    else:
+        direccion = accion[2]
+    fuente, frase = anadir(tema, direccion)
+    if not fuente:
+        return frase
+    dominio = fuente["dominio"] if origen == "texto" else dominio_hablado(fuente["dominio"])
+    return T("Guardado: para {tema}, usaré {dominio}. Si no es así, dime «quita la última fuente», o en la terminal: lina fuentes quitar {id}.",
+             tema=fuente["tema"], dominio=dominio, id=fuente["id"])
 
 
 def principal(argv, salida=print):
