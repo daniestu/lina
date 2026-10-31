@@ -1,0 +1,163 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Lina contributors
+"""Fuentes propias: para un tema concreto, una web concreta («para las recetas de refinería de No Man's Sky, usa esta página»).
+
+Reglas que no se saltan:
+  · Las escribe el usuario, en la terminal o con una frase suya. La IA no tiene ninguna herramienta que escriba aquí, y `lina fuentes` y este archivo están
+    bloqueados para ella: como mucho elegirá un id de la lista. Así una página con instrucciones ocultas no puede colar una fuente.
+  · Nada que parezca una clave ni direcciones con usuario, contraseña o tokens; solo webs con un dominio de verdad (ni IP ni nombres locales).
+  · El tema es una frase libre, porque lo que encaja lo decidirá el significado, no unas palabras.
+De momento solo se guardan: todavía no se usan al responder.
+Se ve y se borra con  lina fuentes  (y  lina olvidar fuentes)."""
+import json
+import os
+import re
+import threading
+import time
+from urllib.parse import urlparse
+
+from lina.nucleo import claves as CLA
+from lina.nucleo import memoria as MEM
+from lina.nucleo import rutas as RUT
+from lina.nucleo.comandos import normalizar
+from lina.nucleo.idioma import N_, T
+
+ARCHIVO = RUT.DATOS / "fuentes.json"
+MAX_FUENTES = 20                   # cada una ocupará sitio en las instrucciones de cada pregunta
+MAX_TEMA = 120
+_lock = threading.RLock()
+_PARAMETRO_SECRETO = re.compile(r"(?i)[?&;](?:[^=&;]*[_-])?(?:token|api_?key|key|clave|pass|password|secret|auth|sig|signature)=")
+AYUDA = N_("lina fuentes                              las webs que has elegido para cada tema\n"
+           "lina fuentes añadir \"TEMA\" DIRECCIÓN      para ese tema, usa esa web (por ejemplo: \"recetas de refinería de No Man's Sky\" https://…)\n"
+           "lina fuentes quitar f1 | todas            quita una o todas\n"
+           "De momento solo se guardan: todavía no se usan al responder.")
+
+
+def _cargar():
+    try:
+        datos = json.loads(ARCHIVO.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(datos, list):
+        return []
+    return [f for f in datos if isinstance(f, dict) and all(isinstance(f.get(k), str) and f[k] for k in ("id", "tema", "url", "dominio"))]
+
+
+def _guardar(fuentes):
+    try:
+        ARCHIVO.parent.mkdir(parents=True, exist_ok=True)
+        tmp = ARCHIVO.with_name(ARCHIVO.name + ".tmp")
+        tmp.write_text(json.dumps(fuentes, ensure_ascii=False, indent=1), encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        tmp.replace(ARCHIVO)
+        return True
+    except OSError:
+        return False
+
+
+def _id_nuevo(fuentes):
+    usados = [int(m.group(1)) for f in fuentes if (m := re.fullmatch(r"f(\d+)", f["id"]))]
+    return f"f{max(usados, default=0) + 1}"
+
+
+def listar():
+    return _cargar()
+
+
+def validar_direccion(texto):
+    """(dirección, dominio) de una web, con o sin https://; o ValueError con el motivo. Sin usuario ni contraseña, sin nada con pinta de clave y con un dominio de verdad."""
+    from lina.nucleo.ia import dominio_valido
+    t = str(texto or "").strip()
+    if not t or re.search(r"\s", t):
+        raise ValueError(T("eso no es una dirección web"))
+    if "://" not in t:
+        t = "https://" + t
+    try:
+        p = urlparse(t)
+        usuario, contrasena = p.username, p.password
+    except ValueError:
+        raise ValueError(T("eso no es una dirección web")) from None
+    if p.scheme not in ("http", "https"):
+        raise ValueError(T("solo vale una web (http o https)"))
+    if usuario or contrasena:
+        raise ValueError(T("no guardo direcciones con usuario o contraseña"))
+    if CLA.limpiar(t) != t or _PARAMETRO_SECRETO.search("?" + p.query if p.query else ""):
+        raise ValueError(T("la dirección parece llevar una clave: quítala y vuelve a probar"))
+    dominio = dominio_valido(p.hostname or "")
+    if not dominio or re.fullmatch(r"[\d.]+", p.hostname or ""):
+        raise ValueError(T("eso no tiene un dominio válido (por ejemplo: nomanssky.fandom.com)"))
+    return t.split("#")[0], dominio
+
+
+def anadir(tema, direccion):
+    """Guarda una fuente. Devuelve (fuente o None, lo_que_se_dice)."""
+    tema = re.sub(r"\s+", " ", str(tema or "")).strip()
+    if not tema:
+        return None, T("¿Para qué tema es esa web?")
+    if len(tema) > MAX_TEMA:
+        return None, T("El tema es demasiado largo ({n} caracteres; el máximo es {max}). Dímelo más corto.", n=len(tema), max=MAX_TEMA)
+    motivo = MEM.motivo_de_rechazo(tema)
+    if motivo:
+        return None, motivo
+    try:
+        url, dominio = validar_direccion(direccion)
+    except ValueError as e:
+        return None, T("No la guardo: {e}.", e=e)
+    with _lock:
+        fuentes = _cargar()
+        if any(normalizar(f["tema"]) == normalizar(tema) for f in fuentes):
+            return None, T("Ya hay una fuente para ese tema. Quítala primero si quieres cambiarla:  lina fuentes")
+        if len(fuentes) >= MAX_FUENTES:
+            return None, T("Ya hay {n} fuentes, el máximo. Quita alguna con  lina fuentes quitar", n=MAX_FUENTES)
+        fuente = {"id": _id_nuevo(fuentes), "tema": tema, "url": url, "dominio": dominio, "fecha": time.strftime("%Y-%m-%d")}
+        if not _guardar(fuentes + [fuente]):
+            return None, T("No he podido guardarla.")
+    return fuente, T("Vale: para «{tema}», {dominio}.", tema=tema, dominio=dominio)
+
+
+def quitar(ident):
+    """Quita una fuente por su id, o todas. Devuelve (hecho, lo_que_se_dice)."""
+    with _lock:
+        fuentes = _cargar()
+        quedan = [] if ident == "todas" else [f for f in fuentes if f["id"] != ident]
+        if len(quedan) == len(fuentes):
+            return False, T("No hay ninguna fuente con ese id.") if ident != "todas" else T("No hay ninguna fuente guardada.")
+        if quedan:
+            if not _guardar(quedan):
+                return False, T("No he podido guardarlo.")
+        else:
+            ARCHIVO.unlink(missing_ok=True)
+    return True, T("Quitada.")
+
+
+def principal(argv, salida=print):
+    """`lina fuentes`, `lina fuentes añadir "TEMA" DIRECCIÓN` y `lina fuentes quitar ID|todas`."""
+    orden = argv[0] if argv else ""
+    if orden in ("-h", "--help", "ayuda"):
+        salida(T(AYUDA))
+        return 0
+    if orden in ("añadir", "anadir", "agregar"):
+        if len(argv) != 3:
+            salida(T(AYUDA))
+            return 2
+        fuente, frase = anadir(argv[1], argv[2])
+        salida(frase)
+        return 0 if fuente else 1
+    if orden in ("quitar", "borrar"):
+        if len(argv) != 2:
+            salida(T(AYUDA))
+            return 2
+        hecho, frase = quitar(argv[1])
+        salida(frase)
+        return 0 if hecho else 1
+    if argv:
+        salida(T(AYUDA))
+        return 2
+    fuentes = _cargar()
+    if not fuentes:
+        salida(T("No hay ninguna fuente guardada.  Para añadir una:  lina fuentes añadir \"TEMA\" DIRECCIÓN"))
+        return 0
+    salida(T("Tus fuentes ({n} de {max}). De momento solo se guardan: todavía no se usan al responder.", n=len(fuentes), max=MAX_FUENTES))
+    for f in fuentes:
+        salida(f"  {f['id']}  {f.get('fecha', '')}  {f['tema']} → {f['url']}")
+    return 0

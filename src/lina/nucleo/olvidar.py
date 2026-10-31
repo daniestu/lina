@@ -14,12 +14,13 @@ QUE = {
     "diario": (N_("el diario de cambios y las copias para deshacer (después no podrás deshacer lo anterior)"), lambda: [RUT.DATOS / "diario"]),
     "acciones": (N_("el registro de las órdenes que se han ejecutado"), lambda: [RUT.REGISTRO_ACCIONES, RUT.REGISTRO_ACCIONES.with_name(RUT.REGISTRO_ACCIONES.name + ".1")]),
     "memoria": (N_("lo que me has pedido recordar («recuerda que…»)"), lambda: [RUT.DATOS / "memoria.json"]),
+    "fuentes": (N_("las webs que has elegido para cada tema (lina fuentes)"), lambda: [RUT.DATOS / "fuentes.json"]),
     "recetas": (N_("las recetas aprendidas (cómo hacer lo que ya me has pedido)"), lambda: [RUT.DATOS / "recetas.json"]),
     "tiempos": (N_("las mediciones de tiempo de las peticiones (solo números)"), lambda: [RUT.ESTADO / "tiempos.jsonl", RUT.ESTADO / "escuchas.jsonl",
                                                                                           RUT.ESTADO / "llamadas_ia.jsonl"]),
     "registro": (N_("el registro del sistema de tu usuario (journalctl --user): incluye lo que dijiste y contesté"), lambda: []),
 }
-TODO = ("diario", "acciones", "memoria", "recetas", "tiempos", "registro")
+TODO = ("diario", "acciones", "memoria", "fuentes", "recetas", "tiempos", "registro")
 
 
 def _tamano(ruta):

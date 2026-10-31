@@ -105,7 +105,7 @@ _SUDOERS = r"/etc/sudoers|\bvisudo\b|sudoers\.d"
 # Órdenes de Lina que cambian sus propios permisos, gasto, voz o claves: las da el usuario en su terminal o con el atajo, nunca la IA
 _ORDEN_PROPIA = (r"(?:^|[\s;&|(`/])(?:lina|python3?\s+-m\s+lina(?:\.__main__)?)\s+"
                  r"(?:config\s+(?:poner|perfil)\b|clave\b|voz\s+\S|privilegios\s+(?:instalar|total|quitar)\b|privacidad\s+(?:si|no|preguntar|sí)\b|olvidar\b|memoria\b|"
-                 r"di\b|pulsar\b)")
+                 r"di\b|pulsar\b|fuentes\b)")
 # El canal de «lina di» (y la carpeta donde vive): hablarle directamente al socket (socat, nc -U, python) sería rodear el bloqueo de «lina di».
 # Es una capa más: la barrera de verdad es que lo que llega por ese canal no puede confirmar acciones ni subir el tope de gasto.
 _CANAL = r"lina\.sock\b|(?:/run/user/\d+|xdg_runtime_dir\}?)/lina\b"

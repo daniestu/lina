@@ -22,9 +22,10 @@ AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
   lina ia [ORDEN]            con qué IA habla Lina (Gemini, Anthropic, OpenAI y compatibles) y cómo cambiarla:  lina ia ayuda
   lina privilegios [instalar|total|quitar]   qué permisos de administrador tiene Lina y cómo dárselos o quitárselos (siempre tras enseñarte lo que se escribe)
   lina privacidad [si|no]    qué se envía a la IA y qué no, y si permites enviar capturas de tu pantalla
-  lina olvidar [QUÉ]         borra lo que Lina guarda de ti: diario, registro de acciones, recetas, tiempos, registro del sistema (antes enseña qué y cuánto)
+  lina olvidar [QUÉ]         borra lo que Lina guarda de ti: diario, registro de acciones, fuentes, recetas, tiempos, registro del sistema (antes enseña qué y cuánto)
   lina directas [probar F]   las órdenes que Lina hace sin llamar a la IA (abrir un programa, volumen…); «probar» dice qué haría con una frase
   lina memoria [borrar ID|todas|medir]   lo que le has pedido recordar («recuerda que…»): verlo y borrarlo; «medir» compara cómo se eligen (--mios: con los tuyos, solo números)
+  lina fuentes [añadir "TEMA" WEB|quitar ID|todas]   las webs que eliges para cada tema (de momento solo se guardan)
   lina recetas [probar F|borrar ID]   lo que Lina ha aprendido a hacer y repite sin llamar a la IA; «probar» dice qué haría con una frase
   lina musica ORDEN          controla la música que pone Lina con mpv: poner "Queen" · pausar · reanudar · siguiente · anterior · detener
   lina probar-voz [--completo|mas|grande|silencio]  graba unas frases tuyas y mide qué Whisper te entiende mejor (motor, modelo, CPU o tarjeta gráfica); «mas» mide ayudas sin VRAM y Ollama, «grande» lo hace con ~95 frases tuyas, «silencio» si el fin de frase por silencio del atajo cortaría alguna; no cambia nada
@@ -111,6 +112,9 @@ def main(argv=None):
     if orden == "memoria":
         from lina.nucleo import memoria
         return memoria.principal(resto)
+    if orden == "fuentes":
+        from lina.nucleo import fuentes
+        return fuentes.principal(resto)
     if orden == "recetas":
         from lina.nucleo import recetas
         return recetas.principal(resto)
