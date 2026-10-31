@@ -19,6 +19,24 @@ Lina no tiene telemetría: no envía estadísticas ni datos de uso a nadie. Lo �
 - Tus archivos, a no ser que me pidas algo que exija leer uno (entonces solo lo que se lee para esa tarea).
 - Capturas de pantalla en modo privado, con ventanas sensibles o sin tu permiso.
 
+## Qué hace el modo privado
+
+Se activa con «activa el modo privado» y se quita solo con el atajo, diciendo «quita el modo privado». La IA puede activarlo, pero no quitarlo. Se recuerda aunque reinicies.
+
+**Mientras está activo:**
+
+- No se hace ni se envía ninguna captura de tu pantalla, y la IA no puede pedirla.
+- No atiendo «Oye Lina»: solo te escucho con el atajo.
+- No se conserva lo que acaba de pasar (ver más abajo), y al activarlo se borra lo que hubiera.
+- No puedo probar ajustes de KDE que haya que comprobar mirando el panel.
+
+**Lo que NO cambia. No es un modo de incógnito:**
+
+- Lo que dices se sigue enviando a la IA en texto, con la conversación en curso, el nombre de la ventana activa y el resultado de las herramientas.
+- Las búsquedas se siguen enviando a Tavily o a DuckDuckGo.
+- Lo que ya estaba en la conversación sigue ahí: activarlo no la borra.
+- Sigue guardándose lo demás: el registro (también tus preguntas, si `privacidad.registrar_preguntas` está activo), el registro de acciones, el diario de cambios, las recetas que aprendo, los tiempos y lo que me pidas recordar, y sigo usando esos recuerdos.
+
 ## Qué dice Google de lo que recibe
 
 Con la clave **gratuita**, según las condiciones de Google vigentes, lo que se envía puede usarse para mejorar sus productos y puede ser revisado por personas; con una clave **de pago** no. Compruébalo en las condiciones de la API de Gemini antes de enviar nada que no quieras compartir. Si trabajas con información confidencial, usa la clave de pago, un proveedor que cumpla lo que tu empresa exige o el modo privado.

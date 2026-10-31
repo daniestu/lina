@@ -19,6 +19,24 @@ Lina has no telemetry: she sends no statistics or usage data to anyone. The only
 - Your files, unless you ask for something that requires reading one (then only what is read for that task).
 - Screenshots in private mode, with sensitive windows or without your permission.
 
+## What private mode does
+
+Turn it on with «activa el modo privado»; only you can turn it off, with the shortcut, saying «quita el modo privado». The AI can turn it on but not off. It is remembered across restarts.
+
+**While it is on:**
+
+- No screenshot of your screen is taken or sent, and the AI can't ask for one.
+- I don't answer «Oye Lina»: I only listen with the shortcut.
+- What just happened is not kept (see below), and turning it on deletes whatever there was.
+- I can't try KDE settings that need checking by looking at the panel.
+
+**What does NOT change. It is not an incognito mode:**
+
+- What you say is still sent to the AI as text, with the current conversation, the name of the active window and the result of the tools.
+- Searches are still sent to Tavily or DuckDuckGo.
+- What was already in the conversation stays there: turning it on doesn't delete it.
+- Everything else is still saved: the log (including your questions, if `privacidad.registrar_preguntas` is on), the action log, the change journal, the recipes I learn, the timings and what you ask me to remember, and I keep using those memories.
+
 ## What Google says about what it receives
 
 With the **free** key, according to Google's current terms, what is sent may be used to improve its products and may be reviewed by people; with a **paid** key it is not. Check the Gemini API terms before sending anything you don't want to share. If you work with confidential information, use the paid key, a provider that meets what your company requires, or private mode.
