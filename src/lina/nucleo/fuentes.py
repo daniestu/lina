@@ -171,7 +171,24 @@ def quitar(ident):
 # ======================= lo que dices =======================
 _VERBO_ES = r"(?:usa|utiliza|consulta|mira en|busca en)(?:\s+(?:siempre|solo|s[oó]lo|solamente))?"
 _VERBO_EN = r"(?:use|check|look at|search)(?:\s+(?:always|only))?"
+# Añadir una fuente también se dice así, y se reconoce solo si lo de detrás habla de una web: «añade sal a la receta» sigue su camino
+_ANADIR_ES = r"(?:a[ñn][aá]de(?:me)?|agr[eé]ga(?:me)?|gu[aá]rda(?:me)?|ap[uú]nta(?:me)?)"
+_ANADIR_EN = r"(?:add|save|note(?:\s+down)?)"
+# Sobre el texto normalizado. Lo que no es esto (ni preguntas, ni tipografía, ni una fuente de agua) pasa a la IA: «usa la fuente de recetas» es una consulta, no una orden de añadir
+_VERBOS_ES = r"(?:anad\w*|agreg\w*|guard\w*|apunt\w*|mete\w*|meter|inclu\w*|registr\w*)"
+_VERBOS_EN = r"(?:add\w*|sav\w*|note|register\w*|includ\w*|put)"
 _ES = {
+    "anadir": re.compile(r"^(?:por favor,?\s*)?" + _ANADIR_ES + r"\s+(?P<web>.+?)\s+(?:a|para)\s+(?P<tema>.+)$", re.I),
+    "anadir_en": re.compile(r"^(?:por favor,?\s*)?" + _ANADIR_ES + r"\s+(?P<web>.+?)\s+en\s+(?P<tema>.+)$", re.I),
+    "es_web": re.compile(r"\b(?:fuentes?|p[aá]ginas?|webs?|enlaces?|sitio|url|https?)\b|\.[a-z]{2,24}\b", re.I),
+    "es_fuente": re.compile(r"\bfuentes?\b|https?://", re.I),
+    "papeles": re.compile(r"\b(?:porta|corta)\s*papeles\b", re.I),
+    "consulta": re.compile(r"^(?:(?:la|esa|esta|mi|tu)\s+)?fuente\s+del?\s", re.I),
+    "gestion": re.compile(r"^(?:por favor\W*)?(?:(?:quiero|puedes|podrias)\s+)?(?:" + _VERBOS_ES + r"\s+(?:(?:la|las|una|unas|esta|estas|esa|esas|mi|mis|otra|nueva|en|a)\s+){0,3}fuentes?\b"
+                         r"|.*\b(?:usa|utiliza|usar|utilizar|" + _VERBOS_ES + r")\b.*\b(?:como|nueva)\s+fuente\b)"),
+    "suelta": re.compile(r"\b" + _VERBOS_ES + r"\b.*\bfuentes?\b|\bfuentes?\b.*\b" + _VERBOS_ES + r"\b|\b(?:usa|utiliza)\b.*\b(?:como|nueva)\s+fuente\b"),
+    "no_es": re.compile(r"\bfuentes?\s+del?\s+(?:agua|alimentacion|energia|poder|luz|letra|texto|ingresos|informacion)\b|\btipografi|\bdocumento\b"
+                        r"|\b(?:tamano|grande|pequena|mayor|menor|negrita|cursiva|arial|helvetica|roboto|calibri|verdana)\b"),
     "para": re.compile(r"^(?:por favor,?\s*)?para\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_ES + r"\s+(?P<web>.+)$", re.I),
     "usa": re.compile(r"^(?:por favor,?\s*)?" + _VERBO_ES + r"\s+(?P<web>.+?)[,:]?\s+para\s+(?P<tema>.+)$", re.I),
     "cuando": re.compile(r"^cuando\s+(?:te\s+)?pregunte\s+(?:por|sobre)\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_ES + r"\s+(?P<web>.+)$", re.I),
@@ -184,6 +201,16 @@ _ES = {
     "ultima": re.compile(r"^(?:por favor,?\s*)?(?:quita|borra|elimina)\s+la\s+[uú]ltima\s+fuente$", re.I),
 }
 _EN = {
+    "anadir": re.compile(r"^(?:please,?\s*)?" + _ANADIR_EN + r"\s+(?P<web>.+?)\s+(?:to|for)\s+(?P<tema>.+)$", re.I),
+    "anadir_en": re.compile(r"^(?:please,?\s*)?" + _ANADIR_EN + r"\s+(?P<web>.+?)\s+in\s+(?P<tema>.+)$", re.I),
+    "es_web": re.compile(r"\b(?:sources?|pages?|websites?|sites?|links?|url|https?)\b|\.[a-z]{2,24}\b", re.I),
+    "es_fuente": re.compile(r"\bsources?\b|https?://", re.I),
+    "papeles": re.compile(r"\bclip\s*board\b", re.I),
+    "consulta": re.compile(r"^(?:(?:the|that|this|my|your)\s+)?source\s+(?:of|for|on)\s", re.I),
+    "gestion": re.compile(r"^(?:please\W*)?(?:(?:i want to|can you|could you)\s+)?(?:" + _VERBOS_EN + r"\s+(?:(?:the|a|an|this|that|these|those|my|another|new|to)\s+){0,3}sources?\b"
+                          r"|.*\buse\b.*\b(?:as\s+a|new)\s+source\b)"),
+    "suelta": re.compile(r"\b" + _VERBOS_EN + r"\b.*\bsources?\b|\bsources?\b.*\b" + _VERBOS_EN + r"\b|\buse\b.*\b(?:as\s+a|new)\s+source\b"),
+    "no_es": re.compile(r"\b(?:water|power|light|income|font)\s+sources?\b|\bdocument\b"),
     "para": re.compile(r"^(?:please,?\s*)?for\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_EN + r"\s+(?P<web>.+)$", re.I),
     "usa": re.compile(r"^(?:please,?\s*)?" + _VERBO_EN + r"\s+(?P<web>.+?)[,:]?\s+for\s+(?P<tema>.+)$", re.I),
     "cuando": re.compile(r"^when\s+i\s+ask\s+(?:about|for)\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_EN + r"\s+(?P<web>.+)$", re.I),
@@ -200,14 +227,21 @@ _DIRECCION = re.compile(r"https?://\S+", re.I)
 _DOMINIO = re.compile(r"^[^\s/]+\.[a-z]{2,24}(?:/\S*)?$", re.I)
 
 
-def _web(web, p):
+def _copiada(web, p, clara=False):
+    """¿Habla de lo copiado? «portapapeles» a secas solo si la frase ya es clara o nombra una web: «usa lo del portapapeles como título» no va de fuentes."""
+    return p["copiada"].search(web) or (p["papeles"].search(web) and (clara or p["es_web"].search(web)))
+
+
+def _web(web, p, clara=False):
     """(«copiada»,) / («direccion», texto) / («falta»,) / («mala»,) / None si lo que hay detrás del verbo no habla de una web («usa Spotify»)."""
     web = web.strip().rstrip(".,;")
-    if p["copiada"].search(web):
+    if _copiada(web, p, clara):
         return ("copiada",)
     enlace = _DIRECCION.search(web)
     if enlace:
         return ("direccion", enlace.group(0).rstrip(".,;"))
+    if p["consulta"].match(web):                       # «la fuente de recetas» ya es una tuya: se consulta, no se añade
+        return None
     marca = p["marca"].match(web)
     resto = (marca.group("resto") if marca else web).strip()
     if marca and not resto:
@@ -231,19 +265,51 @@ def entender(texto):
         m = p[forma].match(frase)
         if not m:
             continue
-        web = _web(m.group("web"), p)
+        web = _web(m.group("web"), p, forma != "usa")
         if web is None:
             return None
-        tema = p["articulo"].sub("", m.group("tema").strip().rstrip(".,;:"), count=1)
-        if web[0] == "direccion":
-            return ("anadir", tema, web[1])
-        return {"copiada": ("copiada", tema), "falta": ("falta_web", tema)}.get(web[0], ("mala", tema))
+        return _accion(web, m.group("tema"), p)
+    m = p["anadir"].match(frase)                       # «en» solo si nombra la fuente: «guarda esta página en marcadores» es otra cosa
+    if not m or not p["es_web"].search(m.group("web")):
+        m = p["anadir_en"].match(frase)
+        m = m if m and p["es_fuente"].search(m.group("web")) else None
+    if m and not p["no_es"].search(normalizar(frase)):
+        web = _web(m.group("web"), p, True)
+        if web:
+            return _accion(web, m.group("tema"), p)
     m = p["sin_tema"].match(frase)
     if m:
         web = m.group("web").strip().rstrip(".,;")
-        if p["esta_pagina"].match(web) or p["copiada"].search(web) or _DIRECCION.search(web):
+        if p["esta_pagina"].match(web) or _copiada(web, p) or _DIRECCION.search(web):
             return ("falta_tema",)
-    return None
+    return ("incompleta",) if pide_gestion(frase) else None
+
+
+def _accion(web, tema, p):
+    tema = p["articulo"].sub("", tema.strip().rstrip(".,;:"), count=1)
+    if web[0] == "direccion":
+        return ("anadir", tema, web[1])
+    return {"copiada": ("copiada", tema), "falta": ("falta_web", tema)}.get(web[0], ("mala", tema))
+
+
+def _normalizada(frase, p):
+    """La frase sin acentos y en minúsculas si puede ir de gestionar fuentes, o None: nunca preguntas, ni tipografía ni otras fuentes."""
+    t = normalizar(str(frase or ""))
+    return None if "?" in str(frase) or "¿" in str(frase) or p["no_es"].search(t) else t
+
+
+def pide_gestion(frase):
+    """¿Pide añadir una fuente aunque no se entienda el resto? Antes de la IA: «guarda esta fuente». «usa» solo con «como fuente» o «nueva fuente»: lo demás es consultarla."""
+    p = IDI.segun(_POR_IDIOMA)
+    t = _normalizada(frase, p)
+    return bool(t and p["gestion"].search(t))
+
+
+def pide_anadir_suelto(frase):
+    """Lo mismo, pero en cualquier orden, para la última red: lo que se escapó y llegó a la IA."""
+    p = IDI.segun(_POR_IDIOMA)
+    t = _normalizada(frase, p)
+    return bool(t and p["suelta"].search(t))
 
 
 def activas():
@@ -276,6 +342,8 @@ def gestionar(accion, origen, leer_portapapeles):
     tipo = accion[0]
     if tipo == "quitar_ultima":
         return quitar_ultima()
+    if tipo == "incompleta":
+        return T("No lo he guardado: me falta la web o el tema. Dímelo así: «para las recetas de refinería usa la página que tengo copiada».")
     if tipo == "falta_tema":
         return T("¿Para qué tema? Dímelo entero: «para las recetas de refinería usa esta página».")
     if tipo == "falta_web":

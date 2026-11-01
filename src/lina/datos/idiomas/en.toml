@@ -1044,3 +1044,5 @@
 "Ojo: esto no sale de tu web {web}." = "Careful: this doesn't come from your site {web}."
 "Ojo: esto no sale de tu web {web}, sino de una búsqueda general." = "Careful: this doesn't come from your site {web}, but from a general search."
 "Ojo: en tu web {web} no lo he encontrado; lo que te digo no sale de ahí." = "Careful: I didn't find it on your site {web}; what I'm telling you doesn't come from there."
+"No lo he guardado: me falta la web o el tema. Dímelo así: «para las recetas de refinería usa la página que tengo copiada»." = "I haven't saved it: I'm missing the website or the topic. Say it like this: «for refinery recipes use the page I have copied»."
+"Ojo: no he añadido ninguna fuente. Dímelo con el atajo o con lina di: «para este tema usa esta web»." = "Careful: I haven't added any source. Tell me with the shortcut or with lina di: «for this topic use this website»."

@@ -2046,7 +2046,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def asegurar_honestidad_final(self, texto):
         """Última red: lo que el código sabe y la respuesta no reconoce se añade o se sustituye. No se confía en que la IA lo diga."""
-        return self._aclarar_fuente(self._honestidad_de_lo_hecho(texto))
+        return self._avisar_fuente_sin_anadir(self._aclarar_fuente(self._honestidad_de_lo_hecho(texto)))
+
+    def _avisar_fuente_sin_anadir(self, texto):
+        """Lo que se escapó de `FUE.entender` y llegó a la IA: si pedías añadir una fuente y la lista sigue igual, se dice, aunque la respuesta hable de otra cosa."""
+        peticion = str(getattr(self, "pregunta_pura", "") or "")
+        if (self.ejecutor.pendientes or not FUE.pide_anadir_suelto(peticion) or FUE.firma() != getattr(self, "_fuentes_antes", None)
+                or re.search(r"\bno (?:lo |la )?(?:he|puedo) \w*\s*(?:guard|anad|apunt|sav|add)|\b(?:haven't|can't|didn't) (?:\w+ )?(?:sav|add)", C.normalizar(texto))):
+            return texto
+        log("Pedían añadir una fuente y la lista no ha cambiado: se avisa")
+        return texto.rstrip() + " " + T("Ojo: no he añadido ninguna fuente. Dímelo con el atajo o con lina di: «para este tema usa esta web».")
 
     def _aclarar_fuente(self, texto):
         """La respuesta no puede presentar como de tu web lo que no sale de ahí, ni callar que de ahí no salió."""
