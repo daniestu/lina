@@ -62,7 +62,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, afirma_fuente, correccion_de_fuente, enlace_sin_comprobar, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
+from lina.nucleo.turnos import HERRAMIENTAS_META, afirma_fuente, correccion_de_fuente, enlace_sin_comprobar, orden_de_cortesia, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -2219,12 +2219,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         return msg + " " + (T("Tengo {n} cosa más apuntada para después.", n=en_cola) if en_cola == 1 else T("Tengo {n} cosas más apuntadas para después.", n=en_cola))
 
     def _insistir_solo_con_la_web(self, pregunta):
-        """S12: insistir en una pregunta no da derecho a mirar el equipo. Una orden, una pregunta con la que ya se cambió algo («¿puedes abrir…?») o «lee esa página» cuando la
-        web bloquea (el código vio el obstáculo y se pidió esa página, sin preguntar) insisten como siempre."""
+        """S12: insistir en una pregunta de información no da derecho a mirar el equipo. Una orden, también dicha con cortesía («¿puedes abrir Steam?»), una pregunta con la que ya se
+        cambió algo o «lee esa página» cuando la web bloquea (el código vio el obstáculo y se pidió esa página, sin preguntar) insisten como siempre."""
         peticion = str(getattr(self, "pregunta_pura", "") or pregunta)
         if getattr(self, "obstaculo", "") and "?" not in peticion and "¿" not in peticion:
             return False
-        return (not pide_accion(peticion) and not self.ejecutor.duda and not self.ejecutor.efecto_sin_comprobar
+        return (not pide_accion(peticion) and not orden_de_cortesia(peticion) and not self.ejecutor.duda and not self.ejecutor.efecto_sin_comprobar
                 and solo_se_informo(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura"))
 
     def _tarea_de_ajustes(self):

@@ -124,6 +124,41 @@ def test_preguntar_por_una_pagina_que_bloquea_se_queda_en_la_web(lina):
     assert lina.reintento_solo_web is True and _llamada(lina)[1]["herramientas"] == [WEB, LEER]
 
 
+CORTESIA = ["¿Puedes abrir Steam?", "¿Me abres Steam?", "¿Podrías subir el volumen?", "¿Me puedes poner música?", "¿Quieres cerrar el navegador?", "¿Te importa apagar la pantalla?",
+            "¿Sabrías instalar VLC?", "¿Me subes el volumen?", "¿Me pones una canción?", "¿Te importaría bajar el brillo?", "¿Puedes reiniciar el Bluetooth?", "Oye, ¿podrías quitar el sonido?",
+            "¿Nos pones música?", "¿Podrías, por favor, abrir Firefox?", "¿Me lo abres?", "¿Puedes ponerme música?"]
+INFORMACION = ["¿Qué dice esta página?", "¿Cuánto cuesta un Steam Deck?", "¿Qué es la ferrita?", "¿Cómo abro Steam?", "¿Puedes decirme qué hora es?", "¿Me dices el precio del oro?",
+               "¿Me explicas qué es un kernel?", "¿Sabrías decirme quién ganó ayer?", "¿Podrías contarme qué pasó?", "¿Cuándo sale el juego?", "¿Dónde consigo ferrita?",
+               "¿Por qué sube el precio?", "¿Quién abrió la tienda?", "¿Qué pasa si subo el volumen?"]
+
+
+@pytest.mark.parametrize("frase", CORTESIA)
+def test_la_cortesia_con_un_verbo_de_hacer_conserva_el_reintento_con_el_equipo(lina, frase):
+    _insistir(lina, frase)
+    args, k = _llamada(lina)
+    assert lina.reintento_solo_web is False and k["herramientas"] == HERRAMIENTAS and args[0] == "profundo"
+
+
+@pytest.mark.parametrize("frase", INFORMACION)
+def test_la_pregunta_de_informacion_se_queda_en_la_web(lina, frase):
+    _insistir(lina, frase)
+    args, k = _llamada(lina)
+    assert lina.reintento_solo_web is True and k["herramientas"] == [WEB, LEER] and args[0] == "rapido"
+
+
+def test_orden_de_cortesia_en_ingles(monkeypatch):
+    from lina.nucleo import idioma as IDI
+    from lina.nucleo import turnos as TU
+    monkeypatch.setattr(IDI, "actual", lambda: "en")
+    assert TU.orden_de_cortesia("Can you open Steam?") and TU.orden_de_cortesia("Could you please turn up the volume?")
+    assert not TU.orden_de_cortesia("Can you tell me the time?") and not TU.orden_de_cortesia("What does this page say?")
+
+
+def test_pide_accion_no_cambia():
+    from lina.nucleo import turnos as TU
+    assert TU.pide_accion("¿Puedes abrir Steam?") is False
+
+
 def test_el_modo_a_fondo_pedido_no_reintenta_ni_cambia(lina):
     lina.pregunta_pura = PREGUNTA
     r = lina._insistir_si_hace_falta("No he podido.", "m", "profundo", PREGUNTA, None, list(HERRAMIENTAS), "s")

@@ -190,6 +190,24 @@ def nota_de_hechos(registros):
             "estos hechos contradicen o no respaldan, díselo con claridad y no le des la razón.")
 
 
+# Órdenes con forma de pregunta: «¿puedes abrir Steam?», «¿me subes el volumen?». Solo con un verbo de hacer: «¿puedes decirme qué hora es?» es una pregunta
+_TU_ES = (r"(?:abres|cierras|subes|bajas|pones|quitas|apagas|enciendes|activas|desactivas|instalas|desinstalas|borras|mueves|copias|cambias|creas|guardas|lanzas|ejecutas|reinicias|paras|pausas|"
+          r"silencias|configuras|descargas|conectas|desconectas|arrancas|ajustas|pegas|renombras)")
+_INF_ES = (r"(?:abrir|cerrar|subir|bajar|poner|quitar|apagar|encender|activar|desactivar|instalar|desinstalar|borrar|mover|copiar|cambiar|crear|guardar|lanzar|ejecutar|reiniciar|parar|pausar|"
+           r"silenciar|configurar|descargar|conectar|desconectar|arrancar|ajustar|pegar|renombrar)(?:me|nos|lo|la|los|las|le|les|melo|mela|melos|melas)?")
+_INICIO_ES = r"^(?:(?:oye|hola|lina|vale|venga|por favor)\s+)*"
+_CORTESIA_ES = re.compile(_INICIO_ES + r"(?:(?:(?:me|nos)\s+)?(?:puedes|podrias|sabrias|quieres|querrias|te importa|te importaria)\s+(?:(?:por favor|tambien|ya)\s+)?" + _INF_ES
+                          + r"|(?:me|nos)\s+(?:lo\s+|la\s+)?" + _TU_ES + r")\b")
+_CORTESIA_EN = re.compile(r"^(?:(?:hey|hi|ok|okay|please)\s+)*(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:open|close|turn|raise|lower|put|play|remove|shut|enable|disable|install|uninstall|delete|"
+                          r"move|copy|change|create|save|launch|run|restart|stop|pause|mute|configure|download|connect|disconnect|start|adjust|paste|rename)\b")
+
+
+def orden_de_cortesia(texto):
+    """¿Es una orden dicha como pregunta? Va aparte de `pide_accion`, que sigue considerando pregunta todo lo que lleva interrogación."""
+    from lina.nucleo import idioma as IDI
+    return bool((_CORTESIA_EN if IDI.actual() == "en" else _CORTESIA_ES).search(C.normalizar(texto)))
+
+
 def pide_accion(texto):
     """¿La frase pide hacer algo («ponme el partido», «abre Steam») y no solo saber algo («¿a qué hora es el partido?»)?"""
     from lina.nucleo import idioma as IDI
