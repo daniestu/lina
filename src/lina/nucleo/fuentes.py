@@ -32,7 +32,7 @@ _PARAMETRO_SECRETO = re.compile(r"(?i)[?&;](?:[^=&;]*[_-])?(?:token|api_?key|key
 AYUDA = N_("lina fuentes                              las webs que has elegido para cada tema\n"
            "lina fuentes añadir \"TEMA\" DIRECCIÓN      para ese tema, usa esa web (por ejemplo: \"recetas de refinería de No Man's Sky\" https://…)\n"
            "lina fuentes quitar f1 | todas            quita una o todas\n"
-           "lina fuentes medir [--grupos C,D] [--variante r1] [--comprobar] [--lanzar]   mide si la IA elegiría bien la fuente (sin --lanzar, solo dice qué haría)\n"
+           "lina fuentes medir [--grupos C,D] [--variante r1] [--comprobar] [--tiempos --clave gratuita|pago] [--lanzar]   mide si la IA elegiría bien la fuente (sin --lanzar, solo dice qué haría)\n"
            "De momento solo se guardan: todavía no se usan al responder.")
 
 

@@ -3,19 +3,29 @@
 """`lina fuentes medir [--lanzar]` (A11): ¿el modelo ligero elegiría bien la fuente por significado? Se mide ANTES de activar `usar_fuente`.
 
 Pasa una tanda escrita a mano por el modelo rápido con las instrucciones y herramientas de verdad, más `usar_fuente` con dos fuentes de ejemplo, y mira solo su primer turno: no ejecuta
-ninguna herramienta, no busca, no lee ninguna web y no toca tus fuentes. Va siempre con la clave gratuita. Sin --lanzar no llama a la IA: solo dice qué haría y resume lo que haya medido.
+ninguna herramienta, no busca, no lee ninguna web y no toca tus fuentes. Va con la clave gratuita; solo `--tiempos --clave pago`, si se pide, usa la de pago. Sin --lanzar no llama a la IA: solo dice qué haría y resume lo que haya medido.
 
 Dos errores: no usarla cuando debía (leve) y usarla cuando no debía o con el id equivocado (grave). El criterio de la fila A11 se escribió antes de medir. Los casos «gris» son ambiguos de
 verdad: se miden y se enseñan aparte, pero no cuentan en el criterio. El progreso se guarda: si se acaba el cupo, se continúa después."""
 import json
 import re
+import statistics
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
 
 from lina.nucleo import rutas as RUT
 from lina.nucleo.idioma import N_, T
 
 ARCHIVO = RUT.ESTADO / "medida_fuentes.jsonl"
 VARIANTES = ("base", "r1")          # qué descripción de usar_fuente se mide; cada una en su archivo, sin mezclarse
+# --tiempos (F3a): ¿los timeouts de R3 son del nivel gratuito? 45 de 234 pasaron de 4 s, en ráfagas. Criterio escrito antes de medir.
+LLAMADAS_TIEMPOS = 100
+PAUSA_TIEMPOS = 5.0
+ESPERA_MAX = 12.0                   # cada llamada espera hasta aquí, para ver cuánto tarda de verdad sin cortarla a 4 s
+ESPERA_REINTENTO = 2.5              # si a los 2,5 s no ha contestado, sale otra en paralelo: así se ve qué habría hecho un reintento
+POLITICAS = (("A", 4.0), ("C", 5.0), ("B", 8.0))      # (política, espera extra máxima): se prefiere la que menos hace esperar
+MAX_FALLO_PAGO = 0.02               # «apenas tiene»
+MAX_FALLO_TIEMPOS = 0.08            # con esto, «no la usa» queda en 1,9 % + 0,981 × 8 % ≈ 9,7 %, dentro del 10 %
 REPETICIONES = 3                   # el modelo no siempre responde igual
 PAUSA_SEG = 4.0                    # para no chocar con el límite por minuto de la clave gratuita
 JUEGO = "No Man's Sky"
@@ -340,26 +350,35 @@ def _preguntar_de_verdad(variante="base"):
     return preguntar, ""
 
 
-def _consultar_de_verdad():
-    """R3: solo el tema y la pregunta, con el modelo ligero y la clave gratuita. (función, «») o (None, motivo). La función devuelve True, False o el ErrorIA."""
+def _consultar_de_verdad(nombre_clave="gemini", timeout=None):
+    """R3: solo el tema y la pregunta, con el modelo ligero. (función, «») o (None, motivo). La función devuelve True, False o el ErrorIA. La clave de pago solo si se pide:
+    apunta su gasto y respeta el tope."""
     from lina.nucleo import claves as CL
     from lina.nucleo import fuentes as FUE
     from lina.nucleo import ia as IA
     from lina.nucleo import ia_activa as IAC
+    from lina.nucleo import presupuesto as PRES
     from lina.nucleo import proveedores as PROV
     from lina.nucleo.constantes import TIMEOUT_REVISOR
     ia = IAC.actual()
-    clave = CL.obtener("gemini")
+    clave = CL.obtener(nombre_clave)
+    pago = nombre_clave == "gemini_pago"
     if ia.nombre != "gemini" or not clave:
-        return None, T("Esta medida necesita Gemini con su clave gratuita.")
+        return None, T("Esta medida necesita Gemini con su clave de pago.") if pago else T("Esta medida necesita Gemini con su clave gratuita.")
+    if pago:
+        PRES.configurar_claves(CL.obtener("gemini"), clave)
     modelo = IAC.modelos("rapido")[0]
 
     def consultar(tema, frase):
+        if pago and not PRES.pago_disponible():
+            return PROV.ErrorIA("cuota", None, "tope de gasto")
         with IA.motivo_llamada("medida"):
             r = IA._turno_medido(ia.proveedor, clave, modelo, FUE.PROMPT_TEMA, [{"rol": "user", "texto": FUE.contenido_tema(tema, frase)}], json_esquema=FUE.ESQUEMA_TEMA,
-                                 nivel=IA.nivel_razonamiento(modelo, "rapido"), temperatura=0, max_salida=100, timeout=TIMEOUT_REVISOR)
+                                 nivel=IA.nivel_razonamiento(modelo, "rapido"), temperatura=0, max_salida=100, timeout=timeout or TIMEOUT_REVISOR)
         if isinstance(r, PROV.ErrorIA):
             return r
+        if pago:
+            PRES.registrar(clave, modelo, r.uso, r.modelo_real)
         try:
             return json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", r.texto.strip()))["decision"] == "encaja"
         except (ValueError, KeyError, TypeError):
@@ -389,11 +408,150 @@ def _argumentos(argv):
     return grupos, variante, ver, lanzar
 
 
+# ----- --tiempos (F3a): cuánto tarda R3 con cada clave, sin cortarlo a 4 s. Solo números: ni frases ni respuestas en el archivo
+def ruta_tiempos():
+    return ARCHIVO.with_name(f"{ARCHIVO.stem}_tiempos.jsonl")
+
+
+def leer_tiempos(archivo, clave=None):
+    try:
+        lineas = archivo.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    salida = []
+    for l in lineas:
+        try:
+            d = json.loads(l)
+            if isinstance(d["seg1"], (int, float)) and (clave is None or d["clave"] == clave):
+                salida.append(d)
+        except (ValueError, KeyError, TypeError):
+            continue
+    return salida
+
+
+def cronometrar(consultar, tema, frase, reintento=ESPERA_REINTENTO):
+    """Una llamada y, si tarda más de `reintento`, otra en paralelo. Devuelve {seg1, res1, seg2, res2}; sin segunda, seg2 y res2 son None."""
+    from lina.nucleo import proveedores as PROV
+
+    def una():
+        t0 = time.monotonic()
+        r = consultar(tema, frase)
+        return round(time.monotonic() - t0, 3), r.tipo if isinstance(r, PROV.ErrorIA) else "ok"
+    with ThreadPoolExecutor(max_workers=2) as hilos:
+        primera = hilos.submit(una)
+        segunda = None if wait([primera], timeout=reintento).done else hilos.submit(una)
+    seg1, res1 = primera.result()
+    seg2, res2 = segunda.result() if segunda else (None, None)
+    return {"seg1": seg1, "res1": res1, "seg2": seg2, "res2": res2}
+
+
+def medir_tiempos(consultar, clave, archivo, salida=print, dormir=time.sleep, pausa=PAUSA_TIEMPOS, reintento=ESPERA_REINTENTO):
+    """Las llamadas que falten de esta clave, repartidas entre las parejas ya medidas. Devuelve «hecho», o «cupo» si se acaba el cupo o el tope."""
+    temas = {f["id"]: f["tema"] for f in FUENTES}
+    pares = parejas(leer(ruta()))
+    hechas = len(leer_tiempos(archivo, clave))
+    RUT.asegurar(archivo.parent)
+    for n in range(hechas, LLAMADAS_TIEMPOS):
+        frase, ident = pares[n % len(pares)]
+        r = cronometrar(consultar, temas[ident], frase, reintento)
+        if "cuota" in (r["res1"], r["res2"]) or "auth" in (r["res1"], r["res2"]):
+            salida(T("Parada: {motivo}. Quedan {n} llamadas; se sigue con la misma orden cuando haya cupo.", motivo=r["res1"], n=LLAMADAS_TIEMPOS - n))
+            return "cupo"
+        with open(archivo, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"clave": clave, "vuelta": n, **r}) + "\n")
+        if (n + 1) % 25 == 0:
+            salida(T("  {n} de {total}…", n=n + 1, total=LLAMADAS_TIEMPOS))
+        dormir(pausa)
+    return "hecho"
+
+
+def fallaria(r, politica):
+    """¿Con esta política esa llamada habría acabado sin veredicto?"""
+    a_tiempo = r["res1"] == "ok" and r["seg1"] <= {"A": 4.0, "B": 8.0, "C": ESPERA_REINTENTO}[politica]
+    return not (a_tiempo or (politica == "C" and r["res2"] == "ok" and r["seg2"] <= ESPERA_REINTENTO))
+
+
+def resumir_tiempos(registros):
+    """Por política, qué parte habría acabado sin veredicto; y la racha más larga de llamadas seguidas por encima de 4 s."""
+    segs = sorted(r["seg1"] for r in registros)
+    racha = maxima = 0
+    for r in registros:
+        racha = racha + 1 if fallaria(r, "A") else 0
+        maxima = max(maxima, racha)
+    return {"n": len(registros), "p50": statistics.median(segs) if segs else 0.0, "p95": segs[int(len(segs) * 0.95)] if segs else 0.0, "racha": maxima,
+            "fallos": {p: sum(fallaria(r, p) for r in registros) / max(1, len(registros)) for p, _ in POLITICAS}}
+
+
+def mejor_politica(r, limite):
+    return next((p for p, _ in POLITICAS if r["fallos"][p] <= limite), None)
+
+
+def decision_tiempos(gratuita, pago):
+    """El criterio de F3a, escrito antes de medir. (decisión, política) o None si faltan llamadas."""
+    if gratuita["n"] < LLAMADAS_TIEMPOS or pago["n"] < LLAMADAS_TIEMPOS:
+        return None
+    limpia = mejor_politica(pago, MAX_FALLO_PAGO)
+    if limpia:
+        return ("sin_rafaga", limpia) if gratuita["fallos"]["A"] <= MAX_FALLO_PAGO else ("pago_primero", limpia)
+    if mejor_politica(pago, MAX_FALLO_TIEMPOS):
+        return "pago_justo", mejor_politica(pago, MAX_FALLO_TIEMPOS)
+    if mejor_politica(gratuita, MAX_FALLO_TIEMPOS):
+        return "gratuita_justa", mejor_politica(gratuita, MAX_FALLO_TIEMPOS)
+    return "medida_larga", None
+
+
+DECISIONES_TIEMPOS = {"pago_primero": N_("la de pago apenas falla y la gratuita sí: R3 usará primero la de pago, con la política {p}"),
+                      "sin_rafaga": N_("ninguna falla en esta medida: no hubo ráfaga, así que no dice de quién son los timeouts; repetirla en otro momento"),
+                      "pago_justo": N_("la de pago pasa justa, con la política {p}: parar y decidir"),
+                      "gratuita_justa": N_("solo pasa la gratuita, con la política {p}: parar y decidir"),
+                      "medida_larga": N_("ninguna llega: hace falta la medida larga")}
+NOMBRES_CLAVE = {"gratuita": "gemini", "pago": "gemini_pago"}
+
+
+def informe_tiempos(archivo, salida=print):
+    resumenes = {c: resumir_tiempos(leer_tiempos(archivo, c)) for c in NOMBRES_CLAVE}
+    for c, r in resumenes.items():
+        salida(T("Clave {c}: {n} de {t} llamadas; mediana {p50} s, p95 {p95} s; racha sobre 4 s: {racha}.", c=c, n=r["n"], t=LLAMADAS_TIEMPOS, p50=round(r["p50"], 2), p95=round(r["p95"], 2),
+                 racha=r["racha"]))
+        if r["n"]:
+            salida(T("  Sin veredicto: A, 4 s sin reintento {a}; C, 2,5 s + reintento {c}; B, 8 s sin reintento {b}.", a=_pc(r["fallos"]["A"] * r["n"], r["n"]),
+                     c=_pc(r["fallos"]["C"] * r["n"], r["n"]), b=_pc(r["fallos"]["B"] * r["n"], r["n"])))
+    d = decision_tiempos(resumenes["gratuita"], resumenes["pago"])
+    if d:
+        salida(T("Decisión: {d}.", d=T(DECISIONES_TIEMPOS[d[0]], p=d[1])))
+
+
+def principal_tiempos(argv, salida=print, consultar=None, archivo=None, dormir=time.sleep):
+    args = [a for a in argv if a not in ("--tiempos", "--lanzar")]
+    clave = args[1] if len(args) == 2 and args[0] == "--clave" else None
+    if clave not in NOMBRES_CLAVE:
+        salida(T("Uso:  lina fuentes medir --tiempos --clave gratuita|pago [--lanzar]"))
+        return 2
+    archivo = archivo or ruta_tiempos()
+    if "--lanzar" not in argv:
+        salida(T("Tiempos de R3: {t} llamadas con la clave {c}. Con la de pago, menos de 2 céntimos. Para lanzarlo:  lina fuentes medir --tiempos --clave {c} --lanzar", t=LLAMADAS_TIEMPOS, c=clave))
+        informe_tiempos(archivo, salida)
+        return 0
+    if not parejas(leer(ruta())):
+        salida(T("No hay respuestas que comprobar en esta variante."))
+        return 1
+    if consultar is None:
+        consultar, motivo = _consultar_de_verdad(NOMBRES_CLAVE[clave], ESPERA_MAX)
+        if consultar is None:
+            salida(motivo)
+            return 1
+    fin = medir_tiempos(consultar, clave, archivo, salida, dormir)
+    informe_tiempos(archivo, salida)
+    return 0 if fin == "hecho" else 3
+
+
 def principal(argv, salida=print, preguntar=None, archivo=None, dormir=time.sleep, consultar=None):
+    if "--tiempos" in argv:
+        return principal_tiempos(argv, salida, consultar, archivo, dormir)
     try:
         grupos, variante, ver, lanzar = _argumentos(argv)
     except ValueError:
-        salida(T("Uso:  lina fuentes medir [--grupos C,D] [--variante r1] [--comprobar] [--lanzar]"))
+        salida(T("Uso:  lina fuentes medir [--grupos C,D] [--variante r1] [--comprobar] [--tiempos --clave gratuita|pago] [--lanzar]"))
         return 2
     archivo = archivo or ruta(variante)
     registros = leer(archivo)

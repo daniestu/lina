@@ -3,6 +3,7 @@
 """`lina fuentes medir`: la tanda con las etiquetas revisadas, cómo se clasifica cada respuesta, el criterio de A11 y que sin --lanzar no se llama a la IA.
 Con un modelo simulado: estas pruebas no llaman a la IA ni van a la red."""
 import json
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,6 +19,7 @@ from lina.nucleo import tiempos as TIE
 def archivo(tmp_path, monkeypatch):
     monkeypatch.setattr(requests, "post", MagicMock(side_effect=AssertionError("no debía ir a la red")))
     monkeypatch.setattr(F, "ARCHIVO", tmp_path / "fuentes.json")
+    monkeypatch.setattr(M, "ARCHIVO", tmp_path / "medida.jsonl")
     return tmp_path / "medida.jsonl"
 
 
@@ -312,3 +314,90 @@ def test_la_consulta_de_verdad_usa_la_clave_gratuita_el_modelo_ligero_y_solo_tem
     assert consultar("el tema", "la pregunta") is esperado
     assert (vistos["clave"], vistos["modelo"]) == ("gratuita", "ligero") and "herramientas" not in vistos
     assert vistos["sistema"] == F.PROMPT_TEMA and vistos["mensajes"] == [{"rol": "user", "texto": "<tema>el tema</tema>\n<pregunta>la pregunta</pregunta>"}]
+
+
+# ---------------------------------------------------------------- --tiempos (F3a)
+def _t(seg1, res1="ok", seg2=None, res2=None):
+    return {"clave": "pago", "seg1": seg1, "res1": res1, "seg2": seg2, "res2": res2}
+
+
+def test_el_reintento_solo_sale_si_la_primera_tarda():
+    assert M.cronometrar(lambda t, f: True, "t", "f", reintento=1)["seg2"] is None
+    llamadas = []
+
+    def lenta(t, f):
+        llamadas.append(1)
+        if len(llamadas) == 1:
+            time.sleep(0.05)
+        return True
+    r = M.cronometrar(lenta, "t", "f", reintento=0.01)
+    assert len(llamadas) == 2 and r["res2"] == "ok" and r["seg1"] >= 0.05 > r["seg2"]
+
+
+@pytest.mark.parametrize("registro, a, c, b", [(_t(1), False, False, False), (_t(3), False, True, False), (_t(3, seg2=1, res2="ok"), False, False, False), (_t(5), True, True, False),
+                                               (_t(5, seg2=1, res2="ok"), True, False, False), (_t(12, "red", 12, "red"), True, True, True), (_t(0.5, "servidor"), True, True, True)])
+def test_que_habria_hecho_cada_politica(registro, a, c, b):
+    assert (M.fallaria(registro, "A"), M.fallaria(registro, "C"), M.fallaria(registro, "B")) == (a, c, b)
+
+
+def _resumen(fallos_a, fallos_c=None, fallos_b=None, n=100):
+    return {"n": n, "fallos": {"A": fallos_a, "C": fallos_a if fallos_c is None else fallos_c, "B": fallos_a if fallos_b is None else fallos_b}}
+
+
+@pytest.mark.parametrize("gratuita, pago, esperado", [
+    (_resumen(.19), _resumen(.01), ("pago_primero", "A")),
+    (_resumen(.19), _resumen(.05, .01), ("pago_primero", "C")),
+    (_resumen(.01), _resumen(.01), ("sin_rafaga", "A")),
+    (_resumen(.19), _resumen(.05), ("pago_justo", "A")),
+    (_resumen(.05), _resumen(.19), ("gratuita_justa", "A")),
+    (_resumen(.19), _resumen(.19), ("medida_larga", None)),
+    (_resumen(.19, n=99), _resumen(.01), None)])
+def test_criterio_de_tiempos(gratuita, pago, esperado):
+    assert M.decision_tiempos(gratuita, pago) == esperado
+
+
+def test_tiempos_guarda_solo_numeros_sigue_donde_quedo_y_no_repite(archivo, monkeypatch):
+    _guardados(archivo, [("A", BUENA, "f1")])
+    monkeypatch.setattr(M, "LLAMADAS_TIEMPOS", 4)
+    destino = archivo.with_name("tiempos.jsonl")
+    respuestas = iter([True, True, PROV.ErrorIA("cuota", 429, "sin cupo")])
+    assert M.principal(["--tiempos", "--clave", "pago", "--lanzar"], lambda t: None, None, destino, lambda s: None, lambda t, f: next(respuestas)) == 3
+    assert len(M.leer_tiempos(destino, "pago")) == 2 and BUENA not in destino.read_text(encoding="utf-8")
+    pedidas = []
+    assert M.principal(["--tiempos", "--clave", "pago", "--lanzar"], lambda t: None, None, destino, lambda s: None, lambda t, f: pedidas.append(f) or True) == 0
+    assert len(pedidas) == 2 and len(M.leer_tiempos(destino, "gratuita")) == 0
+
+
+@pytest.mark.parametrize("args", [["--tiempos"], ["--tiempos", "--clave", "otra"], ["--tiempos", "--clave"], ["--tiempos", "--clave", "pago", "--grupos", "C"]])
+def test_tiempos_exige_decir_la_clave(archivo, args):
+    salida = []
+    assert M.principal(args + ["--lanzar"], salida.append, None, archivo, lambda s: None, MagicMock(side_effect=AssertionError)) == 2
+    assert "Uso:" in salida[0]
+
+
+def test_tiempos_sin_lanzar_no_llama(archivo):
+    salida = []
+    assert M.principal(["--tiempos", "--clave", "pago"], salida.append, None, archivo, lambda s: None, MagicMock(side_effect=AssertionError)) == 0
+    assert "100 llamadas" in salida[0]
+
+
+def test_la_clave_de_pago_apunta_el_gasto_y_respeta_el_tope(monkeypatch):
+    from lina.nucleo import claves as CL
+    from lina.nucleo import ia as IA
+    from lina.nucleo import ia_activa as IAC
+    from lina.nucleo import presupuesto as PRES
+    usadas, gasto = [], []
+    ia = MagicMock()
+    ia.nombre = "gemini"
+    monkeypatch.setattr(IAC, "actual", lambda *a: ia)
+    monkeypatch.setattr(IAC, "modelos", lambda *a: ["ligero"])
+    monkeypatch.setattr(CL, "obtener", lambda nombre, *a: {"gemini": "gratis", "gemini_pago": "de-pago"}.get(nombre))
+    monkeypatch.setattr(PRES, "configurar_claves", lambda g, p: None)
+    monkeypatch.setattr(PRES, "registrar", lambda *a: gasto.append(a))
+    disponible = [True]
+    monkeypatch.setattr(PRES, "pago_disponible", lambda: disponible[0])
+    monkeypatch.setattr(IA, "_turno_medido", lambda p, clave, *a, **k: usadas.append((clave, k["timeout"])) or PROV.Respuesta('{"decision":"encaja"}', [], {}, "ligero", None))
+    consultar, _ = M._consultar_de_verdad("gemini_pago", M.ESPERA_MAX)
+    assert consultar("t", "f") is True and usadas == [("de-pago", M.ESPERA_MAX)] and len(gasto) == 1
+    disponible[0] = False
+    assert consultar("t", "f").tipo == "cuota" and len(usadas) == 1             # con el tope alcanzado no llama
