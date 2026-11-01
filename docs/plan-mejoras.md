@@ -264,6 +264,7 @@ Lo que ya está bien: `rm` va a la papelera; `shred`, `truncate` y `dd` sobre tu
 | M3 | **Estado de la petición en una clase** (`TareaActual`, reiniciada en `nueva_tarea`) en vez de 44 `getattr(self, …, defecto)`; cambiar `estado` siempre con el cerrojo (hoy `decir` y `avisar` no lo cogen). | M |
 | M4 | **Resultados con estructura** (`rc`, salida, comprobado, preparado) que se convierten en texto solo para la IA, en vez de comparar prefijos como `"código de salida: 0"` o `"COMPROBADO AHORA"`. Poco a poco, herramienta a herramienta. | L |
 | M5 | **mypy más estricto** (`check_untyped_defs`) en los módulos grandes, uno a uno, empezando por `herramientas.py`. | M |
+| M7 | **`t_mov`** *(pendiente)*: renombrar `DEPENDEN_DEL_ENTORNO`, porque no depende del entorno; que el `xfail` cubra solo los dos casos conocidos, para que un tercer fallo salte; y decir si importa la falta de precisión del puntero (error de 3 y 17 píxeles de esquina a esquina con ratón muy acelerado). | S |
 | M6 | *(hecha)* En CLAUDE.md, `ruff` como `uvx ruff check src tests` (en el equipo del mantenedor `ruff` no está en el PATH). | S |
 
 ### Orden propuesto

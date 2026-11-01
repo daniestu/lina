@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Lina contributors
-"""F3b: R3 en producción, sin dársela aún a la IA al responder. Clave de pago primero, dos intentos con la misma clave y solo el modelo medido; cada comprobación se apunta con su
+"""F3b: R3 en producción. Clave de pago primero, dos intentos con la misma clave y solo el modelo medido; cada comprobación se apunta con su
 origen y solo con números; la regla del 8 % mira solo el uso real. Y `lina fuentes probar` no responde, no busca ni ejecuta nada. Sin red: todo simulado, en carpetas temporales."""
 import json
 from unittest.mock import MagicMock
@@ -248,9 +248,3 @@ def test_probar_sin_fuentes_no_llama_a_la_ia(probar):
 def test_probar_prueba_la_otra_clave_si_la_primera_falla(probar):
     _, _, _, turnos = probar([PROV.ErrorIA("cuota", 429, "sin cupo"), USA])
     assert turnos == ["gratis", "de-pago"]
-
-
-def test_usar_fuente_sigue_sin_darse_a_la_ia_al_responder():
-    from lina.nucleo import asistente as A
-    import inspect
-    assert "usar_fuente" not in inspect.getsource(A) and "comprobar_tema" not in inspect.getsource(A)

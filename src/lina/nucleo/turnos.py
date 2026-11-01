@@ -45,7 +45,7 @@ _ACCION_EN = re.compile(r"^(?:(?:hey|ok|please|can you|could you)\s+)*(?:put on|
 # Herramientas que solo informan (buscan, leen, miran): no hacen nada en el equipo.
 HERRAMIENTAS_DE_INFORMAR = HERRAMIENTAS_META | {"buscar_web", "leer_web", "buscar_youtube", "mirar_pantalla", "ver_pantalla", "buscar_ajuste_kde",
                                                 "buscar_clave_en_binarios", "observar_config", "ver_diario", "ver_recetas", "ver_juegos", "ver_gasto",
-                                                "mis_ajustes", "ver_papelera", "usar_receta", "necesito_datos_actuales"}
+                                                "mis_ajustes", "ver_papelera", "usar_receta", "necesito_datos_actuales", "usar_fuente"}
 
 
 # Para la última red de honestidad vale cualquier orden de hacer algo, no solo las que tienen reintento: «sube», «borra», «cambia», «crea», «reinicia»…
@@ -88,6 +88,39 @@ _FUENTE_OBJETO_ES = re.compile(r"\b(?:fuentes?|pagina|web|enlace|sitio)\b")
 _FUENTE_OBJETO_EN = re.compile(r"\b(?:sources?|page|website|site|link)\b")
 _FUENTE_HECHO_ES = re.compile(r"\b(?:(?:guardad|apuntad|anadid)[ao]s?|(?:quitad|borrad|eliminad)[ao]s?)\b")
 _FUENTE_HECHO_EN = re.compile(r"\b(?:saved|added|removed|deleted)\b")
+
+
+_PALABRAS_DE_DOMINIO = {"www", "wiki", "web", "com", "org", "net", "es", "info", "site"}
+
+
+def menciona_fuente(texto, dominio):
+    """¿La respuesta habla de esa web? Por su dominio, dicho o escrito, o por alguna de sus partes con nombre propio, o como «tu web»."""
+    t = C.normalizar(texto)
+    if re.search(r"\btu (?:web|fuente|pagina)\b|\byour (?:site|source|page|website)\b", t) or C.normalizar(dominio) in t:
+        return True
+    partes = [p for p in re.split(r"[^a-z0-9]+", C.normalizar(dominio)) if len(p) >= 4 and p not in _PALABRAS_DE_DOMINIO]
+    return any(re.search(rf"\b{re.escape(p)}\b", t) for p in partes)
+
+
+def en_resultados_generales(acciones, dominio):
+    """¿Alguna búsqueda general trajo de verdad una página de ese dominio o de un subdominio suyo? Entonces citarlo no es mentira."""
+    patron = re.compile(rf"(?:https?://|\()(?:[\w-]+\.)*{re.escape(dominio)}(?:[/)\s]|$)", re.I)
+    return any(nombre == "buscar_web" and patron.search(str(resultado)) for nombre, _, resultado in acciones or [])
+
+
+def correccion_de_fuente(estado, texto, acciones):
+    """Qué le falta a la respuesta sobre la fuente: «no_sale», «sino_general», «no_estaba» o None. `estado` = {dominio, encaja, sin_respuesta}, escrito por el código."""
+    if not estado:
+        return None
+    dominio = estado["dominio"]
+    citada, general = menciona_fuente(texto, dominio), any(a[0] == "buscar_web" for a in acciones or [])
+    if en_resultados_generales(acciones, dominio):
+        return None
+    if not estado["encaja"]:
+        return "no_sale" if citada else None
+    if citada:
+        return None
+    return "sino_general" if general else "no_estaba" if estado["sin_respuesta"] else None
 
 
 def afirma_fuente(peticion, respuesta):

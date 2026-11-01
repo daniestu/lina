@@ -73,11 +73,12 @@ def test_un_archivo_roto_no_rompe_nada(archivo):
     assert [f["id"] for f in F.listar()] == ["f2"]
 
 
-def test_la_orden(capsys):
+def test_la_orden(capsys, monkeypatch):
+    monkeypatch.setattr(F, "activas", lambda: True)
     salida = []
     assert F.principal([], salida.append) == 0 and "No hay ninguna fuente" in salida[-1]
     assert F.principal(["añadir", TEMA, WEB], salida.append) == 0
-    assert F.principal([], salida.append) == 0 and "todavía no se usan" in salida[-2] and TEMA in salida[-1] and WEB in salida[-1]
+    assert F.principal([], salida.append) == 0 and "Tus fuentes (1 de 20)." == salida[-2] and TEMA in salida[-1] and WEB in salida[-1]
     assert F.principal(["quitar", "f1"], salida.append) == 0
     assert F.principal(["añadir", TEMA], salida.append) == 2 and F.principal(["otra"], salida.append) == 2 and F.principal(["quitar"], salida.append) == 2
     assert F.principal(["añadir", TEMA, "no vale"], salida.append) == 1
@@ -89,11 +90,20 @@ def test_la_ia_no_puede_tocarlas(comando):
     assert CLA._bloqueado(comando), comando
 
 
-def test_ninguna_herramienta_escribe_fuentes_ni_se_usan_al_responder():
+def test_ninguna_herramienta_escribe_fuentes():
     assert not [d["name"] for d in H.DECLARACIONES if "fuente" in d["name"]]
+    usar = F.declaracion_usar_fuente([{"id": "f1", "tema": "t"}])
+    assert set(usar["parameters"]["properties"]) == {"id", "consulta"}                  # solo elige: ni dirección ni tema
     from pathlib import Path
-    fuente = Path(F.__file__).with_name("asistente.py").read_text(encoding="utf-8")
-    assert "FUE.listar" not in fuente and "FUE._cargar" not in fuente
+    assert "FUE._cargar" not in Path(F.__file__).with_name("asistente.py").read_text(encoding="utf-8")
+
+
+def test_sin_gemini_la_lista_dice_que_no_se_usan(monkeypatch):
+    monkeypatch.setattr(F, "activas", lambda: False)
+    salida = []
+    F.principal(["añadir", TEMA, WEB], salida.append)
+    F.principal([], salida.append)
+    assert any("Con esta configuración no se usan" in s for s in salida)
 
 
 def test_olvidar():

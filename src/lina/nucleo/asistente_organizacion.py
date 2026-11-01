@@ -85,8 +85,48 @@ class MixinOrganizacion:
                 if _A.RECORD.un_intento_mas(r["id"]) >= 4:
                     _A.RECORD.marcar_sonado(r["id"], ahora, perdido=True)
 
-    def leer_web(self, args):
-        """C1: descarga una página, saca su texto y, si es larga, la resume por trozos con el modelo barato. Siempre es contenido de fuera."""
+    def usar_fuente(self, args):
+        """La IA elige una fuente; manda el código: el id tiene que existir, R3 comprueba la pregunta del usuario (no lo que escriba la IA) y sin veredicto no se usa, en silencio."""
+        ident = str(args.get("id", "")).strip()
+        ya = self.fuentes_turno.get(ident)
+        if ya:                                                   # una comprobación por petición, aunque la pida otra vez
+            return ya
+        fuente = next((f for f in _A.FUE.listar() if f["id"] == ident), None)
+        if fuente is None:
+            return "Esa fuente no existe: sigue sin ella."
+        dominio = fuente["dominio"]
+        if _A.comprobar_tema(self._claves("fuente"), fuente["tema"], str(self.pregunta_pura)) != "encaja":
+            self.fuente_turno = self.fuente_turno or {"dominio": dominio, "encaja": False, "sin_respuesta": False}
+            resultado = "Esa fuente no sirve para esta pregunta: sigue sin ella y no la menciones."
+        else:
+            self.fuente_turno = {"dominio": dominio, "encaja": True, "sin_respuesta": False}
+            resultado = self._leer_fuente(fuente, str(args.get("consulta", "")).strip() or str(self.pregunta_pura))
+        self.fuentes_turno[ident] = resultado
+        return resultado
+
+    def _leer_fuente(self, fuente, consulta):
+        """Busca en la fuente; sin búsqueda con Tavily, lee solo la página guardada. Si no tiene la respuesta sigue sola, sin preguntar."""
+        dominio = fuente["dominio"]
+        if not _A.hay_busqueda_tavily():
+            resultado = self.leer_web({"url": fuente["url"], "foco": consulta}, obstaculo=False)
+            if resultado.startswith("CONTENIDO DE LA PÁGINA"):
+                return f"Es la fuente que eligió el usuario. Si no trae la respuesta, dilo: no contestes de memoria como si fuera un dato.\n{resultado}"
+            self.fuente_turno["sin_respuesta"] = True
+            return f"{resultado}\nDi que no has podido leer la web {dominio} y no contestes de memoria como si fuera un dato."
+        if self.busquedas_turno >= getattr(self, "max_busquedas", _A.MAX_BUSQUEDAS):
+            return "No hagas más búsquedas: responde con lo que ya tienes o di que no lo has encontrado."
+        self.busquedas_turno += 1
+        resultado = _A.buscar_tavily(consulta, dominio)
+        self.ejecutor.contaminar("búsqueda web")
+        if not resultado.startswith("RESULTADOS DE BÚSQUEDA"):
+            self.fuente_turno["sin_respuesta"] = True
+            return f"En la web {dominio} no se ha encontrado. Llama a buscar_web sin dominio y di en la respuesta que en esa web no estaba."
+        return (f"Es la fuente que eligió el usuario, {dominio}. Si esto responde, contesta con ello y di que sale de esa web. Si no responde, llama a buscar_web sin dominio "
+                f"y di en la respuesta que en esa web no estaba.\n{resultado}")
+
+    def leer_web(self, args, obstaculo=True):
+        """C1: descarga una página, saca su texto y, si es larga, la resume por trozos con el modelo barato. Siempre es contenido de fuera.
+        `obstaculo=False`: si la web bloquea no se insiste con más recursos (la fuente guardada, que sin ella sigue sola)."""
         if _A.W is None:
             return "Falta web.py: no puedo leer páginas."
         url = str(args.get("url", "") or "").strip()
@@ -101,7 +141,7 @@ class MixinOrganizacion:
         except _A.W.ErrorWeb as e:
             log(f"Leer web {url[:80]}: {e}")
             msg = f"No he podido leer la página: {e}"
-            if re.search(r"error (401|403|429)|bloquee", str(e)):
+            if obstaculo and re.search(r"error (401|403|429)|bloquee", str(e)):
                 self.obstaculo = f"leer la página {url[:150]}: la web no deja leerla a un programa ({str(e)[:90]})"
                 msg += ("\n(Para ti, no para el usuario: el usuario pidió ESA página; contestar con otras fuentes no cumple lo pedido. El sistema va a reintentarlo "
                         "con más recursos para conseguirla. Mientras tanto no des la respuesta por buena: di en una frase que esa web bloquea y que lo intentas de otra forma.)")

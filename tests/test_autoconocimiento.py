@@ -91,7 +91,7 @@ def test_el_resumen_sale_de_las_herramientas_de_verdad():
 
 def test_cada_herramienta_que_nombra_existe():
     nombradas = set(re.findall(r"\b[a-z]+_[a-z_]+\b", AUTO.resumen()))
-    assert nombradas and nombradas <= NOMBRES | set(G.GRUPOS), nombradas - NOMBRES
+    assert nombradas and nombradas <= NOMBRES | set(G.GRUPOS) | {"usar_fuente"}, nombradas - NOMBRES    # usar_fuente no es de las de siempre: solo se ofrece con fuentes guardadas
     assert set(G.NUCLEO) <= NOMBRES and all(set(h) <= NOMBRES for h in G.GRUPOS.values())
 
 

@@ -62,7 +62,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, afirma_fuente, enlace_sin_comprobar, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
+from lina.nucleo.turnos import HERRAMIENTAS_META, afirma_fuente, correccion_de_fuente, enlace_sin_comprobar, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -462,7 +462,7 @@ from lina.nucleo.ia import (  # noqa: F401
     BucleDeHerramienta, Cancelado, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
-    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva,
+    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
     cabe_modelo_local, dominio_valido,
@@ -539,6 +539,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.ejecutor = H.Ejecutor(avisar=self.avisar, confirmar=CONFIRMAR_ACCIONES)
         self.ejecutor.continuar = self._continuar_peticion
         self.busquedas_turno = 0
+        self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
         self.acciones_turno = []       # todo lo que se ha ejecutado de verdad en esta pregunta: (herramienta, datos, resultado)
         self.acciones_confirmadas = []  # lo que se ejecutó al decir «sí», para contarlo aunque Gemini falle
         self.t_tarea = time.time()      # cuándo empezó la petición actual (para el tope de tiempo)
@@ -1764,6 +1765,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             resultado = buscar_tavily(consulta, args.get("dominio") or None)
             self.ejecutor.contaminar("búsqueda web")      # A2e: lo que trae internet puede traer instrucciones escondidas
             return resultado
+        if nombre == "usar_fuente":
+            return self.usar_fuente(args)
         if nombre == "necesito_datos_actuales":
             AVB.apuntar(AVB.SIN_BUSQUEDA)
             return AVB.PARA_LA_IA_SIN_BUSQUEDA
@@ -2013,6 +2016,13 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     _NO_AJUSTE = re.compile(r"^(?:rm|mv|cp|mkdir|rmdir|touch|tee|echo|git|python3?|bash|sh|zsh|fish|systemctl|kill|pkill|killall|xdg-open|notify-send|"
                             r"sudo|" + "|".join(sorted(PL.GESTORES_PAQUETES)) + r"|flatpak|curl|wget|ln|chmod|chown|kdotool|xdotool|spectacle|grim|scrot|steam|kcmshell[56])$")
 
+    def _herramienta_de_fuente(self):
+        """usar_fuente, si hay fuentes, se usan con esta configuración y la frase no es una orden. Lo decide el código."""
+        fuentes = FUE.listar()
+        if not fuentes or not FUE.activas() or pide_accion(str(getattr(self, "pregunta_pura", "") or "")):
+            return []
+        return [FUE.declaracion_usar_fuente(fuentes)]
+
     def _nota_sobre_mi(self, peticion):
         """Si preguntan por la propia Lina, su ayuda reducida va con la petición (no entra en el historial): lo decide el código, no que la IA se acuerde de consultarla."""
         if not G.pregunta_por_mi(peticion):
@@ -2035,7 +2045,22 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return None
 
     def asegurar_honestidad_final(self, texto):
-        """Última red: si el último cambio sigue SIN comprobarse (⚠, ✘ o error) y la respuesta lo da por hecho sin reconocer la duda,
+        """Última red: lo que el código sabe y la respuesta no reconoce se añade o se sustituye. No se confía en que la IA lo diga."""
+        return self._aclarar_fuente(self._honestidad_de_lo_hecho(texto))
+
+    def _aclarar_fuente(self, texto):
+        """La respuesta no puede presentar como de tu web lo que no sale de ahí, ni callar que de ahí no salió."""
+        estado = getattr(self, "fuente_turno", None)
+        falta = correccion_de_fuente(estado, texto, getattr(self, "acciones_turno", None))
+        if not falta:
+            return texto
+        log(f"Fuente: la respuesta no reconoce de dónde sale ({falta}): se corrige")
+        web = FUE.dominio_hablado(estado["dominio"])
+        return texto.rstrip() + " " + {"no_sale": T("Ojo: esto no sale de tu web {web}.", web=web), "sino_general": T("Ojo: esto no sale de tu web {web}, sino de una búsqueda general.", web=web),
+                                       "no_estaba": T("Ojo: en tu web {web} no lo he encontrado; lo que te digo no sale de ahí.", web=web)}[falta]
+
+    def _honestidad_de_lo_hecho(self, texto):
+        """Si el último cambio sigue SIN comprobarse (⚠, ✘ o error) y la respuesta lo da por hecho sin reconocer la duda,
         el código añade la corrección. No se confía en que la IA lo diga."""
         if self.ejecutor.pendientes or admite_duda(texto):
             return texto
@@ -2402,6 +2427,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _responder(self, pregunta, imagen, modo="rapido"):
         self.modo_actual = modo
         self.busquedas_turno = 0
+        self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
         self.guion_herramientas = []
         self.acciones_turno = list(self.acciones_confirmadas)
         self.turno_aceptado = False
@@ -2423,6 +2449,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             grupos = self._preparar_grupos_mcp(self.elegir_grupos(pregunta))
             herramientas = G.herramientas(H.DECLARACIONES, grupos)
             herramientas = declaraciones_de_busqueda() + herramientas     # sin clave de Tavily: necesito_datos_actuales, y el código avisa una vez
+            herramientas = self._herramienta_de_fuente() + herramientas   # delante, como se midió
             self.herramientas_turno = herramientas        # la misma lista que usa Gemini: mas_herramientas la amplía en sitio
             self.grupos_turno = set(grupos)
             sistema = G.sistema(instrucciones(), H.hechos_sistema(), G.ordenar(grupos))

@@ -20,8 +20,8 @@ INTOCABLES = {("gasto", "tope_mensual_eur"), ("gasto", "eur_por_usd"), ("gasto",
 # Lo que NO se puede sacar de las herramientas. Una prueba comprueba que lo que se nombra aquí existe y que cada límite sigue siendo verdad en el código.
 LIMITES = (
     "Solo puedes hacer lo que permiten tus herramientas y comandos: si algo no está aquí ni en mis_ajustes, no existe.",
-    "No hay ningún sitio donde el usuario pueda dejarte páginas o fuentes fijas. Lo que sí hay: leer_web lee una dirección y, si tienes buscar_web, con «dominio» busca "
-    "dentro de una web, en la petición en que te la den.",
+    "Las webs por tema las guarda solo el usuario, con el atajo, con lina di o con lina fuentes; tú no puedes añadirlas ni quitarlas, solo usarlas con usar_fuente cuando la tengas. "
+    "Además, leer_web lee una dirección y, si tienes buscar_web, con «dominio» busca dentro de una web, en la petición en que te la den.",
     "De una conversación a otra solo recuerdas lo que el usuario apunta diciendo «recuerda que…» con el atajo; tú no escribes en esa memoria.",
     "Lo crítico solo se confirma con el atajo: ni con «Oye Lina» ni con lina di.",
     "No puedes tocar claves, el tope de gasto ni tus propios permisos, ni leer contraseñas o cookies, ni cambiar tu propio código.",

@@ -171,13 +171,6 @@ def test_la_declaracion_lleva_los_temas_y_solo_ids_de_la_lista():
     assert d["parameters"]["properties"]["id"]["enum"] == ["f1", "f2"] and "aunque sea del mismo juego" in d["description"]
 
 
-def test_usar_fuente_no_se_le_da_a_la_ia_al_responder():
-    from lina.nucleo import herramientas as H
-    from pathlib import Path
-    assert "usar_fuente" not in {d["name"] for d in H.DECLARACIONES}
-    assert "usar_fuente" not in Path(H.__file__).with_name("asistente.py").read_text(encoding="utf-8")
-
-
 # ---------------------------------------------------------------- --grupos, --variante y --comprobar
 def _respuestas():
     pedidas = []
