@@ -3,6 +3,7 @@
 """Clasificación de comandos: qué es de solo lectura, qué lanza un programa, qué es hostil y qué se debe bloquear siempre.
 
 Todo son funciones puras sobre texto; la decisión final de ejecutar o pedir confirmación se toma en herramientas.py."""
+import fnmatch
 import os
 import re
 import shlex
@@ -86,6 +87,8 @@ _LECTURA_SENSIBLE = [
      "es el historial de navegación (dice qué webs visitas); lo que lea se enviará a la IA"),
     (r"\bjournalctl\b[^;|&\n]*(?:-u|--unit|--user-unit)[=\s]*['\"]?lina\b",
      "es el registro de Lina y puede llevar tus preguntas anteriores; lo que lea se enviará a la IA"),
+    (r"\bjournalctl\b(?=[^;|&\n]*\s--user(?:\s|$))(?![^;|&\n]*\s(?:-u|--unit|--user-unit)[=\s])",        # sin filtrar por servicio, lleva también el de Lina
+     "es el registro de tus servicios, con el de Lina, y puede llevar tus preguntas anteriores; lo que lea se enviará a la IA"),
 ]
 
 
@@ -328,6 +331,97 @@ def _critico_extra(comando):
 
 
 
+# Leer a lo ancho: los patrones de arriba buscan el texto de la ruta, y «grep -r clave ~» no lo lleva. Es una capa más sobre bash, no una barrera: esa es S9.
+_RUTAS_PROTEGIDAS = (".config/lina", ".local/state/lina", ".local/share/lina", ".ssh", ".gnupg", ".mozilla", ".aws", ".kube", ".docker", ".netrc", ".pgpass", ".npmrc", ".pypirc",
+                     ".git-credentials", ".cargo/credentials", ".terraform.d/credentials", ".local/share/keyrings", ".config/gh", ".config/gcloud", ".config/hub", ".config/rclone",
+                     ".config/git/credentials", ".config/containers", ".config/google-chrome", ".config/chromium", ".config/BraveSoftware", ".config/vivaldi", ".config/microsoft-edge",
+                     ".config/opera")
+_LECTORES = {"cat", "tac", "head", "tail", "less", "more", "nl", "grep", "egrep", "fgrep", "rg", "ag", "ack", "ugrep", "ug", "sed", "awk", "gawk", "strings", "od", "xxd", "hexdump",
+             "base64", "sort", "uniq", "cut", "wc", "tar", "zip", "cp", "rsync", "scp"}
+_GREP = {"grep", "egrep", "fgrep", "ugrep", "ug"}
+_SIEMPRE_RECURSIVOS = {"rg", "ag", "ack"}
+_COPIAS = {"cp": "rRa", "rsync": "ra", "scp": "r", "zip": "r"}
+_MOTIVO_AMPLIA = ("buscaría o copiaría a lo ancho en una carpeta que incluye claves o los datos de Lina, y lo que salga se enviaría a la IA: "
+                  "hazlo en una carpeta concreta, como Documentos")
+
+
+def _expandir(ruta, cwd):
+    """La ruta absoluta y normalizada: ~, $HOME y ${HOME}, relativa a `cwd`. Conserva los comodines."""
+    casa = os.path.expanduser("~")
+    ruta = re.sub(r"^(?:~|\$HOME\b|\$\{HOME\})(?=/|$)", lambda _: casa, ruta)
+    return os.path.normpath(os.path.join(cwd, ruta))
+
+
+def _trozos(ruta):
+    return [t for t in ruta.split("/") if t]
+
+
+def _toca_protegida(ruta, recursivo):
+    """¿Esa ruta, con o sin comodines, llega a una protegida? Una carpeta superior solo cuenta si se recorre; un comodín como el de la shell: «*» no entra en lo que empieza por punto."""
+    patron = _trozos(ruta)
+    for relativa in _RUTAS_PROTEGIDAS:
+        protegida = _trozos(os.path.expanduser("~")) + _trozos(relativa)
+        comunes = min(len(patron), len(protegida))
+        if not all(fnmatch.fnmatchcase(p, c) and (not p.startswith(".") or c.startswith(".")) for p, c in zip(protegida[:comunes], patron[:comunes])):
+            continue
+        if len(patron) >= len(protegida) or recursivo:
+            return True
+    return False
+
+
+def _argumentos_de_lectura(base, args):
+    """(¿recorre carpetas?, las rutas que lee). Sin ruta, recorre la carpeta en la que está, y en grep y compañía lo primero que no es opción es el patrón."""
+    opciones = [a for a in args if a.startswith("-") and a != "-"]
+    cortas = "".join(a[1:] for a in opciones if not a.startswith("--"))
+    rutas = [a for a in args if not a.startswith("-") and not re.search(r"[<>]", a)]
+    if base in _GREP or base in _SIEMPRE_RECURSIVOS:
+        recursivo = base in _SIEMPRE_RECURSIVOS or bool(re.search(r"[rR]", cortas)) or any(a in ("--recursive", "--dereference-recursive", "--directories=recurse") for a in opciones)
+        if rutas and not re.search(r"[ef]", cortas) and "--regexp" not in " ".join(opciones):
+            rutas = rutas[1:]
+        return recursivo, rutas or (["."] if recursivo else [])
+    if base == "tar":
+        crear = bool(args) and (bool(re.fullmatch(r"-?[a-zA-Z]*c[a-zA-Z]*", args[0])) or "--create" in opciones)
+        return crear, rutas[1:] if crear and not args[0].startswith("-") else rutas
+    if base in _COPIAS:
+        return base == "zip" or bool(set(cortas) & set(_COPIAS[base])) or "--recursive" in opciones or "--archive" in opciones, rutas
+    return False, rutas
+
+
+def _lectura_amplia(comando):
+    """Si el comando recorre o lee con comodines algo que incluye una ruta protegida, el motivo; si no, None. Listar nombres con find sigue valiendo: lo normal es buscar un archivo."""
+    if re.search(r"\bfind\b[^;&]*\|\s*(?:sudo\s+)?xargs\b", comando):
+        trozo = re.search(r"\bfind\s+([^|;&]*)", comando).group(1)
+        destinos = [a for a in trozo.split() if not a.startswith("-")][:1] or ["."]
+        if _toca_protegida(_expandir(destinos[0].strip("'\""), os.path.expanduser("~")), True):
+            return _MOTIVO_AMPLIA
+    cwd = os.path.expanduser("~")                       # los comandos se ejecutan en tu carpeta personal
+    for seg in _segmentos(comando):
+        t = _quitar_prefijos(_tokens(seg) or [])
+        if not t:
+            continue
+        base, args = os.path.basename(t[0]), t[1:]
+        if base == "cd":
+            cwd = _expandir(args[0] if args else "~", cwd)
+        elif base in ("bash", "sh", "zsh", "dash") and "-c" in args[:-1]:
+            motivo = _lectura_amplia(args[args.index("-c") + 1])
+            if motivo:
+                return motivo
+        elif base == "find":
+            destinos = []
+            for a in args:
+                if a.startswith("-") or a in ("(", "!"):
+                    break
+                destinos.append(a)
+            if {"-exec", "-execdir", "-ok", "-okdir", "-delete"} & set(args) and any(_toca_protegida(_expandir(d, cwd), True) for d in destinos or ["."]):
+                return _MOTIVO_AMPLIA
+        elif base in _LECTORES:
+            recursivo, rutas = _argumentos_de_lectura(base, args)
+            for r in rutas:
+                if (recursivo or re.search(r"[*?\[]", r)) and _toca_protegida(_expandir(r, cwd), recursivo):
+                    return _MOTIVO_AMPLIA
+    return None
+
+
 def _bloqueado(comando, _profundidad=0):
     """Si el comando está prohibido siempre, devuelve el motivo; si no, None."""
     bajo = comando.lower()
@@ -351,7 +445,7 @@ def _bloqueado(comando, _profundidad=0):
         return "cambiaría mis propios ajustes de permisos, gasto o claves, o me daría órdenes a mí misma (eso lo haces tú, o con el atajo)"
     if re.search(_CANAL, bajo):
         return "me daría órdenes a mí misma por el canal de «lina di» (eso lo haces tú, desde tu terminal)"
-    motivo = _bloqueado_hostil(comando)
+    motivo = _bloqueado_hostil(comando) or _lectura_amplia(comando)
     if motivo:
         return motivo
 
