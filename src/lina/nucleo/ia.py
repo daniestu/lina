@@ -26,7 +26,7 @@ from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
 from lina.nucleo import tiempos as TIE
 from lina.nucleo.constantes import (ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
-                                    MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, PAUSA_RED_SEG, TIMEOUT_REVISOR, REINTENTOS_SERVIDOR,
+                                    MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, PAUSA_RED_SEG, TIMEOUT_REVISOR, TIMEOUT_TEMA, INTENTOS_TEMA, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, ESTIMACION_VRAM_LOCAL)
 from lina.nucleo.opcionales import PRES
 from lina.nucleo.registro import log
@@ -420,7 +420,7 @@ def _pedir_corto(proveedor, clave, modelo, sistema, mensajes, etiqueta, *, inten
     Devuelve la Respuesta o None (con el motivo ya anotado en el registro; los fallos de cuota y de servidor dejan el modelo en pausa)."""
     degradar = list(degradar)
     motivo = ("resumen" if etiqueta.startswith("resumir") else "pantalla" if etiqueta == "mirar la pantalla" else
-              "comprobacion" if "se cumplió" in etiqueta else "consulta")
+              "comprobacion" if "se cumplió" in etiqueta else "fuente" if "la fuente encaja" in etiqueta else "consulta")
     for intento in range(intentos):
         with motivo_llamada(motivo):
             r = _turno_medido(proveedor, clave, modelo, sistema, mensajes, timeout=timeout, **ajustes)
@@ -508,11 +508,11 @@ PROMPT_INTERRUPCION = (
     "exige que el usuario lo haya dejado claro. Responde solo con el JSON pedido.")
 
 
-def _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, maximo=200, proveedor=None, timeout=None, un_modelo=False, pausar_en_red=True):
+def _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, maximo=200, proveedor=None, timeout=None, un_modelo=False, pausar_en_red=True, solo_primero=False):
     """Una pregunta corta con respuesta JSON. `validar(objeto)` lanza ValueError/KeyError si no sirve. Devuelve (objeto, modelo) o None si ningún
-    modelo respondió bien."""
+    modelo respondió bien. `solo_primero`: nunca otro modelo, ni con el primero en pausa (`un_modelo` solo corta tras probarlo)."""
     proveedor = proveedor or IAC.actual().proveedor
-    for modelo in IAC.modelos("mini"):
+    for modelo in IAC.modelos("mini")[:1 if solo_primero else None]:
         if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
             log(f"{modelo}: en pausa por un fallo reciente, lo salto")
             continue
@@ -543,6 +543,27 @@ def _mini_consulta_ia(clave, prompt, esquema, contenido, validas, etiqueta, **ex
             raise ValueError(f"decisión desconocida: {obj['decision']!r}")
     hecho = _mini_consulta_json(clave, prompt, esquema, contenido, etiqueta, validar, **extra)
     return {"decision": hecho[0]["decision"], "modelo": hecho[1]} if hecho else None
+
+
+def comprobar_tema(claves, tema, pregunta, origen="real"):
+    """R3: ¿esta pregunta es exactamente de ese tema? «encaja», «no_encaja» o None si no hubo veredicto, que para quien llama es un no. Solo prueba la primera clave y el modelo
+    medido. Cada comprobación se apunta con su origen («real» o «prueba»), solo con números."""
+    from lina.nucleo import fuentes as FUE
+    t0, decision, intentos = time.monotonic(), None, 0
+    clave = claves[0] if claves else None
+    while clave and decision is None and intentos < INTENTOS_TEMA:
+        intentos += 1
+        r = _mini_consulta_ia(clave, FUE.PROMPT_TEMA, FUE.ESQUEMA_TEMA, FUE.contenido_tema(tema, pregunta), FUE.DECISIONES_TEMA, "si la fuente encaja", maximo=100,
+                              timeout=TIMEOUT_TEMA, un_modelo=True, solo_primero=True, pausar_en_red=False)
+        decision = r["decision"] if r else None
+    if decision is None:
+        log(f"Fuente: sin veredicto tras {intentos} intentos; sigue la búsqueda general")
+    try:
+        if AJ.actuales(log=lambda m: None).get("privacidad", "registrar_tiempos"):
+            TIE.apuntar_comprobacion(TIE.registro_comprobacion(origen, decision or "sin_veredicto", intentos, time.monotonic() - t0, pago=PRES.nombre_de(clave) == "pago"))
+    except Exception as e:
+        log(f"Fuente: no he podido apuntar la comprobación ({e!r})")
+    return decision
 
 
 DECISIONES_CUMPLIMIENTO = ("cumplido", "no_cumplido")

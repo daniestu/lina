@@ -33,6 +33,7 @@ AYUDA = N_("lina fuentes                              las webs que has elegido p
            "lina fuentes añadir \"TEMA\" DIRECCIÓN      para ese tema, usa esa web (por ejemplo: \"recetas de refinería de No Man's Sky\" https://…)\n"
            "lina fuentes quitar f1 | todas            quita una o todas\n"
            "lina fuentes medir [--grupos C,D] [--variante r1] [--comprobar] [--tiempos --clave gratuita|pago] [--lanzar]   mide si la IA elegiría bien la fuente (sin --lanzar, solo dice qué haría)\n"
+           "lina fuentes probar \"PREGUNTA\"           qué fuente elegiría y si la comprobación la aceptaría, sin responder ni buscar\n"
            "De momento solo se guardan: todavía no se usan al responder.")
 
 
@@ -305,6 +306,12 @@ def principal(argv, salida=print):
     if orden == "medir":
         from lina.nucleo import medir_fuentes
         return medir_fuentes.principal(argv[1:], salida)
+    if orden == "probar":
+        if len(argv) != 2 or not argv[1].strip():
+            salida(T(AYUDA))
+            return 2
+        from lina.nucleo import medir_fuentes
+        return medir_fuentes.probar(argv[1], salida)
     if orden in ("-h", "--help", "ayuda"):
         salida(T(AYUDA))
         return 0

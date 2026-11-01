@@ -82,10 +82,10 @@ def pago_disponible():
 
 
 def claves_para(modo):
-    """Las claves en el orden en que se prueban. «profundo»: primero la de pago; lo demás («rapido», «mini»): primero la gratuita.
+    """Las claves en el orden en que se prueban. «profundo» y «fuente»: primero la de pago; lo demás («rapido», «mini»): primero la gratuita.
     La de pago solo entra si hay saldo de tope este mes."""
     pago = _claves["pago"] if pago_disponible() else ""
-    orden = [pago, _claves["gratis"]] if modo == "profundo" else [_claves["gratis"], pago]
+    orden = [pago, _claves["gratis"]] if modo in ("profundo", "fuente") else [_claves["gratis"], pago]
     return [c for c in dict.fromkeys(orden) if c]
 
 

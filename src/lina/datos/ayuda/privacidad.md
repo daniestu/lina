@@ -53,6 +53,7 @@ Con la clave **gratuita**, según las condiciones de Google vigentes, lo que se 
 | Tiempos de cada petición (solo números, nunca lo que dices; `lina tiempos` los resume) | `~/.local/state/lina/tiempos.jsonl` (se recorta solo al llegar a ~200 KB) | `lina olvidar tiempos` |
 | Cómo termina cada escucha del atajo (por silencio, por tu pulsación…), con el día sin hora y tiempos; nunca audio ni texto (`lina tiempos escucha`) | `~/.local/state/lina/escuchas.jsonl` (últimas 5000) | `lina olvidar tiempos` |
 | Tokens y duración de cada llamada a la IA, con el modelo, su motivo (normal, reintento…), el día sin hora y una huella del principio fijo (para saber si la caché se aprovecha); nunca lo que preguntas ni lo que contesta (`lina tiempos ia`) | `~/.local/state/lina/llamadas_ia.jsonl` (últimas 5000) | `lina olvidar tiempos` |
+| Cómo acabó cada comprobación de que una pregunta es del tema de una fuente: si es uso real o `lina fuentes probar`, encaja o no, intentos, segundos, el día sin hora y si usó la clave de pago; nunca el tema ni la pregunta (`lina tiempos ia`) | `~/.local/state/lina/comprobaciones_fuente.jsonl` | `lina olvidar tiempos` |
 | Registro del sistema (lo que dices y contesto, si no lo desactivas) | `journalctl --user -u lina` | `lina olvidar registro` |
 
 Para que lo que dices y contesto no quede en el registro: `lina config poner privacidad.registrar_preguntas false`.

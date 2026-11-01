@@ -323,15 +323,26 @@ def informe_r3(registros, veredictos, salida=print):
         salida(T("Decisión con R3: {d}.", d=T(DECISIONES[decision_r3(resumir(h["finales"]))])))
 
 
+def _primer_turno(ia, clave, modelo, usar, frase, juego=False):
+    """El primer turno, con lo mismo que el modelo recibiría en una petición más `usar`. No ejecuta nada de lo que pida."""
+    from lina.nucleo import grupos as G
+    from lina.nucleo import herramientas as H
+    from lina.nucleo import ia as IA
+    from lina.nucleo.constantes import instrucciones
+    grupos = G.elegir(frase)
+    herramientas = [usar] + IA.declaraciones_de_busqueda() + G.herramientas(H.DECLARACIONES, grupos)
+    sistema = G.sistema(instrucciones(), H.hechos_sistema(), G.ordenar(grupos))
+    texto = (f"Contexto: videojuego «{JUEGO}». Pregunta: {frase}" if juego else frase) + ("\n[SISTEMA: esta petición NO lleva captura de pantalla: no sabes lo que hay en ella.]")
+    with IA.motivo_llamada("medida"):
+        return IA._turno_medido(ia.proveedor, clave, modelo, sistema, [{"rol": "user", "texto": texto}], herramientas=herramientas,
+                                nivel=IA.nivel_razonamiento(modelo, "rapido"), timeout=20)
+
+
 def _preguntar_de_verdad(variante="base"):
     """La función que pregunta al modelo rápido con lo mismo que recibiría en una petición: siempre la clave gratuita de Gemini. (función, «») o (None, motivo)."""
     from lina.nucleo import claves as CL
     from lina.nucleo import fuentes as FUE
-    from lina.nucleo import grupos as G
-    from lina.nucleo import herramientas as H
-    from lina.nucleo import ia as IA
     from lina.nucleo import ia_activa as IAC
-    from lina.nucleo.constantes import instrucciones
     ia = IAC.actual()
     clave = CL.obtener("gemini")
     if ia.nombre != "gemini" or not clave:
@@ -340,13 +351,7 @@ def _preguntar_de_verdad(variante="base"):
     usar = FUE.declaracion_usar_fuente(FUENTES, FUE.DESCRIPCION_R1 if variante == "r1" else FUE.DESCRIPCION_BASE)
 
     def preguntar(frase, juego):
-        grupos = G.elegir(frase)
-        herramientas = [usar] + IA.declaraciones_de_busqueda() + G.herramientas(H.DECLARACIONES, grupos)
-        sistema = G.sistema(instrucciones(), H.hechos_sistema(), G.ordenar(grupos))
-        texto = (f"Contexto: videojuego «{JUEGO}». Pregunta: {frase}" if juego else frase) + ("\n[SISTEMA: esta petición NO lleva captura de pantalla: no sabes lo que hay en ella.]")
-        with IA.motivo_llamada("medida"):
-            return IA._turno_medido(ia.proveedor, clave, modelo, sistema, [{"rol": "user", "texto": texto}], herramientas=herramientas,
-                                    nivel=IA.nivel_razonamiento(modelo, "rapido"), timeout=20)
+        return _primer_turno(ia, clave, modelo, usar, frase, juego)
     return preguntar, ""
 
 
@@ -406,6 +411,51 @@ def _argumentos(argv):
     if ver and grupos:
         raise ValueError
     return grupos, variante, ver, lanzar
+
+
+def probar(frase, salida=print):
+    """`lina fuentes probar`: qué fuente de las tuyas elegiría la IA para esa pregunta y qué diría R3, sin responder, buscar ni ejecutar nada."""
+    from lina.nucleo import claves as CL
+    from lina.nucleo import fuentes as FUE
+    from lina.nucleo import ia as IA
+    from lina.nucleo import ia_activa as IAC
+    from lina.nucleo import presupuesto as PRES
+    from lina.nucleo import proveedores as PROV
+    fuentes = FUE.listar()
+    if not fuentes:
+        salida(T("No hay fuentes guardadas: no hay nada que probar."))
+        return 1
+    ia = IAC.actual()
+    PRES.configurar_claves(CL.obtener("gemini"), CL.obtener("gemini_pago"))
+    claves = PRES.claves_para("rapido")
+    if ia.nombre != "gemini" or not claves:
+        salida(T("Esta prueba necesita Gemini."))
+        return 1
+    modelo, usar, r = IAC.modelos("rapido")[0], FUE.declaracion_usar_fuente(fuentes), None
+    for clave in claves:
+        r = _primer_turno(ia, clave, modelo, usar, frase)
+        if not isinstance(r, PROV.ErrorIA):
+            break
+    if isinstance(r, PROV.ErrorIA):
+        salida(T("La IA no ha respondido: {motivo}.", motivo=r.resumen[:120]))
+        return 1
+    elegida = next((str((ll.args or {}).get("id", "")) for ll in r.llamadas or [] if ll.nombre == "usar_fuente"), None)
+    if elegida is None:
+        salida(T("La IA no elegiría ninguna fuente."))
+        return 0
+    fuente = next((f for f in fuentes if f["id"] == elegida), None)
+    if fuente is None:
+        salida(T("La IA ha pedido una fuente que no existe."))
+        return 0
+    veredicto = IA.comprobar_tema(PRES.claves_para("fuente"), fuente["tema"], frase, "prueba")
+    salida(T("La IA elegiría {id} («{tema}»).", id=fuente["id"], tema=fuente["tema"]))
+    if veredicto == "encaja":
+        salida(T("La comprobación dice que encaja: buscaría en {dominio}.", dominio=fuente["dominio"]))
+    elif veredicto == "no_encaja":
+        salida(T("La comprobación dice que no encaja: seguiría con la búsqueda general."))
+    else:
+        salida(T("La comprobación no ha contestado: seguiría con la búsqueda general."))
+    return 0
 
 
 # ----- --tiempos (F3a): cuánto tarda R3 con cada clave, sin cortarlo a 4 s. Solo números: ni frases ni respuestas en el archivo

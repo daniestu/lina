@@ -53,6 +53,7 @@ With the **free** key, according to Google's current terms, what is sent may be 
 | Timings of each request (numbers only, never what you say; `lina tiempos` summarises them) | `~/.local/state/lina/tiempos.jsonl` (trims itself at ~200 KB) | `lina olvidar tiempos` |
 | How each shortcut listen ended (by silence, by your press…), with the day without the time and timings; never audio or text (`lina tiempos escucha`) | `~/.local/state/lina/escuchas.jsonl` (last 5000) | `lina olvidar tiempos` |
 | Tokens and duration of each AI call, with the model, its reason (normal, retry…), the day without the time and a fingerprint of the fixed prefix (to know whether the cache is used); never what you ask or what it answers (`lina tiempos ia`) | `~/.local/state/lina/llamadas_ia.jsonl` (last 5000) | `lina olvidar tiempos` |
+| How each check that a question belongs to a source's topic ended: real use or `lina fuentes probar`, fits or not, attempts, seconds, the day without the time and whether it used the paid key; never the topic or the question (`lina tiempos ia`) | `~/.local/state/lina/comprobaciones_fuente.jsonl` | `lina olvidar tiempos` |
 | System log (what you say and I answer, unless you turn it off) | `journalctl --user -u lina` | `lina olvidar registro` |
 
 So that what you say and I answer doesn't stay in the log: `lina config poner privacidad.registrar_preguntas false`.

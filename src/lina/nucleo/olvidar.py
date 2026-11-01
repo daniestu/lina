@@ -17,7 +17,7 @@ QUE = {
     "fuentes": (N_("las webs que has elegido para cada tema (lina fuentes)"), lambda: [RUT.DATOS / "fuentes.json"]),
     "recetas": (N_("las recetas aprendidas (cómo hacer lo que ya me has pedido)"), lambda: [RUT.DATOS / "recetas.json"]),
     "tiempos": (N_("las mediciones de tiempo de las peticiones (solo números)"), lambda: [RUT.ESTADO / "tiempos.jsonl", RUT.ESTADO / "escuchas.jsonl",
-                                                                                          RUT.ESTADO / "llamadas_ia.jsonl"]),
+                                                                                          RUT.ESTADO / "llamadas_ia.jsonl", RUT.ESTADO / "comprobaciones_fuente.jsonl"]),
     "registro": (N_("el registro del sistema de tu usuario (journalctl --user): incluye lo que dijiste y contesté"), lambda: []),
 }
 TODO = ("diario", "acciones", "memoria", "fuentes", "recetas", "tiempos", "registro")

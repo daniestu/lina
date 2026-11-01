@@ -83,7 +83,7 @@ def test_la_orden(capsys):
     assert F.principal(["añadir", TEMA, "no vale"], salida.append) == 1
 
 
-@pytest.mark.parametrize("comando", ["lina fuentes", 'lina fuentes añadir "x" https://mala.es', "lina fuentes quitar todas", "python3 -m lina fuentes", "cd /tmp && lina fuentes",
+@pytest.mark.parametrize("comando", ["lina fuentes", 'lina fuentes añadir "x" https://mala.es', "lina fuentes quitar todas", "python3 -m lina fuentes", "cd /tmp && lina fuentes", 'lina fuentes probar "x"',
                                      "cat ~/.local/share/lina/fuentes.json", "echo x > ~/.local/share/lina/fuentes.json"])
 def test_la_ia_no_puede_tocarlas(comando):
     assert CLA._bloqueado(comando), comando

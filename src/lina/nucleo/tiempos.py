@@ -37,13 +37,19 @@ ARCHIVO_LLAMADAS = RUT.ESTADO / "llamadas_ia.jsonl"
 MAX_LINEAS_LLAMADAS = 5000
 CAMPOS_LLAMADA = ("dia", "modelo", "res", "seg", "ent", "cache", "sal", "raz", "pref", "conv", "huella", "repite", "pago", "motivo")
 # Por qué se llamó a la IA, de esta lista y nada más: separa los reintentos de las llamadas normales al mirar la caché y el coste.
-MOTIVOS = ("normal", "a_fondo", "hechos", "reintento", "pantalla", "comprobacion", "consulta", "resumen", "medida", "otro")
+MOTIVOS = ("normal", "a_fondo", "hechos", "reintento", "pantalla", "comprobacion", "consulta", "resumen", "fuente", "medida", "otro")
 REPITE_SEG = 300                     # el mismo principio en menos de esto: la caché debería aprovecharlo
 DIAS_IA = 30
 MOTIVO_APARTE = "medida"             # no es uso real: se enseña aparte y no cuenta para el criterio de V4
 MIN_LLAMADAS_CACHE = 50              # criterio de V4 (escrito antes de medir)
 MIN_LLAMADAS_TAMANO = 100
 UMBRAL_CACHE = 0.30
+# Cada comprobación de R3 (A11), que puede ser una o dos llamadas. La regla mira solo el uso real: tus pruebas con `lina fuentes probar` van aparte
+ARCHIVO_COMPROBACIONES = RUT.ESTADO / "comprobaciones_fuente.jsonl"
+MAX_LINEAS_COMPROBACIONES = 5000
+CAMPOS_COMPROBACION = ("dia", "origen", "res", "intentos", "seg", "pago")
+PRIMERAS_COMPROBACIONES = 100
+MAX_SIN_VEREDICTO = 8
 UMBRAL_PRINCIPIO_TOKENS = 6000
 UMBRAL_DIFERENCIA_SEG = 0.5
 UMBRAL_PARTE_ENTRADA = 0.70
@@ -409,6 +415,60 @@ def resumir_ia(registros, precio=None):
     return out
 
 
+def registro_comprobacion(origen, res, intentos, seg, pago=False, hoy=None):
+    """La línea de una comprobación de R3: nunca el tema ni la pregunta."""
+    return {"dia": (hoy or datetime.date.today()).isoformat(), "origen": "prueba" if origen == "prueba" else "real", "res": str(res)[:14], "intentos": int(intentos),
+            "seg": round(float(seg), 3), "pago": bool(pago)}
+
+
+def apuntar_comprobacion(reg, archivo=None):
+    return _anadir(archivo or ARCHIVO_COMPROBACIONES, reg, CAMPOS_COMPROBACION, MAX_LINEAS_COMPROBACIONES)
+
+
+def leer_comprobaciones(archivo=None):
+    try:
+        lineas = (archivo or ARCHIVO_COMPROBACIONES).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for linea in lineas:
+        try:
+            d = json.loads(linea)
+        except ValueError:
+            continue
+        if isinstance(d, dict) and d.get("origen") in ("real", "prueba") and isinstance(d.get("res"), str):
+            out.append(d)
+    return out
+
+
+def resumir_comprobaciones(registros):
+    """Por origen, cuántas y cuántas sin veredicto; y la regla del 8 % sobre las primeras comprobaciones de uso real, en orden."""
+    por = {o: [r for r in registros if r["origen"] == o] for o in ("real", "prueba")}
+    fallos = {o: sum(r["res"] == "sin_veredicto" for r in rs) for o, rs in por.items()}
+    primeras = por["real"][:PRIMERAS_COMPROBACIONES]
+    en_primeras = sum(r["res"] == "sin_veredicto" for r in primeras)
+    return {"n": {o: len(rs) for o, rs in por.items()}, "fallos": fallos, "primeras": len(primeras), "en_primeras": en_primeras, "aviso": en_primeras > MAX_SIN_VEREDICTO}
+
+
+def informe_comprobaciones(salida, archivo=None, apuntando=True):
+    registros = leer_comprobaciones(archivo)
+    if not registros:
+        if not apuntando:
+            salida(T("Fuentes: las comprobaciones no se apuntan con privacidad.registrar_tiempos apagado, así que la regla del 8 % no tiene datos."))
+        return
+    r = resumir_comprobaciones(registros)
+    salida(T("Fuentes, uso real: {n} comprobaciones, {f} sin veredicto ({pc}).", n=r["n"]["real"], f=r["fallos"]["real"], pc=_pc(r["fallos"]["real"], r["n"]["real"])))
+    salida(T("Fuentes, pruebas con lina fuentes probar: {n}, {f} sin veredicto ({pc}); no cuentan para la regla.", n=r["n"]["prueba"], f=r["fallos"]["prueba"],
+             pc=_pc(r["fallos"]["prueba"], r["n"]["prueba"])))
+    if r["aviso"]:
+        salida("→ " + T("Regla del 8 %: {f} sin veredicto en las primeras {n} de uso real: supera el 8 %, para y revisa.", f=r["en_primeras"], n=r["primeras"]))
+    elif r["primeras"] < PRIMERAS_COMPROBACIONES:
+        salida("→ " + T("Regla del 8 %: llevas {n} de {t} de uso real. El aviso solo salta con {m} fallos: que no salte todavía no significa que vaya bien.", n=r["primeras"],
+                        t=PRIMERAS_COMPROBACIONES, m=MAX_SIN_VEREDICTO + 1))
+    else:
+        salida("→ " + T("Regla del 8 %: {f} sin veredicto en las primeras {n} de uso real: dentro del límite.", f=r["en_primeras"], n=r["primeras"]))
+
+
 def _pct(x):
     return "-" if x is None else f"{round(100 * x)} %"
 
@@ -437,6 +497,12 @@ def principal_ia(argv, salida=print, archivo=None, hoy=None, precio=None):
         except Exception:
             precio = None
     modelos = resumir_ia(leer_llamadas(archivo, dias, hoy), precio)
+    try:
+        from lina.nucleo import ajustes as AJ
+        apuntando = AJ.actuales(log=lambda m: None).get("privacidad", "registrar_tiempos")
+    except Exception:
+        apuntando = True
+    informe_comprobaciones(salida, archivo.with_name(ARCHIVO_COMPROBACIONES.name), apuntando)      # junto al de llamadas
     if not modelos:
         salida(T("Todavía no hay llamadas a la IA apuntadas en los últimos {d} días.", d=dias))
         return 0
