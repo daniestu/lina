@@ -92,7 +92,10 @@ class MixinOrganizacion:
         if ya:                                                   # una comprobación por petición, aunque la pida otra vez
             return ya
         fuente = next((f for f in _A.FUE.listar() if f["id"] == ident), None)
-        if fuente is None:
+        if fuente is None:                                       # inventada o borrada: lo mismo que una web que no se puede leer
+            self.fuente_cerrada = True
+            if not _A.hay_busqueda_tavily():
+                raise _A.BucleDeHerramienta(_A.T("No tengo esa fuente, así que no tengo ese dato."))
             return "Esa fuente no existe: sigue sin ella."
         dominio = fuente["dominio"]
         if _A.comprobar_tema(self._claves("fuente"), fuente["tema"], str(self.pregunta_pura)) != "encaja":
@@ -100,6 +103,7 @@ class MixinOrganizacion:
             resultado = "Esa fuente no sirve para esta pregunta: sigue sin ella y no la menciones."
         else:
             self.fuente_turno = {"dominio": dominio, "encaja": True, "sin_respuesta": False}
+            self.fuente_cerrada = True                           # es una pregunta: de aquí en adelante, web y nada más, y sin reintento a fondo
             resultado = self._leer_fuente(fuente, str(args.get("consulta", "")).strip() or str(self.pregunta_pura))
         self.fuentes_turno[ident] = resultado
         return resultado
@@ -112,7 +116,8 @@ class MixinOrganizacion:
             if resultado.startswith("CONTENIDO DE LA PÁGINA"):
                 return f"Es la fuente que eligió el usuario. Si no trae la respuesta, dilo: no contestes de memoria como si fuera un dato.\n{resultado}"
             self.fuente_turno["sin_respuesta"] = True
-            return f"{resultado}\nDi que no has podido leer la web {dominio} y no contestes de memoria como si fuera un dato."
+            log(f"Fuente: no he podido leer {dominio}: termino aquí, sin reintento ni herramientas")
+            raise _A.BucleDeHerramienta(_A.T("No he podido leer tu web {web}, así que no tengo ese dato.", web=_A.FUE.dominio_hablado(dominio)))
         if self.busquedas_turno >= getattr(self, "max_busquedas", _A.MAX_BUSQUEDAS):
             return "No hagas más búsquedas: responde con lo que ya tienes o di que no lo has encontrado."
         self.busquedas_turno += 1

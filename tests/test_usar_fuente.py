@@ -31,7 +31,9 @@ def lina(monkeypatch):
     a.ejecutor = MagicMock(pendientes=[], duda=None, efecto_sin_comprobar=False, contaminado=False)
     a.pregunta_pura = PREGUNTA
     a.busquedas_turno, a.max_busquedas = 0, 2
-    a.fuente_turno, a.fuentes_turno = None, {}
+    a.fuente_turno, a.fuentes_turno, a.fuente_cerrada = None, {}, False
+    a.guion_herramientas, a.paso_guion = [], 0
+    a.tope_de_tarea = MagicMock(return_value=None)
     a.acciones_turno, a.obstaculo = [], ""
     a._claves = MagicMock(return_value=["de-pago"])
     monkeypatch.setattr(FUE, "listar", lambda: [FUENTE])
@@ -145,11 +147,12 @@ def test_sin_busqueda_lee_solo_la_direccion_guardada(sin_busqueda):
 
 
 @pytest.mark.parametrize("error", ["La web no me deja leerla (error 403); puede que pida iniciar sesión o bloquee a los programas.", "Esa página no existe (error 404)."])
-def test_si_no_se_puede_leer_lo_dice_y_no_insiste(sin_busqueda, error):
+def test_si_no_se_puede_leer_termina_el_turno_con_la_frase_del_codigo(sin_busqueda, error):
     sin_busqueda.A.W.leer.side_effect = W.ErrorWeb(error)
-    r = _usar(sin_busqueda)
-    assert "no contestes de memoria" in r and "reintentarlo" not in r
-    assert sin_busqueda.obstaculo == "" and sin_busqueda.fuente_turno["sin_respuesta"] is True
+    with pytest.raises(sin_busqueda.A.BucleDeHerramienta) as fin:
+        _usar(sin_busqueda)
+    assert fin.value.respuesta == "No he podido leer tu web nomanssky punto fandom punto com, así que no tengo ese dato."
+    assert sin_busqueda.obstaculo == "" and sin_busqueda.fuente_turno["sin_respuesta"] is True and sin_busqueda.fuente_cerrada is True
 
 
 def test_leer_web_normal_sigue_insistiendo_si_la_web_bloquea(sin_busqueda):
@@ -176,8 +179,9 @@ def test_la_pagina_guardada_no_puede_redirigir_a_una_direccion_interna(sin_busqu
         assert k["allow_redirects"] is False
         return _respuesta_http(302, destino)
     monkeypatch.setattr(W.requests, "get", obtener)
-    r = _usar(sin_busqueda)
-    assert pedidas == [FUENTE["url"]] and "red interna" in r and "no contestes de memoria" in r
+    with pytest.raises(sin_busqueda.A.BucleDeHerramienta):
+        _usar(sin_busqueda)
+    assert pedidas == [FUENTE["url"]]
     assert sin_busqueda.fuente_turno["sin_respuesta"] is True and sin_busqueda.obstaculo == ""
 
 
@@ -248,3 +252,88 @@ def test_la_correccion_tambien_llega_si_hay_duda_en_la_respuesta(lina):
                                              ("En No Man's Sky sale ferrita", False), ("según otra web", False)])
 def test_menciona_fuente(texto, esperado):
     assert TU.menciona_fuente(texto, DOMINIO) is esperado
+
+
+# ---------------------------------------------------------------- el fallo de la fuente no escala: lo del caso 7 de la prueba en vivo
+AUTONOMAS = ["ejecutar_comando", "mas_herramientas", "pensar_a_fondo", "buscar_archivos", "abrir_app", "mirar_pantalla"]
+ERRORES = [W.ErrorWeb("No he podido conectar con esa página."), W.ErrorWeb("La web no me deja leerla (error 403); puede que pida iniciar sesión o bloquee a los programas."),
+           W.ErrorWeb("Esa página no existe (error 404).")]
+
+
+def _preparar_cierre(a):
+    a.max_tiempo, a.max_tokens, a.max_busquedas = 1, 1, 2
+    a.insistiendo, a.pedir_profundo, a.clave = False, "", "clave"
+    a.ejecutor.profundo, a.ejecutor.recetas_diferidas = False, []
+    a.preguntar_otra_vez = MagicMock(side_effect=AssertionError("no debía reintentar"))
+
+
+def _ejecutar(a, nombre, args=None):
+    a._ejecutar_herramienta = MagicMock(wraps=None, side_effect=AssertionError(f"{nombre}: no debía ejecutarse"))
+    return a.ejecutar_herramienta(nombre, args or {})
+
+
+@pytest.mark.parametrize("error", ERRORES)
+def test_web_inaccesible_sin_busqueda_cierra_y_no_deja_nada_autonomo(sin_busqueda, error):
+    sin_busqueda.A.W.leer.side_effect = error
+    with pytest.raises(sin_busqueda.A.BucleDeHerramienta):
+        _usar(sin_busqueda)
+    for nombre in AUTONOMAS:
+        assert "sin más herramientas" in _ejecutar(sin_busqueda, nombre, {"comando": "grep -rn x ~"})
+
+
+def test_fuente_borrada_sin_busqueda_termina_el_turno(sin_busqueda, monkeypatch):
+    monkeypatch.setattr(FUE, "listar", lambda: [])
+    with pytest.raises(sin_busqueda.A.BucleDeHerramienta) as fin:
+        _usar(sin_busqueda)
+    assert "No tengo esa fuente" in fin.value.respuesta and sin_busqueda.fuente_cerrada is True
+
+
+def test_fuente_borrada_con_busqueda_sigue_solo_con_la_web(lina, monkeypatch):
+    monkeypatch.setattr(FUE, "listar", lambda: [])
+    assert "no existe" in _usar(lina)
+    assert "sin más herramientas" in _ejecutar(lina, "ejecutar_comando", {"comando": "curl x"})
+
+
+def test_con_busqueda_tras_fallar_la_fuente_se_puede_buscar_y_leer_pero_no_comandos(lina):
+    lina.A.buscar_tavily.return_value = "La búsqueda no ha encontrado nada."
+    _usar(lina)
+    lina._ejecutar_herramienta = MagicMock(return_value="ok")
+    lina.acciones_turno = []
+    lina.crono = None
+    lina.ejecutar_herramienta("buscar_web", {"consulta": "x"})
+    lina._ejecutar_herramienta.assert_called_once()
+    assert "sin más herramientas" in lina.ejecutar_herramienta("ejecutar_comando", {"comando": "grep -rn x ~"})
+    assert lina._ejecutar_herramienta.call_count == 1
+
+
+@pytest.mark.parametrize("respuesta", ["No he podido leer tu web.", "No lo he encontrado en tu web.", "Ha fallado la lectura."])
+def test_un_no_he_podido_tras_la_fuente_no_reintenta(lina, respuesta):
+    _preparar_cierre(lina)
+    lina.ejecutor.duda = "algo"                                                  # ni con duda: se cierra igual
+    lina._cerrar_receta_interfaz = MagicMock()
+    lina.pedir_profundo = "lo pide la IA"
+    _usar(lina)
+    assert lina._insistir_si_hace_falta(respuesta, "modelo", "rapido", PREGUNTA, None, [], "s") == (respuesta, "modelo")
+    assert lina.ejecutor.profundo is False and lina.insistiendo is False and lina.pedir_profundo == ""
+
+
+def test_sin_fuente_en_la_peticion_el_reintento_sigue_como_antes(lina):
+    _preparar_cierre(lina)
+    lina.ejecutor.duda = None
+    lina._cerrar_receta_interfaz = MagicMock()
+    lina._avisar_voz = MagicMock(side_effect=InterruptedError("llega al reintento"))
+    with pytest.raises(InterruptedError):
+        lina._insistir_si_hace_falta("No he podido leer la página.", "modelo", "rapido", PREGUNTA, None, [], "s")
+    assert lina.insistiendo is True
+
+
+def test_rechazada_no_cierra_nada(lina):
+    lina.A.comprobar_tema.return_value = "no_encaja"
+    _usar(lina)
+    assert lina.fuente_cerrada is False
+
+
+def test_el_bucle_de_la_ia_termina_con_la_frase_del_codigo():
+    from pathlib import Path
+    fuente = Path(IA.__file__).read_text(encoding="utf-8")
+    assert "except BucleDeHerramienta as e:" in fuente and "return e.respuesta" in fuente

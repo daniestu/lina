@@ -540,6 +540,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.ejecutor.continuar = self._continuar_peticion
         self.busquedas_turno = 0
         self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
+        self.fuente_cerrada = False                            # tras usar una fuente no se reintenta a fondo ni se pasa de la web
         self.acciones_turno = []       # todo lo que se ha ejecutado de verdad en esta pregunta: (herramienta, datos, resultado)
         self.acciones_confirmadas = []  # lo que se ejecutó al decir «sí», para contarlo aunque Gemini falle
         self.t_tarea = time.time()      # cuándo empezó la petición actual (para el tope de tiempo)
@@ -1726,6 +1727,9 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         """Lo que Gemini nos pide hacer. Si un modelo falla a mitad y otro lo reintenta, lo que ya se hizo con los mismos
         datos y en el mismo orden NO se vuelve a ejecutar (así no se abre un programa dos veces ni se gastan búsquedas).
         Dentro de un mismo modelo, repetir una orden sí la ejecuta de nuevo (p. ej. comprobar algo antes y después de cambiarlo)."""
+        if getattr(self, "fuente_cerrada", False) and nombre not in ("buscar_web", "leer_web", "usar_fuente"):
+            log(f"Fuente: {nombre} rechazada: tras la fuente solo cabe la web")
+            return "Aquí no hace falta nada más: responde ya con lo que tienes, sin más herramientas."
         clave = (nombre, json.dumps(args, sort_keys=True, ensure_ascii=False, default=str))
         if self.paso_guion < len(self.guion_herramientas) and self.guion_herramientas[self.paso_guion][0] == clave:
             resultado = self.guion_herramientas[self.paso_guion][1]
@@ -2220,6 +2224,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _insistir_si_hace_falta(self, respuesta, modelo, modo, pregunta, imagen, herramientas, sistema):
         """Si el intento rápido terminó SIN poder comprobar el último cambio (⚠, ✘ o error), no se da por bueno: se vuelve a
         intentar una vez con el razonamiento a fondo y topes más amplios, contándole lo ya hecho. Devuelve (respuesta, modelo)."""
+        if getattr(self, "fuente_cerrada", False):        # una pregunta con fuente: «no he podido» es la respuesta, no un fracaso que arreglar a fondo
+            self.pedir_profundo, self.obstaculo = "", ""
+            self._cerrar_receta_interfaz(False)
+            return respuesta, modelo
         pide = getattr(self, "pedir_profundo", "") if not self.ejecutor.duda else ""     # si hay una duda de verdad, manda la duda
         rapido = False                                    # el código vio que no se hizo lo pedido (solo se informó, o se abrió otra página): basta el modelo rápido
         obst = getattr(self, "obstaculo", "") if not self.ejecutor.duda else ""
@@ -2437,6 +2445,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.modo_actual = modo
         self.busquedas_turno = 0
         self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
+        self.fuente_cerrada = False                            # tras usar una fuente no se reintenta a fondo ni se pasa de la web
         self.guion_herramientas = []
         self.acciones_turno = list(self.acciones_confirmadas)
         self.turno_aceptado = False
