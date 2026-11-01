@@ -192,6 +192,7 @@ def prompt_whisper():
 
 
 TOPE_ATAJO_SEG = 60              # con fin por silencio: si el detector nunca corta (música, ruido), deja de escucharte a los 60 s
+SOLO_WEB = ("buscar_web", "leer_web", "usar_fuente")      # lo único que queda tras usar una fuente, o al insistir en una pregunta (S12)
 MAX_REPETICIONES = 2             # la misma herramienta, con los mismos datos y el mismo resultado: a la tercera no se ejecuta y se termina el turno
 MAX_HECHOS = 4                   # peticiones de las que se guarda lo que consta que pasó
 HECHOS_VALEN_SEG = 900           # pasado esto, ya no son «lo que acaba de pasar»
@@ -541,6 +542,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.busquedas_turno = 0
         self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
         self.fuente_cerrada = False                            # tras usar una fuente no se reintenta a fondo ni se pasa de la web
+        self.reintento_solo_web = False                        # S12: al insistir en una pregunta solo cabe la web
         self.acciones_turno = []       # todo lo que se ha ejecutado de verdad en esta pregunta: (herramienta, datos, resultado)
         self.acciones_confirmadas = []  # lo que se ejecutó al decir «sí», para contarlo aunque Gemini falle
         self.t_tarea = time.time()      # cuándo empezó la petición actual (para el tope de tiempo)
@@ -1727,8 +1729,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         """Lo que Gemini nos pide hacer. Si un modelo falla a mitad y otro lo reintenta, lo que ya se hizo con los mismos
         datos y en el mismo orden NO se vuelve a ejecutar (así no se abre un programa dos veces ni se gastan búsquedas).
         Dentro de un mismo modelo, repetir una orden sí la ejecuta de nuevo (p. ej. comprobar algo antes y después de cambiarlo)."""
-        if getattr(self, "fuente_cerrada", False) and nombre not in ("buscar_web", "leer_web", "usar_fuente"):
-            log(f"Fuente: {nombre} rechazada: tras la fuente solo cabe la web")
+        if (getattr(self, "fuente_cerrada", False) or getattr(self, "reintento_solo_web", False)) and nombre not in SOLO_WEB:
+            log(f"{nombre} rechazada: en esta parte de la petición solo cabe la web")
             return "Aquí no hace falta nada más: responde ya con lo que tienes, sin más herramientas."
         clave = (nombre, json.dumps(args, sort_keys=True, ensure_ascii=False, default=str))
         if self.paso_guion < len(self.guion_herramientas) and self.guion_herramientas[self.paso_guion][0] == clave:
@@ -2216,6 +2218,15 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return msg
         return msg + " " + (T("Tengo {n} cosa más apuntada para después.", n=en_cola) if en_cola == 1 else T("Tengo {n} cosas más apuntadas para después.", n=en_cola))
 
+    def _insistir_solo_con_la_web(self, pregunta):
+        """S12: insistir en una pregunta no da derecho a mirar el equipo. Una orden, una pregunta con la que ya se cambió algo («¿puedes abrir…?») o «lee esa página» cuando la
+        web bloquea (el código vio el obstáculo y se pidió esa página, sin preguntar) insisten como siempre."""
+        peticion = str(getattr(self, "pregunta_pura", "") or pregunta)
+        if getattr(self, "obstaculo", "") and "?" not in peticion and "¿" not in peticion:
+            return False
+        return (not pide_accion(peticion) and not self.ejecutor.duda and not self.ejecutor.efecto_sin_comprobar
+                and solo_se_informo(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura"))
+
     def _tarea_de_ajustes(self):
         """¿Esta petición tiene que ver con ajustes de configuración (donde insistir a fondo sí compensa)?"""
         return (any(n in {"probar_ajuste_kde", "buscar_ajuste_kde", "observar_config", "buscar_clave_en_binarios"} for n, _, _ in self.acciones_turno)
@@ -2267,6 +2278,12 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             self._cerrar_receta_interfaz(not self.ejecutor.duda and not pide and not getattr(self, "insistiendo", False) and not self.ejecutor.pendientes)
             return respuesta, modelo
         self._cerrar_receta_interfaz(False)               # lo apuntado en el primer intento no vale: no se dio por cumplido
+        solo_web = self._insistir_solo_con_la_web(pregunta)
+        if solo_web:
+            log("Es una pregunta y no se ha cambiado nada: insisto solo con la web")
+            self.reintento_solo_web = True
+            herramientas = [h for h in herramientas if h.get("name") in SOLO_WEB]
+            rapido = rapido or bool(obst)
         self.pedir_profundo, self.obstaculo = "", ""
         self.insistiendo = True
         self.ejecutor.profundo = True
@@ -2300,7 +2317,10 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                 continue
             que = str(args.get("motivo") or args.get("comando") or args.get("consulta") or nombre)[:70]
             hechas.append(f"- {nombre}: {que} → " + " | ".join(str(resultado).splitlines())[:300])
-        if obst:
+        if solo_web and obst:
+            nota = ("\n[SISTEMA: es una pregunta y no se ha podido contestar: " + obst + ". Lo que ya se hizo:\n" + ("\n".join(hechas) if hechas else "(nada)")
+                    + "\nSolo puedes usar buscar_web y leer_web, si las tienes: no mires el equipo. Si con eso no lo consigues, di en una frase qué no has podido averiguar.]")
+        elif obst:
             nota = ("\n[SISTEMA: el usuario pidió algo concreto y NO se ha cumplido: " + obst + ". Lo que ya se hizo:\n" + ("\n".join(hechas) if hechas else "(nada)")
                     + "\nDecir que no puedes, pedirle al usuario que lo haga él, o contestar con otra cosa NO es cumplir lo pedido. Tienes ordenador, internet, instalación de "
                     "programas y la posibilidad de conectar servidores MCP (herramientas nuevas). Razona así y no pares hasta lograrlo o agotar las vías: "
@@ -2446,6 +2466,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.busquedas_turno = 0
         self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
         self.fuente_cerrada = False                            # tras usar una fuente no se reintenta a fondo ni se pasa de la web
+        self.reintento_solo_web = False                        # S12: al insistir en una pregunta solo cabe la web
         self.guion_herramientas = []
         self.acciones_turno = list(self.acciones_confirmadas)
         self.turno_aceptado = False

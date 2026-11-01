@@ -322,6 +322,7 @@ def test_sin_fuente_en_la_peticion_el_reintento_sigue_como_antes(lina):
     lina.ejecutor.duda = None
     lina._cerrar_receta_interfaz = MagicMock()
     lina._avisar_voz = MagicMock(side_effect=InterruptedError("llega al reintento"))
+    lina.pregunta_pura = "abre Steam"
     with pytest.raises(InterruptedError):
         lina._insistir_si_hace_falta("No he podido leer la página.", "modelo", "rapido", PREGUNTA, None, [], "s")
     assert lina.insistiendo is True
