@@ -2,6 +2,7 @@
 # Copyright (C) 2026 Lina contributors
 """`lina fuentes medir`: la tanda con las etiquetas revisadas, cómo se clasifica cada respuesta, el criterio de A11 y que sin --lanzar no se llama a la IA.
 Con un modelo simulado: estas pruebas no llaman a la IA ni van a la red."""
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -173,3 +174,141 @@ def test_usar_fuente_no_se_le_da_a_la_ia_al_responder():
     from pathlib import Path
     assert "usar_fuente" not in {d["name"] for d in H.DECLARACIONES}
     assert "usar_fuente" not in Path(H.__file__).with_name("asistente.py").read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------- --grupos, --variante y --comprobar
+def _respuestas():
+    pedidas = []
+
+    def preguntar(frase, juego):
+        pedidas.append(frase)
+        return _perfecto(frase, juego)
+    return preguntar, pedidas
+
+
+def test_grupos_solo_mide_esos_y_no_decide(archivo):
+    preguntar, pedidas = _respuestas()
+    salida = []
+    assert M.principal(["--grupos", "C,D", "--lanzar"], salida.append, preguntar, archivo, lambda s: None) == 0
+    assert len(pedidas) == len(M.casos({"C", "D"})) * M.REPETICIONES == 144
+    assert {r["grupo"] for r in M.leer(archivo)} == {"C", "D"}
+    texto = "\n".join(salida)
+    assert "Resultado parcial" in texto and "Cumple el límite" in texto and "Decisión:" not in texto
+
+
+def test_grupos_rellena_lo_que_falta_sin_repetir(archivo):
+    M.principal(["--grupos", "F", "--lanzar"], lambda t: None, _respuestas()[0], archivo, lambda s: None)
+    preguntar, pedidas = _respuestas()
+    M.principal(["--grupos", "F,E", "--lanzar"], lambda t: None, preguntar, archivo, lambda s: None)
+    assert len(pedidas) == len(M.casos({"E"})) * M.REPETICIONES
+
+
+def test_cada_variante_tiene_su_archivo_y_la_descripcion_es_otra(archivo):
+    assert M.ruta("base") == M.ARCHIVO and M.ruta("r1") != M.ruta("base")
+    con = F.declaracion_usar_fuente(M.FUENTES, F.DESCRIPCION_R1)["description"]
+    assert con.startswith("Busca en una web") and "Si dudas, no la uses" in con and "f2: " in con
+    assert F.declaracion_usar_fuente(M.FUENTES)["description"].startswith(F.DESCRIPCION_BASE)
+
+
+@pytest.mark.parametrize("args", [["--grupos"], ["--grupos", "Z"], ["--variante", "r9"], ["--otra"], ["--comprobar", "--grupos", "C"]])
+def test_argumentos_malos_no_lanzan_nada(archivo, args):
+    salida = []
+    assert M.principal(args + ["--lanzar"], salida.append, MagicMock(side_effect=AssertionError), archivo, lambda s: None) == 2
+    assert "Uso:" in salida[0]
+
+
+def _guardados(archivo, filas):
+    with open(archivo, "w", encoding="utf-8") as f:
+        for grupo, frase, hizo in filas:
+            for v in range(M.REPETICIONES):
+                f.write(json.dumps({"grupo": grupo, "frase": frase, "juego": False, "vuelta": v, "hizo": hizo}, ensure_ascii=False) + "\n")
+
+
+BUENA = M.GRUPOS["A"][2][0]
+MALA = M.GRUPOS["C"][2][0]
+
+
+def test_comprobar_rechaza_lo_que_no_encaja_y_guarda_veredictos(archivo):
+    _guardados(archivo, [("A", BUENA, "f1"), ("C", MALA, "f1"), ("C", M.GRUPOS["C"][2][1], "buscar_web")])
+    pedidas = []
+
+    def consultar(tema, frase):
+        pedidas.append((tema, frase))
+        return frase == BUENA
+    salida = []
+    assert M.principal(["--comprobar", "--lanzar"], salida.append, None, archivo, lambda s: None, consultar) == 0
+    assert len(pedidas) == 2 * M.REPETICIONES and all(t == M.FUENTES[0]["tema"] for t, _ in pedidas)
+    finales = M.resumen_r3(M.leer(archivo), M.leer_r3(archivo.with_name(f"{archivo.stem}_r3.jsonl")))
+    assert (finales["bien_rechazadas"], finales["mal_rechazadas"], finales["faltan"]) == (M.REPETICIONES, 0, 0)
+    assert M.resumir(finales["finales"])["graves"] == 0
+    assert "Decisión con R3" in "\n".join(salida)
+    assert M.leer(archivo)[0]["hizo"] == "f1"                                 # lo medido no se reescribe
+
+
+def test_rechazar_uno_bueno_cuenta_como_no_la_usa(archivo):
+    _guardados(archivo, [("A", BUENA, "f1")])
+    veredictos = {(BUENA, "f1", v): False for v in range(M.REPETICIONES)}
+    h = M.resumen_r3(M.leer(archivo), veredictos)
+    r = M.resumir(h["finales"])
+    assert h["mal_rechazadas"] == 3 and r["no_la_usa"] == 3 and r["rechazadas"] == 3
+    assert M.decision_r3(r) == "r3_rechaza"
+
+
+def test_criterio_r3():
+    base = {"total": 100, "graves": 0, "juego_total": 50, "juego_graves": 0, "debian": 100, "no_la_usa": 10}
+    assert M.decision_r3(base) == "r3_si"
+    assert M.decision_r3({**base, "no_la_usa": 11}) == "r3_rechaza"
+    assert M.decision_r3({**base, "graves": 3}) == "r3_no"
+    assert M.decision_r3({**base, "juego_graves": 2}) == "r3_no"
+
+
+def test_comprobar_cada_vuelta_usa_su_veredicto_y_avisa_de_los_discordantes(archivo):
+    _guardados(archivo, [("C", MALA, "f1")])
+    h = M.resumen_r3(M.leer(archivo), {(MALA, "f1", 0): True, (MALA, "f1", 1): False, (MALA, "f1", 2): False})
+    assert [r["hizo"] for r in h["finales"]] == ["f1", "rechazada", "rechazada"]
+    assert h["discordantes"] == [(MALA, "f1")]
+
+
+def test_comprobar_sigue_donde_quedo_y_para_con_el_cupo(archivo):
+    _guardados(archivo, [("A", BUENA, "f1")])
+    respuestas = iter([True, PROV.ErrorIA("cuota", 429, "sin cupo")])
+    assert M.principal(["--comprobar", "--lanzar"], lambda t: None, None, archivo, lambda s: None, lambda t, f: next(respuestas)) == 3
+    pedidas = []
+    consultar = lambda t, f: pedidas.append(f) or True                       # noqa: E731
+    assert M.principal(["--comprobar", "--lanzar"], lambda t: None, None, archivo, lambda s: None, consultar) == 0
+    assert len(pedidas) == M.REPETICIONES - 1
+
+
+def test_comprobar_sin_lanzar_no_llama(archivo):
+    _guardados(archivo, [("A", BUENA, "f1")])
+    salida = []
+    consultar = MagicMock(side_effect=AssertionError("no debía llamar"))
+    assert M.principal(["--comprobar"], salida.append, None, archivo, lambda s: None, consultar) == 0
+    assert "0 de 3" in salida[0]
+
+
+def test_el_prompt_de_comprobar_solo_lleva_tema_y_pregunta():
+    assert F.contenido_tema("t", "p") == "<tema>t</tema>\n<pregunta>p</pregunta>"
+    assert set(F.ESQUEMA_TEMA["properties"]) == {"decision"}
+
+
+@pytest.mark.parametrize("texto, esperado", [('{"decision":"encaja"}', True), ('```json\n{"decision":"encaja"}\n```', True), ('{"decision":"no_encaja"}', False), ("ilegible", False)])
+def test_la_consulta_de_verdad_usa_la_clave_gratuita_el_modelo_ligero_y_solo_tema_y_pregunta(monkeypatch, texto, esperado):
+    from lina.nucleo import claves as CL
+    from lina.nucleo import ia as IA
+    from lina.nucleo import ia_activa as IAC
+    vistos = {}
+
+    def turno(proveedor, clave, modelo, sistema, mensajes, **k):
+        vistos.update(clave=clave, modelo=modelo, sistema=sistema, mensajes=mensajes, **k)
+        return PROV.Respuesta(texto, [], {}, modelo, None)
+    ia = MagicMock()
+    ia.nombre = "gemini"
+    monkeypatch.setattr(IAC, "actual", lambda *a: ia)
+    monkeypatch.setattr(IAC, "modelos", lambda *a: ["ligero", "otro"])
+    monkeypatch.setattr(CL, "obtener", lambda nombre, *a: "gratuita" if nombre == "gemini" else None)
+    monkeypatch.setattr(IA, "_turno_medido", turno)
+    consultar, _ = M._consultar_de_verdad()
+    assert consultar("el tema", "la pregunta") is esperado
+    assert (vistos["clave"], vistos["modelo"]) == ("gratuita", "ligero") and "herramientas" not in vistos
+    assert vistos["sistema"] == F.PROMPT_TEMA and vistos["mensajes"] == [{"rol": "user", "texto": "<tema>el tema</tema>\n<pregunta>la pregunta</pregunta>"}]
