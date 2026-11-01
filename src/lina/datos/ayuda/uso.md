@@ -29,6 +29,36 @@ Lina entiende la intención, no frases fijas. Estos ejemplos son solo orientativ
 | Sobre ella misma | «¿qué puedes hacer?», «cámbiate la voz», «llámate Jarvis», «¿cuánto he gastado de Gemini?» |
 | Corregirla | «cuando oigas cait quiero decir Kate» (para lo que oye mal; solo con el atajo), «olvida el alias cait» |
 
+## Tus fuentes: una web para cada tema
+
+Puedes decirle a Lina qué web usar para un tema concreto, por ejemplo las recetas de refinería de un juego. Para lo demás, aunque sea del mismo juego, seguirá buscando como siempre.
+
+**Añadir una fuente**, solo con el atajo, con `lina di` o en la terminal. Por «Oye Lina» se niega, por si lo dijera otra voz:
+
+- «para las recetas de refinería usa esta web: nomanssky punto fandom punto com»
+- Copia la dirección y di «para las recetas de refinería usa la página que tengo copiada», o «añade la fuente que tengo en el portapapeles a recetas de refinería». El portapapeles solo se mira si lo pides, con el atajo, y lo copiado no se repite.
+- `lina fuentes añadir "recetas de refinería" https://…`
+
+Guardar una fuente **no pide confirmación previa**. Lina te avisa después, con el dominio deletreado («nomanssky punto fandom punto com»), y si no es lo que querías se deshace con «quita la última fuente». Escucha ese dominio: es la forma de notar que lo copiado no era lo que creías. Solo se deletrea el dominio: una página distinta de esa misma web no se notaría, y se comprueba con `lina fuentes`. Si falta la web o el tema, te lo pide. Puedes guardar hasta 20.
+
+**Quitar una fuente:** «quita la última fuente» por voz, con el atajo o con `lina di`. Las demás, con `lina fuentes quitar f1`, y todas con `lina fuentes quitar todas`. `lina olvidar fuentes` también las borra. `lina fuentes` enseña la lista. Por voz aún no se quita una fuente concreta.
+
+**Cómo elige Lina.** Cuando le preguntas algo, la IA decide por significado si va de uno de tus temas, aunque uses otras palabras. Después, una comprobación aparte mira solo el tema y tu pregunta, y si no es exactamente de ese tema no se usa la fuente. Si esa comprobación no contesta a tiempo, tampoco, y Lina sigue con la búsqueda general sin decírtelo. Para consultarla no hace falta nombrarla, aunque también puedes: «usa la fuente de recetas». `lina fuentes probar "tu pregunta"` enseña qué fuente elegiría y si la comprobación la aceptaría, sin responder ni buscar.
+
+**Si la fuente no tiene la respuesta,** Lina no te pregunta: sigue con la búsqueda general y te dice que en tu web no estaba y de dónde sale lo demás. Si tu web no se puede leer y no hay búsqueda, te lo dice y termina, sin insistir ni probar otras vías, y no te contesta de memoria como si fuera un dato. Si te contesta algo como si fuera de tu web y no lo es, añade una corrección.
+
+**Preguntas de seguimiento.** La comprobación solo ve la frase que acabas de decir. Algo como «¿y con carbono?» puede ir a la búsqueda general aunque siga siendo tu tema. Si quieres asegurarte de que use tu fuente, repite el tema en la pregunta.
+
+**En qué configuraciones funciona.** Con Gemini y con `ia.busqueda` en `tavily` o `ninguna`:
+
+| `ia.busqueda` | Qué hace con tu fuente |
+|---|---|
+| `tavily` con clave | Busca dentro de esa web (con DuckDuckGo si Tavily no responde) |
+| `tavily` sin clave, o `ninguna` | Lee solo la dirección que guardaste, sin buscar: guarda la página concreta, no solo el dominio |
+| `google` | No se usan |
+
+Con otro proveedor de IA tampoco se usan, porque no está medido. `lina fuentes` te avisa si es tu caso. Lo que sale de tu equipo está en el [manual de privacidad](privacidad.md).
+
 ## Cómo te pide permiso
 
 - Lo que cambia el sistema queda **pendiente** y Lina te lo dice en una pregunta («voy a instalar X, ¿lo hago?»). Según el perfil que elijas

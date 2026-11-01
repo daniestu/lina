@@ -34,7 +34,7 @@ AYUDA = N_("lina fuentes                              las webs que has elegido p
            "lina fuentes quitar f1 | todas            quita una o todas\n"
            "lina fuentes medir [--grupos C,D] [--variante r1] [--comprobar] [--tiempos --clave gratuita|pago] [--lanzar]   mide si la IA elegiría bien la fuente (sin --lanzar, solo dice qué haría)\n"
            "lina fuentes probar \"PREGUNTA\"           qué fuente elegiría y si la comprobación la aceptaría, sin responder ni buscar\n"
-           "Se usan al responder con Gemini y con ia.busqueda en tavily o ninguna.")
+           "Se usan al responder con Gemini y con ia.busqueda en tavily o ninguna. Por voz, con el atajo: «para TEMA usa esta web» y «quita la última fuente».")
 
 
 def _cargar():

@@ -12,6 +12,11 @@ Lina no tiene telemetría: no envía estadísticas ni datos de uso a nadie. Lo �
 - **El resultado de las órdenes y herramientas** que la IA usa para ayudarte (por ejemplo, la lista de programas instalados o el texto de una página que le pides leer).
 - Si has puesto una clave de **Tavily**, el texto de cada búsqueda web, que se envía a Tavily. Puede incluir lo que preguntas o el nombre de un programa o juego que tengas abierto; a Tavily no le llegan tu voz, capturas de pantalla ni archivos.
 
+- Si guardas **fuentes** (una web para un tema) y usas Gemini, lo siguiente:
+  - **A Gemini:** la lista de tus temas en cada petición que pueda usarlas, y cuando la IA elige una, una consulta más con solo ese tema y tu pregunta. Esa consulta va por tu clave de pago si la tienes y queda saldo de tu tope; si no, por la gratuita. Lo que traiga la web también le llega a la IA.
+  - **A Tavily o DuckDuckGo:** el texto de la búsqueda y el dominio de tu fuente, para buscar solo ahí. DuckDuckGo solo se usa si Tavily no responde y tienes la reserva activa.
+  - **Con `ia.busqueda` en `ninguna`, o `tavily` sin clave:** no se usa ningún buscador. Tu equipo descarga directamente la página guardada, así que **esa web ve tu dirección IP**, y su texto se envía a la IA.
+
 ## Qué NO se envía
 
 - Tus grabaciones de voz.
@@ -48,7 +53,7 @@ Con la clave **gratuita**, según las condiciones de Google vigentes, lo que se 
 | Diario de cambios y copias para deshacer | `~/.local/share/lina/diario` | `lina olvidar diario` |
 | Registro de acciones (órdenes ejecutadas) | `~/.local/state/lina/acciones.log` (rota solo al llegar a ~1 MB) | `lina olvidar acciones` |
 | Lo que me pides recordar («recuerda que…»; solo lo escribes tú, con el atajo, nunca la IA ni Lina por su cuenta, y nunca contraseñas ni claves; a la IA solo le llega lo que viene al caso de cada petición) | `~/.local/share/lina/memoria.json` | `lina memoria` (verlo y borrar uno), `lina olvidar memoria` |
-| Las webs que eliges para cada tema (`lina fuentes`; solo las escribes tú, nunca la IA, y de momento solo se guardan) | `~/.local/share/lina/fuentes.json` (solo lo puedes leer tú) | `lina fuentes quitar`, `lina olvidar fuentes` |
+| Las webs que eliges para cada tema (`lina fuentes`; solo las escribes tú, nunca la IA; se usan al responder, como se explica arriba) | `~/.local/share/lina/fuentes.json` (solo lo puedes leer tú) | `lina fuentes quitar`, `lina olvidar fuentes` |
 | Recetas aprendidas (lo que ya me pediste y salió bien: la frase, los pasos y cómo se comprobó; nunca contraseñas) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` o `lina recetas borrar todas` |
 | Tiempos de cada petición (solo números, nunca lo que dices; `lina tiempos` los resume) | `~/.local/state/lina/tiempos.jsonl` (se recorta solo al llegar a ~200 KB) | `lina olvidar tiempos` |
 | Cómo termina cada escucha del atajo (por silencio, por tu pulsación…), con el día sin hora y tiempos; nunca audio ni texto (`lina tiempos escucha`) | `~/.local/state/lina/escuchas.jsonl` (últimas 5000) | `lina olvidar tiempos` |

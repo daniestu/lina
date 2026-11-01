@@ -239,3 +239,24 @@ def test_al_retomar_una_tarea_no_se_vuelve_a_guardar(asistente, monkeypatch):
     with pytest.raises(Parar):
         a._atender(f"Para las recetas usa esta página {URL_FRASE}", 0.0, profundidad=1, origen="atajo")
     assert F.listar() == [] and a.dicho == []
+
+
+# ---------------------------------------------------------------- los manuales dicen lo que hace
+def test_los_manuales_de_las_fuentes_dicen_lo_que_hace():
+    from pathlib import Path
+    ayuda = Path(F.__file__).parents[1] / "datos" / "ayuda"
+    uso = (ayuda / "uso.md").read_text(encoding="utf-8")
+    assert "puede ir a la búsqueda general" in uso and "suele ir" not in uso
+    assert "no pide confirmación previa" in uso and "quita la última fuente" in uso
+    for frase in ("`tavily`", "`ninguna`", "`google`"):
+        assert frase in uso
+    privacidad = (ayuda / "privacidad.md").read_text(encoding="utf-8")
+    assert "de momento solo se guardan" not in privacidad and "ve tu dirección IP" in privacidad and "clave de pago" in privacidad
+    ingles = (ayuda / "privacidad.en.md").read_text(encoding="utf-8")
+    assert "only saved" not in ingles and "sees your IP address" in ingles
+
+
+def test_la_ayuda_de_la_ia_sobre_si_misma_sabe_lo_de_las_fuentes():
+    from lina.nucleo import autoconocimiento as AUTO
+    limites = " ".join(AUTO.LIMITES)
+    assert "no puedes añadirlas ni quitarlas" in limites and "quita la última fuente" in limites and "puede ir a la búsqueda general" in limites

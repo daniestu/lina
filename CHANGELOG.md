@@ -6,6 +6,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ### Añadido
 - **Las fuentes por tema ya se usan al responder**: si la pregunta es de ese tema, Lina busca primero en tu web y lo dice. Una comprobación aparte, con solo el tema y tu pregunta, evita usarla para otra cosa. Si tu web no lo tiene, sigue sola con la búsqueda general y dice de dónde sale cada cosa. Con `ia.busqueda` en `ninguna`, lee solo la página guardada.
+- El manual de uso explica las fuentes (`docs/uso.md`), el de privacidad qué sale de tu equipo con ellas, y `docs/seguridad.md` sus límites y los de la lectura a lo ancho.
 - Las fuentes también se añaden con «añade la fuente que tengo en el portapapeles a TEMA», aunque Whisper oiga «cortapapeles». Si falta algo, Lina lo pide en vez de contestar otra cosa; por manos libres sigue negándose, y si una petición de añadir se escapa, avisa de que no ha añadido nada.
 - Si tu fuente no se puede leer, Lina lo dice y termina: no reintenta a fondo ni ejecuta comandos. Con búsqueda, sigue solo con la búsqueda general.
 - Cuando una pregunta no se puede contestar a la primera, Lina insiste solo con la web, con el modelo rápido y un máximo de 60 s: ya no mira tu equipo, ni instala nada, ni conecta servidores. Las órdenes insisten como siempre, también si las dices con cortesía («¿puedes abrir Steam?»).

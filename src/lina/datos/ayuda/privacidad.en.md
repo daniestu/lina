@@ -12,6 +12,11 @@ Lina has no telemetry: she sends no statistics or usage data to anyone. The only
 - **The result of the commands and tools** the AI uses to help you (for example, the list of installed programs or the text of a page you ask it to read).
 - If you have set a **Tavily** key, the text of each web search, which is sent to Tavily. It may include what you ask or the name of a program or game you have open; Tavily does not receive your voice, screenshots or files.
 
+- If you save **sources** (a website for a topic) and use Gemini, the following:
+  - **To Gemini:** the list of your topics in each request that may use them and, when the AI picks one, one more query with only that topic and your question. That query goes through your paid key if you have one and your spending cap has room left; otherwise, through the free key. What the website returns also reaches the AI.
+  - **To Tavily or DuckDuckGo:** the search text and your source's domain, to search only there. DuckDuckGo is only used if Tavily does not answer and you have the fallback on.
+  - **With `ia.busqueda` set to `ninguna`, or `tavily` without a key:** no search engine is used. Your computer downloads the saved page directly, so **that website sees your IP address**, and its text is sent to the AI.
+
 ## What is NOT sent
 
 - Your voice recordings.
@@ -48,7 +53,7 @@ With the **free** key, according to Google's current terms, what is sent may be 
 | Change journal and copies for undoing | `~/.local/share/lina/diario` | `lina olvidar diario` |
 | Action log (commands run) | `~/.local/state/lina/acciones.log` (rotates itself at ~1 MB) | `lina olvidar acciones` |
 | What you ask me to remember («remember that…»; only you write it, with the hotkey, never the AI nor Lina on its own, and never passwords or keys; the AI only receives what is relevant to each request) | `~/.local/share/lina/memoria.json` | `lina memoria` (view and delete one), `lina olvidar memoria` |
-| The websites you choose for each topic (`lina fuentes`; only you write them, never the AI, and for now they are only saved) | `~/.local/share/lina/fuentes.json` (only you can read it) | `lina fuentes quitar`, `lina olvidar fuentes` |
+| The websites you choose for each topic (`lina fuentes`; only you write them, never the AI; they are used when answering, as explained above) | `~/.local/share/lina/fuentes.json` (only you can read it) | `lina fuentes quitar`, `lina olvidar fuentes` |
 | Learned recipes (what you already asked me that went well: the phrase, the steps and how it was checked; never passwords) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` or `lina recetas borrar todas` |
 | Timings of each request (numbers only, never what you say; `lina tiempos` summarises them) | `~/.local/state/lina/tiempos.jsonl` (trims itself at ~200 KB) | `lina olvidar tiempos` |
 | How each shortcut listen ended (by silence, by your press…), with the day without the time and timings; never audio or text (`lina tiempos escucha`) | `~/.local/state/lina/escuchas.jsonl` (last 5000) | `lina olvidar tiempos` |

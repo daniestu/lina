@@ -103,6 +103,17 @@ Esto es lo que se considera, qué lo frena y qué queda sin cubrir.
 | **Escalada de privilegios** | Convertir a Lina en administrador | Ver «Privilegios»: un solo ayudante validado, regla de sudoers verificada, sin contraseñas en Lina; la IA no puede tocar la regla ni el ayudante | En el nivel *total* cualquier cosa que corra como tú puede ser administrador |
 | **Cambiar sus propios límites** | La IA edita `politica.txt`, `config.toml`, su código o su servicio | Todo eso está protegido en el código; los ajustes sensibles (perfil, gasto, claves, privacidad) solo los cambia el usuario | — |
 
+### Fuentes y lectura a lo ancho
+
+- **La IA no puede añadir ni quitar fuentes.** Solo las escribes tú, con el atajo, con `lina di` o en la terminal, y `lina fuentes` y `fuentes.json` están bloqueados para ella. Una página con instrucciones escondidas no puede colar una fuente: `usar_fuente` solo elige un id de tu lista, y el id lo revisa el código.
+- **La comprobación del tema (R3) solo ve el tema y la pregunta.** No recibe instrucciones, herramientas, historial ni nada de lo que traiga una web, y usa tu frase, no lo que escriba la IA. Por eso una web no puede influir en ella. Si no contesta, la fuente no se usa.
+- **Tras usar una fuente solo cabe la web**, sin reintento a fondo ni comandos. Y lo que traiga marca la petición como contaminada, como cualquier búsqueda.
+- **Guardar desde el portapapeles no pide confirmación previa.** Una página puede cambiar lo que copias. Te protege lo siguiente: solo se lee con el atajo y si lo pides, se rechazan claves, IP y nombres locales, se te deletrea el dominio y se deshace con una frase. Si no atiendes al dominio, queda guardada, y una página distinta del mismo dominio no se detecta.
+- **Insistir en una pregunta de información no mira el equipo**: va con el modelo rápido, hasta 60 s y solo con `buscar_web` y `leer_web`. Las órdenes, también las de cortesía («¿puedes abrir Steam?»), insisten como siempre.
+- **Lectura a lo ancho:** `grep -r`, `rg`, `ag`, comodines, `tar`, `cp -r`, `rsync`, `zip` y `find` con `-exec` o `xargs` se bloquean si recorren una carpeta que incluye claves o los datos de Lina, como `~`, `~/.config` o `~/.local`, igual que leer esas rutas directamente. Buscar en una carpeta concreta sigue libre, y listar nombres con `find` también.
+- **`journalctl` sin filtro de servicio pide confirmación**, porque lleva el registro de Lina: tus preguntas y el principio de lo que devuelven los comandos. Sigue libre con `-u`, `-k`, `-t` o `-p` de aviso hacia abajo.
+- **Límite de esas dos reglas:** son filtros sobre el texto de bash. `python3 -c`, una variable o un script los rodean. La barrera de verdad sería aislar los comandos, la fase S9 del plan, todavía sin hacer. Tampoco se resuelve aún una sola vez el nombre de la web al comprobarla y al descargarla (S11).
+
 ### Lo que Lina **no** es
 
 No es un entorno aislado: las órdenes se ejecutan con tu usuario y el filtro razona sobre el texto de cada orden (con las inevitables formas de esquivarlo que tiene cualquier
