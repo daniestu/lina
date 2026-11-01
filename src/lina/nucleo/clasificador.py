@@ -87,8 +87,6 @@ _LECTURA_SENSIBLE = [
      "es el historial de navegación (dice qué webs visitas); lo que lea se enviará a la IA"),
     (r"\bjournalctl\b[^;|&\n]*(?:-u|--unit|--user-unit)[=\s]*['\"]?lina\b",
      "es el registro de Lina y puede llevar tus preguntas anteriores; lo que lea se enviará a la IA"),
-    (r"\bjournalctl\b(?=[^;|&\n]*\s--user(?:\s|$))(?![^;|&\n]*\s(?:-u|--unit|--user-unit)[=\s])",        # sin filtrar por servicio, lleva también el de Lina
-     "es el registro de tus servicios, con el de Lina, y puede llevar tus preguntas anteriores; lo que lea se enviará a la IA"),
 ]
 
 
@@ -98,7 +96,48 @@ def lectura_sensible(comando):
     for patron, motivo in _LECTURA_SENSIBLE:
         if re.search(patron, bajo):
             return motivo
-    return None
+    return _JOURNAL_SIN_FILTRO if _journal_sin_filtrar(bajo) else None
+
+
+_JOURNAL_SIN_FILTRO = "es el registro del sistema y lleva el de Lina: tus preguntas y el principio de lo que devuelven los comandos; lo que lea se enviará a la IA"
+_JOURNAL_SIN_DATOS = {"--disk-usage", "--list-boots", "--verify", "--list-catalog", "--field", "--fields", "--vacuum-time", "--vacuum-size", "--vacuum-files", "--flush", "--sync", "--rotate"}
+_PRIORIDADES = {"emerg": 0, "alert": 1, "crit": 2, "err": 3, "warning": 4, "notice": 5, "info": 6, "debug": 7}
+
+
+def _prioridad_alta(valor):
+    """¿Ese -p se queda en avisos o peor? Lina escribe en nivel informativo: ahí no sale. En un rango manda el extremo menos grave."""
+    ultimo = valor.split("..")[-1].strip()
+    nivel = int(ultimo) if ultimo.isdigit() else _PRIORIDADES.get(ultimo, 7)
+    return nivel <= _PRIORIDADES["warning"]
+
+
+def _journal_filtrado(args):
+    """¿Esas opciones se quedan fuera del registro de Lina? Por servicio (el de Lina lo atrapa `_LECTURA_SENSIBLE`), identificador, núcleo o prioridad, o porque no leen entradas."""
+    for i, a in enumerate(args):
+        opcion, igual, valor = a.partition("=")
+        if not igual and i + 1 < len(args):
+            valor = args[i + 1]
+        if opcion in _JOURNAL_SIN_DATOS or opcion in ("-k", "--dmesg"):
+            return True
+        if opcion in ("-u", "--unit", "--user-unit", "-t", "--identifier") and valor and "lina" not in valor:
+            return True
+        if opcion in ("-p", "--priority") and valor and _prioridad_alta(valor):
+            return True
+        pegada = re.fullmatch(r"-([ut])(\S+)", a)
+        if pegada and "lina" not in pegada.group(2):
+            return True
+        pegada = re.fullmatch(r"-p(\S+)", a)
+        if pegada and _prioridad_alta(pegada.group(1).lstrip("=")):
+            return True
+    return False
+
+
+def _journal_sin_filtrar(bajo):
+    for seg in _segmentos(bajo):
+        t = _quitar_prefijos(_tokens(seg) or [])
+        if t and os.path.basename(t[0]) == "journalctl" and not _journal_filtrado(t[1:]):
+            return True
+    return False
 _PROPIO = (r"(?:^|/)lina/(?:nucleo|voz|escritorio|modulos|mcp|datos)/|site-packages/lina|/src/lina/|\.config/lina|\.local/share/lina|\.local/state/lina|"
           r"lina\.service|systemd/user/lina|systemctl[^;|&\n]*\blina\b|mcp\.json|mcp_estado|"
           r"\b(?:politica|comandos|activacion|presupuesto|paquetes_confiables|alias|vocabulario|disco_datos)\.txt|config\.toml|mcp_claves|"

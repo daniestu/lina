@@ -57,12 +57,24 @@ def test_lo_directo_sigue_bloqueado(comando):
     assert _clase(comando) == "bloqueado"
 
 
-def test_journalctl_user_sin_filtrar_pide_confirmacion():
-    for comando in ("journalctl --user -n 50", "journalctl --user", "journalctl --user --since today"):
-        clase, motivo = H.clasificar(comando)
-        assert clase == "critico" and "Lina" in motivo, comando
+# ---------------------------------------------------------------- journalctl: sin filtrar lleva el registro de Lina
+@pytest.mark.parametrize("comando", ["journalctl", "journalctl -n 50", "journalctl -b", "journalctl --user", "journalctl --user -n 50", "journalctl --user --since today", "journalctl -xe",
+                                     "journalctl --since today | grep x", "journalctl -g clave", "sudo journalctl -n 50", "journalctl -p info", "journalctl -p debug -n 5", "journalctl -p err..info",
+                                     "journalctl --priority=notice", "journalctl -o json -n 5", "journalctl -u lina", "journalctl --user-unit=lina -n 5", "journalctl -t lina -n 5",
+                                     "journalctl --identifier=lina"])
+def test_sin_filtrar_pide_confirmacion(comando):
+    clase, motivo = H.clasificar(comando)
+    assert clase == "critico" and "Lina" in motivo, comando
 
 
-@pytest.mark.parametrize("comando", ["journalctl -u NetworkManager -n 20", "journalctl --user -u pipewire -n 20", "journalctl --user-unit=pipewire -n 5"])
-def test_journalctl_de_otro_servicio_sigue_libre(comando):
-    assert _clase(comando) == "lectura"
+@pytest.mark.parametrize("comando", ["journalctl -u NetworkManager -n 20", "journalctl --user -u pipewire -n 20", "journalctl --user-unit=pipewire -n 5", "journalctl --unit=sshd", "journalctl -uNetworkManager",
+                                     "journalctl -k", "journalctl --dmesg -n 20", "journalctl -k -b -1", "journalctl -t kernel", "journalctl --identifier=sudo", "journalctl -p err -b", "journalctl -p warning",
+                                     "journalctl -p 0..4", "journalctl -p err..warning", "journalctl -p3", "journalctl --priority=crit", "journalctl -p err | grep x", "journalctl --disk-usage",
+                                     "journalctl --list-boots"])
+def test_con_filtro_sigue_libre(comando):
+    assert _clase(comando) == "lectura", comando
+
+
+def test_no_afecta_a_otros_comandos():
+    from lina.nucleo import clasificador as CLA
+    assert CLA.lectura_sensible("ls ~/Documentos") is None and CLA.lectura_sensible("grep journalctl notas.txt") is None
