@@ -269,6 +269,7 @@ Lo que ya está bien: `rm` va a la papelera; `shred`, `truncate` y `dd` sobre tu
 | M7 | **`t_mov`** *(pendiente)*: renombrar `DEPENDEN_DEL_ENTORNO`, porque no depende del entorno; que el `xfail` cubra solo los dos casos conocidos, para que un tercer fallo salte; y decir si importa la falta de precisión del puntero (error de 3 y 17 píxeles de esquina a esquina con ratón muy acelerado). | S |
 | M8 | **Quitar una fuente por voz** *(pendiente)*: solo se entiende «quita la última fuente». «Quita la fuente de recetas» va a la IA, que no puede hacerlo; `afirma_fuente` impide que diga que lo ha hecho, pero no la pide bien. Tratarlo como añadir: con el atajo o `lina di`, quitar la que encaje; por manos libres, rechazo hablado. | S |
 | M9 | **Avisar al añadir una fuente que es la portada** *(pendiente)*: con `ia.busqueda` en `ninguna`, o `tavily` sin clave, Lina lee solo la dirección guardada, y si es la portada del dominio rara vez tendrá la respuesta. Al guardarla en esa configuración, avisar de que conviene la página concreta. Hoy solo lo dice `uso.md`. | S |
+| M10 | **git en los contenedores de la CI** *(pendiente)*: añadirlo al paso `preparar` de las familias en `ci.yml`. Sin él, los 12 omitidos de `test_actualizar.py` dejan `lina update` sin probar en las distros. | S |
 | M6 | *(hecha)* En CLAUDE.md, `ruff` como `uvx ruff check src tests` (en el equipo del mantenedor `ruff` no está en el PATH). | S |
 
 ### Orden propuesto

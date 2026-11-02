@@ -33,6 +33,22 @@ def test_leer_a_lo_ancho_se_bloquea(comando):
     assert _clase(comando) == "bloqueado", comando
 
 
+@pytest.mark.parametrize("casa, comando", [
+    ("/var/home/ana", "grep -rn x /home"), ("/var/home/ana", "grep -rn x /home/"), ("/var/home/ana", "grep -rn x /home/*"), ("/var/home/ana", "tar czf - /home"),
+    ("/var/home/ana", "cp -r /home /tmp/x"), ("/var/home/ana", "cat /home/*/.ssh/*"), ("/var/home/ana", "grep -rn x ~"),
+    ("/root", "grep -rn x /home"), ("/root", "grep -rn x /root"), ("/root", "grep -rn x ~"), ("/root", "tar czf - ~"),
+])
+def test_con_la_casa_fuera_de_home_tambien_se_bloquea(monkeypatch, casa, comando):
+    monkeypatch.setenv("HOME", casa)
+    assert _clase(comando) == "bloqueado", comando
+
+
+@pytest.mark.parametrize("comando", ["ls /home", "grep -n x /home/notas.txt"])
+def test_con_la_casa_fuera_de_home_lo_que_no_recorre_sigue_libre(monkeypatch, comando):
+    monkeypatch.setenv("HOME", "/var/home/ana")
+    assert _clase(comando) == "lectura", comando
+
+
 def test_el_motivo_le_dice_a_la_ia_que_acote():
     assert "carpeta concreta" in H.clasificar("grep -rn clave ~")[1]
 

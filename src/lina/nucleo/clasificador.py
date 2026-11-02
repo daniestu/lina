@@ -398,6 +398,8 @@ def _trozos(ruta):
 def _toca_protegida(ruta, recursivo):
     """¿Esa ruta, con o sin comodines, llega a una protegida? Una carpeta superior solo cuenta si se recorre; un comodín como el de la shell: «*» no entra en lo que empieza por punto."""
     patron = _trozos(ruta)
+    if recursivo and patron in (["home"], ["home", "*"]):   # están las casas de todos, también si la tuya no cuelga de ahí (/root, /var/home/…)
+        return True
     for relativa in _RUTAS_PROTEGIDAS:
         protegida = _trozos(os.path.expanduser("~")) + _trozos(relativa)
         comunes = min(len(patron), len(protegida))
