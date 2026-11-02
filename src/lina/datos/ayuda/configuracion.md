@@ -145,6 +145,16 @@ dices, así que por voz exige el atajo (o se hace en la terminal).
 | `registro_ruido` | `false` | true: se apunta en el registro lo que oye y descarta (solo para depurar). |
 | `registrar_tiempos` | `true` | true: se apuntan cuántos segundos tarda cada fase de una petición, cómo termina cada escucha del atajo y los tokens de cada llamada a la IA (solo números, nunca lo que dices). Se ven con:  lina tiempos |
 
+### [avisos] Avisos por iniciativa propia
+
+Apagados de fábrica. Son solo una notificación: Lina no habla ni llama a la IA. `lina avisos` enseña cómo están y qué dirían ahora.
+
+| Ajuste | De fábrica | Qué hace |
+|---|---|---|
+| `disco` | `false` | true: notificación si quedan menos de 5 GB o del 5 % en tu carpeta personal, como mucho una vez al día. |
+| `bateria` | `false` | true: notificación si la batería baja del 15 % y se está descargando, una vez por descarga. |
+| `actualizaciones` | `false` | true: notificación si hay actualizaciones pendientes, como mucho una vez al día. En Arch necesita `checkupdates` (`pacman-contrib`). |
+
 ### [interfaz] Interfaz
 
 | Ajuste | De fábrica | Qué hace |

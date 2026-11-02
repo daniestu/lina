@@ -120,6 +120,11 @@ ESQUEMA: dict = {
         "registrar_tiempos": (True, "bool", None, N_("true: se apuntan cuántos segundos tarda cada fase de una petición, cómo termina cada escucha del atajo y los tokens de cada llamada a la IA (solo números, nunca lo que dices). Se ven con:  lina tiempos")),
         "almacen_claves": ("auto", "opcion", ("auto", "archivo"), N_("auto: las claves van al llavero del sistema si lo hay (y si no, a un archivo solo tuyo). archivo: siempre archivo.")),
     },
+    "avisos": {
+        "disco": (False, "bool", None, N_("true: notificación si quedan menos de 5 GB o del 5 % en tu carpeta personal, como mucho una vez al día.")),
+        "bateria": (False, "bool", None, N_("true: notificación si la batería baja del 15 % y se está descargando, una vez por descarga.")),
+        "actualizaciones": (False, "bool", None, N_("true: notificación si hay actualizaciones pendientes, como mucho una vez al día. En Arch necesita checkupdates (pacman-contrib).")),
+    },
     "interfaz": {
         "indicador": (True, "bool", None, N_("Resplandor en los bordes: te escucha (azul), piensa (ámbar), habla (verde).")),
         "indicador_color": ("azul", "color", None, N_("Color al escucharte: azul, rojo, verde, morado, naranja, amarillo, rosa, cian, blanco o #rrggbb.")),
@@ -130,7 +135,7 @@ ESQUEMA: dict = {
     },
 }
 TITULOS = {"asistente": N_("Identidad"), "voz": N_("Voz"), "sonido": N_("Sonido mientras te escucha"), "memoria": N_("Memoria de preferencias"), "activacion": N_("Manos libres"), "autonomia": N_("Autonomía: qué hace solo y qué te pregunta"),
-           "directas": N_("Órdenes directas (sin IA)"), "ia": N_("Inteligencia artificial"), "gasto": N_("Gasto con la clave de pago"), "privacidad": N_("Privacidad"), "interfaz": N_("Interfaz")}
+           "directas": N_("Órdenes directas (sin IA)"), "ia": N_("Inteligencia artificial"), "avisos": N_("Avisos por iniciativa propia"), "gasto": N_("Gasto con la clave de pago"), "privacidad": N_("Privacidad"), "interfaz": N_("Interfaz")}
 
 # Nombres planos que usa el manos libres desde siempre (activacion.txt) → ajuste nuevo
 PLANAS = {

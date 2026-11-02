@@ -255,7 +255,7 @@ Lo que ya está bien: `rm` va a la papelera; `shred`, `truncate` y `dd` sobre tu
 | A4 | **`lina di "frase"`** *(hecha)*: hablarle por texto a la Lina en marcha (sin micrófono, para pruebas completas reproducibles) por un socket Unix (`$XDG_RUNTIME_DIR/lina/lina.sock`, 0600, `SO_PEERCRED`), líneas JSON; la respuesta sale en la terminal y, con `--voz`, también hablada. Entra por `_atender` con origen **«texto»**: como el atajo (recordar, alias, recetas, ajustes), pero **no confirma acciones críticas ni sube el tope** (decidido: un proceso de tu usuario puede escribir en el socket; memoria y recetas, mismo alcance que editar tus archivos). Ocupada: código 3, sin interrumpir ni encolar. Sin Lina en marcha: código 1, no arranca nada. La IA tiene bloqueados (bloqueo duro del código, no `politica.txt`) `lina di`, `lina pulsar` y cualquier comando con el socket o su carpeta: una capa, no la barrera. | M |
 | A5 | **Más contexto, con las mismas reglas que las capturas**: portapapeles, texto seleccionado y archivo seleccionado en Dolphin («resume esto», «manda este archivo»), solo cuando la frase lo pide. | M |
 | A6 | **Tareas largas**: plan con pasos y progreso que sobrevive a un reinicio, y tareas programadas («cada lunes vacía Descargas») que pasan por el ejecutor y el diario como todo. | L |
-| A7 | **Avisos por iniciativa propia, opcionales**: disco casi lleno, batería baja, actualizaciones pendientes. Apagados por defecto. | M |
+| A7 | **Avisos por iniciativa propia, opcionales** *(hecha: `nucleo/avisos.py`, `[avisos]` y `lina avisos`; solo notificación, sin voz ni IA)*: disco casi lleno, batería baja, actualizaciones pendientes. Apagados por defecto. | M |
 
 ### Mantenimiento
 | # | Qué | Tamaño |

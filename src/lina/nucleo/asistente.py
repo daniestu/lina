@@ -31,6 +31,7 @@ from pathlib import Path
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import autoconocimiento as AUTO
 from lina.nucleo import aviso_busqueda as AVB
+from lina.nucleo import avisos as AVI
 from lina.nucleo import canal as CANAL
 from lina.nucleo.registro import log
 from lina.nucleo import claves as CL
@@ -2769,6 +2770,7 @@ def main():
     else:
         log("Sin la librería evdev: el mando no activará el asistente")
     threading.Thread(target=asistente.vigilar_recordatorios, daemon=True).start()
+    threading.Thread(target=AVI.vigilar, daemon=True).start()
     if asistente.mcp:
         threading.Thread(target=asistente.vigilar_mcp, daemon=True).start()
     if INT:
