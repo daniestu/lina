@@ -11,9 +11,11 @@ import os
 import shutil
 import sys
 import tempfile
+import types
 from pathlib import Path
+from unittest.mock import MagicMock
 
-SRC = Path(__file__).resolve().parents[1] / "src"
+SRC =Path(__file__).resolve().parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
@@ -68,6 +70,24 @@ os.environ.setdefault("LINA_DISTRO", "arch")
 # Y de KDE Plasma con Wayland, que es para lo que están escritas las pruebas de ventanas (las de otros escritorios pasan su propio entorno).
 os.environ.setdefault("XDG_CURRENT_DESKTOP", "KDE")
 os.environ.setdefault("XDG_SESSION_TYPE", "wayland")
+
+
+# ---- El audio de las pruebas (antes de importar nada de Lina) ----
+class SustitutoAudio(types.ModuleType):
+    """`sounddevice` de mentira, igual en todos los equipos: con PortAudio o sin él, la librería real no llega a cargarse. Sus atributos son reales,
+    no los que un MagicMock inventa al pedirlos: desde pytest 9.2, monkeypatch no ve esos y al deshacer los borra del simulacro."""
+
+    def __getattr__(self, nombre):
+        if nombre.startswith("__"):                  # lo que Python pregunta a cualquier módulo (__path__, __file__…) no se inventa
+            raise AttributeError(nombre)
+        valor = MagicMock(name=f"sounddevice.{nombre}")
+        setattr(self, nombre, valor)
+        return valor
+
+
+sys.modules["sounddevice"] = SustitutoAudio("sounddevice")      # sin setdefault: los `setdefault` de cada prueba se encuentran este y no hacen nada
+for _n in ("InputStream", "OutputStream", "play", "stop", "wait", "rec", "sleep", "query_devices", "default"):
+    setattr(sys.modules["sounddevice"], _n, MagicMock(name=f"sounddevice.{_n}"))
 
 
 def pytest_sessionfinish(session, exitstatus):
