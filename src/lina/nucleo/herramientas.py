@@ -265,7 +265,8 @@ def categoria_de_motivo(razon):
 def _secciones_de(comando, _prof=0):
     """Las secciones de politica.txt en las que encaja el comando, contando TODOS sus trozos (no solo el primero que encaja). Lleva "" si algo de él no se
     puede cubrir con un «sí» anterior: código libre con sudo, un paquete suelto (archivo o URL), o ejecutar lo descargado (Descargas, .run, .AppImage)."""
-    datos, secciones = _politica(), set()
+    datos = _politica()
+    secciones: set[str] = set()
     for seg in _segmentos(comando):
         if _es_lectura(seg):
             continue
@@ -1194,7 +1195,7 @@ def deshacer_entrada(entrada):
 def _verificar(intenciones, payloads=None):
     """Comprueba de verdad que lo que el comando dice haber hecho está hecho. Devuelve una línea o None.
     Cada comprobación sale bien (True), mal (False) o dudosa (None: escrito, pero sin garantía de que tenga efecto)."""
-    c = []                                                      # (estado, texto si bien/dudoso, texto si mal)
+    c: list[tuple[bool | None, str, str]] = []                  # (estado, texto si bien/dudoso, texto si mal)
     for it in intenciones[:8]:
         tipo = it[0]
         if tipo == "crear_dir":
@@ -1561,7 +1562,7 @@ class Ejecutor:
         """Si acabas de confirmar la instalación de un paquete del AUR y salió bien, queda como de confianza (A4)."""
         if _codigo_de_salida(resultado) != 0:
             return ""
-        nombres = []
+        nombres: list[str] = []
         for seg in _segmentos(comando):
             tk = _tokens(seg)
             resto = _quitar_prefijos(tk) if tk else None
@@ -2015,7 +2016,7 @@ class Ejecutor:
             todos = [j for _, j in juegos.buscar(buscar, todos)]
         if not todos:
             return "No encuentro ningún juego instalado" + (f" que encaje con «{buscar}»" if buscar else " en Steam, Heroic ni Lutris") + "."
-        por = {}
+        por: dict[str, list[str]] = {}
         for j in todos:
             por.setdefault(j["origen"], []).append(j["nombre"])
         return "Juegos instalados: " + " | ".join(f"{o}: " + ", ".join(sorted(n)[:40]) + (f" (y {len(n) - 40} más)" if len(n) > 40 else "") for o, n in por.items())

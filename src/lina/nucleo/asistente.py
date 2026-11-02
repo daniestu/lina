@@ -492,7 +492,21 @@ _ACCION_DESTRUCTIVA = IDI.PorIdioma({
     "en": re.compile(r"\b(i will|i ll|i am going to|i m going to|proceeding|i have (formatted|deleted|erased|wiped)|already (formatted|deleted|erased|wiped)|i formatted|i deleted|i erased|i wiped)\b"),
 })
 
-class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, MixinInterfaz, MixinMCP):
+class TareaActual:
+    """El estado de cada petición, con su valor antes de que empiece la primera. `nueva_tarea` y `_atender` lo van poniendo en cada Asistente; lo que aquí es mutable nunca se modifica en su sitio."""
+    pregunta_pura = ""
+    acciones_turno = ()
+    fuente_turno = None
+    fuente_cerrada = reintento_solo_web = turno_aceptado = insistiendo = False
+    max_tiempo, max_tokens, max_busquedas = MAX_TIEMPO_TAREA, MAX_TOKENS_TAREA, MAX_BUSQUEDAS
+    obstaculo = pedir_profundo = modo_actual = nota_captura = ""
+    miradas = pasos_interfaz = _n_peticion = _n_respondida = _n_captura = 0
+    pasos_receta: list = []
+    receta_interfaz_pendiente = ultima_tecla = _repetida = _fuentes_antes = imagen_del_turno = turno_voz = crono = None
+    ultima_pantalla_t = 0.0
+
+
+class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, MixinInterfaz, MixinMCP):
     modo_privado = False          # «modo privado»: no se envía NINGUNA captura de tu pantalla (se recuerda aunque reinicies)
     ultima_pantalla_t = 0.0       # cuándo se usó la pantalla por última vez (para seguir una ayuda paso a paso)
     pedir_pantalla = False        # la IA ha pedido ver la captura y falta repetir la petición con ella
@@ -1047,7 +1061,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self._atender(pregunta, inicio, crono, origen=ORIGEN_ATAJO)
 
     def _atender(self, pregunta, inicio, crono=None, nota_sistema="", profundidad=0, origen=None):
-        self._n_peticion = getattr(self, "_n_peticion", 0) + 1        # los avisos de espera de esta petición caducan cuando se dice su respuesta
+        self._n_peticion = self._n_peticion + 1        # los avisos de espera de esta petición caducan cuando se dice su respuesta
         origen = _origen_valido(origen)                                  # el de ESTA petición; sin origen, el restrictivo
         self.origen_voz_libre = origen == ORIGEN_VOZ_LIBRE
         self.origen_texto = origen == ORIGEN_TEXTO
@@ -1161,7 +1175,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if not imagen and not self.pedir_pantalla:
             pregunta += ("\n[SISTEMA: esta petición NO lleva captura de pantalla: no sabes lo que hay en ella (solo el título de la ventana). "
                          "Si lo que te piden depende de verla, usa ver_pantalla; sin imagen NUNCA describas lo que se ve.]")
-            if getattr(self, "nota_captura", ""):
+            if self.nota_captura:
                 pregunta += (f"\n[SISTEMA: no se ha hecho la captura de pantalla porque {self.nota_captura}. Díselo al usuario en una frase y no adivines lo "
                              "que hay en la pantalla.]")
         if AJ.actuales(log=lambda m: None).get("memoria", "usar"):
@@ -1343,11 +1357,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _otra_pagina_de_mas(self, comando):
         """Al «poner» algo, una sola página por petición: no se abre otra vez la misma, ni otra si ya hay abierta una que es la de lo pedido."""
-        peticion = str(getattr(self, "pregunta_pura", "") or "")
+        peticion = str(self.pregunta_pura or "")
         if not comando.strip().startswith(("xdg-open ", "xdg-open\t")) or "://" not in comando or not pide_contenido(peticion):
             return None
         nueva = comando.split(None, 1)[1].strip().strip("'\"")
-        abiertas = [str(a[1].get("comando", "")).split(None, 1)[1].strip().strip("'\"") for a in getattr(self, "acciones_turno", [])
+        abiertas = [str(a[1].get("comando", "")).split(None, 1)[1].strip().strip("'\"") for a in self.acciones_turno
                     if a[0] == "ejecutar_comando" and str(a[1].get("comando", "")).strip().startswith("xdg-open ") and "://" in str(a[1].get("comando", ""))]
         if nueva in abiertas:
             return "Esa página ya está abierta: no la abro otra vez. Si es la buena, díselo al usuario en una frase; si no, busca otra."
@@ -1446,7 +1460,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         reales = [a for a in self.acciones_turno if a[0] not in HERRAMIENTAS_META]
         if not reales:
             return False
-        peticion = str(getattr(self, "pregunta_pura", "") or "")
+        peticion = str(self.pregunta_pura or "")
         if (pide_contenido(peticion) and any(a[0] == "ejecutar_comando" and "://" in str(a[1].get("comando", "")) for a in reales)
                 and not pagina_que_no_es(self.acciones_turno, peticion, lambda c: H.clasificar(c)[0] == "lectura")):
             return True
@@ -1490,7 +1504,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return False
         if self._pidio_otra_cosa_despues(peticion):               # puede haber pasado mientras esperaba su turno
             log(f"Petición «{peticion[:60]}»: has pedido otra cosa mientras esperaba, no la retomo")
-            self.estado = "esperando"
+            with self.cerrojo:
+                self.estado = "esperando"
             return False
         log(f"Retomo la petición «{peticion if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'}» ahora que ha terminado: {motivo}")
         nota = (f"\n[SISTEMA: esta petición se quedó esperando a una tarea en segundo plano ({motivo}) y YA HA TERMINADO. La petición original del usuario es la de arriba y "
@@ -1559,7 +1574,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         self.ejecutor.retirar_permiso()                           # y el «sí» que se dio para ella, tampoco
         log("Tarea cancelada por el usuario" + (f"; ya se había hecho: {'; '.join(hecho)}" if hecho else ""))
         nota = "[Interrumpido por el usuario]" + (f" Antes de parar ya se había hecho: {'; '.join(hecho)}." if hecho else " No llegó a hacerse nada.")
-        self.guardar_en_historial(getattr(self, "pregunta_pura", "") or "(petición interrumpida)", nota)
+        self.guardar_en_historial(self.pregunta_pura or "(petición interrumpida)", nota)
         if self.interrumpiendo:
             return                                                # estás hablando: no se te habla encima
         if self.sustituida and not (hecho or descartadas or en_cola):
@@ -1592,7 +1607,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             return
         try:
             if hechos is None:
-                hechos = hechos_de_peticion(getattr(self, "acciones_turno", None), lambda c: H.clasificar(c)[0] == "lectura", peticion)
+                hechos = hechos_de_peticion(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura", peticion)
             registro = {"t": time.time(), "hora": time.strftime("%H:%M:%S"), "pedido": str(peticion)[:120], "hechos": hechos, "dijo": str(respuesta)[:120]}
             self.hechos_recientes = [*self.hechos_recientes, registro][-MAX_HECHOS:]
         except Exception as e:
@@ -1600,7 +1615,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _hechos_al_caso(self):
         """Lo que consta de las últimas peticiones, si esta pregunta va de lo que pasó; si no, []."""
-        if self.modo_privado or not pregunta_por_lo_anterior(getattr(self, "pregunta_pura", "")):
+        if self.modo_privado or not pregunta_por_lo_anterior(self.pregunta_pura):
             return []
         return [r for r in self.hechos_recientes if time.time() - r["t"] < HECHOS_VALEN_SEG]
 
@@ -1714,7 +1729,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def tope_de_tarea(self):
         """Si esta petición ya ha gastado demasiado tiempo o demasiados tokens, el mensaje para la IA; si no, None (A2c)."""
-        tiempo, tokens = getattr(self, "max_tiempo", MAX_TIEMPO_TAREA), getattr(self, "max_tokens", MAX_TOKENS_TAREA)
+        tiempo, tokens = self.max_tiempo, self.max_tokens
         if time.time() - self.t_tarea > tiempo:
             log(f"Tope de tiempo de la tarea ({tiempo} s)")
             return (f"TOPE ALCANZADO: esta petición ya ha durado más de {tiempo} s. No uses más herramientas: cuéntale al "
@@ -1729,7 +1744,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         """Lo que Gemini nos pide hacer. Si un modelo falla a mitad y otro lo reintenta, lo que ya se hizo con los mismos
         datos y en el mismo orden NO se vuelve a ejecutar (así no se abre un programa dos veces ni se gastan búsquedas).
         Dentro de un mismo modelo, repetir una orden sí la ejecuta de nuevo (p. ej. comprobar algo antes y después de cambiarlo)."""
-        if (getattr(self, "fuente_cerrada", False) or getattr(self, "reintento_solo_web", False)) and nombre not in SOLO_WEB:
+        if (self.fuente_cerrada or self.reintento_solo_web) and nombre not in SOLO_WEB:
             log(f"{nombre} rechazada: en esta parte de la petición solo cabe la web")
             return "Aquí no hace falta nada más: responde ya con lo que tienes, sin más herramientas."
         clave = (nombre, json.dumps(args, sort_keys=True, ensure_ascii=False, default=str))
@@ -1741,11 +1756,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         tope = self.tope_de_tarea()
         if tope:
             return tope
-        repetida = getattr(self, "_repetida", None)
+        repetida = self._repetida
         if repetida and repetida[0] == clave and repetida[2] >= MAX_REPETICIONES and "sleep" not in clave[1]:     # esperar a que algo cambie sí se puede repetir
             raise BucleDeHerramienta(self._frase_de_no_hecho(repetida[1]))
         del self.guion_herramientas[self.paso_guion:]   # ya no coincide: se descarta lo que sobraba del intento anterior
-        crono = getattr(self, "crono", None)
+        crono = self.crono
         with (crono.medir("herramientas") if crono else nullcontext()):
             resultado = self._ejecutar_herramienta(nombre, args)
         if isinstance(resultado, str):
@@ -1761,178 +1776,237 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _ejecutar_herramienta(self, nombre, args):
         """La herramienta de verdad. Cada una devuelve un texto con el resultado."""
-        if nombre == "buscar_web":
-            consulta = str(args.get("consulta", "")).strip()
-            if not consulta:
-                return "Falta la consulta."
-            if self.busquedas_turno >= getattr(self, "max_busquedas", MAX_BUSQUEDAS):
-                return "No hagas más búsquedas: responde con lo que ya tienes o di que no lo has encontrado."
-            self.busquedas_turno += 1
-            resultado = buscar_tavily(consulta, args.get("dominio") or None)
-            self.ejecutor.contaminar("búsqueda web")      # A2e: lo que trae internet puede traer instrucciones escondidas
-            return resultado
-        if nombre == "usar_fuente":
-            return self.usar_fuente(args)
-        if nombre == "necesito_datos_actuales":
-            AVB.apuntar(AVB.SIN_BUSQUEDA)
-            return AVB.PARA_LA_IA_SIN_BUSQUEDA
-        if nombre == "ejecutar_comando":
-            otra = self._otra_pagina_de_mas(str(args.get("comando", "")))
-            if otra:
-                return otra
-            return self.ejecutor.herramienta(args)
-        if nombre == "disenar_documento":
-            return H.disenar_documento(args)
-        if nombre == "crear_documento":
-            return H.crear_documento(args.get("nombre", ""), args.get("contenido", ""), args.get("formato", "docx"))
-        if nombre == "buscar_youtube":
-            resultado = H.buscar_youtube(args.get("consulta", ""))
-            self.ejecutor.contaminar("búsqueda en YouTube")
-            return resultado
-        if nombre == "ver_papelera":
-            return H.ver_papelera()
-        if nombre == "vaciar_papelera":
-            return self.ejecutor.preparar_accion("Vaciar la papelera (borra PARA SIEMPRE todo lo que hay en ella)",
-                                                 H.vaciar_papelera, "vaciar la papelera")
-        if nombre == "restaurar_de_papelera":
-            return H.restaurar_de_papelera(args.get("nombre", ""))
-        if nombre == "copiar_portapapeles":
-            return H.copiar_portapapeles(args.get("texto", ""))
-        if nombre == "buscar_ajuste_kde":
-            resultado = H.buscar_ajuste_kde(args.get("consulta", ""), args.get("valor"))
-            log(f"Ajustes de KDE para «{str(args.get('consulta', ''))[:60]}»: " + (resultado.splitlines() or [""])[0][:120]
-                + f" ({resultado.count(chr(10) + '- ')} resultados)")
-            return resultado
-        if nombre == "mirar_pantalla":
-            tope = MAX_MIRADAS_PROFUNDO if getattr(self, "insistiendo", False) else MAX_MIRADAS
-            if getattr(self, "miradas", 0) >= tope:
-                return f"Ya has mirado la pantalla {tope} veces en esta petición: no mires más, usa lo que ya has visto."
-            self.miradas = getattr(self, "miradas", 0) + 1
-            H.anotar(f"[pantalla] {str(args.get('pregunta', ''))[:150]}")
-            motivo_no = self._motivo_sin_pantalla(ventana_activa(), clase_activa())
-            if motivo_no and self._permiso_de_capturas():
-                resultado = self._permiso_de_capturas()
-            elif motivo_no:
-                resultado = f"No miro la pantalla: {motivo_no}. Díselo al usuario y no adivines lo que hay en ella."
-            else:
-                resultado = mirar_pantalla(self._claves("mini"), args.get("pregunta", ""), args.get("espera", 2))
-            if resultado.startswith("Lo que se ve"):
-                self.ejecutor.efecto_sin_comprobar = False          # alguien ha mirado de verdad
-            return resultado
-        if nombre == "probar_ajuste_kde":
-            resultado = self.probar_ajuste_kde(args)
-            log("Prueba de ajuste de KDE: " + resultado.splitlines()[0][:320])
-            return resultado
-        if nombre == "buscar_clave_en_binarios":
-            resultado = H.buscar_clave_en_binarios(args.get("app", ""), args.get("palabras", ""))
-            log(f"Claves en binarios de «{str(args.get('app', ''))[:30]}»: " + resultado.splitlines()[0][:120])
-            return resultado
-        if nombre == "observar_config":
-            return H.observar_config(str(args.get("fase", "")).strip().lower())
-        if nombre == "leer_web":
-            return self.leer_web(args)
-        if nombre == "notas":
-            return self.herramienta_notas(args)
-        if nombre == "mcp_servidores":
-            return self.herramienta_mcp_servidores(args)
-        if nombre == "interfaz":
-            if not INT:
-                return "Falta interfaz.py: no puedo leer los controles de las ventanas."
-            return self.herramienta_interfaz(args)
         if nombre.startswith("mcp__"):
             return self.herramienta_mcp(nombre, args)
-        if nombre in ("hoja_calculo", "presentacion"):
-            return self.herramienta_oficina(nombre, args)
-        if nombre == "recordatorios":
-            return self.herramienta_recordatorios(args)
-        if nombre == G.META:
-            r = self.cargar_grupo(args.get("grupo", ""))
-            log(f"mas_herramientas({args.get('grupo', '')}) → {r[:80]}")
-            return r
-        if nombre == "usar_receta":
-            como = REC.obtener(args.get("id", ""))
-            try:                                            # la receta puede necesitar herramientas que no estaban cargadas
-                for tipo, cambiar in REC.tipos([args.get("id", "")]):
-                    for g in G.grupos_de_receta(tipo, cambiar):
-                        self.cargar_grupo(g)
-            except Exception as e:
-                log(f"Grupos de la receta: {e!r}")
-            return (como + " Pruébala PRIMERO y comprueba el resultado como siempre; si no funciona, descubre desde cero y apunta la nueva."
-                    if como else "No hay ninguna receta con ese id: mira la lista que te di, o descubre el ajuste desde cero.")
-        if nombre == "ver_recetas":
-            return REC.listar()
-        if nombre == "olvidar_receta":
-            borradas = REC.olvidar(str(args.get("ajuste", "")))
-            return ("Olvidado: " + ", ".join(borradas) + ".") if borradas else "No tenía ninguna receta que encaje con eso."
-        if nombre == "guardar_receta":
-            return self._guardar_receta(args)
-        if nombre == "guardar_receta_interfaz":
-            return self._guardar_receta_interfaz(args)
-        if nombre == "ver_pantalla":
-            if self.modo_privado:
-                return "No puedo ver la pantalla: el usuario está en modo privado. Díselo y no adivines lo que hay en ella."
-            sin_permiso = self._permiso_de_capturas()
-            if sin_permiso:
-                return sin_permiso
-            if self.pantalla_adjunta:
-                return "La captura ya va adjunta a esta petición: úsala."
+        hacer = self._HERRAMIENTAS.get(nombre)
+        return hacer(self, nombre, args) if hacer else f"Herramienta desconocida: {nombre}"
+
+    def _h_buscar_web(self, nombre, args):
+        consulta = str(args.get("consulta", "")).strip()
+        if not consulta:
+            return "Falta la consulta."
+        if self.busquedas_turno >= self.max_busquedas:
+            return "No hagas más búsquedas: responde con lo que ya tienes o di que no lo has encontrado."
+        self.busquedas_turno += 1
+        resultado = buscar_tavily(consulta, args.get("dominio") or None)
+        self.ejecutor.contaminar("búsqueda web")      # A2e: lo que trae internet puede traer instrucciones escondidas
+        return resultado
+
+    def _h_usar_fuente(self, nombre, args):
+        return self.usar_fuente(args)
+
+    def _h_necesito_datos_actuales(self, nombre, args):
+        AVB.apuntar(AVB.SIN_BUSQUEDA)
+        return AVB.PARA_LA_IA_SIN_BUSQUEDA
+
+    def _h_ejecutar_comando(self, nombre, args):
+        otra = self._otra_pagina_de_mas(str(args.get("comando", "")))
+        if otra:
+            return otra
+        return self.ejecutor.herramienta(args)
+
+    def _h_disenar_documento(self, nombre, args):
+        return H.disenar_documento(args)
+
+    def _h_crear_documento(self, nombre, args):
+        return H.crear_documento(args.get("nombre", ""), args.get("contenido", ""), args.get("formato", "docx"))
+
+    def _h_buscar_youtube(self, nombre, args):
+        resultado = H.buscar_youtube(args.get("consulta", ""))
+        self.ejecutor.contaminar("búsqueda en YouTube")
+        return resultado
+
+    def _h_ver_papelera(self, nombre, args):
+        return H.ver_papelera()
+
+    def _h_vaciar_papelera(self, nombre, args):
+        return self.ejecutor.preparar_accion("Vaciar la papelera (borra PARA SIEMPRE todo lo que hay en ella)",
+                                             H.vaciar_papelera, "vaciar la papelera")
+
+    def _h_restaurar_de_papelera(self, nombre, args):
+        return H.restaurar_de_papelera(args.get("nombre", ""))
+
+    def _h_copiar_portapapeles(self, nombre, args):
+        return H.copiar_portapapeles(args.get("texto", ""))
+
+    def _h_buscar_ajuste_kde(self, nombre, args):
+        resultado = H.buscar_ajuste_kde(args.get("consulta", ""), args.get("valor"))
+        log(f"Ajustes de KDE para «{str(args.get('consulta', ''))[:60]}»: " + (resultado.splitlines() or [""])[0][:120]
+            + f" ({resultado.count(chr(10) + '- ')} resultados)")
+        return resultado
+
+    def _h_mirar_pantalla(self, nombre, args):
+        tope = MAX_MIRADAS_PROFUNDO if self.insistiendo else MAX_MIRADAS
+        if self.miradas >= tope:
+            return f"Ya has mirado la pantalla {tope} veces en esta petición: no mires más, usa lo que ya has visto."
+        self.miradas = self.miradas + 1
+        H.anotar(f"[pantalla] {str(args.get('pregunta', ''))[:150]}")
+        motivo_no = self._motivo_sin_pantalla(ventana_activa(), clase_activa())
+        if motivo_no and self._permiso_de_capturas():
+            resultado = self._permiso_de_capturas()
+        elif motivo_no:
+            resultado = f"No miro la pantalla: {motivo_no}. Díselo al usuario y no adivines lo que hay en ella."
+        else:
+            resultado = mirar_pantalla(self._claves("mini"), args.get("pregunta", ""), args.get("espera", 2))
+        if resultado.startswith("Lo que se ve"):
+            self.ejecutor.efecto_sin_comprobar = False          # alguien ha mirado de verdad
+        return resultado
+
+    def _h_probar_ajuste_kde(self, nombre, args):
+        resultado = self.probar_ajuste_kde(args)
+        log("Prueba de ajuste de KDE: " + resultado.splitlines()[0][:320])
+        return resultado
+
+    def _h_buscar_clave_en_binarios(self, nombre, args):
+        resultado = H.buscar_clave_en_binarios(args.get("app", ""), args.get("palabras", ""))
+        log(f"Claves en binarios de «{str(args.get('app', ''))[:30]}»: " + resultado.splitlines()[0][:120])
+        return resultado
+
+    def _h_observar_config(self, nombre, args):
+        return H.observar_config(str(args.get("fase", "")).strip().lower())
+
+    def _h_leer_web(self, nombre, args):
+        return self.leer_web(args)
+
+    def _h_notas(self, nombre, args):
+        return self.herramienta_notas(args)
+
+    def _h_mcp_servidores(self, nombre, args):
+        return self.herramienta_mcp_servidores(args)
+
+    def _h_interfaz(self, nombre, args):
+        if not INT:
+            return "Falta interfaz.py: no puedo leer los controles de las ventanas."
+        return self.herramienta_interfaz(args)
+
+    def _h_oficina(self, nombre, args):
+        return self.herramienta_oficina(nombre, args)
+
+    def _h_recordatorios(self, nombre, args):
+        return self.herramienta_recordatorios(args)
+
+    def _h_meta(self, nombre, args):
+        r = self.cargar_grupo(args.get("grupo", ""))
+        log(f"mas_herramientas({args.get('grupo', '')}) → {r[:80]}")
+        return r
+
+    def _h_usar_receta(self, nombre, args):
+        como = REC.obtener(args.get("id", ""))
+        try:                                            # la receta puede necesitar herramientas que no estaban cargadas
+            for tipo, cambiar in REC.tipos([args.get("id", "")]):
+                for g in G.grupos_de_receta(tipo, cambiar):
+                    self.cargar_grupo(g)
+        except Exception as e:
+            log(f"Grupos de la receta: {e!r}")
+        return (como + " Pruébala PRIMERO y comprueba el resultado como siempre; si no funciona, descubre desde cero y apunta la nueva."
+                if como else "No hay ninguna receta con ese id: mira la lista que te di, o descubre el ajuste desde cero.")
+
+    def _h_ver_recetas(self, nombre, args):
+        return REC.listar()
+
+    def _h_olvidar_receta(self, nombre, args):
+        borradas = REC.olvidar(str(args.get("ajuste", "")))
+        return ("Olvidado: " + ", ".join(borradas) + ".") if borradas else "No tenía ninguna receta que encaje con eso."
+
+    def _h_guardar_receta(self, nombre, args):
+        return self._guardar_receta(args)
+
+    def _h_guardar_receta_interfaz(self, nombre, args):
+        return self._guardar_receta_interfaz(args)
+
+    def _h_ver_pantalla(self, nombre, args):
+        if self.modo_privado:
+            return "No puedo ver la pantalla: el usuario está en modo privado. Díselo y no adivines lo que hay en ella."
+        sin_permiso = self._permiso_de_capturas()
+        if sin_permiso:
+            return sin_permiso
+        if self.pantalla_adjunta:
+            return "La captura ya va adjunta a esta petición: úsala."
+        if not self.captura_guardada:
+            self.captura_guardada, motivo = self._capturar_ahora()          # fuera de un juego no se capturó al pulsar: se hace ahora, si se puede
             if not self.captura_guardada:
-                self.captura_guardada, motivo = self._capturar_ahora()          # fuera de un juego no se capturó al pulsar: se hace ahora, si se puede
-                if not self.captura_guardada:
-                    return (f"No hay captura que enseñarte ({motivo or 'no se ha podido capturar'}). Díselo al usuario y no adivines lo que hay en la "
-                            "pantalla.")
-            self.pedir_pantalla = True
-            return "Vale: se te adjuntará la captura en cuanto termines esta respuesta. No hagas nada más ahora; contesta solo con una frase corta."
-        if nombre == "modo_privado":
-            activo = args.get("activo")
-            if activo is False or str(activo).strip().lower() in ("false", "no", "0"):   # quitarlo NUNCA lo hace la IA: solo el código, ante una frase del usuario con el atajo
-                log("La IA ha intentado quitar el modo privado: no se hace")
-                return ("No quito el modo privado: eso no lo puedes hacer tú. Solo lo quita el usuario, pulsando el atajo y diciendo «quita el modo privado». "
-                        "Díselo así, en una frase.")
-            self._poner_modo_privado(True)
-            return ("Modo privado activado: no enviaré ninguna captura de tu pantalla hasta que el usuario lo quite (se recuerda aunque reinicie)."
-                    + (" Ojo: en ESTA petición la captura ya iba con la pregunta." if self.pantalla_adjunta else ""))
-        if nombre in {"ventanas", "procesos", "servicios", "red", "energia", "pantalla", "audio", "kde_dbus", "gpu"}:
-            return self.ejecutor.sistema(nombre, args)
-        if nombre == "mangohud":
-            return self.ejecutor.mangohud(args)
-        if nombre in {"proton", "opciones_lanzamiento"}:
-            return self.ejecutor.steam_config(nombre, args)
-        if nombre == "ver_juegos":
-            return self.ejecutor.ver_juegos(args.get("buscar"), bool(args.get("diagnostico")))
-        if nombre == "abrir_app":
-            return self.ejecutor.abrir_app(args.get("nombre", ""))
-        if nombre == "ver_gasto":
-            return PRES.resumen()
-        if nombre == "mis_ajustes":
-            return self._mis_ajustes(args)
-        if nombre == "empezar_de_cero":
-            self.historial.clear()
-            self.hechos_recientes = []
-            self.ejecutor.cancelar()
-            log("Conversación reiniciada por la IA")
-            return "Hecho: conversación reiniciada; ya no recuerdas nada de lo anterior. Díselo al usuario en una frase corta."
-        if nombre == "pensar_a_fondo":
-            if getattr(self, "modo_actual", "") == "profundo" or getattr(self, "insistiendo", False) or self.ejecutor.profundo:
-                return "Ya lo estás pensando a fondo: sigue y responde."
-            self.pedir_profundo = str(args.get("motivo") or "la petición lo merece")[:200]
-            log(f"La IA pide pensarlo a fondo: {self.pedir_profundo}")
-            return ("Vale: se pensará a fondo en cuanto termines esta respuesta. No hagas nada más ahora; contesta solo con una frase corta "
-                    "diciendo que lo vas a pensar bien.")
-        if nombre == "alias_de_voz":
-            resultado = self.alias_de_voz(args)
-            log(f"Alias de voz (herramienta): {resultado[:200]}")
-            return resultado
-        if nombre == "ver_diario":
-            resultado = self.ejecutor.ver_diario(args.get("cuantos"), args.get("buscar"), args.get("fecha"), bool(args.get("mostrar")))
-            log(f"Diario consultado (buscar={args.get('buscar')!r}, fecha={args.get('fecha')!r}, cuantos={args.get('cuantos')!r}): "
-                + resultado.splitlines()[0][:160])
-            return resultado
-        if nombre == "deshacer_cambio":
-            resultado = self.ejecutor.deshacer(args.get("id"))
-            log(f"Deshacer cambio (id={args.get('id')!r}): " + " | ".join(resultado.splitlines()[:2])[:300])
-            return resultado
-        return f"Herramienta desconocida: {nombre}"
+                return (f"No hay captura que enseñarte ({motivo or 'no se ha podido capturar'}). Díselo al usuario y no adivines lo que hay en la "
+                        "pantalla.")
+        self.pedir_pantalla = True
+        return "Vale: se te adjuntará la captura en cuanto termines esta respuesta. No hagas nada más ahora; contesta solo con una frase corta."
+
+    def _h_modo_privado(self, nombre, args):
+        activo = args.get("activo")
+        if activo is False or str(activo).strip().lower() in ("false", "no", "0"):   # quitarlo NUNCA lo hace la IA: solo el código, ante una frase del usuario con el atajo
+            log("La IA ha intentado quitar el modo privado: no se hace")
+            return ("No quito el modo privado: eso no lo puedes hacer tú. Solo lo quita el usuario, pulsando el atajo y diciendo «quita el modo privado». "
+                    "Díselo así, en una frase.")
+        self._poner_modo_privado(True)
+        return ("Modo privado activado: no enviaré ninguna captura de tu pantalla hasta que el usuario lo quite (se recuerda aunque reinicie)."
+                + (" Ojo: en ESTA petición la captura ya iba con la pregunta." if self.pantalla_adjunta else ""))
+
+    def _h_sistema(self, nombre, args):
+        return self.ejecutor.sistema(nombre, args)
+
+    def _h_mangohud(self, nombre, args):
+        return self.ejecutor.mangohud(args)
+
+    def _h_steam(self, nombre, args):
+        return self.ejecutor.steam_config(nombre, args)
+
+    def _h_ver_juegos(self, nombre, args):
+        return self.ejecutor.ver_juegos(args.get("buscar"), bool(args.get("diagnostico")))
+
+    def _h_abrir_app(self, nombre, args):
+        return self.ejecutor.abrir_app(args.get("nombre", ""))
+
+    def _h_ver_gasto(self, nombre, args):
+        return PRES.resumen()
+
+    def _h_mis_ajustes(self, nombre, args):
+        return self._mis_ajustes(args)
+
+    def _h_empezar_de_cero(self, nombre, args):
+        self.historial.clear()
+        self.hechos_recientes = []
+        self.ejecutor.cancelar()
+        log("Conversación reiniciada por la IA")
+        return "Hecho: conversación reiniciada; ya no recuerdas nada de lo anterior. Díselo al usuario en una frase corta."
+
+    def _h_pensar_a_fondo(self, nombre, args):
+        if self.modo_actual == "profundo" or self.insistiendo or self.ejecutor.profundo:
+            return "Ya lo estás pensando a fondo: sigue y responde."
+        self.pedir_profundo = str(args.get("motivo") or "la petición lo merece")[:200]
+        log(f"La IA pide pensarlo a fondo: {self.pedir_profundo}")
+        return ("Vale: se pensará a fondo en cuanto termines esta respuesta. No hagas nada más ahora; contesta solo con una frase corta "
+                "diciendo que lo vas a pensar bien.")
+
+    def _h_alias_de_voz(self, nombre, args):
+        resultado = self.alias_de_voz(args)
+        log(f"Alias de voz (herramienta): {resultado[:200]}")
+        return resultado
+
+    def _h_ver_diario(self, nombre, args):
+        resultado = self.ejecutor.ver_diario(args.get("cuantos"), args.get("buscar"), args.get("fecha"), bool(args.get("mostrar")))
+        log(f"Diario consultado (buscar={args.get('buscar')!r}, fecha={args.get('fecha')!r}, cuantos={args.get('cuantos')!r}): "
+            + resultado.splitlines()[0][:160])
+        return resultado
+
+    def _h_deshacer_cambio(self, nombre, args):
+        resultado = self.ejecutor.deshacer(args.get("id"))
+        log(f"Deshacer cambio (id={args.get('id')!r}): " + " | ".join(resultado.splitlines()[:2])[:300])
+        return resultado
+
+    _HERRAMIENTAS = {
+        "buscar_web": _h_buscar_web, "usar_fuente": _h_usar_fuente, "necesito_datos_actuales": _h_necesito_datos_actuales,
+        "ejecutar_comando": _h_ejecutar_comando, "disenar_documento": _h_disenar_documento, "crear_documento": _h_crear_documento,
+        "buscar_youtube": _h_buscar_youtube, "ver_papelera": _h_ver_papelera, "vaciar_papelera": _h_vaciar_papelera,
+        "restaurar_de_papelera": _h_restaurar_de_papelera, "copiar_portapapeles": _h_copiar_portapapeles, "buscar_ajuste_kde": _h_buscar_ajuste_kde,
+        "mirar_pantalla": _h_mirar_pantalla, "probar_ajuste_kde": _h_probar_ajuste_kde, "buscar_clave_en_binarios": _h_buscar_clave_en_binarios,
+        "observar_config": _h_observar_config, "leer_web": _h_leer_web, "notas": _h_notas, "mcp_servidores": _h_mcp_servidores,
+        "interfaz": _h_interfaz, **dict.fromkeys(("hoja_calculo", "presentacion"), _h_oficina), "recordatorios": _h_recordatorios, G.META: _h_meta,
+        "usar_receta": _h_usar_receta, "ver_recetas": _h_ver_recetas, "olvidar_receta": _h_olvidar_receta, "guardar_receta": _h_guardar_receta,
+        "guardar_receta_interfaz": _h_guardar_receta_interfaz, "ver_pantalla": _h_ver_pantalla, "modo_privado": _h_modo_privado,
+        **dict.fromkeys(("ventanas", "procesos", "servicios", "red", "energia", "pantalla", "audio", "kde_dbus", "gpu"), _h_sistema),
+        "mangohud": _h_mangohud, **dict.fromkeys(("proton", "opciones_lanzamiento"), _h_steam), "ver_juegos": _h_ver_juegos, "abrir_app": _h_abrir_app,
+        "ver_gasto": _h_ver_gasto, "mis_ajustes": _h_mis_ajustes, "empezar_de_cero": _h_empezar_de_cero, "pensar_a_fondo": _h_pensar_a_fondo,
+        "alias_de_voz": _h_alias_de_voz, "ver_diario": _h_ver_diario, "deshacer_cambio": _h_deshacer_cambio,
+    }
 
     def resumen_de_lo_hecho(self):
         """Lo que ya se ha ejecutado (o queda pendiente) en esta petición, contado por el código a partir de lo que de verdad
@@ -2025,7 +2099,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _herramienta_de_fuente(self):
         """usar_fuente, si hay fuentes, se usan con esta configuración y la frase no es una orden. Lo decide el código."""
         fuentes = FUE.listar()
-        if not fuentes or not FUE.activas() or pide_accion(str(getattr(self, "pregunta_pura", "") or "")):
+        if not fuentes or not FUE.activas() or pide_accion(str(self.pregunta_pura or "")):
             return []
         return [FUE.declaracion_usar_fuente(fuentes)]
 
@@ -2038,14 +2112,14 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _frase_de_no_hecho(self, motivo):
         """«No lo he abierto: …» (o «No lo he hecho: …»), con el motivo que dio la herramienta, escrita por el código."""
-        abrir = re.match(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:abre|abreme|abrir)\b", C.normalizar(str(getattr(self, "pregunta_pura", "") or "")))
+        abrir = re.match(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:abre|abreme|abrir)\b", C.normalizar(str(self.pregunta_pura or "")))
         motivo = motivo_corto(motivo) or T("no he llegado a hacer nada")
         return T("No lo he abierto: {motivo}.", motivo=motivo) if abrir else T("No lo he hecho: {motivo}.", motivo=motivo)
 
     def _enlace_sin_comprobar(self):
         try:
             plataformas = sorted({d for ds in CONT.PLATAFORMAS.values() for d in ds})
-            return enlace_sin_comprobar(self.acciones_turno, plataformas, lambda c: H.clasificar(c)[0] == "lectura", getattr(self, "pregunta_pura", ""))
+            return enlace_sin_comprobar(self.acciones_turno, plataformas, lambda c: H.clasificar(c)[0] == "lectura", self.pregunta_pura)
         except Exception as e:
             log(f"Comprobar la ficha abierta: fallo {e!r}")
             return None
@@ -2056,8 +2130,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _avisar_fuente_sin_anadir(self, texto):
         """Lo que se escapó de `FUE.entender` y llegó a la IA: si pedías añadir una fuente y la lista sigue igual, se dice, aunque la respuesta hable de otra cosa."""
-        peticion = str(getattr(self, "pregunta_pura", "") or "")
-        if (self.ejecutor.pendientes or not FUE.pide_anadir_suelto(peticion) or FUE.firma() != getattr(self, "_fuentes_antes", None)
+        peticion = str(self.pregunta_pura or "")
+        if (self.ejecutor.pendientes or not FUE.pide_anadir_suelto(peticion) or FUE.firma() != self._fuentes_antes
                 or re.search(r"\bno (?:lo |la )?(?:he|puedo) \w*\s*(?:guard|anad|apunt|sav|add)|\b(?:haven't|can't|didn't) (?:\w+ )?(?:sav|add)", C.normalizar(texto))):
             return texto
         log("Pedían añadir una fuente y la lista no ha cambiado: se avisa")
@@ -2065,8 +2139,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _aclarar_fuente(self, texto):
         """La respuesta no puede presentar como de tu web lo que no sale de ahí, ni callar que de ahí no salió."""
-        estado = getattr(self, "fuente_turno", None)
-        falta = correccion_de_fuente(estado, texto, getattr(self, "acciones_turno", None))
+        estado = self.fuente_turno
+        falta = correccion_de_fuente(estado, texto, self.acciones_turno)
         if not falta:
             return texto
         log(f"Fuente: la respuesta no reconoce de dónde sale ({falta}): se corrige")
@@ -2079,16 +2153,16 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         el código añade la corrección. No se confía en que la IA lo diga."""
         if self.ejecutor.pendientes or admite_duda(texto):
             return texto
-        peticion = str(getattr(self, "pregunta_pura", "") or "")
+        peticion = str(self.pregunta_pura or "")
         afirma = afirma_fuente(peticion, texto)                    # las fuentes solo las cambia el código: que la IA diga que lo ha hecho no vale
-        if afirma and FUE.firma() == getattr(self, "_fuentes_antes", None):
+        if afirma and FUE.firma() == self._fuentes_antes:
             log(f"La respuesta dice haber cambiado una fuente y no consta: se sustituye («{str(texto)[:80]}»)")
             return (T("No lo he guardado: las fuentes no las guardo así. Dime «para TEMA usa esta página…» con el atajo o con lina di, o usa lina fuentes añadir.") if afirma == "guardar"
                     else T("No lo he quitado: las fuentes no las quito así. Dime «quita la fuente de TEMA» con el atajo o con lina di, o usa lina fuentes quitar."))
         if not afirma_hecho(texto):
             return texto
         if pide_hacer(peticion):
-            nada, motivo = sin_efecto(getattr(self, "acciones_turno", None), lambda c: H.clasificar(c)[0] == "lectura")
+            nada, motivo = sin_efecto(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura")
             if nada:                                               # sin confirmación no hay éxito: pase lo que pase con el revisor, no consta que se hiciera
                 log(f"La respuesta da por hecho algo que no consta: se sustituye («{str(texto)[:80]}»)")
                 return self._frase_de_no_hecho(motivo)
@@ -2108,11 +2182,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _avisar_voz(self, texto):
         """Un aviso de espera («lo pienso a fondo», «Google está tardando…»), sin bloquear y sin romper nada si el audio falla. Es efímero: si cuando le
         llega el turno ya se ha dicho la respuesta de su petición, no se dice. Devuelve el hilo."""
-        n = getattr(self, "_n_peticion", 0)
+        n = self._n_peticion
 
         def hablar():
             try:
-                self._hablar(texto, tipo="efimero", vigente=lambda: getattr(self, "_n_respondida", 0) < n)
+                self._hablar(texto, tipo="efimero", vigente=lambda: self._n_respondida < n)
             except Exception as e:
                 log(f"No he podido avisar por voz: {e!r}")
         hilo = threading.Thread(target=hablar, daemon=True)
@@ -2195,7 +2269,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def _contexto_de_la_tarea(self):
         """Qué está haciendo (para que la IA entienda lo que le dices): tu petición y lo ejecutado hasta ahora."""
-        pet = str(getattr(self, "pregunta_pura", "") or "(desconocida)")
+        pet = str(self.pregunta_pura or "(desconocida)")
         hechas = []
         for nombre, args, _ in self.acciones_turno[-4:]:
             hechas.append(str(args.get("motivo") or args.get("comando") or args.get("consulta") or nombre)[:60])
@@ -2204,7 +2278,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _estado_de_la_tarea(self):
         """Lo que se te dice cuando preguntas cómo va (lo compone el código, sin gastar otra llamada)."""
         seg = int(time.time() - self.t_tarea)
-        pet = str(getattr(self, "pregunta_pura", "") or "tu petición")[:90]
+        pet = str(self.pregunta_pura or "tu petición")[:90]
         n = len(self.acciones_turno)
         if n:
             nombre, args, _ = self.acciones_turno[-1]
@@ -2221,8 +2295,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _insistir_solo_con_la_web(self, pregunta):
         """S12: insistir en una pregunta de información no da derecho a mirar el equipo. Una orden, también dicha con cortesía («¿puedes abrir Steam?»), una pregunta con la que ya se
         cambió algo o «lee esa página» cuando la web bloquea (el código vio el obstáculo y se pidió esa página, sin preguntar) insisten como siempre."""
-        peticion = str(getattr(self, "pregunta_pura", "") or pregunta)
-        if getattr(self, "obstaculo", "") and "?" not in peticion and "¿" not in peticion:
+        peticion = str(self.pregunta_pura or pregunta)
+        if self.obstaculo and "?" not in peticion and "¿" not in peticion:
             return False
         return (not pide_accion(peticion) and not orden_de_cortesia(peticion) and not self.ejecutor.duda and not self.ejecutor.efecto_sin_comprobar
                 and solo_se_informo(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura"))
@@ -2235,13 +2309,13 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _insistir_si_hace_falta(self, respuesta, modelo, modo, pregunta, imagen, herramientas, sistema):
         """Si el intento rápido terminó SIN poder comprobar el último cambio (⚠, ✘ o error), no se da por bueno: se vuelve a
         intentar una vez con el razonamiento a fondo y topes más amplios, contándole lo ya hecho. Devuelve (respuesta, modelo)."""
-        if getattr(self, "fuente_cerrada", False):        # una pregunta con fuente: «no he podido» es la respuesta, no un fracaso que arreglar a fondo
+        if self.fuente_cerrada:        # una pregunta con fuente: «no he podido» es la respuesta, no un fracaso que arreglar a fondo
             self.pedir_profundo, self.obstaculo = "", ""
             self._cerrar_receta_interfaz(False)
             return respuesta, modelo
-        pide = getattr(self, "pedir_profundo", "") if not self.ejecutor.duda else ""     # si hay una duda de verdad, manda la duda
+        pide = self.pedir_profundo if not self.ejecutor.duda else ""     # si hay una duda de verdad, manda la duda
         rapido = False                                    # el código vio que no se hizo lo pedido (solo se informó, o se abrió otra página): basta el modelo rápido
-        obst = getattr(self, "obstaculo", "") if not self.ejecutor.duda else ""
+        obst = self.obstaculo if not self.ejecutor.duda else ""
         if (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes
                 and solo_herramientas_meta(self.acciones_turno) and "?" not in str(respuesta)):
             obst = (f"lo que pidió el usuario («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») no se ha cumplido: has cargado herramientas pero no has hecho ni "
@@ -2252,30 +2326,30 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             obst = f"lo que pidió el usuario («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») no se ha cumplido; la respuesta fue: «{str(respuesta)[:200]}»"
             log("La respuesta dice que no se ha podido hacer lo pedido: reintento a fondo")
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and "?" not in str(respuesta)
-              and pide_accion(str(getattr(self, "pregunta_pura", "") or pregunta))
+              and pide_accion(str(self.pregunta_pura or pregunta))
               and solo_se_informo(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura")):
             obst = (f"el usuario pidió que HICIERAS algo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}»), no que le informaras, y en esta "
                     f"petición solo se ha buscado o leído, sin hacer nada en el equipo; la respuesta fue: «{str(respuesta)[:200]}»")
             log("Pidió hacer algo y solo se ha informado (lo dice el código, sin revisor): reintento con el modelo rápido")
             rapido = True
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and "?" not in str(respuesta)
-              and pide_contenido(str(getattr(self, "pregunta_pura", "") or pregunta))
-              and pagina_que_no_es(self.acciones_turno, str(getattr(self, "pregunta_pura", "") or pregunta), lambda c: H.clasificar(c)[0] == "lectura")):
-            url, por_que = pagina_que_no_es(self.acciones_turno, str(getattr(self, "pregunta_pura", "") or pregunta), lambda c: H.clasificar(c)[0] == "lectura")
+              and pide_contenido(str(self.pregunta_pura or pregunta))
+              and pagina_que_no_es(self.acciones_turno, str(self.pregunta_pura or pregunta), lambda c: H.clasificar(c)[0] == "lectura")):
+            url, por_que = pagina_que_no_es(self.acciones_turno, str(self.pregunta_pura or pregunta), lambda c: H.clasificar(c)[0] == "lectura")
             obst = self._nota_pagina_de_contenido(url, por_que, pregunta)
             log(f"Pidió poner algo y {por_que} (lo dice el código): reintento con el modelo rápido")
             rapido = True
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
-              and not self._acciones_comprobadas() and verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, respuesta,
+              and not self._acciones_comprobadas() and verificar_cumplimiento(self.clave, str(self.pregunta_pura or pregunta), self.acciones_turno, respuesta,
                                                      bool(imagen is not None or self.pantalla_adjunta))):
             obst = (f"lo que pidió el usuario («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») no se ha cumplido tal cual o la respuesta no se apoya "
                     f"en lo que se hizo de verdad; la respuesta fue: «{str(respuesta)[:200]}»")
             log("El revisor dice que no se cumplió lo pedido (o que la respuesta no se apoya en lo hecho): reintento a fondo")
             log(f"   respuesta descartada: «{str(respuesta)[:300]}»")
         pide = pide or obst
-        if ((not self.ejecutor.duda and not pide) or modo == "profundo" or getattr(self, "insistiendo", False) or self.ejecutor.pendientes
+        if ((not self.ejecutor.duda and not pide) or modo == "profundo" or self.insistiendo or self.ejecutor.pendientes
                 or not self.clave):
-            self._cerrar_receta_interfaz(not self.ejecutor.duda and not pide and not getattr(self, "insistiendo", False) and not self.ejecutor.pendientes)
+            self._cerrar_receta_interfaz(not self.ejecutor.duda and not pide and not self.insistiendo and not self.ejecutor.pendientes)
             return respuesta, modelo
         self._cerrar_receta_interfaz(False)               # lo apuntado en el primer intento no vale: no se dio por cumplido
         solo_web = self._insistir_solo_con_la_web(pregunta)
@@ -2365,7 +2439,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
                     r = self._asegurar_pagina_de_contenido(r, pregunta, imagen, herramientas, sistema)   # lo que se abre al insistir también se comprueba
                     if self.ejecutor.recetas_diferidas and not pide:      # tras el reintento, lo apuntado solo vale si ahora sí se cumplió lo pedido
                         bueno = (not self.ejecutor.duda and not self.ejecutor.pendientes and not fracaso_en_respuesta(r, True)
-                                 and not verificar_cumplimiento(self.clave, str(getattr(self, "pregunta_pura", "") or pregunta), self.acciones_turno, r,
+                                 and not verificar_cumplimiento(self.clave, str(self.pregunta_pura or pregunta), self.acciones_turno, r,
                                                                 bool(imagen is not None or self.pantalla_adjunta)))
                         self._cerrar_receta_interfaz(bueno)
                     return r, f"{m} ({'insistió' if rapido else 'a fondo' if pide else 'insistió a fondo'})"
@@ -2390,7 +2464,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
     def _asegurar_pagina_de_contenido(self, respuesta, pregunta, imagen, herramientas, sistema):
         """Tras un reintento (rápido o a fondo): si se pidió PONER algo y sigue sin abrirse su página, hasta dos vueltas más con el modelo rápido. Si aun así
         no está, la respuesta lo dice en vez de dar por abierto algo que no es."""
-        peticion = str(getattr(self, "pregunta_pura", "") or pregunta)
+        peticion = str(self.pregunta_pura or pregunta)
         if not pide_contenido(peticion):
             return respuesta
         for _ in range(2):
@@ -2440,7 +2514,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
 
     def elegir_grupos(self, pregunta):
         """Qué grupos de herramientas lleva esta petición (palabras, recetas ofrecidas y lo anterior); la IA puede pedir más con mas_herramientas."""
-        texto = getattr(self, "pregunta_pura", "") or pregunta
+        texto = self.pregunta_pura or pregunta
         de_recetas = set()
         try:
             for tipo, cambiar in REC.tipos(self.ids_recetas):
@@ -2532,11 +2606,11 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
             self.estado = "hablando"
         ej = getattr(self, "ejecutor", None)
         tipo = "confirmacion" if ej is not None and getattr(ej, "pendientes", None) and "?" in str(texto) else "normal"
-        n = getattr(self, "_n_peticion", 0)
+        n = self._n_peticion
         self._hablar(texto, tipo=tipo, al_empezar=lambda: setattr(self, "_n_respondida", n))
 
     def _turno_voz(self):
-        if getattr(self, "turno_voz", None) is None:
+        if self.turno_voz is None:
             self.turno_voz = TURNO.TurnoDeVoz()
         return self.turno_voz
 
@@ -2644,7 +2718,8 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         try:
             self._hablar(texto, tipo="aviso")
         finally:
-            self.estado = "esperando"
+            with self.cerrojo:
+                self.estado = "esperando"
         return True
 
 

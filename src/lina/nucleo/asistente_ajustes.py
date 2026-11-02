@@ -116,7 +116,7 @@ class MixinAjustes:
             ej.duda, ej.efecto_sin_comprobar = "", False
             aprendida = None
             if antes or conocida:                              # solo se aprende lo DEMOSTRADO: antes era otra cosa y tras escribir es lo esperado (o ya estaba demostrado)
-                aprendida = _A.REC.aprender_kde(ajuste, sinonimos, getattr(self, "pregunta_pura", ""), archivo, list(grupos), clave, valor, panel, control,
+                aprendida = _A.REC.aprender_kde(ajuste, sinonimos, self.pregunta_pura, archivo, list(grupos), clave, valor, panel, control,
                                              esperado, recargar, web=bool(ej.contaminado))
             if aprendida:
                 ej.receta_turno = True
@@ -240,7 +240,7 @@ class MixinAjustes:
         """Red de seguridad: si en esta petición se cambió UN ajuste con un comando y luego se leyó con un comando de lectura que mira lo mismo,
         pero nadie apuntó la receta (la IA suele olvidarse), se apunta aquí. El nombre sale del «motivo» del comando y el valor, de su último argumento."""
         ej = self.ejecutor
-        if not getattr(self, "turno_aceptado", False) or ej.receta_turno or ej.duda or ej.pendientes or ej.contaminado:
+        if not self.turno_aceptado or ej.receta_turno or ej.duda or ej.pendientes or ej.contaminado:
             return
         hechas = [(n, a or {}, str(r)) for n, a, r in self.acciones_turno]
         if any(n in {"guardar_receta", "usar_receta", "probar_ajuste_kde"} for n, _, _ in hechas):

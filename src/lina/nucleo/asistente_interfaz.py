@@ -12,7 +12,7 @@ import re
 class MixinInterfaz:
     def _paso_hecho(self, paso):
         """Apunta un paso de interfaz que SÍ se hizo (con el nombre del control, no su id) por si luego se guarda como receta."""
-        self.pasos_receta = (getattr(self, "pasos_receta", []) + [paso])[-20:]
+        self.pasos_receta = (self.pasos_receta + [paso])[-20:]
 
     def _fallo_interfaz(self, motivo):
         """Una acción de interfaz que no pudo hacerse: si la petición acaba sin cumplirse, se reintenta a fondo con este motivo."""
@@ -36,11 +36,11 @@ class MixinInterfaz:
         if self.en_juego():
             return "Hay un juego en primer plano: no toco su ventana con la interfaz."
         tope = getattr(_A.INT, "MAX_PASOS", 15)
-        if getattr(self, "pasos_interfaz", 0) >= tope:
+        if self.pasos_interfaz >= tope:
             return f"Ya he hecho {tope} acciones de interfaz en esta petición: paro aquí. Cuenta al usuario qué queda por hacer y que te lo pida de nuevo si quiere seguir."
         if accion == "accionar" and not str(args.get("nombre") or "").strip():
             return "Para accionar necesito el «nombre» (id o texto) de la acción: míralo antes con interfaz(acciones, filtro=…)."
-        if accion == "tecla" and getattr(self, "ultima_tecla", None) == (str(args.get("combo") or "").lower(), str(args.get("ventana") or "").lower()):
+        if accion == "tecla" and self.ultima_tecla == (str(args.get("combo") or "").lower(), str(args.get("ventana") or "").lower()):
             return ("Ya mandaste esa misma tecla y no has mirado el estado desde entonces. Si ALTERNA algo (como ctrl+h), repetirla lo deshace. Comprueba el estado "
                     "(interfaz elementos/acciones o mirar_pantalla) antes de volver a mandarla.")
         if accion in ("pulsar", "escribir") and not (str(args.get("nombre") or "").strip() and (str(args.get("elemento") or "").strip() or str(args.get("ventana") or "").strip())):
@@ -70,7 +70,7 @@ class MixinInterfaz:
             resumen += f" (ventana «{ctx['ventana'][:50]}»)"
 
         def hacer(a=dict(args)):  # noqa: B006 (copia a propósito: la acción se ejecuta más tarde)
-            self.pasos_interfaz = getattr(self, "pasos_interfaz", 0) + 1
+            self.pasos_interfaz = self.pasos_interfaz + 1
             H.anotar("[interfaz] " + resumen)
             r = _A.INT.herramienta(a)
             u = dict(getattr(_A.INT, "ULTIMO", {}) or {})
@@ -84,7 +84,7 @@ class MixinInterfaz:
                 if accion == "accionar" and "Verificado por el estado" in r:
                     self.ejecutor.efecto_sin_comprobar = False          # lo ha comprobado el propio programa: un comando fallido anterior ya no importa
                     self.ejecutor.duda = ""
-                if str(getattr(self, "obstaculo", "")).startswith("usar la interfaz"):
+                if str(self.obstaculo).startswith("usar la interfaz"):
                     self.obstaculo = ""
             elif accion == "pulsar" and "no tiene una acción de pulsar" in r and _A.VIS is not None:
                 log("Interfaz: el control no se puede pulsar por accesibilidad; pruebo con la visión")
@@ -106,7 +106,7 @@ class MixinInterfaz:
         """Apunta como receta lo que se hizo con la interfaz en ESTA petición. Los pasos los pone el código (lo ejecutado de verdad), no la IA;
         hace falta que algo haya comprobado el resultado después del último paso."""
         ajuste, comprobar = str(args.get("ajuste", "")).strip(), str(args.get("comprobar", "")).strip()
-        pasos = list(getattr(self, "pasos_receta", []))
+        pasos = list(self.pasos_receta)
         if not ajuste or not comprobar:
             return "No guardo la receta: faltan el nombre de lo que se consigue o cómo lo comprobaste."
         if not pasos:
@@ -119,7 +119,7 @@ class MixinInterfaz:
             return "No guardo la receta: algún paso no tiene nombre de control."
         if not _A.REC.aprender_interfaz(ajuste, "", "", pasos, "", comprobar, solo_comprobar=True):
             return "No puedo guardar esa receta (el nombre debe tener alguna palabra concreta y los pasos ser de pulsar, escribir, tecla o clic)."
-        self.receta_interfaz_pendiente = (ajuste, args.get("palabras", ""), getattr(self, "pregunta_pura", ""), pasos, args.get("valor_usado", ""), comprobar)
+        self.receta_interfaz_pendiente = (ajuste, args.get("palabras", ""), self.pregunta_pura, pasos, args.get("valor_usado", ""), comprobar)
         return (f"Receta anotada: «{ajuste}» ({len(pasos)} pasos). Se guardará cuando la respuesta se dé por buena; si resulta que no funcionó, se descarta. "
                 "Contesta al usuario normalmente.")
 
@@ -132,7 +132,7 @@ class MixinInterfaz:
         elif diferidas:
             log(f"Receta descartada ({len(diferidas)}): la petición no se dio por cumplida")
         self.ejecutor.recetas_diferidas = []
-        pendiente, self.receta_interfaz_pendiente = getattr(self, "receta_interfaz_pendiente", None), None
+        pendiente, self.receta_interfaz_pendiente = self.receta_interfaz_pendiente, None
         if not pendiente or not aceptada:
             if pendiente:
                 log("Receta de interfaz descartada: la petición no se dio por buena a la primera")
@@ -142,7 +142,7 @@ class MixinInterfaz:
             self.ejecutor.receta_turno = True
 
     def _peticion_de_receta(self):
-        return peticion_de_receta(self.historial, getattr(self, "pregunta_pura", ""))
+        return peticion_de_receta(self.historial, self.pregunta_pura)
 
     def interfaz_por_vision(self, args, accion):
         """Clic donde la accesibilidad no llega: se mira la ventana con la visión, se comprueba el punto y se pulsa. Mismos topes y confirmaciones que pulsar."""
@@ -153,7 +153,7 @@ class MixinInterfaz:
         if self.en_juego():
             return "Hay un juego en primer plano: no toco su ventana con la interfaz."
         tope = getattr(_A.INT, "MAX_PASOS", 15)
-        if accion == "clic" and getattr(self, "pasos_interfaz", 0) >= tope:
+        if accion == "clic" and self.pasos_interfaz >= tope:
             return f"Ya he hecho {tope} acciones de interfaz en esta petición: paro aquí. Cuenta al usuario qué queda por hacer."
         if not str(args.get("descripcion") or "").strip():
             return "Describe qué hay que pulsar (por ejemplo «el botón Reproducir» o «el icono de la lupa»)."
@@ -187,13 +187,13 @@ class MixinInterfaz:
         boton, veces = args.get("boton", "izquierdo"), args.get("veces", 1)
 
         def hacer():
-            self.pasos_interfaz = getattr(self, "pasos_interfaz", 0) + 1
+            self.pasos_interfaz = self.pasos_interfaz + 1
             H.anotar("[interfaz-visión] " + resumen)
             r = _A.VIS.hacer_clic(loc, boton, veces)
             if r.startswith("Clic"):
                 self._paso_hecho({"accion": "clic", "ventana": loc.get("ventana", ""), "descripcion": str(args.get("descripcion", "")), "boton": boton, "veces": veces})
                 self.ejecutor.efecto_sin_comprobar = True               # un clic a ciegas: que se compruebe con la pantalla o los controles
-                if str(getattr(self, "obstaculo", "")).startswith("usar la interfaz"):
+                if str(self.obstaculo).startswith("usar la interfaz"):
                     self.obstaculo = ""
             else:
                 self._fallo_interfaz(r)

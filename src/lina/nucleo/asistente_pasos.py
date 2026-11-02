@@ -157,7 +157,7 @@ class MixinPasos:
     def _frase_para_receta(self):
         """La petición que se cumplió, tal como la dijiste. None si lo último que dijiste es un seguimiento («ahora desactívala») que no la describe."""
         from lina.nucleo.turnos import es_seguimiento, peticion_de_receta
-        actual = str(getattr(self, "pregunta_pura", "") or "")
+        actual = str(self.pregunta_pura or "")
         if es_seguimiento(actual) and not H.es_afirmativo(actual):
             return None
         texto = peticion_de_receta(self.historial, actual)
@@ -167,8 +167,8 @@ class MixinPasos:
     def _aprender_pasos(self):
         """Al terminar una petición dada por buena: si hizo algo que se puede repetir, apunta los pasos. Nunca estropea la respuesta."""
         REC, ej = self._REC(), self.ejecutor
-        if (REC is None or not self._recetas_de_pasos_activas() or not getattr(self, "turno_aceptado", False) or ej.receta_turno or ej.duda or ej.pendientes
-                or ej.contaminado or getattr(self, "insistiendo", False)):
+        if (REC is None or not self._recetas_de_pasos_activas() or not self.turno_aceptado or ej.receta_turno or ej.duda or ej.pendientes
+                or ej.contaminado or self.insistiendo):
             return
         frase = self._frase_para_receta()
         if not frase:

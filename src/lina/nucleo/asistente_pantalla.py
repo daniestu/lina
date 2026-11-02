@@ -34,7 +34,7 @@ class MixinPantalla:
         if self.ejecutor.contaminado:
             return ("No puedo ver la pantalla: el usuario aún no ha dado permiso para enviar capturas y, como en esta tarea has leído contenido de fuera, "
                     "no lo propongo ahora. Díselo y que lo decida él con «lina privacidad».")
-        self.peticion_de_capturas = getattr(self, "pregunta_pura", "")
+        self.peticion_de_capturas = self.pregunta_pura
         r = self.ejecutor.preparar_accion(
             "Dar permiso a Lina para enviar capturas de tu pantalla a la IA (Gemini, de Google) cuando hagan falta, empezando por la petición de ahora. "
             "Nunca en modo privado ni con ventanas sensibles; se revoca con «lina privacidad no»",
@@ -47,7 +47,7 @@ class MixinPantalla:
         """Se ejecuta SOLO cuando el usuario confirma con el atajo: guarda el permiso y deja lista la captura para retomar lo que pidió."""
         AJ.actuales(log=lambda m: None).establecer("privacidad", "capturas", "si")
         H.anotar("[privacidad] capturas = si (confirmado por el usuario con el atajo, a petición de la IA)")
-        imagen = getattr(self, "imagen_del_turno", None)
+        imagen = self.imagen_del_turno
         if not imagen and not self._motivo_sin_pantalla():
             imagen = self._capturar_ahora()[0]                   # con el permiso sin decidir no se capturó al pulsar: se hace ahora
         if imagen and not self._motivo_sin_pantalla():
@@ -72,7 +72,7 @@ class MixinPantalla:
         """Al pulsar (o al llegar una orden por «Oye Lina»): se apunta QUÉ ventana tenías delante y, solo en un juego (donde la captura siempre se envía y
         el momento importa), se captura ya. Fuera de un juego se captura después, y solo si la frase lo pide. Si no se podría usar (modo privado, sin
         permiso, ventana sensible), no se captura nada."""
-        self._n_captura = getattr(self, "_n_captura", 0) + 1
+        self._n_captura = self._n_captura + 1
         self.ruta_captura = RUT.temporal(f"captura-{self._n_captura}.png")
         self.ventana_al_pulsar = {"id": str(ventana.get("id") or ""), "titulo": ventana.get("titulo") or "", "clase": ventana.get("clase") or ""}
         self.hilo_captura = None
@@ -128,7 +128,7 @@ class MixinPantalla:
             return "estás en un juego", True
         if C.pide_mirar(pregunta):
             return "hablas de lo que ves", True
-        if time.time() - getattr(self, "ultima_pantalla_t", 0.0) < PANTALLA_SESION_SEG and C.sigue_mirando(pregunta):
+        if time.time() - self.ultima_pantalla_t < PANTALLA_SESION_SEG and C.sigue_mirando(pregunta):
             return "seguías pidiendo ayuda con la pantalla", False
         return "", False
 

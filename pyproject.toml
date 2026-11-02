@@ -82,6 +82,10 @@ warn_unused_ignores = true
 no_implicit_optional = true
 show_error_codes = true
 
+[[tool.mypy.overrides]]
+module = ["lina.nucleo.herramientas"]
+check_untyped_defs = true
+
 # Los módulos pequeños y limpios se comprueban a fondo desde ya.
 [[tool.mypy.overrides]]
 module = ["lina.nucleo.registro", "lina.nucleo.procesos", "lina.nucleo.ejecucion", "lina.nucleo.texto", "lina.nucleo.constantes",

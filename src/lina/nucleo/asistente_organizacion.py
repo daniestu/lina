@@ -112,7 +112,7 @@ class MixinOrganizacion:
         """Busca en la fuente; sin clave de Tavily, en la reserva si la permites; si no, o si la reserva no da nada, lee solo la página guardada. Si no tiene la respuesta sigue sola, sin preguntar."""
         dominio = fuente["dominio"]
         if not _A.hay_busqueda_tavily():
-            if _A.reserva_sin_clave() and self.busquedas_turno < getattr(self, "max_busquedas", _A.MAX_BUSQUEDAS):
+            if _A.reserva_sin_clave() and self.busquedas_turno < self.max_busquedas:
                 self.busquedas_turno += 1
                 resultado = _A.buscar_reserva(consulta, dominio)
                 self.ejecutor.contaminar("búsqueda web")
@@ -124,7 +124,7 @@ class MixinOrganizacion:
             self.fuente_turno["sin_respuesta"] = True
             log(f"Fuente: no he podido leer {dominio}: termino aquí, sin reintento ni herramientas")
             raise _A.BucleDeHerramienta(_A.T("No he podido leer tu web {web}, así que no tengo ese dato.", web=_A.FUE.dominio_hablado(dominio)))
-        if self.busquedas_turno >= getattr(self, "max_busquedas", _A.MAX_BUSQUEDAS):
+        if self.busquedas_turno >= self.max_busquedas:
             return "No hagas más búsquedas: responde con lo que ya tienes o di que no lo has encontrado."
         self.busquedas_turno += 1
         resultado = _A.buscar_tavily(consulta, dominio)

@@ -1,0 +1,200 @@
+{
+ "origen": "a_mano",
+ "llamadas": {
+  "Ponme el partido del Barça contra el Sevilla.": [
+   [
+    "buscar_web",
+    {
+     "consulta": "partido Barça Sevilla dónde ver"
+    }
+   ],
+   [
+    "ejecutar_comando",
+    {
+     "comando": "xdg-open https://www.movistarplus.es/ficha/prueba"
+    }
+   ]
+  ],
+  "Ponme el partido en el navegador.": [
+   [
+    "buscar_web",
+    {
+     "consulta": "partido de hoy dónde ver"
+    }
+   ],
+   [
+    "ejecutar_comando",
+    {
+     "comando": "xdg-open https://www.movistarplus.es/ficha/prueba"
+    }
+   ]
+  ],
+  "¿A qué hora juega hoy el Betis?": [
+   [
+    "buscar_web",
+    {
+     "consulta": "Betis partido hoy hora"
+    }
+   ]
+  ],
+  "¿Cuánto cuesta ahora una Steam Deck?": [
+   [
+    "buscar_web",
+    {
+     "consulta": "precio Steam Deck"
+    }
+   ]
+  ],
+  "Lee esta página y resúmela: https://ejemplo.es/articulo": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "web"
+    }
+   ],
+   [
+    "leer_web",
+    {
+     "url": "https://ejemplo.es/articulo"
+    }
+   ]
+  ],
+  "Crea un documento llamado notas de prueba que diga hola.": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "archivos"
+    }
+   ],
+   [
+    "crear_documento",
+    {
+     "nombre": "notas de prueba",
+     "contenido": "hola"
+    }
+   ]
+  ],
+  "¿Cuánto llevo gastado este mes en la IA?": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "memoria"
+    }
+   ],
+   [
+    "ver_gasto",
+    {}
+   ]
+  ],
+  "Apunta en mis notas que hay que comprar pilas.": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "organizacion"
+    }
+   ],
+   [
+    "notas",
+    {
+     "accion": "crear",
+     "texto": "comprar pilas"
+    }
+   ]
+  ],
+  "Recuérdame dentro de una hora que saque la ropa.": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "organizacion"
+    }
+   ],
+   [
+    "recordatorios",
+    {
+     "accion": "crear",
+     "texto": "sacar la ropa"
+    }
+   ]
+  ],
+  "¿Qué juegos tengo instalados?": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "juegos"
+    }
+   ],
+   [
+    "ver_juegos",
+    {}
+   ]
+  ],
+  "¿Qué has cambiado hoy en el equipo?": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "memoria"
+    }
+   ],
+   [
+    "ver_diario",
+    {
+     "fecha": "hoy"
+    }
+   ]
+  ],
+  "¿Cuánta memoria RAM está usando el equipo?": [
+   [
+    "ejecutar_comando",
+    {
+     "comando": "free -h"
+    }
+   ]
+  ],
+  "Cuéntame un chiste corto.": [],
+  "Crea un Excel con mis gastos de enero.": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "archivos"
+    }
+   ],
+   [
+    "hoja_calculo",
+    {
+     "accion": "crear",
+     "nombre": "gastos de enero"
+    }
+   ]
+  ],
+  "Conéctate a mi GitHub y dime mis repositorios.": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "mcp"
+    }
+   ],
+   [
+    "mcp_servidores",
+    {
+     "accion": "listar"
+    }
+   ]
+  ],
+  "Escribe /tmp en la barra de ruta de Dolphin.": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "interfaz"
+    }
+   ],
+   [
+    "interfaz",
+    {
+     "accion": "escribir",
+     "ventana": "Dolphin",
+     "texto": "/tmp"
+    }
+   ]
+  ]
+ }
+}

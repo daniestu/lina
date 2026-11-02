@@ -5,6 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- **`lina probar-ia`** pasa una tanda fija de frases por tu Lina con el modelo de verdad y comprueba qué herramientas elige, sin ejecutar ninguna. Sirve para cambiar instrucciones o modelo sin ir a ciegas.
 - **«Quita la fuente de recetas» funciona**, con el atajo o `lina di`. Por manos libres lo rechaza, y si varias encajan no quita ninguna y te las dice.
 - **Aviso al guardar una portada como fuente sin poder buscar**: Lina dice que solo leerá esa dirección, no el resto de la web.
 - **Las fuentes por tema ya se usan al responder**: si la pregunta es de ese tema, Lina busca primero en tu web y lo dice. Una comprobación aparte, con solo el tema y tu pregunta, evita usarla para otra cosa. Si tu web no lo tiene, sigue sola con la búsqueda general y dice de dónde sale cada cosa. Con `ia.busqueda` en `ninguna`, lee solo la página guardada.
