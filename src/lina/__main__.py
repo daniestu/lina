@@ -31,7 +31,7 @@ AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
   lina probar-voz [--completo|mas|grande|silencio]  graba unas frases tuyas y mide qué Whisper te entiende mejor (motor, modelo, CPU o tarjeta gráfica); «mas» mide ayudas sin VRAM y Ollama, «grande» lo hace con ~95 frases tuyas, «silencio» si el fin de frase por silencio del atajo cortaría alguna; no cambia nada
   lina probar-ponme [N]                 pasa una tanda de «ponme el partido / el capítulo…» por tu Lina sin abrir nada y mide si acierta, cuánto tarda y cuántas páginas abre
   lina avisos                qué avisos de disco, batería y actualizaciones tienes encendidos y qué dirían ahora
-  lina probar-ia [N] [--grabar]         pasa una tanda de frases por tu Lina sin ejecutar nada y comprueba qué herramientas elige el modelo
+  lina probar-ia [N] [--grabar]         pasa una tanda de frases por tu Lina sin ejecutar nada y comprueba qué herramientas elige el modelo; --comparar enfrenta pasadas
   lina tiempos [N|escucha|ia]   en qué fase se va el tiempo de tus últimas N peticiones (solo números, nada de lo que dices); «escucha»: cómo termina el atajo de escucharte; «ia»: tokens y caché de la IA
   lina manos-libres ORDEN    probar "frase" · eco · nivel   (ajustes del manos libres)
   lina indicador probar      enseña el resplandor de escucha

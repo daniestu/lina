@@ -5,6 +5,8 @@ huella del principio fijo (instrucciones y herramientas) y si se repite; nunca t
 tamaño, con el criterio de la fila V4. Archivo en tmp_path; proveedor falso, sin red."""
 import datetime
 import json
+import threading
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -244,3 +246,22 @@ def test_un_modelo_con_solo_medida_no_rompe_ni_decide(tmp_path):
     salida = []
     assert TIE.principal_ia([], salida.append, a, HOY, precio=lambda *x: 0.0) == 0
     assert any("solo 4 llamadas de medida" in t for t in salida)
+
+
+def test_solo_medida_llega_hasta_el_registro_y_lina_tiempos_la_separa(archivo):
+    """Gana al motivo que pone _atender por dentro, también desde otro hilo, y al terminar se acaba."""
+    r = MagicMock(uso={"promptTokenCount": 6000}, modelo_real="m")
+
+    def llamada():
+        with IA.motivo_llamada("normal"):
+            IA._apuntar_llamada("clave", "m", ("sistema", []), {}, r, 0.1, "ok")
+    with IA.solo_medida():
+        hilo = threading.Thread(target=llamada)
+        hilo.start()
+        hilo.join()
+        llamada()
+    llamada()
+    lineas = _lineas(archivo)
+    assert [x["motivo"] for x in lineas] == ["medida", "medida", "normal"]
+    resumen = TIE.resumir_ia(lineas)[0]
+    assert resumen["medida"] == 2 and resumen["n"] == 1

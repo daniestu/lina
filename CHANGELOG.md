@@ -6,7 +6,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ### Añadido
 - **Avisos opcionales de disco, batería y actualizaciones** (`[avisos]`, apagados de fábrica): solo una notificación, sin voz ni IA. `lina avisos` enseña cómo están.
-- **`lina probar-ia`** pasa una tanda fija de frases por tu Lina con el modelo de verdad y comprueba qué herramientas elige, sin ejecutar ninguna. Sirve para cambiar instrucciones o modelo sin ir a ciegas.
+- **`lina probar-ia`** pasa una tanda fija de frases por tu Lina con el modelo de verdad y comprueba qué herramientas elige, sin ejecutar ninguna. Sirve para cambiar instrucciones o modelo sin ir a ciegas. Con `--comparar` enfrenta dos pasadas de antes y dos de después: ignora lo que ya bailaba y avisa si la respuesta cambia de forma.
+- **`lina probar-ia` y `lina probar-ponme` ya no cuentan en `lina tiempos ia`**: salen aparte, como medida.
 - **«Quita la fuente de recetas» funciona**, con el atajo o `lina di`. Por manos libres lo rechaza, y si varias encajan no quita ninguna y te las dice.
 - **Aviso al guardar una portada como fuente sin poder buscar**: Lina dice que solo leerá esa dirección, no el resto de la web.
 - **Las fuentes por tema ya se usan al responder**: si la pregunta es de ese tema, Lina busca primero en tu web y lo dice. Una comprobación aparte, con solo el tema y tu pregunta, evita usarla para otra cosa. Si tu web no lo tiene, sigue sola con la búsqueda general y dice de dónde sale cada cosa. Con `ia.busqueda` en `ninguna`, lee solo la página guardada.

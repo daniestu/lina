@@ -43,3 +43,12 @@ def test_pasar_no_abre_nada_y_corta_si_tarda():
 
 def test_ayuda(capsys):
     assert P.principal(["--help"]) == 0 and "probar-ponme" in capsys.readouterr().out
+
+
+def test_las_peticiones_se_registran_como_medida(monkeypatch):
+    from lina.nucleo import ia as IA
+    vistos = []
+    monkeypatch.setattr(P, "_asistente", lambda: (MagicMock(), MagicMock(), []))
+    monkeypatch.setattr(P, "pasar", lambda *a: vistos.append(IA._motivo_fijo[0]) or ([], [], 0.0))
+    P.principal(["1"], lambda t: None)
+    assert vistos == ["medida"] and IA._motivo_fijo[0] is None

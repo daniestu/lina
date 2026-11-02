@@ -178,15 +178,17 @@ def principal(argv, salida=print):
         return 0
     casos = CASOS[:int(argv[0])] if argv[:1] and argv[0].isdigit() else CASOS
     from lina.nucleo import claves as CL
+    from lina.nucleo import ia as IA
     CL.proteger_salida()
     salida(T("Paso {n} peticiones por tu Lina, sin abrir nada (unos segundos cada una)…", n=len(casos)))
     A, a, abiertas = _asistente()
     cuenta, filas = {}, []
-    for frase, juez in casos:
-        abiertas_caso, dicho, seg = pasar(frase, A, a, abiertas)
-        nota, motivo = juez(abiertas_caso, dicho)
-        cuenta[nota] = cuenta.get(nota, 0) + 1
-        filas.append((frase, nota, motivo, seg, abiertas_caso, dicho))
+    with IA.solo_medida():
+        for frase, juez in casos:
+            abiertas_caso, dicho, seg = pasar(frase, A, a, abiertas)
+            nota, motivo = juez(abiertas_caso, dicho)
+            cuenta[nota] = cuenta.get(nota, 0) + 1
+            filas.append((frase, nota, motivo, seg, abiertas_caso, dicho))
     salida("")
     for frase, nota, motivo, seg, abiertas_caso, dicho in filas:
         salida(f"{nota:9} {seg:5.1f} s  {len(abiertas_caso)} pág.  {frase}")

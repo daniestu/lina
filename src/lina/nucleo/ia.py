@@ -375,6 +375,7 @@ def _turno_medido(proveedor, clave, modelo, *args, **kwargs):
 
 
 _motivo_actual: contextvars.ContextVar = contextvars.ContextVar("motivo_llamada", default="normal")
+_motivo_fijo: list = [None]
 
 
 @contextmanager
@@ -385,6 +386,16 @@ def motivo_llamada(motivo):
         yield
     finally:
         _motivo_actual.reset(marca)
+
+
+@contextmanager
+def solo_medida():
+    """Todo lo que se llame dentro, desde cualquier hilo, cuenta como medida: `lina probar-ia` y `lina probar-ponme` pasan por `_atender`, que pone su propio motivo."""
+    _motivo_fijo[0] = "medida"
+    try:
+        yield
+    finally:
+        _motivo_fijo[0] = None
 
 
 _huellas: dict = {}                    # huella del principio → cuándo se usó por última vez (para saber si se repite; no sale de la memoria)
@@ -416,7 +427,7 @@ def _apuntar_llamada(clave, modelo, args, kwargs, r, segundos, resultado):
                 del _huellas[min(_huellas, key=_huellas.get)]
         repite = ahora - antes if antes is not None and ahora - antes < TIE.REPITE_SEG else None
         TIE.apuntar_llamada(TIE.registro_llamada(getattr(r, "modelo_real", None) or modelo, resultado, segundos, uso=getattr(r, "uso", None), pref=pref,
-                                                 conv=conv, huella=huella, repite=repite, pago=PRES.nombre_de(clave) == "pago", motivo=_motivo_actual.get()))
+                                                 conv=conv, huella=huella, repite=repite, pago=PRES.nombre_de(clave) == "pago", motivo=_motivo_fijo[0] or _motivo_actual.get()))
     except Exception as e:
         log(f"Llamadas a la IA: no he podido apuntarla ({e!r})")
 
