@@ -15,7 +15,8 @@ Lina has no telemetry: she sends no statistics or usage data to anyone. The only
 - If you save **sources** (a website for a topic) and use Gemini, the following:
   - **To Gemini:** the list of your topics in each request that may use them and, when the AI picks one, one more query with only that topic and your question. That query goes through your paid key if you have one and your spending cap has room left; otherwise, through the free key. What the website returns also reaches the AI.
   - **To Tavily or DuckDuckGo:** the search text and your source's domain, to search only there. DuckDuckGo is only used if Tavily does not answer and you have the fallback on.
-  - **With `ia.busqueda` set to `ninguna`, or `tavily` without a key:** no search engine is used. Your computer downloads the saved page directly, so **that website sees your IP address**, and its text is sent to the AI.
+  - **With `ia.busqueda` set to `tavily` without a key and `busqueda_reserva` on:** your query goes to DuckDuckGo, limited to that website. If it finds nothing, the saved page is downloaded, as in the next case.
+  - **With `ia.busqueda` set to `ninguna`, or `tavily` without a key and `busqueda_reserva` off:** no search engine is used. Your computer downloads the saved page directly, so **that website sees your IP address**, and its text is sent to the AI.
 
 ## What is NOT sent
 

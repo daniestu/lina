@@ -3,7 +3,7 @@
 """Ejecuta cada suite de tests/suites/ como un programa aparte (con un HOME temporal, para no tocar el del desarrollador).
 
 Una suite falla si termina con error, si imprime «FALLO:», o si su línea final dice «fallos N» / «FALLOS: N» con N > 0.
-Las que dependen del entorno (programas o librerías que no están en todas partes) se marcan como «esperadas».
+Las que dependen del entorno (programas o librerías que no están en todas partes) se marcan como «esperadas», y los fallos ya conocidos solo valen si son esos.
 """
 import os
 import re
@@ -21,7 +21,11 @@ SRC = AQUI.parent / "src"
 # suite -> por qué puede fallar según el entorno
 DEPENDEN_DEL_ENTORNO = {
     "t_err.py": "necesita la librería del sistema PortAudio",
-    "t_mov.py": "mover el puntero de esquina a esquina con un ratón muy acelerado: dos casos simulados todavía no convergen (mejora pendiente)",
+}
+# suite -> (por qué, los casos que fallan hoy): en cualquier equipo. Un caso nuevo ya no se perdona.
+FALLOS_CONOCIDOS = {
+    "t_mov.py": ("mover el puntero de esquina a esquina con un ratón muy acelerado: dos casos simulados todavía no convergen (mejora pendiente)",
+                 {"suave (3000, 1000) (10, 10)", "dura (3000, 1000) (10, 10)"}),
 }
 
 
@@ -38,10 +42,28 @@ def _ejecutar(suite):
     return r.returncode, malos, [int(n) for n in finales], salida
 
 
+def solo_fallos_conocidos(suite, salida):
+    """¿Falla algún caso, y todos son de los ya conocidos?"""
+    casos = set(re.findall(r"^FALLO (.+?) error \d+", salida, flags=re.M))
+    return bool(casos) and casos <= FALLOS_CONOCIDOS.get(suite, (None, set()))[1]
+
+
+@pytest.mark.parametrize("salida, perdona", [
+    ("FALLO suave (3000, 1000) (10, 10) error 3 pasos 40\nFALLOS: 1\n", True),
+    ("FALLO suave (3000, 1000) (10, 10) error 3 pasos 40\nFALLO dura (3000, 1000) (10, 10) error 17 pasos 40\nFALLOS: 2\n", True),
+    ("FALLO suave (3000, 1000) (10, 10) error 3 pasos 40\nFALLO plano (100, 100) (103, 98) error 5 pasos 9\nFALLOS: 2\n", False),
+    ("Traceback\n", False),
+])
+def test_un_tercer_fallo_de_t_mov_no_se_perdona(salida, perdona):
+    assert solo_fallos_conocidos("t_mov.py", salida) is perdona
+
+
 @pytest.mark.parametrize("suite", SUITES, ids=[s.stem for s in SUITES])
 def test_suite(suite):
     codigo, malos, finales, salida = _ejecutar(suite)
     correcta = codigo == 0 and not malos and all(n == 0 for n in finales)
     if suite.name in DEPENDEN_DEL_ENTORNO and not correcta:
         pytest.xfail(DEPENDEN_DEL_ENTORNO[suite.name])
+    if solo_fallos_conocidos(suite.name, salida):
+        pytest.xfail(FALLOS_CONOCIDOS[suite.name][0])
     assert correcta, f"{suite.name}: código {codigo}, fallos {malos[:5]}, totales {finales}\n{salida[-1500:]}"

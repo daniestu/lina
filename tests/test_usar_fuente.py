@@ -40,6 +40,7 @@ def lina(monkeypatch):
     monkeypatch.setattr(A, "comprobar_tema", MagicMock(return_value="encaja"))
     monkeypatch.setattr(A, "buscar_tavily", MagicMock(return_value=RESULTADOS))
     monkeypatch.setattr(A, "hay_busqueda_tavily", lambda: True)
+    monkeypatch.setattr(A, "reserva_sin_clave", lambda: False)
     a.A = A
     return a
 
@@ -144,6 +145,31 @@ def test_sin_busqueda_lee_solo_la_direccion_guardada(sin_busqueda):
     sin_busqueda.A.W.leer.assert_called_once_with(FUENTE["url"])
     sin_busqueda.A.buscar_tavily.assert_not_called()
     sin_busqueda.ejecutor.contaminar.assert_called_once()
+
+
+def test_sin_clave_y_con_la_reserva_permitida_busca_en_toda_esa_web(sin_busqueda, monkeypatch):
+    monkeypatch.setattr(sin_busqueda.A, "reserva_sin_clave", lambda: True)
+    monkeypatch.setattr(sin_busqueda.A, "buscar_reserva", MagicMock(return_value=RESULTADOS))
+    r = _usar(sin_busqueda)
+    sin_busqueda.A.buscar_reserva.assert_called_once_with("ferrita refinar", DOMINIO)
+    sin_busqueda.A.W.leer.assert_not_called()
+    assert RESULTADOS in r and "no contestes de memoria" in r and "buscar_web" not in r.split("RESULTADOS")[0] and sin_busqueda.busquedas_turno == 1
+    sin_busqueda.ejecutor.contaminar.assert_called_once()
+
+
+def test_si_la_reserva_no_da_nada_lee_la_direccion_guardada(sin_busqueda, monkeypatch):
+    monkeypatch.setattr(sin_busqueda.A, "reserva_sin_clave", lambda: True)
+    monkeypatch.setattr(sin_busqueda.A, "buscar_reserva", MagicMock(return_value="La búsqueda no ha encontrado nada."))
+    assert "Ferrita pura" in _usar(sin_busqueda)
+    sin_busqueda.A.W.leer.assert_called_once_with(FUENTE["url"])
+
+
+def test_la_reserva_no_pasa_del_tope_de_busquedas(sin_busqueda, monkeypatch):
+    monkeypatch.setattr(sin_busqueda.A, "reserva_sin_clave", lambda: True)
+    monkeypatch.setattr(sin_busqueda.A, "buscar_reserva", MagicMock())
+    sin_busqueda.busquedas_turno = 2
+    assert "Ferrita pura" in _usar(sin_busqueda)
+    sin_busqueda.A.buscar_reserva.assert_not_called()
 
 
 @pytest.mark.parametrize("error", ["La web no me deja leerla (error 403); puede que pida iniciar sesión o bloquee a los programas.", "Esa página no existe (error 404)."])

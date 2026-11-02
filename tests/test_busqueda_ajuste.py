@@ -48,6 +48,14 @@ def test_hay_busqueda_tavily(con, busqueda, clave, hay):
     assert IA.hay_busqueda_tavily() is hay
 
 
+@pytest.mark.parametrize("busqueda, clave, permitida, hay", [("tavily", None, True, True), ("tavily", None, False, False), ("tavily", "tvly-x", True, False),
+                                                             ("ninguna", None, True, False), ("google", None, True, False)])
+def test_reserva_sin_clave_respeta_el_permiso(con, monkeypatch, busqueda, clave, permitida, hay):
+    con(busqueda, clave)
+    monkeypatch.setattr(IA, "hay_reserva", lambda: permitida)
+    assert IA.reserva_sin_clave() is hay
+
+
 @pytest.mark.parametrize("busqueda,clave", [("ninguna", "tvly-x"), ("tavily", None), ("google", "tvly-x")])
 def test_sin_busqueda_tavily_no_se_busca(con, busqueda, clave):
     con(busqueda, clave)

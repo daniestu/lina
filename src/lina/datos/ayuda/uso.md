@@ -41,7 +41,7 @@ Puedes decirle a Lina qué web usar para un tema concreto, por ejemplo las recet
 
 Guardar una fuente **no pide confirmación previa**. Lina te avisa después, con el dominio deletreado («nomanssky punto fandom punto com»), y si no es lo que querías se deshace con «quita la última fuente». Escucha ese dominio: es la forma de notar que lo copiado no era lo que creías. Solo se deletrea el dominio: una página distinta de esa misma web no se notaría, y se comprueba con `lina fuentes`. Si falta la web o el tema, te lo pide. Puedes guardar hasta 20.
 
-**Quitar una fuente:** «quita la última fuente» por voz, con el atajo o con `lina di`. Las demás, con `lina fuentes quitar f1`, y todas con `lina fuentes quitar todas`. `lina olvidar fuentes` también las borra. `lina fuentes` enseña la lista. Por voz aún no se quita una fuente concreta.
+**Quitar una fuente:** «quita la última fuente» o «quita la fuente de recetas», por voz con el atajo o con `lina di`; por manos libres no. Si varias encajan, no quita ninguna y te las dice. Por terminal, `lina fuentes quitar f1`, y todas con `lina fuentes quitar todas`. `lina olvidar fuentes` también las borra. `lina fuentes` enseña la lista.
 
 **Cómo elige Lina.** Cuando le preguntas algo, la IA decide por significado si va de uno de tus temas, aunque uses otras palabras. Después, una comprobación aparte mira solo el tema y tu pregunta, y si no es exactamente de ese tema no se usa la fuente. Si esa comprobación no contesta a tiempo, tampoco, y Lina sigue con la búsqueda general sin decírtelo. Para consultarla no hace falta nombrarla, aunque también puedes: «usa la fuente de recetas». `lina fuentes probar "tu pregunta"` enseña qué fuente elegiría y si la comprobación la aceptaría, sin responder ni buscar.
 
@@ -54,7 +54,8 @@ Guardar una fuente **no pide confirmación previa**. Lina te avisa después, con
 | `ia.busqueda` | Qué hace con tu fuente |
 |---|---|
 | `tavily` con clave | Busca dentro de esa web (con DuckDuckGo si Tavily no responde) |
-| `tavily` sin clave, o `ninguna` | Lee solo la dirección que guardaste, sin buscar: guarda la página concreta, no solo el dominio |
+| `tavily` sin clave, con `busqueda_reserva` activa | Busca dentro de esa web con DuckDuckGo; si no encuentra nada, lee la dirección que guardaste |
+| `tavily` sin clave y `busqueda_reserva` apagada, o `ninguna` | Lee solo la dirección que guardaste, sin buscar: guarda la página concreta. Si guardas la portada, Lina te avisa |
 | `google` | No se usan |
 
 Con otro proveedor de IA tampoco se usan, porque no está medido. `lina fuentes` te avisa si es tu caso. Lo que sale de tu equipo está en el [manual de privacidad](privacidad.md).

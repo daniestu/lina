@@ -90,5 +90,11 @@ for _n in ("InputStream", "OutputStream", "play", "stop", "wait", "rec", "sleep"
     setattr(sys.modules["sounddevice"], _n, MagicMock(name=f"sounddevice.{_n}"))
 
 
+def pytest_configure(config):
+    """tmp_path, dentro de la casa: en /tmp cualquier ruta contaría como desechable. Nombre corto: en esas carpetas hay sockets, con un límite de ~108 caracteres."""
+    if not config.option.basetemp:
+        config.option.basetemp = str(CASA / "t")
+
+
 def pytest_sessionfinish(session, exitstatus):
     shutil.rmtree(CASA, ignore_errors=True)

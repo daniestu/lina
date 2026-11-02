@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Lina contributors
 """Un alias no puede convertir un verbo de orden en otro («conecta = desconecta»): cambiaría lo que hace Lina cada vez que lo dices."""
+from pathlib import Path
+
 import pytest
 
 from lina.nucleo import comandos as C
@@ -27,7 +29,7 @@ def aislado(tmp_path, monkeypatch):
 def test_rechaza_dos_verbos_de_orden_distintos(aislado, oido, significa):
     hecho, mensaje = C.guardar_alias(oido, significa)
     assert not hecho
-    assert "órdenes distintas" in mensaje and "aunque sean casi sinónimos" in mensaje and "a mano" in mensaje and str(aislado) in mensaje
+    assert "órdenes distintas" in mensaje and "aunque sean casi sinónimos" in mensaje and "a mano" in mensaje and str(aislado).replace(str(Path.home()), "~", 1) in mensaje
     assert not aislado.exists()
 
 

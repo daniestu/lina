@@ -7,6 +7,7 @@ import pytest
 
 from lina.nucleo import clasificador as CLA
 from lina.nucleo import fuentes as F
+from lina.nucleo import ia as IA
 from lina.nucleo import herramientas as H
 from lina.nucleo import olvidar as OLV
 
@@ -126,6 +127,9 @@ URL_FRASE = "https://nomanssky.fandom.com/wiki/Refining"
     ("Usa esta página", ("falta_tema",)),
     ("Para las recetas usa la web cosa rara", ("mala", "recetas")),
     ("Quita la última fuente.", ("quitar_ultima",)),
+    ("Quita la fuente de recetas.", ("quitar", "recetas")),
+    ("Borra la fuente de las recetas de refinería", ("quitar", "las recetas de refinería")),
+    ("por favor, elimina mi fuente sobre recetas", ("quitar", "recetas")),
 ])
 def test_entender_las_frases(frase, esperado):
     assert F.entender(frase) == esperado
@@ -155,7 +159,64 @@ def test_el_dominio_dictado_con_guion_se_oye_bien():
     assert F.dominio_hablado("no-mans.ejemplo.es") == "no guion mans punto ejemplo punto es"
 
 
-@pytest.mark.parametrize("accion", [("anadir", TEMA, URL_FRASE), ("copiada", TEMA), ("quitar_ultima",)])
+def test_quitar_por_tema_quita_solo_la_que_encaja():
+    F.anadir(TEMA, WEB)
+    F.anadir("recetas de cocina", "https://cocina.es/recetas")
+    assert F.gestionar(("quitar", "las recetas de cocina"), "atajo", _nada) == "Quitada: recetas de cocina."
+    assert [f["tema"] for f in F.listar()] == [TEMA]
+
+
+def test_quitar_por_unas_palabras_si_solo_estan_en_una():
+    F.anadir(TEMA, WEB)
+    assert F.gestionar(("quitar", "refinería"), "texto", _nada) == f"Quitada: {TEMA}."
+    assert F.listar() == []
+
+
+def test_si_varias_encajan_no_quita_ninguna_y_las_dice():
+    F.anadir("recetas de refinería", WEB)
+    F.anadir("recetas de cocina", "https://cocina.es/recetas")
+    r = F.gestionar(("quitar", "recetas"), "atajo", _nada)
+    assert "recetas de refinería" in r and "recetas de cocina" in r and "no he quitado nada" in r and len(F.listar()) == 2
+
+
+def test_el_tema_entero_gana_a_uno_que_lo_contiene():
+    F.anadir("recetas", WEB)
+    F.anadir("recetas de cocina", "https://cocina.es/recetas")
+    assert F.gestionar(("quitar", "recetas"), "atajo", _nada) == "Quitada: recetas."
+
+
+@pytest.mark.parametrize("tema", ["coches", "de la", "recetas de coches"])
+def test_si_no_encaja_ninguna_no_se_quita_nada(tema):
+    F.anadir("recetas de cocina", "https://cocina.es/recetas")
+    assert "No he quitado nada" in F.gestionar(("quitar", tema), "atajo", _nada) and len(F.listar()) == 1
+
+
+@pytest.mark.parametrize("frase", ["usa la fuente de recetas", "¿quita la fuente de recetas?"])
+def test_consultar_o_preguntar_no_es_quitar(frase):
+    assert F.entender(frase) is None
+
+
+@pytest.mark.parametrize("buscar, reserva, url, avisa", [
+    (False, False, "https://nomanssky.fandom.com", True), (False, False, "https://nomanssky.fandom.com/", True),
+    (False, False, "https://nomanssky.fandom.com/wiki/Refining", False), (False, False, "https://ejemplo.es/?p=3", False),
+    (True, False, "https://nomanssky.fandom.com", False), (False, True, "https://nomanssky.fandom.com", False),
+])
+def test_guardar_la_portada_sin_poder_buscar_avisa(monkeypatch, buscar, reserva, url, avisa):
+    monkeypatch.setattr(IA, "hay_busqueda_tavily", lambda: buscar)
+    monkeypatch.setattr(IA, "reserva_sin_clave", lambda: reserva)
+    r = F.gestionar(("anadir", TEMA, url), "atajo", _nada)
+    assert ("solo leeré esa dirección" in r) is avisa and F.listar()[0]["url"] == url
+
+
+def test_la_terminal_tambien_avisa_de_la_portada(monkeypatch):
+    monkeypatch.setattr(IA, "hay_busqueda_tavily", lambda: False)
+    monkeypatch.setattr(IA, "reserva_sin_clave", lambda: False)
+    salida = []
+    assert F.principal(["añadir", TEMA, "https://nomanssky.fandom.com"], salida.append) == 0
+    assert "solo leeré esa dirección" in salida[0]
+
+
+@pytest.mark.parametrize("accion", [("anadir", TEMA, URL_FRASE), ("copiada", TEMA), ("quitar_ultima",), ("quitar", "ya estaba")])
 @pytest.mark.parametrize("origen", ["voz_libre", None, "lo que sea"])
 def test_por_manos_libres_no_se_cambia_nada_ni_se_mira_el_portapapeles(accion, origen):
     assert F.anadir("ya estaba", "https://a.es")[0]

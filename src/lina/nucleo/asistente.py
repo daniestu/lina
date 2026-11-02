@@ -463,7 +463,7 @@ from lina.nucleo.ia import (  # noqa: F401
     BucleDeHerramienta, Cancelado, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
-    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva,
+    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_reserva, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva, reserva_sin_clave,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
     cabe_modelo_local, dominio_valido,
@@ -2084,7 +2084,7 @@ class Asistente(MixinOrganizacion, MixinPantalla, MixinAjustes, MixinPasos, Mixi
         if afirma and FUE.firma() == getattr(self, "_fuentes_antes", None):
             log(f"La respuesta dice haber cambiado una fuente y no consta: se sustituye («{str(texto)[:80]}»)")
             return (T("No lo he guardado: las fuentes no las guardo así. Dime «para TEMA usa esta página…» con el atajo o con lina di, o usa lina fuentes añadir.") if afirma == "guardar"
-                    else T("No lo he quitado: las fuentes no las quito así. Dime «quita la última fuente» con el atajo o con lina di, o usa lina fuentes quitar."))
+                    else T("No lo he quitado: las fuentes no las quito así. Dime «quita la fuente de TEMA» con el atajo o con lina di, o usa lina fuentes quitar."))
         if not afirma_hecho(texto):
             return texto
         if pide_hacer(peticion):

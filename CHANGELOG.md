@@ -5,6 +5,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- **«Quita la fuente de recetas» funciona**, con el atajo o `lina di`. Por manos libres lo rechaza, y si varias encajan no quita ninguna y te las dice.
+- **Aviso al guardar una portada como fuente sin poder buscar**: Lina dice que solo leerá esa dirección, no el resto de la web.
 - **Las fuentes por tema ya se usan al responder**: si la pregunta es de ese tema, Lina busca primero en tu web y lo dice. Una comprobación aparte, con solo el tema y tu pregunta, evita usarla para otra cosa. Si tu web no lo tiene, sigue sola con la búsqueda general y dice de dónde sale cada cosa. Con `ia.busqueda` en `ninguna`, lee solo la página guardada.
 - El manual de uso explica las fuentes (`docs/uso.md`), el de privacidad qué sale de tu equipo con ellas, y `docs/seguridad.md` sus límites y los de la lectura a lo ancho.
 - Las fuentes también se añaden con «añade la fuente que tengo en el portapapeles a TEMA», aunque Whisper oiga «cortapapeles». Si falta algo, Lina lo pide en vez de contestar otra cosa; por manos libres sigue negándose, y si una petición de añadir se escapa, avisa de que no ha añadido nada.
@@ -37,6 +39,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - **Las pruebas ya no tocan tu carpeta personal.** Antes, `pytest` en un equipo con Lina instalada escribía en tu registro de acciones, podía reescribir tu diario (al recortarlo) y leía tus ajustes, tu memoria, tus programas y tus juegos, así que el resultado podía depender de tu equipo. Ahora todas las pruebas usan una casa temporal en `tests/.casa-pruebas/` (fuera de `/tmp`, para que las rutas `~/…` no cuenten como desechables), sin bus de sesión ni escritorio, y `tests/test_aislamiento.py` falla si algo se sale de ella. Solo afecta a quien desarrolla Lina.
 
 ### Seguridad
+- **Con Tavily sin clave y la reserva permitida, tus fuentes se buscan enteras**: Lina busca dentro de esa web con DuckDuckGo, y lee la dirección guardada si no encuentra nada. Con `ia.busqueda_reserva` apagado o `ninguna`, no sale ninguna búsqueda.
 - **Recorrer `/home` se bloquea aunque tu carpeta personal esté en otro sitio** (`/root`, `/var/home/…`): `grep -r`, `tar` o `cp -r` sobre `/home` solo se paraban si tu casa colgaba de ahí.
 - **La IA ya no puede leer a lo ancho sobre carpetas con claves**: `grep -r` o `rg` en tu carpeta personal, `cat ~/.config/*/*`, o copiar `~/.config`, se bloquean igual que leer esas rutas directamente. Buscar en una carpeta concreta sigue libre. - Leer `journalctl` sin filtrar por servicio pide confirmación, porque lleva el registro de Lina: tus preguntas y el principio de lo que devuelven los comandos. Sigue libre con `-u`, `-k`, `-t` o `-p` de aviso hacia abajo.
 - **El modo privado también desactiva los hechos recientes.** Lo que Lina apunta en memoria para contestar «¿qué ha pasado?» no se guarda en modo privado, y al activarlo se borra lo que hubiera.

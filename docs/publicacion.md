@@ -10,7 +10,7 @@ Para quien mantiene el proyecto. Nada de esto lo hace Lina sola: etiquetar, publ
    en otros ámbitos (se consultó TMview), así que `TRADEMARKS.md` no reclama exclusividad. Si hay un servicio alojado de pago, tendrá otra marca (candidata: **Neolina**,
    neolina.com), y **antes de lanzarlo** hay que repetir la búsqueda en TMview y los dominios y consultar con un abogado de marcas. Revisar que `CONTRIBUTING.md` y
    `TRADEMARKS.md` dicen lo que quieres (son borradores sin revisión legal).
-3. CI en verde en `main` (Ruff, rastros, pruebas con cobertura ≥ 63 % en Python 3.11, 3.12 y 3.13, y las cuatro familias de distribución).
+3. CI en verde en `main` (Ruff, rastros, pruebas con cobertura ≥ 74 % en Python 3.11, 3.12 y 3.13, y las cuatro familias de distribución).
 4. `python scripts/comprobar_rastros.py` sin avisos.
 5. Probado a mano en un equipo real: `./install.sh`, `lina bienvenida`, `lina doctor --red`, hablar con el atajo, una confirmación por atajo, `lina update`,
    `lina uninstall`. Anotar en la hoja de ruta lo que falle.

@@ -46,6 +46,17 @@ def test_la_casa_no_esta_en_una_zona_desechable():
             f"LINA_PRUEBAS_BASE=~/lina-pruebas pytest).")
 
 
+def test_tmp_path_tampoco_esta_en_una_zona_desechable(tmp_path):
+    assert _dentro(tmp_path, CASA)
+    for zona in H._politica()["desechables"]:
+        assert not _dentro(tmp_path, os.path.expanduser(zona)), f"tmp_path ({tmp_path}) cae en la zona desechable {zona}"
+
+
+def test_cabe_un_socket_en_el_tmp_path_mas_largo(tmp_path):
+    mas_largo = tmp_path.parent / ("x" * 30 + "0") / "mpv.sock"          # pytest corta el nombre de la prueba a 30 caracteres
+    assert len(str(mas_largo)) < 108, f"{mas_largo} no cabe en un socket: define LINA_PRUEBAS_BASE con una ruta más corta"
+
+
 def test_se_borran_las_casas_de_ejecuciones_cortadas_y_no_la_de_una_en_marcha(tmp_path):
     import subprocess
     import sys

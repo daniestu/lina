@@ -256,6 +256,11 @@ def resultados_reserva(consulta, dominio=None, maximo=5, post=None):
     return resultados
 
 
+def reserva_sin_clave():
+    """¿Has elegido Tavily, no tienes clave y permites la reserva? Con `ninguna`, o con ia.busqueda_reserva apagado, no se busca."""
+    return modo_busqueda() == "tavily" and hay_reserva() and not CL.obtener("tavily")
+
+
 def resultados_tavily(consulta, dominio=None, maximo=5):
     """Los resultados en bruto de Tavily ([{title, url, content}]) o, si no se pudo buscar, el texto que lo explica. Con `dominio`, solo en esa web.
     Si Tavily no responde o ha agotado su cupo, se busca en la reserva (DuckDuckGo, sin clave) salvo que ia.busqueda_reserva esté apagado. Tras un cupo
@@ -305,7 +310,15 @@ def resultados_tavily(consulta, dominio=None, maximo=5):
 
 def buscar_tavily(consulta, dominio=None):
     """Busca en la web con Tavily y devuelve los resultados como texto para que la IA los lea. Con `dominio`, solo dentro de esa web."""
-    resultados = resultados_tavily(consulta, dominio)
+    return _resultados_como_texto(resultados_tavily(consulta, dominio))
+
+
+def buscar_reserva(consulta, dominio):
+    """Lo mismo en la reserva (DuckDuckGo), dentro de esa web."""
+    return _resultados_como_texto(resultados_reserva(consulta, dominio))
+
+
+def _resultados_como_texto(resultados):
     if isinstance(resultados, str):
         return resultados
     if not resultados:

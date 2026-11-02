@@ -15,7 +15,8 @@ Lina no tiene telemetría: no envía estadísticas ni datos de uso a nadie. Lo �
 - Si guardas **fuentes** (una web para un tema) y usas Gemini, lo siguiente:
   - **A Gemini:** la lista de tus temas en cada petición que pueda usarlas, y cuando la IA elige una, una consulta más con solo ese tema y tu pregunta. Esa consulta va por tu clave de pago si la tienes y queda saldo de tu tope; si no, por la gratuita. Lo que traiga la web también le llega a la IA.
   - **A Tavily o DuckDuckGo:** el texto de la búsqueda y el dominio de tu fuente, para buscar solo ahí. DuckDuckGo solo se usa si Tavily no responde y tienes la reserva activa.
-  - **Con `ia.busqueda` en `ninguna`, o `tavily` sin clave:** no se usa ningún buscador. Tu equipo descarga directamente la página guardada, así que **esa web ve tu dirección IP**, y su texto se envía a la IA.
+  - **Con `ia.busqueda` en `tavily` sin clave y `busqueda_reserva` activa:** tu consulta va a DuckDuckGo, limitada a esa web. Si no encuentra nada, se descarga la página guardada, como en el caso siguiente.
+  - **Con `ia.busqueda` en `ninguna`, o `tavily` sin clave y `busqueda_reserva` apagada:** no se usa ningún buscador. Tu equipo descarga directamente la página guardada, así que **esa web ve tu dirección IP**, y su texto se envía a la IA.
 
 ## Qué NO se envía
 

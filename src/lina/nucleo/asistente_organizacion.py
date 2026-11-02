@@ -109,9 +109,15 @@ class MixinOrganizacion:
         return resultado
 
     def _leer_fuente(self, fuente, consulta):
-        """Busca en la fuente; sin búsqueda con Tavily, lee solo la página guardada. Si no tiene la respuesta sigue sola, sin preguntar."""
+        """Busca en la fuente; sin clave de Tavily, en la reserva si la permites; si no, o si la reserva no da nada, lee solo la página guardada. Si no tiene la respuesta sigue sola, sin preguntar."""
         dominio = fuente["dominio"]
         if not _A.hay_busqueda_tavily():
+            if _A.reserva_sin_clave() and self.busquedas_turno < getattr(self, "max_busquedas", _A.MAX_BUSQUEDAS):
+                self.busquedas_turno += 1
+                resultado = _A.buscar_reserva(consulta, dominio)
+                self.ejecutor.contaminar("búsqueda web")
+                if resultado.startswith("RESULTADOS DE BÚSQUEDA"):
+                    return f"Es la fuente que eligió el usuario, {dominio}. Si esto responde, contesta con ello y di que sale de esa web. Si no, dilo: no contestes de memoria como si fuera un dato.\n{resultado}"
             resultado = self.leer_web({"url": fuente["url"], "foco": consulta}, obstaculo=False)
             if resultado.startswith("CONTENIDO DE LA PÁGINA"):
                 return f"Es la fuente que eligió el usuario. Si no trae la respuesta, dilo: no contestes de memoria como si fuera un dato.\n{resultado}"

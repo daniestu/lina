@@ -34,7 +34,7 @@ AYUDA = N_("lina fuentes                              las webs que has elegido p
            "lina fuentes quitar f1 | todas            quita una o todas\n"
            "lina fuentes medir [--grupos C,D] [--variante r1] [--comprobar] [--tiempos --clave gratuita|pago] [--lanzar]   mide si la IA elegiría bien la fuente (sin --lanzar, solo dice qué haría)\n"
            "lina fuentes probar \"PREGUNTA\"           qué fuente elegiría y si la comprobación la aceptaría, sin responder ni buscar\n"
-           "Se usan al responder con Gemini y con ia.busqueda en tavily o ninguna. Por voz, con el atajo: «para TEMA usa esta web» y «quita la última fuente».")
+           "Se usan al responder con Gemini y con ia.busqueda en tavily o ninguna. Por voz, con el atajo: «para TEMA usa esta web», «quita la última fuente» y «quita la fuente de TEMA».")
 
 
 def _cargar():
@@ -199,6 +199,7 @@ _ES = {
     "punto": re.compile(r"\s+punto\s+", re.I),
     "articulo": re.compile(r"^(?:(?:las|los|la|el|lo\s+de(?:l)?)\s+)", re.I),
     "ultima": re.compile(r"^(?:por favor,?\s*)?(?:quita|borra|elimina)\s+la\s+[uú]ltima\s+fuente$", re.I),
+    "quitar": re.compile(r"^(?:por favor,?\s*)?(?:quita|borra|elimina)\s+(?:la\s+|mi\s+)?fuente\s+(?:de|del|sobre|para)\s+(?P<tema>.+)$", re.I),
 }
 _EN = {
     "anadir": re.compile(r"^(?:please,?\s*)?" + _ANADIR_EN + r"\s+(?P<web>.+?)\s+(?:to|for)\s+(?P<tema>.+)$", re.I),
@@ -221,8 +222,10 @@ _EN = {
     "punto": re.compile(r"\s+dot\s+", re.I),
     "articulo": re.compile(r"^(?:the\s+)", re.I),
     "ultima": re.compile(r"^(?:please,?\s*)?(?:remove|delete)\s+the\s+last\s+source$", re.I),
+    "quitar": re.compile(r"^(?:please,?\s*)?(?:remove|delete)\s+(?:the\s+|my\s+)?source\s+(?:of|for|on|about)\s+(?P<tema>.+)$", re.I),
 }
 _POR_IDIOMA = {"es": _ES, "en": _EN}
+_VACIAS = {"de", "del", "la", "las", "el", "los", "lo", "para", "sobre", "the", "of", "for", "on", "about"}      # no distinguen un tema de otro
 _DIRECCION = re.compile(r"https?://\S+", re.I)
 _DOMINIO = re.compile(r"^[^\s/]+\.[a-z]{2,24}(?:/\S*)?$", re.I)
 
@@ -253,7 +256,7 @@ def _web(web, p, clara=False):
 
 
 def entender(texto):
-    """Lo que pides sobre las fuentes, o None: ('anadir', tema, dirección) / ('copiada', tema) / ('falta_web', tema) / ('falta_tema',) / ('mala', tema) / ('quitar_ultima',).
+    """Lo que pides sobre las fuentes, o None: ('anadir', tema, dirección) / ('copiada', tema) / ('falta_web', tema) / ('falta_tema',) / ('mala', tema) / ('quitar_ultima',) / ('quitar', tema).
     Solo frases claras, nunca preguntas: «para la música usa Spotify» no habla de una web y sigue su camino."""
     frase = re.sub(r"\s+", " ", str(texto or "")).strip().rstrip("!")
     if not frase or "?" in frase or "¿" in frase or len(frase.split()) > 40:
@@ -261,6 +264,9 @@ def entender(texto):
     p = IDI.segun(_POR_IDIOMA)
     if p["ultima"].match(frase.rstrip(".")):
         return ("quitar_ultima",)
+    m = p["quitar"].match(frase.rstrip("."))
+    if m:
+        return ("quitar", m.group("tema").strip().rstrip(".,;:"))
     for forma in ("para", "cuando", "usa"):
         m = p[forma].match(frase)
         if not m:
@@ -334,6 +340,32 @@ def quitar_ultima():
     return T("Quitada: {tema}.", tema=ultima["tema"]) if hecho else frase
 
 
+def _palabras(tema):
+    return {t for t in normalizar(tema).split() if t not in _VACIAS}
+
+
+def quitar_por_tema(tema):
+    """Quita la fuente de ese tema solo si no hay duda: el tema entero, o unas palabras que solo están en una. Ante la duda no se quita nada."""
+    pedidas = _palabras(tema)
+    fuentes = _cargar()
+    encajan = [f for f in fuentes if _palabras(f["tema"]) == pedidas] or [f for f in fuentes if pedidas and pedidas <= _palabras(f["tema"])]
+    if not encajan:
+        return T("No tengo ninguna fuente de {tema}. No he quitado nada.", tema=tema)
+    if len(encajan) > 1:
+        return T("Hay {n} fuentes que encajan: {temas}. Dime el tema entero; no he quitado nada.", n=len(encajan), temas="; ".join(f["tema"] for f in encajan))
+    hecho, frase = quitar(encajan[0]["id"])
+    return T("Quitada: {tema}.", tema=encajan[0]["tema"]) if hecho else frase
+
+
+def aviso_portada(fuente):
+    """Si se ha guardado la portada y Lina no puede buscar dentro de esa web, lo dice: solo leerá esa dirección. Con la búsqueda o la reserva activas, nada."""
+    from lina.nucleo import ia as IA
+    p = urlparse(fuente["url"])
+    if p.path.strip("/") or p.query or IA.hay_busqueda_tavily() or IA.reserva_sin_clave():
+        return ""
+    return " " + T("Ojo: sin búsqueda solo leeré esa dirección, no el resto de la web. Guarda la página concreta o activa la búsqueda.")
+
+
 def gestionar(accion, origen, leer_portapapeles):
     """Hace lo que has pedido y devuelve lo que se dice. Por manos libres no se hace nada (ni se mira el portapapeles): podría decirlo otra voz.
     `leer_portapapeles` solo se llama si lo pides, con el atajo; lo copiado nunca se repite: si no vale, se dice sin decir qué era."""
@@ -342,6 +374,8 @@ def gestionar(accion, origen, leer_portapapeles):
     tipo = accion[0]
     if tipo == "quitar_ultima":
         return quitar_ultima()
+    if tipo == "quitar":
+        return quitar_por_tema(accion[1])
     if tipo == "incompleta":
         return T("No lo he guardado: me falta la web o el tema. Dímelo así: «para las recetas de refinería usa la página que tengo copiada».")
     if tipo == "falta_tema":
@@ -372,7 +406,7 @@ def gestionar(accion, origen, leer_portapapeles):
         return frase
     dominio = fuente["dominio"] if origen == "texto" else dominio_hablado(fuente["dominio"])
     return T("Guardado: para {tema}, usaré {dominio}. Si no es así, dime «quita la última fuente», o en la terminal: lina fuentes quitar {id}.",
-             tema=fuente["tema"], dominio=dominio, id=fuente["id"])
+             tema=fuente["tema"], dominio=dominio, id=fuente["id"]) + aviso_portada(fuente)
 
 
 def principal(argv, salida=print):
@@ -395,7 +429,7 @@ def principal(argv, salida=print):
             salida(T(AYUDA))
             return 2
         fuente, frase = anadir(argv[1], argv[2])
-        salida(frase)
+        salida(frase + (aviso_portada(fuente) if fuente else ""))
         return 0 if fuente else 1
     if orden in ("quitar", "borrar"):
         if len(argv) != 2:
