@@ -65,6 +65,17 @@ def test_la_pasada_apunta_y_no_ejecuta_nada():
     real.assert_not_called()
 
 
+def test_pedir_un_grupo_lo_carga_de_verdad():
+    a = MagicMock()
+    a.cargar_grupo.return_value = "Cargado archivos: ya puedes usar hoja_calculo."
+
+    def frase(texto, A, asistente, abiertas):
+        assert asistente._ejecutar_herramienta(G.META, {"grupo": "archivos"}) == a.cargar_grupo.return_value
+    llamadas = B.pasar(B.Caso("hola"), MagicMock(), a, [], frase)
+    a.cargar_grupo.assert_called_once_with("archivos")
+    assert llamadas == [(G.META, {"grupo": "archivos"})]
+
+
 def test_grabar_deja_el_archivo_en_el_estado(monkeypatch, tmp_path):
     from lina.nucleo import probar_ponme as PON
     monkeypatch.setattr(B.RUT, "ESTADO", tmp_path)
