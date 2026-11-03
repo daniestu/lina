@@ -1266,6 +1266,41 @@ def _verificar(intenciones, payloads=None):
 
 
 
+_QUITAR_EXTRA = {"flatpak": {"uninstall", "remove"}, "snap": {"remove"}}
+_ARRASTRA = re.compile(r"(?:^|\s)(?:-R\w*[cd]\w*|--cascade|--nodeps|--nodeps\w*|-dd)\b")
+
+
+def _nombrado(paquete, peticion):
+    """¿Dijiste el nombre del paquete tal cual? Sin distinguir mayúsculas, guiones ni puntos, pero entero: «f3» no vale por «ttf-f3»."""
+    partes = [p for p in re.split(r"[-_.+]+", _sin_acentos(str(paquete)).lower()) if p]
+    dicho = " ".join(re.split(r"[^a-z0-9]+", _sin_acentos(str(peticion or "")).lower()))
+    return bool(partes) and (re.search(r"(?:^| )" + r" ?".join(map(re.escape, partes)) + r"(?: |$)", dicho) is not None)
+
+
+def desinstala_sin_nombrar(comando, peticion):
+    """Desinstalar paquetes pide confirmación, aunque el perfil sea autónomo, si alguno no lo nombraste tú tal cual o si la orden arrastra o rompe
+    dependencias. Una regla estrecha: el resto de lo que se hace solo no cambia. Devuelve el motivo, o None."""
+    for seg in _segmentos(comando):
+        t = _quitar_prefijos(_tokens(seg) or [])
+        if not t:
+            continue
+        base, args = os.path.basename(t[0]), t[1:]
+        if base in _QUITAR_EXTRA:
+            verbo = next((a for a in args if not a.startswith("-")), "")
+            operacion, nombres = ("quitar", [a for a in args if not a.startswith("-")][1:]) if verbo in _QUITAR_EXTRA[base] else (None, [])
+        else:
+            operacion, nombres = PL.interpretar(base, args)
+        if operacion != "quitar":
+            continue
+        if _ARRASTRA.search(" " + " ".join(args)):
+            return "desinstalar arrastrando o rompiendo dependencias pide confirmación siempre"
+        sin_nombrar = [n for n in nombres if not _nombrado(n, peticion)]
+        if sin_nombrar:
+            return (f"desinstalar {', '.join(sin_nombrar)} pide confirmación: el usuario no ha dicho ese nombre tal cual "
+                    "(confírmale qué paquete es antes de quitarlo)")
+    return None
+
+
 class Ejecutor:
     def __init__(self, avisar=None, confirmar=True):
         self.avisar = avisar or (lambda texto: None)
@@ -1394,6 +1429,10 @@ class Ejecutor:
             clase, razon = "critico", "ya le has preguntado al usuario y falta su «sí»"
         if clase == "instalar" and not INSTALAR_SIN_PREGUNTAR:
             clase, razon = "critico", "instalar programas pide confirmación (INSTALAR_SIN_PREGUNTAR = False)"
+        if clase in {"autonomo", "inocuo", "lectura"} and self.confirmar:
+            sin_nombrar = desinstala_sin_nombrar(comando, self.pregunta_pura)
+            if sin_nombrar:
+                clase, razon = "critico", sin_nombrar
         if clase == "autonomo" and self.confirmar and self.contaminado and _politica().get("frenar_contenido_de_fuera", True):   # A2e
             clase, razon = "critico", (f"en esta tarea se ha leído contenido de fuera ({self.contaminado}) y podría traer "
                                        "instrucciones escondidas")

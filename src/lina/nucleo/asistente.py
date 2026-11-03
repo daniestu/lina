@@ -1091,7 +1091,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         fuente = FUE.entender(pregunta) if not profundidad else None
         if fuente:                                              # «para las recetas de refinería usa esta página»: lo hace el código, sin IA y solo con el atajo o lina di
             log(f"Fuentes: {fuente[0]}")
-            self.decir(FUE.gestionar(fuente, origen, lambda: SES.actual().pegar()))
+            self.decir(FUE.gestionar(fuente, origen, lambda: SES.actual().pegar(),
+                                     preparar=lambda descripcion, funcion: self.ejecutor.preparar_accion(descripcion, funcion, "quitar fuentes",
+                                                                                                         razon="borra todas tus fuentes y no se puede deshacer")))
             return
         recuerdo = MEM.entender(pregunta)
         if recuerdo and C.entender_alias(pregunta) is None:     # «recuerda que mi juego favorito es…», «olvida lo de…», «¿qué recuerdas de mí?»: lo hace el código, la IA no escribe en la memoria

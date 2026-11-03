@@ -5,6 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 ## [Sin publicar]
 
 ### Añadido
+- **Quitar fuentes por id, varias o todas**: «quita f3», «quita las fuentes f3 y f4», «quita todas las fuentes» (esta pide tu «sí»), con el atajo o `lina di`. Por manos libres se rechaza de palabra, y una frase con quitar, borrar, eliminar u olvidar y «fuente» ya no llega nunca a la IA.
 - **Avisos opcionales de disco, batería y actualizaciones** (`[avisos]`, apagados de fábrica): solo una notificación, sin voz ni IA. `lina avisos` enseña cómo están.
 - **`lina probar-ia`** pasa una tanda fija de frases por tu Lina con el modelo de verdad y comprueba qué herramientas elige, sin ejecutar ninguna. Sirve para cambiar instrucciones o modelo sin ir a ciegas. Con `--comparar` enfrenta dos pasadas de antes y dos de después: ignora lo que ya bailaba y avisa si la respuesta cambia de forma.
 - **`lina probar-ia` y `lina probar-ponme` ya no cuentan en `lina tiempos ia`**: salen aparte, como medida.
@@ -43,6 +44,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - **Las pruebas ya no tocan tu carpeta personal.** Antes, `pytest` en un equipo con Lina instalada escribía en tu registro de acciones, podía reescribir tu diario (al recortarlo) y leía tus ajustes, tu memoria, tus programas y tus juegos, así que el resultado podía depender de tu equipo. Ahora todas las pruebas usan una casa temporal en `tests/.casa-pruebas/` (fuera de `/tmp`, para que las rutas `~/…` no cuenten como desechables), sin bus de sesión ni escritorio, y `tests/test_aislamiento.py` falla si algo se sale de ella. Solo afecta a quien desarrolla Lina.
 
 ### Seguridad
+- **Desinstalar paquetes pide confirmación, aunque el perfil sea autónomo, si no dijiste el nombre tal cual** o si la orden arrastra o rompe dependencias (`-Rc`, `-Rdd`, `--nodeps`). Caso real: «quita las fuentes F3 y F4» acabó en `sudo pacman -R --noconfirm ttf-f3 ttf-f4`.
 - **Con Tavily sin clave y la reserva permitida, tus fuentes se buscan enteras**: Lina busca dentro de esa web con DuckDuckGo, y lee la dirección guardada si no encuentra nada. Con `ia.busqueda_reserva` apagado o `ninguna`, no sale ninguna búsqueda.
 - **Recorrer `/home` se bloquea aunque tu carpeta personal esté en otro sitio** (`/root`, `/var/home/…`): `grep -r`, `tar` o `cp -r` sobre `/home` solo se paraban si tu casa colgaba de ahí.
 - **La IA ya no puede leer a lo ancho sobre carpetas con claves**: `grep -r` o `rg` en tu carpeta personal, `cat ~/.config/*/*`, o copiar `~/.config`, se bloquean igual que leer esas rutas directamente. Buscar en una carpeta concreta sigue libre. - Leer `journalctl` sin filtrar por servicio pide confirmación, porque lleva el registro de Lina: tus preguntas y el principio de lo que devuelven los comandos. Sigue libre con `-u`, `-k`, `-t` o `-p` de aviso hacia abajo.

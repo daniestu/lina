@@ -321,3 +321,81 @@ def test_la_ayuda_de_la_ia_sobre_si_misma_sabe_lo_de_las_fuentes():
     from lina.nucleo import autoconocimiento as AUTO
     limites = " ".join(AUTO.LIMITES)
     assert "no puedes añadirlas ni quitarlas" in limites and "quita la última fuente" in limites and "puede ir a la búsqueda general" in limites
+
+
+# ---------------------------------------------------------------- quitar por id, varias o todas (bloque B)
+@pytest.mark.parametrize("frase, esperado", [
+    ("Quita las fuentes F3 y F4", ("quitar_ids", ["f3", "f4"])),                       # la frase real que acabó en sudo pacman -R ttf-f3 ttf-f4
+    ("quita f3", ("quitar_ids", ["f3"])), ("Quita la fuente f3.", ("quitar_ids", ["f3"])), ("borra la fuente 3", ("quitar_ids", ["f3"])),
+    ("quita las fuentes f3, f4 y f5", ("quitar_ids", ["f3", "f4", "f5"])), ("quita la fuente efe tres", ("quitar_ids", ["f3"])),
+    ("olvida la fuente f2 por favor", ("quitar_ids", ["f2"])),
+    ("quita todas las fuentes", ("quitar_todas",)), ("Borra todas mis fuentes.", ("quitar_todas",)), ("elimina las fuentes todas", ("quitar_todas",)),
+    ("olvida la fuente de recetas", ("quitar", "recetas")),
+    ("quita esa fuente", ("quitar_incompleta",)), ("elimina las fuentes", ("quitar_incompleta",)), ("quita la fuente f3 y la de recetas", ("quitar_incompleta",)),
+])
+def test_quitar_se_entiende_por_id_varias_y_todas(frase, esperado):
+    assert F.entender(frase) == esperado
+
+
+@pytest.mark.parametrize("frase", ["quita 3", "quita el volumen", "pon la fuente f3", "usa la fuente de recetas", "¿quita la fuente f3?",
+                                   "quita la fuente negrita", "quita la fuente de letra grande", "borra la tipografía Comic Sans", "quita la fuente del sistema"])
+def test_lo_que_no_es_quitar_una_fuente_web_sigue_su_camino(frase):
+    assert F.entender(frase) is None
+
+
+@pytest.mark.parametrize("frase", ["quita esa fuente", "olvídate de las fuentes viejas", "saca la fuente que puse ayer", "borra las fuentes repetidas"])
+def test_quitar_algo_de_las_fuentes_nunca_llega_a_la_ia(frase):
+    accion = F.entender(frase)
+    assert accion is not None and accion[0].startswith("quitar")
+
+
+def test_quitar_varias_por_id_solo_si_existen_todas():
+    F.anadir("recetas", WEB)
+    F.anadir("partidos", "https://lolesports.com")
+    F.anadir("precios", "https://ejemplo.es/precios")
+    assert F.gestionar(("quitar_ids", ["f1", "f9"]), "atajo", _nada) == "No tengo f9. No he quitado nada." and len(F.listar()) == 3
+    assert F.gestionar(("quitar_ids", ["f1", "f3"]), "texto", _nada) == "Quitadas: recetas; precios."
+    assert [f["id"] for f in F.listar()] == ["f2"]
+    assert F.gestionar(("quitar_ids", ["f2"]), "atajo", _nada) == "Quitada: partidos." and F.listar() == []
+
+
+def test_quitar_todas_queda_pendiente_de_tu_si():
+    F.anadir("recetas", WEB)
+    F.anadir("partidos", "https://lolesports.com")
+    pendientes = []
+    r = F.gestionar(("quitar_todas",), "atajo", _nada, preparar=lambda d, f: pendientes.append((d, f)))
+    assert "¿Las quito todas?" in r and "recetas; partidos" in r and len(F.listar()) == 2
+    [(descripcion, hacer)] = pendientes
+    assert "2 fuentes" in descripcion
+    hacer()
+    assert F.listar() == []
+
+
+def test_quitar_todas_sin_fuentes_o_sin_confirmacion_no_hace_nada():
+    assert F.gestionar(("quitar_todas",), "atajo", _nada, preparar=lambda d, f: None) == "No hay ninguna fuente guardada."
+    F.anadir("recetas", WEB)
+    assert "lina fuentes quitar todas" in F.gestionar(("quitar_todas",), "atajo", _nada) and len(F.listar()) == 1
+
+
+def test_la_confirmacion_de_quitar_todas_usa_la_de_siempre():
+    ej = H.Ejecutor(confirmar=True)
+    ej.nueva_tarea()
+    F.anadir("recetas", WEB)
+    F.gestionar(("quitar_todas",), "atajo", _nada, preparar=lambda d, f: ej.preparar_accion(d, f, "quitar fuentes", razon="no se puede deshacer"))
+    assert len(ej.pendientes) == 1 and ej.pendientes[0]["categoria"] == "interna" and len(F.listar()) == 1
+
+
+@pytest.mark.parametrize("accion", [("quitar_ids", ["f1"]), ("quitar_todas",), ("quitar_incompleta",)])
+def test_por_manos_libres_tampoco_se_quita_por_id_ni_todas(accion):
+    F.anadir("recetas", WEB)
+    pendientes = []
+    r = F.gestionar(accion, "voz_libre", _nada, preparar=lambda d, f: pendientes.append(d))
+    assert "con el atajo o con lina di" in r and len(F.listar()) == 1 and pendientes == []
+
+
+def test_en_ingles_tambien(monkeypatch):
+    monkeypatch.setattr(F.IDI, "actual", lambda: "en")
+    assert F.entender("remove sources f3 and f4") == ("quitar_ids", ["f3", "f4"])
+    assert F.entender("delete all my sources") == ("quitar_todas",)
+    assert F.entender("remove that source") == ("quitar_incompleta",)
+    assert F.entender("remove the bold font") is None

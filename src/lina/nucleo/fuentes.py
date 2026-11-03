@@ -187,7 +187,8 @@ _ES = {
     "gestion": re.compile(r"^(?:por favor\W*)?(?:(?:quiero|puedes|podrias)\s+)?(?:" + _VERBOS_ES + r"\s+(?:(?:la|las|una|unas|esta|estas|esa|esas|mi|mis|otra|nueva|en|a)\s+){0,3}fuentes?\b"
                          r"|.*\b(?:usa|utiliza|usar|utilizar|" + _VERBOS_ES + r")\b.*\b(?:como|nueva)\s+fuente\b)"),
     "suelta": re.compile(r"\b" + _VERBOS_ES + r"\b.*\bfuentes?\b|\bfuentes?\b.*\b" + _VERBOS_ES + r"\b|\b(?:usa|utiliza)\b.*\b(?:como|nueva)\s+fuente\b"),
-    "no_es": re.compile(r"\bfuentes?\s+del?\s+(?:agua|alimentacion|energia|poder|luz|letra|texto|ingresos|informacion)\b|\btipografi|\bdocumento\b"
+    "no_es": re.compile(r"\bfuentes?\s+del?\s+(?:agua|alimentacion|energia|poder|luz|letra|texto|ingresos|informacion|sistema|escritorio|terminal|konsole|navegador|kde|pantalla)\b"
+                        r"|\btipografi|\btipo de letra\b|\bnegrita\b|\bcursiva\b|\bdocumento\b"
                         r"|\b(?:tamano|grande|pequena|mayor|menor|negrita|cursiva|arial|helvetica|roboto|calibri|verdana)\b"),
     "para": re.compile(r"^(?:por favor,?\s*)?para\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_ES + r"\s+(?P<web>.+)$", re.I),
     "usa": re.compile(r"^(?:por favor,?\s*)?" + _VERBO_ES + r"\s+(?P<web>.+?)[,:]?\s+para\s+(?P<tema>.+)$", re.I),
@@ -199,7 +200,7 @@ _ES = {
     "punto": re.compile(r"\s+punto\s+", re.I),
     "articulo": re.compile(r"^(?:(?:las|los|la|el|lo\s+de(?:l)?)\s+)", re.I),
     "ultima": re.compile(r"^(?:por favor,?\s*)?(?:quita|borra|elimina)\s+la\s+[uú]ltima\s+fuente$", re.I),
-    "quitar": re.compile(r"^(?:por favor,?\s*)?(?:quita|borra|elimina)\s+(?:la\s+|mi\s+)?fuente\s+(?:de|del|sobre|para)\s+(?P<tema>.+)$", re.I),
+    "quitar": re.compile(r"^(?:por favor,?\s*)?(?:quita|borra|elimina|olvida|saca)\s+(?:la\s+|mi\s+)?fuente\s+(?:de|del|sobre|para)\s+(?P<tema>.+)$", re.I),
 }
 _EN = {
     "anadir": re.compile(r"^(?:please,?\s*)?" + _ANADIR_EN + r"\s+(?P<web>.+?)\s+(?:to|for)\s+(?P<tema>.+)$", re.I),
@@ -211,7 +212,7 @@ _EN = {
     "gestion": re.compile(r"^(?:please\W*)?(?:(?:i want to|can you|could you)\s+)?(?:" + _VERBOS_EN + r"\s+(?:(?:the|a|an|this|that|these|those|my|another|new|to)\s+){0,3}sources?\b"
                           r"|.*\buse\b.*\b(?:as\s+a|new)\s+source\b)"),
     "suelta": re.compile(r"\b" + _VERBOS_EN + r"\b.*\bsources?\b|\bsources?\b.*\b" + _VERBOS_EN + r"\b|\buse\b.*\b(?:as\s+a|new)\s+source\b"),
-    "no_es": re.compile(r"\b(?:water|power|light|income|font)\s+sources?\b|\bdocument\b"),
+    "no_es": re.compile(r"\b(?:water|power|light|income|font)\s+sources?\b|\bdocument\b|\bfonts?\b|\btypeface\b|\bbold\b|\bitalic\b"),
     "para": re.compile(r"^(?:please,?\s*)?for\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_EN + r"\s+(?P<web>.+)$", re.I),
     "usa": re.compile(r"^(?:please,?\s*)?" + _VERBO_EN + r"\s+(?P<web>.+?)[,:]?\s+for\s+(?P<tema>.+)$", re.I),
     "cuando": re.compile(r"^when\s+i\s+ask\s+(?:about|for)\s+(?P<tema>.+?)[,:]?\s+" + _VERBO_EN + r"\s+(?P<web>.+)$", re.I),
@@ -222,9 +223,18 @@ _EN = {
     "punto": re.compile(r"\s+dot\s+", re.I),
     "articulo": re.compile(r"^(?:the\s+)", re.I),
     "ultima": re.compile(r"^(?:please,?\s*)?(?:remove|delete)\s+the\s+last\s+source$", re.I),
-    "quitar": re.compile(r"^(?:please,?\s*)?(?:remove|delete)\s+(?:the\s+|my\s+)?source\s+(?:of|for|on|about)\s+(?P<tema>.+)$", re.I),
+    "quitar": re.compile(r"^(?:please,?\s*)?(?:remove|delete|forget|drop)\s+(?:the\s+|my\s+)?source\s+(?:of|for|on|about)\s+(?P<tema>.+)$", re.I),
 }
 _POR_IDIOMA = {"es": _ES, "en": _EN}
+# Quitar fuentes (sobre el texto normalizado): por id, varias o todas. Lo que lleve uno de estos verbos y «fuente» no llega nunca a la IA.
+_QUITA = {"es": r"(?:quita|quitame|quitar|borra|borrame|borrar|elimina|eliminame|eliminar|olvida|olvidate de|olvidar|saca)",
+          "en": r"(?:remove|delete|forget|drop)"}
+_NUMEROS = {"es": {"uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6, "siete": 7, "ocho": 8, "nueve": 9, "diez": 10},
+            "en": {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}}
+_RELLENO = {"es": {"la", "las", "mi", "mis", "y", "e", "por", "favor"}, "en": {"the", "my", "and", "please"}}
+_FUENTE = {"es": {"fuente", "fuentes"}, "en": {"source", "sources"}}
+_TODAS = {"es": re.compile(r"^(?:por favor )?" + _QUITA["es"] + r" (?:todas (?:las |mis )?fuentes|(?:las |mis )?fuentes todas)(?: por favor)?$"),
+          "en": re.compile(r"^(?:please )?" + _QUITA["en"] + r" (?:all (?:the |my )?sources|(?:the |my )?sources all)(?: please)?$")}
 _VACIAS = {"de", "del", "la", "las", "el", "los", "lo", "para", "sobre", "the", "of", "for", "on", "about"}      # no distinguen un tema de otro
 _DIRECCION = re.compile(r"https?://\S+", re.I)
 _DOMINIO = re.compile(r"^[^\s/]+\.[a-z]{2,24}(?:/\S*)?$", re.I)
@@ -264,9 +274,9 @@ def entender(texto):
     p = IDI.segun(_POR_IDIOMA)
     if p["ultima"].match(frase.rstrip(".")):
         return ("quitar_ultima",)
-    m = p["quitar"].match(frase.rstrip("."))
-    if m:
-        return ("quitar", m.group("tema").strip().rstrip(".,;:"))
+    quitar = _entender_quitar(frase, p)
+    if quitar:
+        return quitar
     for forma in ("para", "cuando", "usa"):
         m = p[forma].match(frase)
         if not m:
@@ -289,6 +299,50 @@ def entender(texto):
         if p["esta_pagina"].match(web) or _copiada(web, p) or _DIRECCION.search(web):
             return ("falta_tema",)
     return ("incompleta",) if pide_gestion(frase) else None
+
+
+def _ids(palabras, idioma):
+    """[«f3», «f4»] si las palabras solo nombran fuentes por su id («f3», «efe tres», «f 3»; un número suelto, solo si dijiste «fuente»), o None."""
+    numeros, relleno, fuente = _NUMEROS[idioma], _RELLENO[idioma], _FUENTE[idioma]
+    nombro_fuente = any(w in fuente for w in palabras)
+    ids, i = [], 0
+    while i < len(palabras):
+        w = palabras[i]
+        if w in relleno or w in fuente:
+            i += 1
+            continue
+        m = re.fullmatch(r"f(\d+)", w)
+        if m:
+            ids.append(int(m.group(1)))
+        elif w in ("f", "efe") and i + 1 < len(palabras) and (palabras[i + 1].isdigit() or palabras[i + 1] in numeros):
+            i += 1
+            ids.append(int(palabras[i]) if palabras[i].isdigit() else numeros[palabras[i]])
+        elif nombro_fuente and (w.isdigit() or w in numeros):
+            ids.append(int(w) if w.isdigit() else numeros[w])
+        else:
+            return None
+        i += 1
+    return [f"f{n}" for n in dict.fromkeys(ids)] or None
+
+
+def _entender_quitar(frase, p):
+    """('quitar_todas',) / ('quitar_ids', [ids]) / ('quitar', tema) / ('quitar_incompleta',) / None. Fuentes de letra, de alimentación… no son esto."""
+    idioma = IDI.actual() if IDI.actual() in _QUITA else "es"
+    t = normalizar(frase)
+    if p["no_es"].search(t):
+        return None
+    if _TODAS[idioma].match(t):
+        return ("quitar_todas",)
+    m = re.match(r"^(?:por favor |please )?" + _QUITA[idioma] + r" (.+)$", t)
+    ids = _ids(m.group(1).split(), idioma) if m else None
+    if ids:
+        return ("quitar_ids", ids)
+    m = p["quitar"].match(frase.rstrip("."))
+    if m:
+        return ("quitar", m.group("tema").strip().rstrip(".,;:"))
+    if re.search(r"\b" + _QUITA[idioma] + r"\b", t) and set(t.split()) & _FUENTE[idioma]:
+        return ("quitar_incompleta",)
+    return None
 
 
 def _accion(web, tema, p):
@@ -357,6 +411,23 @@ def quitar_por_tema(tema):
     return T("Quitada: {tema}.", tema=encajan[0]["tema"]) if hecho else frase
 
 
+def quitar_ids(ids):
+    """Quita esas fuentes solo si existen todas: si falta alguna, no quita ninguna."""
+    with _lock:
+        fuentes = _cargar()
+        existen = {f["id"]: f for f in fuentes}
+        faltan = [i for i in ids if i not in existen]
+        if faltan:
+            return T("No tengo {faltan}. No he quitado nada.", faltan=", ".join(faltan))
+        quedan = [f for f in fuentes if f["id"] not in ids]
+        if quedan and not _guardar(quedan):
+            return T("No he podido guardarlo.")
+        if not quedan:
+            ARCHIVO.unlink(missing_ok=True)
+    temas = [existen[i]["tema"] for i in ids]
+    return T("Quitada: {tema}.", tema=temas[0]) if len(temas) == 1 else T("Quitadas: {temas}.", temas="; ".join(temas))
+
+
 def aviso_portada(fuente):
     """Si se ha guardado la portada y Lina no puede buscar dentro de esa web, lo dice: solo leerá esa dirección. Con la búsqueda o la reserva activas, nada."""
     from lina.nucleo import ia as IA
@@ -366,9 +437,10 @@ def aviso_portada(fuente):
     return " " + T("Ojo: sin búsqueda solo leeré esa dirección, no el resto de la web. Guarda la página concreta o activa la búsqueda.")
 
 
-def gestionar(accion, origen, leer_portapapeles):
+def gestionar(accion, origen, leer_portapapeles, preparar=None):
     """Hace lo que has pedido y devuelve lo que se dice. Por manos libres no se hace nada (ni se mira el portapapeles): podría decirlo otra voz.
-    `leer_portapapeles` solo se llama si lo pides, con el atajo; lo copiado nunca se repite: si no vale, se dice sin decir qué era."""
+    `leer_portapapeles` solo se llama si lo pides, con el atajo; lo copiado nunca se repite: si no vale, se dice sin decir qué era.
+    Quitarlas todas no se hace sin tu «sí»: `preparar(descripción, función)` lo deja pendiente de confirmación."""
     if origen not in ("atajo", "texto"):
         return T("Las fuentes solo se cambian con el atajo o con lina di, por si lo dijera otra voz: púlsalo y dímelo otra vez.")
     tipo = accion[0]
@@ -376,6 +448,19 @@ def gestionar(accion, origen, leer_portapapeles):
         return quitar_ultima()
     if tipo == "quitar":
         return quitar_por_tema(accion[1])
+    if tipo == "quitar_ids":
+        return quitar_ids(accion[1])
+    if tipo == "quitar_incompleta":
+        return T("No he quitado nada. Dímelo así: «quita la fuente f3», «quita las fuentes f3 y f4», «quita la fuente de recetas» o «quita todas las fuentes».")
+    if tipo == "quitar_todas":
+        fuentes = _cargar()
+        if not fuentes:
+            return T("No hay ninguna fuente guardada.")
+        temas = "; ".join(f["tema"] for f in fuentes)
+        if preparar is None:
+            return T("Para quitarlas todas:  lina fuentes quitar todas")
+        preparar(T("Quitar tus {n} fuentes: {temas}", n=len(fuentes), temas=temas), lambda: quitar("todas")[1])
+        return T("Tienes {n} fuentes: {temas}. ¿Las quito todas? No se puede deshacer: dime «sí».", n=len(fuentes), temas=temas)
     if tipo == "incompleta":
         return T("No lo he guardado: me falta la web o el tema. Dímelo así: «para las recetas de refinería usa la página que tengo copiada».")
     if tipo == "falta_tema":
