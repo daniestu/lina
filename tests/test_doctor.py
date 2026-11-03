@@ -9,6 +9,7 @@ class Todo(D.Sondas):
     """Un equipo en perfecto estado."""
     def sistema(self): return {"distro": "Arch Linux", "familia": "arch", "gestor": "pacman", "escritorio": "kde", "sesion": "wayland"}
     def python(self): return (3, 12, 1)
+    def python_origen(self): return "uv", True
     def base_que_falta(self): return []
     def audio(self): return "pipewire"
     def escritorio(self): return "KDE Plasma (wayland)", {"ventana": ("kdotool", ""), "captura": ("spectacle", ""), "portapapeles": ("wl-copy", "")}, []
@@ -180,3 +181,19 @@ def test_la_sonda_lee_el_ajuste_y_no_las_claves(monkeypatch):
     monkeypatch.setattr(D.AJ, "actuales", lambda log=None: Aj())
     assert D.Sondas().busqueda() == ("ninguna", "", "")
     assert vistas == ["tavily", "gemini_pago"]
+
+
+@pytest.mark.parametrize("version, origen, hay_uv, estado", [((3, 14, 8), "uv", True, D.OK), ((3, 14, 8), "sistema", False, D.OK),
+                                                            ((3, 14, 8), "sistema", True, D.AVISO), ((3, 15, 0), "uv", True, D.MAL), ((3, 10, 2), "sistema", False, D.MAL)])
+def test_la_linea_de_python_dice_rango_y_origen(version, origen, hay_uv, estado):
+    class S(Todo):
+        def python(self): return version
+        def python_origen(self): return origen, hay_uv
+    [(e, _, detalle, arreglo)] = [x for x in D.comprobar(S()) if x[1] == "Python"]
+    assert e == estado and ("de uv" if origen == "uv" else "del sistema") in detalle
+    assert ("instalador" in arreglo) is (estado != D.OK)
+
+
+def test_el_origen_real_se_lee_sin_romperse():
+    origen, hay_uv = D.Sondas().python_origen()
+    assert origen in ("uv", "sistema") and isinstance(hay_uv, bool)

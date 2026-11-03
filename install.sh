@@ -81,12 +81,27 @@ fi
 
 # ---------------------------------------------------------------- 1. sistema
 paso "1/6 Comprobando el sistema"
-command -v python3 >/dev/null || fallo "Falta Python 3. Instálalo con el gestor de tu distribución y vuelve a ejecutar esto."
-python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' \
-  || fallo "Hace falta Python 3.11 o superior (tienes $(python3 -V 2>&1)). En Ubuntu 22.04 o Debian 11 usa una versión más nueva de la distribución."
-ok "$(python3 -V)"
-python3 -c 'import sys; sys.exit(0 if sys.version_info < (3, 15) else 1)' \
-  || aviso "Las dependencias de Lina están fijadas y comprobadas para Python 3.11 a 3.14; con $(python3 -V 2>&1) puede que alguna no tenga paquete todavía."
+# El Python de Lina: el de uv si está (no cambia cuando la distribución sube de versión el suyo); si no, el primero del sistema entre 3.11 y 3.14,
+# que es para lo que están fijadas y comprobadas las dependencias. Fuera de ese rango no se sigue: pip fallaría a medias.
+version_de() { "$1" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null; }
+en_rango() { case "$(version_de "$1")" in 3.11|3.12|3.13|3.14) return 0 ;; *) return 1 ;; esac; }
+PY=""; ORIGEN_PY=""
+if command -v uv >/dev/null; then
+  PY="$(uv --no-cache python find --managed-python 3.14 2>/dev/null || true)"
+  if [ -z "$PY" ]; then
+    if [ "$SIMULAR" = 1 ]; then printf '  [simulación] uv python install 3.14\n'
+    else uv python install 3.14 >/dev/null 2>&1 || aviso "uv no ha podido instalar Python 3.14: busco uno del sistema."; PY="$(uv --no-cache python find --managed-python 3.14 2>/dev/null || true)"; fi
+  fi
+  { [ -n "$PY" ] && en_rango "$PY"; } && ORIGEN_PY="de uv" || PY=""
+fi
+if [ -z "$PY" ]; then
+  for p in python3 python3.14 python3.13 python3.12 python3.11; do
+    if command -v "$p" >/dev/null && en_rango "$p"; then PY="$(command -v "$p")"; ORIGEN_PY="del sistema"; break; fi
+  done
+fi
+[ -n "$PY" ] || fallo "No encuentro un Python entre 3.11 y 3.14$(command -v python3 >/dev/null && echo " (python3 es $(version_de python3))"), que es para lo que están comprobadas las dependencias de Lina. Instala uv (Arch: sudo pacman -S uv · Fedora: sudo dnf install uv) y repite: Lina usará su propio Python. O instala uno de esos (Fedora 45: sudo dnf install python3.14)."
+ok "Python para Lina: $("$PY" -V 2>&1) $ORIGEN_PY ($PY)"
+[ "$ORIGEN_PY" = "de uv" ] || command -v uv >/dev/null || aviso "Con el Python del sistema, Lina deja de arrancar cuando tu distribución lo cambie de versión; con uv instalado usaría el suyo. Si pasa, repite este instalador."
 [ -r /etc/os-release ] && . /etc/os-release
 ok "${PRETTY_NAME:-Linux}${XDG_SESSION_TYPE:+ · sesión $XDG_SESSION_TYPE}${XDG_CURRENT_DESKTOP:+ · $XDG_CURRENT_DESKTOP}"
 [ "$(uname -m)" = "x86_64" ] || aviso "Arquitectura $(uname -m): lo probado es x86_64; algún paquete de Python podría tardar en compilarse."
@@ -107,7 +122,7 @@ fi
 paso "3/6 Paquetes del sistema"
 if [ "$SIN_SISTEMA" = 1 ]; then aviso "Saltado (--sin-sistema)."
 else
-  set +e; ORDEN="$(PYTHONPATH="$FUENTE/src" python3 -m lina.nucleo.plataforma base)"; RC=$?; set -e
+  set +e; ORDEN="$(PYTHONPATH="$FUENTE/src" "$PY" -m lina.nucleo.plataforma base)"; RC=$?; set -e
   if [ "$RC" -ne 0 ]; then
     aviso "No reconozco el gestor de paquetes de esta distribución. Instala a mano: Python con venv y pip, un compilador de C, git, PortAudio y libnotify."
     aviso "Si es una derivada, prueba con LINA_DISTRO=debian (o arch, fedora, suse) delante del comando."
@@ -123,13 +138,22 @@ fi
 # ---------------------------------------------------------------- 4. entorno de Python
 paso "4/6 Entorno de Python aislado"
 hacer mkdir -p "$DATOS"
-[ -d "$VENV" ] || hacer python3 -m venv "$VENV"
+venv_vale() {    # el entorno es del Python elegido y sigue siendo de su versión (una subida del Python del sistema lo deja roto)
+  [ -f "$VENV/pyvenv.cfg" ] && [ -x "$VENV/bin/python" ] || return 1
+  [ "$(sed -n 's/^home = //p' "$VENV/pyvenv.cfg")" = "$(dirname "$PY")" ] && [ "$(version_de "$VENV/bin/python")" = "$(version_de "$PY")" ]
+}
+RECREAR=0
+if [ -d "$VENV" ] && ! venv_vale; then
+  aviso "El entorno de $VENV es de otro Python o está roto: lo creo de nuevo con $("$PY" -V 2>&1)."
+  hacer rm -rf "$VENV"; RECREAR=1
+fi
+{ [ -d "$VENV" ] && [ "$RECREAR" = 0 ]; } || hacer "$PY" -m venv "$VENV"
 hacer "$VENV/bin/pip" install --quiet --upgrade pip
 REQUISITOS="$FUENTE/packaging/requisitos.txt"
 if [ -f "$REQUISITOS" ]; then
   # Versiones exactas y comprobadas con su hash (S8a): lo que se probó, no lo último que haya en PyPI ese día
   hacer "$VENV/bin/pip" install --quiet --require-hashes -r "$REQUISITOS" \
-    || fallo "No he podido instalar las dependencias fijadas con $(python3 -V 2>&1). Están comprobadas para Python 3.11 a 3.14: si tu Python es otro, instala uno de esos y repite."
+    || fallo "No he podido instalar las dependencias fijadas con $("$PY" -V 2>&1). Mira el error de pip de arriba y repite; si no se arregla, borra $VENV y repite."
   hacer "$VENV/bin/pip" install --quiet --no-deps -e "$FUENTE"
 else
   hacer "$VENV/bin/pip" install --quiet -e "$FUENTE"
@@ -140,7 +164,7 @@ ok "Lina instalada en $VENV (modo editable: «lina update» la actualiza)"
 paso "5/6 Modelos de voz, servicio y atajo"
 ARGS=(); [ "$SIMULAR" = 1 ] && ARGS+=(--simular); [ "$SI" = 1 ] && ARGS+=(--si); [ "$ENTRADA" = 1 ] && ARGS+=(--entrada); [ -n "$ATAJO" ] && ARGS+=(--atajo "$ATAJO")
 LINA="$VENV/bin/lina"
-if [ "$SIMULAR" = 1 ] && [ ! -x "$LINA" ]; then LINA="python3 -m lina"; export PYTHONPATH="$FUENTE/src"; fi
+if [ "$SIMULAR" = 1 ] && [ ! -x "$LINA" ]; then LINA="$PY -m lina"; export PYTHONPATH="$FUENTE/src"; fi
 export LINA_CLONADO="$CLONADO"
 set +e
 if [ "$CON_TTY" = 1 ] && [ "$SI" = 0 ] && [ "$SIMULAR" = 0 ]; then $LINA preparar "${ARGS[@]}" < /dev/tty; else $LINA preparar "${ARGS[@]}"; fi

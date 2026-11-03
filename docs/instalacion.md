@@ -13,7 +13,9 @@ con `--simular` dice todo lo que haría sin tocar nada.
 
 `install.sh` hace seis cosas, y antes de cada cambio importante enseña qué va a hacer:
 
-1. **Comprueba el sistema**: Python 3.11 o más reciente y qué distribución, gestor de paquetes y escritorio tienes.
+1. **Comprueba el sistema y elige el Python de Lina**: si tienes `uv`, instala con él un Python 3.14 propio de Lina, que no cambia cuando tu distribución sube el suyo de versión. Sin `uv`, usa el primer Python del sistema entre 3.11 y 3.14 (`python3`, `python3.14`…). Si no hay ninguno, para sin tocar nada y te dice qué instalar (por ejemplo, en Fedora 45, cuyo Python es 3.15: `sudo dnf install uv` o `sudo dnf install python3.14`). También dice qué distribución, gestor de paquetes y escritorio tienes.
+
+   **Si Lina deja de arrancar tras actualizar el sistema** (sale «No module named 'lina'» en `journalctl --user -u lina`), tu distribución ha subido Python de versión y el entorno de Lina se ha quedado con la anterior. Repite el instalador: ve que el entorno es de otro Python y lo crea de nuevo. `lina doctor` avisa de este riesgo cuando Lina usa el Python del sistema y tienes `uv`.
 2. **Consigue el código**: usa la carpeta desde la que lo ejecutas o clona el repositorio en `~/.local/share/lina/fuente`.
 3. **Paquetes del sistema** (Python con venv y pip, un compilador, git, PortAudio, libnotify): enseña la orden exacta
    y la ejecuta con `sudo` solo si lo aceptas. Si no, la deja escrita para que la ejecutes tú.

@@ -42,6 +42,11 @@ class Sondas:
     def python(self):
         return sys.version_info[:3]
 
+    def python_origen(self):
+        """(«uv» o «sistema», ¿hay uv?): el Python del sistema se rompe bajo Lina cuando la distribución lo sube de versión."""
+        import shutil
+        return ("uv" if "/uv/python/" in sys.base_prefix else "sistema"), bool(shutil.which("uv"))
+
     def base_que_falta(self):
         return PL.faltan(PL.PAQUETES_BASE)
 
@@ -140,7 +145,15 @@ def comprobar(s=None, red=False):
         a(OK if sis.get("familia") else AVISO, T("Sistema"), T("{v1} · gestor {v2} · escritorio {v3} ({v4})", v1=sis.get('distro'), v2=sis.get('gestor') or 'desconocido', v3=sis.get('escritorio') or '?', v4=sis.get('sesion') or '?'),
           "" if sis.get("familia") else T("Distribución no reconocida: Lina funciona, pero no instalará paquetes sola. Mira  lina sistema"))
     py = _seguro(s.python, (0, 0, 0))
-    a(OK if py >= (3, 11) else MAL, "Python", ".".join(map(str, py)) + T(" · Lina {__version__}", __version__=__version__), "" if py >= (3, 11) else T("Hace falta Python 3.11 o más reciente"))
+    origen, hay_uv = _seguro(s.python_origen, ("sistema", False))
+    en_rango = (3, 11) <= tuple(py[:2]) <= (3, 14)
+    detalle = ".".join(map(str, py)) + " " + (T("de uv") if origen == "uv" else T("del sistema")) + T(" · Lina {__version__}", __version__=__version__)
+    if not en_rango:
+        a(MAL, "Python", detalle, T("Lina está comprobada con Python 3.11 a 3.14: repite el instalador, que elige uno de esos"))
+    elif origen == "sistema" and hay_uv:
+        a(AVISO, "Python", detalle, T("Si tu distribución sube Python de versión, Lina dejará de arrancar. Repite el instalador y usará el Python de uv"))
+    else:
+        a(OK, "Python", detalle)
     falta = _seguro(s.base_que_falta)
     if isinstance(falta, Exception):
         a(AVISO, T("Paquetes del sistema"), T("no he podido comprobarlos ({falta})", falta=falta))

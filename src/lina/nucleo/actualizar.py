@@ -155,6 +155,8 @@ def _git_actualizar(ctx, fuente, comprobar, volver, estado, git=None):
         c, e = git("reset", "--hard", actual)               # código y dependencias van juntos: si las nuevas no se instalan, se queda la versión de antes
         ctx.salida(T("  ✘ No he podido instalar las dependencias de la versión nueva con tu Python {v1}.{v2} (¿no hay paquetes para él?).",
                      v1=sys.version_info[0], v2=sys.version_info[1]))
+        if not (3, 11) <= sys.version_info[:2] <= (3, 14):
+            ctx.salida(T("  Lina está comprobada con Python 3.11 a 3.14: repite el instalador, que elige uno de esos (con uv, el suyo propio)."))
         ctx.salida(T("  He dejado la versión anterior, que sigue funcionando.") if c == 0 else
                    T("  ! Y no he podido volver a la anterior ({v1}): repite  lina update --volver", v1=e[:150]))
         return 1

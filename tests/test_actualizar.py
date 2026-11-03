@@ -151,3 +151,17 @@ def test_si_las_dependencias_nuevas_no_se_instalan_se_queda_la_version_anterior(
     texto = "\n".join(c.texto)
     assert "No matching distribution" in texto and "versión anterior" in texto
     assert not (RUT.ESTADO / ACT.ARCHIVO).exists()                   # no se apunta como actualización hecha
+
+
+@pytest.mark.parametrize("version, dice_instalador", [((3, 15, 0), True), ((3, 14, 8), False)])
+def test_con_un_python_fuera_de_rango_dice_que_se_repita_el_instalador(tmp_path, monkeypatch, version, dice_instalador):
+    import sys
+    origen, clon, c = escenario(tmp_path, monkeypatch)
+    (origen / "packaging").mkdir()
+    nuevo_commit(origen, "packaging/requisitos.txt", "onnxruntime==1.31.1 --hash=sha256:aa")
+    monkeypatch.setattr(ACT, "sys", SimpleNamespace(version_info=version, executable=sys.executable))
+    ejecutar_antes = c.ejecutar
+    c.ejecutar = lambda orden, **k: (SimpleNamespace(returncode=1, stdout="", stderr="No matching distribution") if orden[1:3] == ["-m", "pip"]
+                                     else ejecutar_antes(orden, **k))
+    assert ACT.principal([], c) == 1
+    assert ("repite el instalador" in "\n".join(c.texto)) is dice_instalador
