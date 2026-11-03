@@ -65,6 +65,11 @@ class Sondas:
     def modelos(self):
         return MOD.estado()
 
+    def tarjeta(self):
+        """(¿hay NVIDIA?, ¿puede Whisper transcribir en ella?): el driver ve la tarjeta aunque falten cuBLAS y cuDNN, y entonces solo falla al transcribir."""
+        from lina.nucleo import cuda as CUDA
+        return (True, CUDA.disponibles()) if CUDA.hay_nvidia() else (False, False)
+
     def ia(self):
         from lina.nucleo import ia_activa
         return ia_activa.actual()
@@ -195,6 +200,13 @@ def comprobar(s=None, red=False):
             a(MAL, T("Voz de Lina"), T("{v1}: los archivos no son los que se descargaron", v1=m['voz']), T("Bórrala y vuelve a bajarla:  lina voz  y elige otra vez"))
         else:
             a(OK, T("Voz de Lina"), m["voz"] + ("" if m["voz_integra"] else T(" (sin huella para verificar)")))
+    nvidia, librerias = _seguro(getattr(s, "tarjeta", lambda: (False, False)), (False, False))
+    procesador = _seguro(lambda: s.ajustes().get("voz", "reconocimiento_procesador"), "auto")
+    if nvidia and procesador != "cpu":
+        if librerias:
+            a(OK, T("Tarjeta NVIDIA para la voz"), T("librerías CUDA listas"))
+        else:
+            a(AVISO, T("Tarjeta NVIDIA para la voz"), T("faltan sus librerías CUDA (cuBLAS y cuDNN): Whisper va en la CPU, más lento"), "lina modelos gpu")
     ia = _seguro(getattr(s, "ia", lambda: None))
     ia = None if isinstance(ia, Exception) else ia
     nombre = "Gemini" if ia is None or ia.nombre == "gemini" else ia.nombre

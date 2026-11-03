@@ -15,6 +15,7 @@ class Todo(D.Sondas):
     def escritorio(self): return "KDE Plasma (wayland)", {"ventana": ("kdotool", ""), "captura": ("spectacle", ""), "portapapeles": ("wl-copy", "")}, []
     def microfonos(self): return ["Micrófono integrado"]
     def modelos(self): return {"whisper": True, "voz": "es_MX-claude-high", "voz_integra": True}
+    def tarjeta(self): return True, True
     def clave(self): return "llavero"
     def llavero(self): return True
     def busqueda(self): return "tavily", "llavero", ""
@@ -197,3 +198,27 @@ def test_la_linea_de_python_dice_rango_y_origen(version, origen, hay_uv, estado)
 def test_el_origen_real_se_lee_sin_romperse():
     origen, hay_uv = D.Sondas().python_origen()
     assert origen in ("uv", "sistema") and isinstance(hay_uv, bool)
+
+
+@pytest.mark.parametrize("tarjeta, procesador, estado", [
+    ((True, True), "auto", D.OK), ((True, False), "auto", D.AVISO), ((True, False), "cpu", None), ((False, False), "auto", None),
+])
+def test_la_linea_de_la_tarjeta_nvidia(tarjeta, procesador, estado):
+    """El driver ve la tarjeta aunque falten cuBLAS y cuDNN: entonces Whisper va en la CPU, y el doctor dice cómo arreglarlo."""
+    class Equipo(Todo):
+        def tarjeta(self): return tarjeta
+        def ajustes(self):
+            class A:
+                def get(self, s, k): return {"perfil": "autonomo", "capturas": "si", "reconocimiento_procesador": procesador}[k]
+            return A()
+    fila = [r for r in D.comprobar(Equipo()) if r[1] == "Tarjeta NVIDIA para la voz"]
+    assert [f[0] for f in fila] == ([estado] if estado else [])
+    if estado == D.AVISO:
+        assert fila[0][3] == "lina modelos gpu" and "CPU" in fila[0][2]
+
+
+def test_la_tarjeta_que_revienta_no_tumba_el_diagnostico():
+    class Equipo(Todo):
+        def tarjeta(self): raise OSError("driver roto")
+    assert "Tarjeta NVIDIA para la voz" not in estados(D.comprobar(Equipo()))
+

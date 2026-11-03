@@ -14,6 +14,7 @@ import sys
 
 PAQUETES = ["nvidia-cublas-cu12", "nvidia-cudnn-cu12"]
 _LIBRERIAS = [("nvidia.cublas", "libcublasLt.so.*"), ("nvidia.cublas", "libcublas.so.*"), ("nvidia.cudnn", "libcudnn.so.*")]
+_DEL_SISTEMA = ["libcublas.so.12", "libcudnn.so.9"]     # las versiones que pide ctranslate2 4 (CUDA 12, cuDNN 9): una CUDA 13 del sistema no le sirve
 
 
 def hay_nvidia():
@@ -40,6 +41,19 @@ def cargar_librerias():
     try:
         for paquete, patron in _LIBRERIAS:
             ctypes.CDLL(sorted(glob.glob(os.path.join(_carpeta(paquete), patron)))[0], mode=ctypes.RTLD_GLOBAL)
+    except OSError:
+        return False
+    return True
+
+
+def disponibles(cargar=None):
+    """¿Puede faster-whisper transcribir en la tarjeta? Que el driver vea la tarjeta no basta: el modelo carga sin cuBLAS y falla al transcribir.
+    Valen las del entorno de Lina (`lina modelos gpu`) o las del sistema si son de la versión que pide ctranslate2."""
+    if cargar_librerias():
+        return True
+    try:
+        for libreria in _DEL_SISTEMA:
+            (cargar or ctypes.CDLL)(libreria, mode=ctypes.RTLD_GLOBAL)
     except OSError:
         return False
     return True

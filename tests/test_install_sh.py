@@ -131,3 +131,20 @@ def test_un_entorno_que_cambio_de_version_se_crea_de_nuevo(tmp_path):
     _python_falso(venv / "bin", "python", "3.15")
     r = ejecutar_con(binario, casa, "--simular", "-y", "--sin-bienvenida")
     assert "es de otro Python o está roto" in r.stdout, r.stdout + r.stderr
+
+
+@pytest.mark.parametrize("tenia", [True, False])
+def test_al_recrear_el_entorno_repone_las_librerias_de_nvidia_si_las_tenia(tmp_path, tenia):
+    """Lo que pasó al pasar al Python de uv: el entorno nuevo no tenía cuBLAS y Whisper cargaba en la tarjeta pero no podía transcribir."""
+    binario, casa = _entorno(tmp_path, {"python3": "3.14"}, uv="3.14")
+    venv = casa / ".local" / "share" / "lina" / "venv"
+    (venv / "bin").mkdir(parents=True)
+    (venv / "pyvenv.cfg").write_text("home = /usr/bin\nversion = 3.14.7\n")
+    _python_falso(venv / "bin", "python", "3.14")
+    if tenia:
+        (venv / "lib" / "python3.14" / "site-packages" / "nvidia" / "cublas").mkdir(parents=True)
+    r = ejecutar_con(binario, casa, "--simular", "-y", "--sin-bienvenida")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert ("pip install --quiet nvidia-cublas-cu12 nvidia-cudnn-cu12" in r.stdout) is tenia
+    assert ("las vuelvo a poner" in r.stdout) is tenia
+

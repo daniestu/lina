@@ -5,6 +5,7 @@
 Se descargan una vez (con `lina modelos`, que ejecuta el instalador) y después todo funciona sin internet. Whisper se baja con la librería
 faster-whisper, que comprueba la integridad de cada archivo contra la huella que publica Hugging Face; las voces las comprueba voz/voces.py.
 """
+import re
 
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import cuda as CUDA
@@ -31,9 +32,10 @@ def _descargar(nombre, **k):
 
 
 def _cuda_usable():
-    """¿faster-whisper puede usar la tarjeta? (con las librerías de NVIDIA del entorno de Lina cargadas, si las hay)."""
+    """¿faster-whisper puede usar la tarjeta? Con cuBLAS y cuDNN cargables (del entorno de Lina o del sistema) y el driver viéndola."""
     try:
-        CUDA.cargar_librerias()
+        if not CUDA.disponibles():
+            return False
         import ctranslate2
         return ctranslate2.get_cuda_device_count() > 0
     except Exception:
@@ -50,7 +52,12 @@ def elegir_whisper(cuda_usable=None, descargar=None, ajustes=None):
         return (MODELO_WHISPER if modelo == "auto" else modelo), "cpu", "int8", "elegido en tus ajustes", None
     usable = _cuda_usable() if cuda_usable is None else cuda_usable
     if not usable:
-        motivo = "pides la tarjeta pero no la puedo usar (¿faltan las librerías de NVIDIA? prueba  lina modelos gpu)" if proc == "cuda" else "sin tarjeta NVIDIA lista"
+        if proc == "cuda":
+            motivo = "pides la tarjeta pero no la puedo usar (¿faltan las librerías de NVIDIA? prueba  lina modelos gpu)"
+        elif cuda_usable is None and CUDA.hay_nvidia():
+            motivo = "la tarjeta NVIDIA no tiene a mano sus librerías CUDA (prueba  lina modelos gpu)"
+        else:
+            motivo = "sin tarjeta NVIDIA lista"
         return (MODELO_WHISPER if modelo == "auto" else modelo), "cpu", "int8", motivo, None
     elegido = MODELO_GPU if modelo == "auto" else modelo
     if not whisper_listo(descargar, elegido):
@@ -84,6 +91,20 @@ def cargar_whisper(log=print, fabrica=None, elegir=None):
             raise
         log(f"Whisper: no he podido cargar «{modelo}» en {proc} ({type(e).__name__}: {str(e)[:120]}); uso «{MODELO_WHISPER}» en la CPU.")
         return fabrica(MODELO_WHISPER, device="cpu", compute_type="int8")
+
+
+def fallo_de_libreria(e):
+    """¿El error es de una librería de NVIDIA que no se puede cargar? (así falla Whisper en la tarjeta al transcribir, no al cargar)."""
+    return isinstance(e, (RuntimeError, OSError)) and bool(re.search(r"\blib(cublas|cudnn|cudart)\w*\.so", str(e)))
+
+
+def pasar_a_cpu(log=print, fabrica=None):
+    """Whisper `small` en la CPU, para cuando la tarjeta no puede transcribir: poder hablar con Lina pesa más que ir rápido."""
+    if fabrica is None:
+        from faster_whisper import WhisperModel as fabrica
+    _en_tarjeta["mb"] = 0
+    log(f"Whisper: la tarjeta no puede transcribir (le faltan librerías de NVIDIA); paso a «{MODELO_WHISPER}» en la CPU. Arréglalo con  lina modelos gpu")
+    return fabrica(MODELO_WHISPER, device="cpu", compute_type="int8")
 
 
 def asegurar_gpu(log=print, entrada=input, descargar=None, instalar=None):

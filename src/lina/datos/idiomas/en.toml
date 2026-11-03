@@ -1103,3 +1103,6 @@
 "Para quitarlas todas:  lina fuentes quitar todas" = "To remove them all:  lina fuentes quitar todas"
 "Quitar tus {n} fuentes: {temas}" = "Remove your {n} sources: {temas}"
 "Tienes {n} fuentes: {temas}. ¿Las quito todas? No se puede deshacer: dime «sí»." = "You have {n} sources: {temas}. Shall I remove them all? It can't be undone: say «yes»."
+"Tarjeta NVIDIA para la voz" = "NVIDIA card for voice"
+"librerías CUDA listas" = "CUDA libraries ready"
+"faltan sus librerías CUDA (cuBLAS y cuDNN): Whisper va en la CPU, más lento" = "its CUDA libraries (cuBLAS and cuDNN) are missing: Whisper runs on the CPU, slower"

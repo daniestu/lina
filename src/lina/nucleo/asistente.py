@@ -889,8 +889,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         """De audio a texto con Whisper (con la pista de tu vocabulario y tus programas)."""
         with self.cerrojo_whisper:
             with (crono.medir("whisper") if crono else nullcontext()):
-                segmentos, _ = self.whisper.transcribe(audio, language=IDI.actual(), vad_filter=True, initial_prompt=prompt_whisper())
-                texto = " ".join(s.text for s in segmentos).strip()
+                texto = self._whisper_texto(audio, language=IDI.actual(), vad_filter=True, initial_prompt=prompt_whisper())
         log(f"Pregunta: «{texto if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'}» ({time.time() - inicio:.1f} s)")
         return texto
 
@@ -899,9 +898,22 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         """Whisper para escuchar si te dirigen la palabra: rápido (sin búsqueda en haz) y con el nombre como pista."""
         nombre = self.manos_libres.cfg.nombre.capitalize() if self.manos_libres else "Lina"
         with self.cerrojo_whisper:
-            segmentos, _ = self.whisper.transcribe(audio, language=IDI.actual(), vad_filter=True, beam_size=1,
-                                                   initial_prompt=f"Oye {nombre}. Escucha {nombre}. {prompt_whisper()}"[:PROMPT_WHISPER_CARACTERES])
+            return self._whisper_texto(audio, language=IDI.actual(), vad_filter=True, beam_size=1,
+                                       initial_prompt=f"Oye {nombre}. Escucha {nombre}. {prompt_whisper()}"[:PROMPT_WHISPER_CARACTERES])
+
+    def _whisper_texto(self, audio, **opciones):
+        """Whisper de audio a texto (con el cerrojo ya cogido). Si la tarjeta no puede porque le falta una librería de NVIDIA, pasa una vez a la CPU
+        y repite: el modelo carga sin cuBLAS y solo falla al transcribir, y sin esto cada petición acababa en «Error inesperado»."""
+        try:
+            segmentos, _ = self.whisper.transcribe(audio, **opciones)
             return " ".join(s.text for s in segmentos).strip()
+        except Exception as e:
+            if not MODELOS.fallo_de_libreria(e) or not MODELOS.vram_whisper_mb():
+                raise
+            log(f"Whisper: {e}")
+        self.whisper = MODELOS.pasar_a_cpu(log, WhisperModel)
+        segmentos, _ = self.whisper.transcribe(audio, **opciones)
+        return " ".join(s.text for s in segmentos).strip()
 
     def en_juego(self):
         """¿Hay un juego en primer plano? (el manos libres no escucha mientras juegas, salvo que lo pidas)."""

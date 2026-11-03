@@ -142,9 +142,11 @@ venv_vale() {    # el entorno es del Python elegido y sigue siendo de su versió
   [ -f "$VENV/pyvenv.cfg" ] && [ -x "$VENV/bin/python" ] || return 1
   [ "$(sed -n 's/^home = //p' "$VENV/pyvenv.cfg")" = "$(dirname "$PY")" ] && [ "$(version_de "$VENV/bin/python")" = "$(version_de "$PY")" ]
 }
-RECREAR=0
+RECREAR=0; TENIA_CUDA=0
 if [ -d "$VENV" ] && ! venv_vale; then
   aviso "El entorno de $VENV es de otro Python o está roto: lo creo de nuevo con $("$PY" -V 2>&1)."
+  # las librerías de NVIDIA no van en requisitos.txt (las pone «lina modelos gpu»): si estaban, se reponen, o Whisper no podría transcribir en la tarjeta
+  for d in "$VENV"/lib/python3*/site-packages/nvidia/cublas; do [ -d "$d" ] && TENIA_CUDA=1; done
   hacer rm -rf "$VENV"; RECREAR=1
 fi
 { [ -d "$VENV" ] && [ "$RECREAR" = 0 ]; } || hacer "$PY" -m venv "$VENV"
@@ -157,6 +159,11 @@ if [ -f "$REQUISITOS" ]; then
   hacer "$VENV/bin/pip" install --quiet --no-deps -e "$FUENTE"
 else
   hacer "$VENV/bin/pip" install --quiet -e "$FUENTE"
+fi
+if [ "$TENIA_CUDA" = 1 ]; then
+  aviso "El entorno anterior tenía las librerías de NVIDIA para la voz (unos 700 MB): las vuelvo a poner."
+  hacer "$VENV/bin/pip" install --quiet nvidia-cublas-cu12 nvidia-cudnn-cu12 \
+    || aviso "No he podido reponerlas: Lina te entenderá con la CPU, más lento. Repítelo con:  lina modelos gpu"
 fi
 ok "Lina instalada en $VENV (modo editable: «lina update» la actualiza)"
 
