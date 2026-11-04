@@ -33,15 +33,25 @@ def con(monkeypatch):
     return poner
 
 
-def test_de_fabrica_tavily_y_lo_mal_escrito_vuelve_a_fabrica(tmp_path):
-    assert AJ.ESQUEMA["ia"]["busqueda"][0] == "tavily"
+def test_de_fabrica_auto_y_lo_mal_escrito_vuelve_a_fabrica(tmp_path):
+    assert AJ.ESQUEMA["ia"]["busqueda"][0] == "auto"
+    assert AJ.ESQUEMA["ia"]["busqueda_reserva"][0] is False                  # DuckDuckGo: 1 de 30 a 4 s y 0 de 30 a 30 s; solo si lo pides
     ruta = tmp_path / "c.toml"
     ruta.write_text('[ia]\nbusqueda = "bing"\n', encoding="utf-8")
     a = AJ.Ajustes(ruta, log=lambda m: None)
-    assert a.get("ia", "busqueda") == "tavily" and len(a.avisos) == 1
+    assert a.get("ia", "busqueda") == "auto" and len(a.avisos) == 1
 
 
-@pytest.mark.parametrize("busqueda,clave,hay", [("tavily", "tvly-x", True), ("tavily", None, False), ("ninguna", "tvly-x", False), ("google", "tvly-x", False)])
+@pytest.mark.parametrize("escrito", ["tavily", "ninguna", "google"])
+def test_quien_ya_lo_tiene_escrito_lo_conserva(tmp_path, escrito):
+    ruta = tmp_path / "c.toml"
+    ruta.write_text(f'[ia]\nbusqueda = "{escrito}"\nbusqueda_reserva = true\n', encoding="utf-8")
+    a = AJ.Ajustes(ruta, log=lambda m: None)
+    assert a.get("ia", "busqueda") == escrito and a.get("ia", "busqueda_reserva") is True
+
+
+@pytest.mark.parametrize("busqueda,clave,hay", [("tavily", "tvly-x", True), ("tavily", None, False), ("ninguna", "tvly-x", False), ("google", "tvly-x", False),
+                                               ("auto", "tvly-x", True), ("auto", None, False)])
 def test_hay_busqueda_tavily(con, busqueda, clave, hay):
     con(busqueda, clave)
     assert IA.modo_busqueda() == busqueda

@@ -29,6 +29,16 @@ Lina entiende la intención, no frases fijas. Estos ejemplos son solo orientativ
 | Sobre ella misma | «¿qué puedes hacer?», «cámbiate la voz», «llámate Jarvis», «¿cuánto he gastado de Gemini?» |
 | Corregirla | «cuando oigas cait quiero decir Kate» (para lo que oye mal; solo con el atajo), «olvida el alias cait» |
 
+## Buscar en internet
+
+Lo que cambia (resultados, horarios, noticias, precios) lo busca en internet, y te dice de qué web sale. De fábrica (`ia.busqueda = auto`):
+
+- **Con una clave de pago de Gemini**, busca con Google dentro de Gemini (cuenta en tu tope de gasto).
+- **Con una clave gratuita de Tavily** (`lina bienvenida` o `lina clave tavily`), busca con Tavily. Es lo recomendado si no tienes clave de pago.
+- **Si no tienes ninguna de las dos**, solo consulta Wikipedia y algunas wikis de juegos: sirven para «cómo se hace la poción de invisibilidad en Skyrim», no para noticias, precios ni horarios. En las pruebas, la clave gratuita de Gemini no ha podido usar la búsqueda de Google.
+
+Si no ha podido buscar, te dice por qué. Nunca te dirá que «no tiene acceso a internet». DuckDuckGo está apagado de fábrica porque es poco fiable; si lo quieres, `lina config poner ia.busqueda_reserva true`. Si apagaste la búsqueda (`ia.busqueda = ninguna`), «búscalo igualmente» busca solo esa vez. `lina doctor` te dice cómo la tienes y `lina probar-busqueda` la prueba con veinte preguntas típicas. Adónde va cada búsqueda está en el [manual de privacidad](privacidad.md).
+
 ## Tus fuentes: una web para cada tema
 
 Puedes decirle a Lina qué web usar para un tema concreto, por ejemplo las recetas de refinería de un juego. Para lo demás, aunque sea del mismo juego, seguirá buscando como siempre.
@@ -49,14 +59,13 @@ Guardar una fuente **no pide confirmación previa**. Lina te avisa después, con
 
 **Preguntas de seguimiento.** La comprobación solo ve la frase que acabas de decir. Algo como «¿y con carbono?» puede ir a la búsqueda general aunque siga siendo tu tema. Si quieres asegurarte de que use tu fuente, repite el tema en la pregunta.
 
-**En qué configuraciones funciona.** Con Gemini y con `ia.busqueda` en `tavily` o `ninguna`:
+**En qué configuraciones funciona.** Con Gemini, sea cual sea `ia.busqueda`:
 
 | `ia.busqueda` | Qué hace con tu fuente |
 |---|---|
-| `tavily` con clave | Busca dentro de esa web (con DuckDuckGo si Tavily no responde) |
-| `tavily` sin clave, con `busqueda_reserva` activa | Busca dentro de esa web con DuckDuckGo; si no encuentra nada, lee la dirección que guardaste |
-| `tavily` sin clave y `busqueda_reserva` apagada, o `ninguna` | Lee solo la dirección que guardaste, sin buscar: guarda la página concreta. Si guardas la portada, Lina te avisa |
-| `google` | No se usan |
+| `auto` o `tavily`, con clave de Tavily | Busca dentro de esa web (con DuckDuckGo si Tavily no responde y lo has encendido) |
+| `auto` o `tavily` sin clave de Tavily, con `busqueda_reserva` encendida | Busca dentro de esa web con DuckDuckGo; si no encuentra nada, lee la dirección que guardaste |
+| Sin clave de Tavily y con `busqueda_reserva` apagada (lo de fábrica), `google` o `ninguna` | Lee solo la dirección que guardaste, sin buscar: guarda la página concreta. Si guardas la portada, Lina te avisa |
 
 Con otro proveedor de IA tampoco se usan, porque no está medido. `lina fuentes` te avisa si es tu caso. Lo que sale de tu equipo está en el [manual de privacidad](privacidad.md).
 

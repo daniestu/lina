@@ -135,9 +135,10 @@ class MixinOrganizacion:
         return (f"Es la fuente que eligió el usuario, {dominio}. Si esto responde, contesta con ello y di que sale de esa web. Si no responde, llama a buscar_web sin dominio "
                 f"y di en la respuesta que en esa web no estaba.\n{resultado}")
 
-    def leer_web(self, args, obstaculo=True):
+    def leer_web(self, args, obstaculo=True, pagina=None):
         """C1: descarga una página, saca su texto y, si es larga, la resume por trozos con el modelo barato. Siempre es contenido de fuera.
-        `obstaculo=False`: si la web bloquea no se insiste con más recursos (la fuente guardada, que sin ella sigue sola)."""
+        `obstaculo=False`: si la web bloquea no se insiste con más recursos (la fuente guardada, que sin ella sigue sola). `pagina` ({url, titulo, texto}):
+        el texto ya traído por otra vía (la API de una wiki, que no bloquea a los programas como sus páginas), para resumirlo igual."""
         if _A.W is None:
             return "Falta web.py: no puedo leer páginas."
         url = str(args.get("url", "") or "").strip()
@@ -148,7 +149,7 @@ class MixinOrganizacion:
                 return "No me has dicho qué página y no hay ningún enlace copiado. Pídele al usuario que la diga o que copie el enlace."
         self.ejecutor.contaminar("página web")                   # A2e: lo que trae la web puede traer órdenes escondidas
         try:
-            pagina = _A.W.leer(url)
+            pagina = pagina or _A.W.leer(url)
         except _A.W.ErrorWeb as e:
             log(f"Leer web {url[:80]}: {e}")
             msg = f"No he podido leer la página: {e}"

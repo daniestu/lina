@@ -138,7 +138,10 @@ class _IA:
 
 
 @pytest.mark.parametrize("modo, tavily, pago, ia, estado, con_arreglo, texto", [
-    ("tavily", "llavero", "", "gemini", D.OK, False, "llavero"),
+    ("auto", "", "", "gemini", D.AVISO, True, "solo Wikipedia y wikis de juegos"),
+    ("auto", "llavero", "", "gemini", D.OK, False, "Tavily (clave en llavero)"),
+    ("auto", "", "archivo", "gemini", D.OK, False, "Gemini con tu clave de pago"),
+    ("tavily", "llavero", "", "gemini", D.OK, True, "solo Tavily, clave guardada en llavero"),
     ("tavily", "", "", "gemini", D.OK, True, "sin datos de hoy"),
     ("google", "", "archivo", "gemini", D.OK, False, "clave de pago"),
     ("google", "llavero", "", "gemini", D.AVISO, True, "no funcionará"),
@@ -154,10 +157,12 @@ def test_linea_de_la_busqueda(modo, tavily, pago, ia, estado, con_arreglo, texto
     est, _, det, arreglo = linea[0]
     assert est == estado and texto in det
     assert bool(arreglo) == con_arreglo
-    if modo == "tavily" and not tavily:
-        assert "lina clave tavily" in arreglo
+    if modo == "tavily":                                                        # lo conserva quien lo eligió, y se le explica qué implica
+        assert ("lina clave tavily" if not tavily else "ia.busqueda auto") in arreglo
+    if modo == "auto" and not (tavily or pago):
+        assert "Tavily" in arreglo and "lina bienvenida" in arreglo
     if modo == "google" and ia == "gemini" and not pago:
-        assert "gemini_pago" in arreglo and "ia.busqueda" in arreglo
+        assert "gemini_pago" in arreglo and "ia.busqueda auto" in arreglo
 
 
 def test_sin_tavily_sigue_todo_en_orden():
@@ -221,4 +226,32 @@ def test_la_tarjeta_que_revienta_no_tumba_el_diagnostico():
     class Equipo(Todo):
         def tarjeta(self): raise OSError("driver roto")
     assert "Tarjeta NVIDIA para la voz" not in estados(D.comprobar(Equipo()))
+
+
+@pytest.mark.parametrize("tipo, texto", [("gratis", "en las pruebas tu clave de Gemini no ha podido usarla"), ("pago", "tope de gasto")])
+def test_la_busqueda_de_google_bloqueada_dice_por_que_y_cuando_vuelve(tipo, texto):
+    class Con(Todo):
+        def busqueda(self): return "auto", "", ("archivo" if tipo == "pago" else "")
+        def busqueda_detalle(self): return False, None, [(tipo, 1_800_000_000.0, None)]
+    fila = [r for r in D.comprobar(Con()) if r[1] == "Búsqueda de Google"]
+    assert len(fila) == 1 and fila[0][0] == D.AVISO and texto in fila[0][2]
+    assert ("al cambiar la clave" in fila[0][2]) and ("mañana" in fila[0][2]) is (tipo == "pago")
+    assert "no puede" not in fila[0][2]                                       # solo lo medido: «no ha podido»
+
+
+def test_duckduckgo_encendido_avisa_y_si_bloqueo_no_promete_arreglarlo(monkeypatch):
+    import time
+    class Con(Todo):
+        def busqueda(self): return "auto", "llavero", ""
+        def busqueda_detalle(self): return True, time.time() - 60, []
+    fila = [r for r in D.comprobar(Con()) if r[1] == "DuckDuckGo"]
+    assert len(fila) == 1 and fila[0][0] == D.AVISO
+    assert "poco fiable" in fila[0][2] and "dirección IP" in fila[0][2] and "no lo esquiva" in fila[0][2]
+    assert fila[0][3] == "lina config poner ia.busqueda_reserva false"
+
+
+def test_duckduckgo_apagado_no_sale():
+    class Con(Todo):
+        def busqueda_detalle(self): return False, 1.0, []
+    assert "DuckDuckGo" not in estados(D.comprobar(Con()))
 

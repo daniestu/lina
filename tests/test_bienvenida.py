@@ -126,9 +126,9 @@ def test_recorrido_completo_y_marca(tmp_path, monkeypatch):
     c = charla(tmp_path, Teclas("s", "", "2", "s", ""), ["AIzaOK"], grabar=lambda s: 0.3)
     marca = tmp_path / "marca.json"
     assert B.principal([], c, marca) == 0 and B.ya_hecha(marca)
-    assert c.resultado["busqueda"] == "saltado"
+    assert c.resultado["busqueda"] == "solo wikis"                              # de fábrica, auto: sin Tavily quedan Wikipedia y las wikis de juegos
     assert any("seis cosas" in t for t in c.texto) and any("6. Búsqueda en internet" in t for t in c.texto)
-    assert any("Búsqueda: saltado" in t for t in c.texto) and any("lina clave tavily" in t for t in c.texto)
+    assert any("Búsqueda: solo wikis" in t for t in c.texto) and any("lina clave tavily" in t for t in c.texto)
     assert c.aj.get("autonomia", "perfil") == "equilibrado" and c.aj.get("privacidad", "capturas") == "si"
 
 
@@ -306,14 +306,14 @@ def test_con_clave_de_tavily_ya_guardada_no_se_pregunta_ni_se_comprueba(tmp_path
 
 @pytest.mark.parametrize("respuesta", ["", "n"])
 def test_intro_o_no_se_salta_el_paso(tmp_path, monkeypatch, respuesta):
-    c, g, reinicios = charla_tavily(tmp_path, monkeypatch, Teclas(respuesta))
+    c, g, reinicios = charla_tavily(tmp_path, monkeypatch, Teclas(respuesta), modo="tavily")
     c.paso_busqueda()
     assert c.resultado["busqueda"] == "saltado" and g == {} and not reinicios
     assert any("lina clave tavily" in t for t in c.texto)
 
 
 def test_si_pero_intro_en_la_clave_tambien_se_salta(tmp_path, monkeypatch):
-    c, g, _ = charla_tavily(tmp_path, monkeypatch, Teclas("s"), [""])
+    c, g, _ = charla_tavily(tmp_path, monkeypatch, Teclas("s"), [""], modo="tavily")
     c.paso_busqueda()
     assert c.resultado["busqueda"] == "saltado" and g == {}
 
@@ -347,7 +347,7 @@ def test_si_no_se_puede_guardar_se_dice_y_se_sigue(tmp_path, monkeypatch):
 
 
 def test_se_explica_que_se_envia_a_tavily_y_donde_se_consigue(tmp_path, monkeypatch):
-    c, _, _ = charla_tavily(tmp_path, monkeypatch, Teclas(""))
+    c, _, _ = charla_tavily(tmp_path, monkeypatch, Teclas(""), modo="tavily")
     c.paso_busqueda()
     texto = "\n".join(c.texto)
     assert B.ENLACE_TAVILY in texto and "plan gratuito" in texto
@@ -355,3 +355,31 @@ def test_se_explica_que_se_envia_a_tavily_y_donde_se_consigue(tmp_path, monkeypa
     assert "No se envían tu voz, capturas de pantalla ni archivos" in texto
     assert "nada de tu equipo" not in texto
     assert "1000" not in texto and "1.000" not in texto                       # sin cifras del plan: cambian y el texto envejecería
+
+
+# ---------------------------------------------------------------- con «auto» (lo de fábrica): Tavily como mejora recomendada, no como requisito
+def test_auto_sin_clave_de_pago_recomienda_tavily_y_dice_solo_lo_medido(tmp_path, monkeypatch):
+    c, g, _ = charla_tavily(tmp_path, monkeypatch, Teclas(""))
+    c.paso_busqueda()
+    texto = "\n".join(c.texto)
+    assert c.resultado["busqueda"] == "solo wikis" and g == {}
+    assert "solo consulta Wikipedia y algunas wikis de juegos" in texto and "te recomiendo una clave" in texto
+    assert "en las pruebas, la clave" in texto and "no ha podido usar la búsqueda de Google" in texto
+    assert "no puede" not in texto and "DuckDuckGo" not in texto                 # DuckDuckGo está apagado de fábrica: no se nombra
+    assert "solo el texto de cada búsqueda" in texto and B.ENLACE_TAVILY in texto
+    assert "1000" not in texto and "1.000" not in texto
+
+
+def test_auto_con_clave_de_pago_dice_que_ya_busca_y_tavily_es_opcional(tmp_path, monkeypatch):
+    c, g, _ = charla_tavily(tmp_path, monkeypatch, Teclas(""), guardadas={"gemini_pago": "AIza-de-pago-0123456789"})
+    c.paso_busqueda()
+    texto = "\n".join(c.texto)
+    assert c.resultado["busqueda"] == "con gemini" and "Ya buscas en internet con Gemini" in texto and "Wikipedia" not in texto
+
+
+def test_auto_una_clave_de_tavily_se_guarda_igual(tmp_path, monkeypatch):
+    clave = "tvly-dev-ABCDEFGHIJ0123456789"
+    c, g, _ = charla_tavily(tmp_path, monkeypatch, Teclas("s"), [clave])
+    c.paso_busqueda()
+    assert g == {"tavily": clave} and c.resultado["busqueda"] == "guardada"
+

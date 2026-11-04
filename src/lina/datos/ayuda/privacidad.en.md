@@ -12,11 +12,22 @@ Lina has no telemetry: she sends no statistics or usage data to anyone. The only
 - **The result of the commands and tools** the AI uses to help you (for example, the list of installed programs or the text of a page you ask it to read).
 - If you have set a **Tavily** key, the text of each web search, which is sent to Tavily. It may include what you ask or the name of a program or game you have open; Tavily does not receive your voice, screenshots or files.
 
+## Where each web search goes (`ia.busqueda`)
+
+With `auto`, the default, Lina tries in this order and keeps the first thing that gives results. In every case only **the search text** leaves: never your voice, screenshots or files.
+
+1. **Google, inside Gemini**, if you have a paid key with room left in your cap (or a Gemini key that can search: in our tests, the free one could not). It is a separate query to Google, which already receives your questions. With the paid key, after the month's free searches, it costs money and counts towards your cap.
+2. **Tavily**, if you have a key.
+3. **DuckDuckGo**, only if you turn it on (`lina config poner ia.busqueda_reserva true`). It is off by default because it is unreliable: it often takes programs for robots and then returns nothing. DuckDuckGo sees the search text and your IP address. Lina does not pretend to be a browser to get around its block. The first time it is used, Lina tells you.
+4. **Wikipedia and some game wikis** (Fandom, minecraft.wiki, wiki.gg, bg3.wiki, WikiDex), with their own search, no key. They see the search text and your IP address. Lina also downloads the first page found, whose text reaches the AI. The first time they are used, you get a notification.
+
+With `tavily` only Tavily is used (and DuckDuckGo if you turn it on); with `google`, only Gemini's (and DuckDuckGo if you turn it on); with `ninguna`, nothing, unless you say «búscalo igualmente», which searches like `auto` for that request only.
+
 - If you save **sources** (a website for a topic) and use Gemini, the following:
   - **To Gemini:** the list of your topics in each request that may use them and, when the AI picks one, one more query with only that topic and your question. That query goes through your paid key if you have one and your spending cap has room left; otherwise, through the free key. What the website returns also reaches the AI.
-  - **To Tavily or DuckDuckGo:** the search text and your source's domain, to search only there. DuckDuckGo is only used if Tavily does not answer and you have the fallback on.
-  - **With `ia.busqueda` set to `tavily` without a key and `busqueda_reserva` on:** your query goes to DuckDuckGo, limited to that website. If it finds nothing, the saved page is downloaded, as in the next case.
-  - **With `ia.busqueda` set to `ninguna`, or `tavily` without a key and `busqueda_reserva` off:** no search engine is used. Your computer downloads the saved page directly, so **that website sees your IP address**, and its text is sent to the AI.
+  - **To Tavily or DuckDuckGo:** the search text and your source's domain, to search only there. DuckDuckGo is only used if you turned it on (`busqueda_reserva`) and Tavily does not answer or there is no key.
+  - **With `ia.busqueda` set to `auto` or `tavily` without a Tavily key and `busqueda_reserva` on:** your query goes to DuckDuckGo, limited to that website. If it finds nothing, the saved page is downloaded, as in the next case.
+  - **With `ia.busqueda` set to `ninguna` or `google`, or without a Tavily key and with `busqueda_reserva` off (the default):** no search engine is used for your source. Your computer downloads the saved page directly, so **that website sees your IP address**, and its text is sent to the AI.
 
 ## What is NOT sent
 
@@ -39,7 +50,7 @@ Turn it on with «activa el modo privado»; only you can turn it off, with the s
 **What does NOT change. It is not an incognito mode:**
 
 - What you say is still sent to the AI as text, with the current conversation, the name of the active window and the result of the tools.
-- Searches are still sent to Tavily or DuckDuckGo.
+- Searches are still sent wherever they go (Google inside Gemini, Tavily, DuckDuckGo if you turned it on, Wikipedia and the game wikis).
 - What was already in the conversation stays there: turning it on doesn't delete it.
 - Everything else is still saved: the log (including your questions, if `privacidad.registrar_preguntas` is on), the action log, the change journal, the recipes I learn, the timings and what you ask me to remember, and I keep using those memories.
 

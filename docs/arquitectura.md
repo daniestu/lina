@@ -37,7 +37,9 @@ src/lina/
     diario.py           registro de cambios y «deshacer»
     presupuesto.py      control del gasto de la clave de pago
     canal.py            lina di: socket Unix con la Lina en marcha (origen «texto»: no confirma ni sube el tope)
-    aviso_busqueda.py   avisos de la búsqueda en internet: que falta (una vez) y el límite de Tavily (432/433, una vez al mes)
+    aviso_busqueda.py   avisos de la búsqueda en internet: que falta (una vez), el límite de Tavily (432/433, una vez al mes) y la primera vez con DuckDuckGo o las wikis
+    busqueda.py         la escalera de ia.busqueda = auto: Google dentro de Gemini (consulta aparte), Tavily, DuckDuckGo si lo enciendes, Wikipedia y wikis de juegos
+    probar_busqueda.py  lina probar-busqueda: 20 preguntas con la Lina de un usuario nuevo, en tres niveles (gratis, tavily, pago)
     comandos.py         palabras y frases con significado fijo (sí/no, cancelar…)
     contenido.py        «ponme el partido…»: busca y elige la ficha en las plataformas oficiales, sin IA
     plataforma.py       distribución (Arch, Debian, Fedora, openSUSE), gestor de paquetes y capacidades del equipo
@@ -51,7 +53,7 @@ src/lina/
 
 ## Fuentes: cómo se usa una al responder
 
-1. `asistente._herramienta_de_fuente` ofrece `usar_fuente` si hay fuentes, `fuentes.activas()` (Gemini, y `ia.busqueda` en `tavily` o `ninguna`) y la frase no es una orden.
+1. `asistente._herramienta_de_fuente` ofrece `usar_fuente` si hay fuentes, `fuentes.activas()` (con Gemini, sea cual sea `ia.busqueda`) y la frase no es una orden.
 2. La IA elige por significado. `asistente_organizacion.usar_fuente` revisa el id y llama a `ia.comprobar_tema` (R3) con el tema y `pregunta_pura`, por la clave de `presupuesto.claves_para("fuente")`.
 3. Si encaja, se busca en el dominio o, sin búsqueda, se lee la dirección guardada; desde ahí `fuente_cerrada` solo deja la web y `_insistir_si_hace_falta` no reintenta. Si no encaja o no contesta, sigue sin decir nada.
 4. `turnos.correccion_de_fuente` añade al final lo que la respuesta no reconozca. Cada comprobación queda en `comprobaciones_fuente.jsonl`, y `lina tiempos ia` enseña la regla del 8 %.

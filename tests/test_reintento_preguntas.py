@@ -171,3 +171,28 @@ def test_el_primer_intento_conserva_sus_comandos(lina):
     lina.crono = None
     lina._ejecutar_herramienta = MagicMock(return_value="ok")
     assert lina.ejecutar_herramienta("ejecutar_comando", {"comando": "ls"}) == "ok"
+
+
+# ---------------------------------------------------------------- S12 sin «¿?»: Whisper no siempre los pone
+SIN_INTERROGACION = ["a qué hora juega el Betis", "qué dice la página de pruebas", "cuánto cuesta la Steam Deck", "oye Lina, quién ganó ayer", "averigua qué dice esa página",
+                     "dime qué hora es en Tokio", "por qué no carga la página"]
+
+
+@pytest.mark.parametrize("frase", SIN_INTERROGACION)
+def test_una_pregunta_sin_interrogacion_y_una_web_que_bloquea_se_queda_en_la_web(lina, frase):
+    lina.obstaculo = "leer la página https://ejemplo.test/p: la web no deja leerla a un programa"
+    _insistir(lina, frase)
+    assert lina.reintento_solo_web is True and _llamada(lina)[1]["herramientas"] == [WEB, LEER]
+
+
+@pytest.mark.parametrize("frase", ["lee la pagina", "abre Steam", "cuando termines, abre Steam", "ponme el partido"])
+def test_las_ordenes_sin_interrogacion_siguen_insistiendo_como_siempre(lina, frase):
+    lina.obstaculo = "leer la página https://ejemplo.test/p: la web no deja leerla a un programa"
+    _insistir(lina, frase)
+    assert lina.reintento_solo_web is False
+
+
+@pytest.mark.parametrize("frase, es", [("¿abro Steam?", True), ("qué tal", True), ("dime un chiste", False), ("what time is it", False)])
+def test_es_pregunta(frase, es):
+    from lina.nucleo import turnos as TU
+    assert TU.es_pregunta(frase) is es

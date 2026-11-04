@@ -217,6 +217,45 @@ def pide_accion(texto):
     return bool((_ACCION_EN if IDI.actual() == "en" else _ACCION_ES).match(t))
 
 
+# S12: preguntas por voz sin «¿?» (Whisper no siempre los pone). Una palabra interrogativa al principio, tras las muletillas, o un verbo de averiguar.
+_RELLENO_PREGUNTA_ES = r"^(?:(?:oye|hola|lina|vale|venga|pues|y|bueno|a ver|por favor|una pregunta|te pregunto|sabes|me puedes decir|puedes decirme|dime)\s+)*"
+_PREGUNTA_ES = re.compile(_RELLENO_PREGUNTA_ES + r"(?:(?:a|de|en|con|para|por|desde|hasta|sobre)\s+)?(?:que|cual|cuales|cuando|cuanto|cuanta|cuantos|cuantas|donde|adonde|"
+                          r"como|quien|quienes|por que)\b|^(?:(?:oye|lina|vale|venga|por favor)\s+)*(?:averigua|averiguame|informate|preguntale|pregunta|"
+                          r"investiga|comprueba si|mira a ver si)\b")
+_PREGUNTA_EN = re.compile(r"^(?:(?:hey|hi|ok|okay|so|and|please|tell me|do you know)\s+)*(?:what|which|when|where|who|whom|whose|why|how|is|are|does|do|did|can|could|"
+                          r"will|would|should)\b|^(?:(?:hey|ok|please)\s+)*(?:find out|look up|check whether|check if)\b")
+
+
+def es_pregunta(texto):
+    """¿La frase es una pregunta, aunque Whisper no haya puesto «¿?»? Con interrogación, sí. Sin ella, si empieza por una palabra interrogativa («qué»,
+    «cuándo», «a qué hora»…) o por «averigua», salvo que tras una coma venga una orden («cuando termines, abre Steam»)."""
+    from lina.nucleo import idioma as IDI
+    if "?" in str(texto) or "¿" in str(texto):
+        return True
+    t = C.normalizar(texto)
+    if not (_PREGUNTA_EN if IDI.actual() == "en" else _PREGUNTA_ES).search(t):
+        return False
+    return not any(pide_accion(trozo) for trozo in re.split(r",|;|\s+y\s+(?=\w)", str(texto))[1:] if trozo.strip())
+
+
+# Lo que la IA dice a veces y nunca es verdad: Lina lee webs y busca. La red de honestidad cambia esa frase por lo que pasó.
+_NIEGA_INTERNET_ES = re.compile(r"\b(?:no (?:tengo|dispongo de|cuento con)(?: ningun| un)? (?:acceso (?:directo )?a |conexion a )?(?:internet|la red|la web|datos en tiempo real|"
+                                r"informacion en tiempo real|informacion actualizada)|no (?:puedo|soy capaz de) (?:acceder a|buscar en|navegar por|navegar en|consultar) "
+                                r"(?:internet|la red|la web)|no puedo (?:navegar|buscar en linea))")
+_NIEGA_INTERNET_EN = re.compile(r"\b(?:i (?:do not|don ?t) have (?:access to |a connection to )?(?:the )?(?:internet|web|real ?time (?:data|information))|"
+                                r"i (?:can ?not|can ?t|am unable to) (?:access|browse|search) (?:the )?(?:internet|web))")
+
+
+def niega_internet(texto):
+    """La frase de `texto` que dice no tener internet (tal como está escrita), o «»."""
+    from lina.nucleo import idioma as IDI
+    patron = _NIEGA_INTERNET_EN if IDI.actual() == "en" else _NIEGA_INTERNET_ES
+    for frase in re.split(r"(?<=[.!?…])\s+", str(texto or "")):
+        if patron.search(C.normalizar(frase)):
+            return frase
+    return ""
+
+
 def solo_se_informo(acciones, es_lectura):
     """True si en la petición solo se buscó, leyó o miró (ningún comando que cambie o abra algo). `es_lectura(comando)` dice si un comando solo lee."""
     if not acciones:

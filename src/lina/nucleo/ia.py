@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from lina import __version__
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import aviso_busqueda as AVB
 from lina.nucleo import claves as CL
@@ -24,9 +25,10 @@ from lina.nucleo import proveedor_gemini as PG
 from lina.nucleo import proveedor_anthropic as PAN  # noqa: F401  (los proveedores se registran al importarse)
 from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
+from lina.nucleo import rutas as RUT
 from lina.nucleo import tiempos as TIE
 from lina.nucleo.constantes import (ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
-                                    MODELO_LOCAL, OLLAMA, PAUSA_BUSQUEDA_SEG, PAUSA_MODELO_SEG, PAUSA_RED_SEG, TIMEOUT_REVISOR, TIMEOUT_TEMA, INTENTOS_TEMA, REINTENTOS_SERVIDOR,
+                                    MODELO_LOCAL, OLLAMA, PAUSA_MODELO_SEG, PAUSA_RED_SEG, TIMEOUT_REVISOR, TIMEOUT_TEMA, INTENTOS_TEMA, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, ESTIMACION_VRAM_LOCAL)
 from lina.nucleo.opcionales import PRES
 from lina.nucleo.registro import log
@@ -132,8 +134,7 @@ def _pausar_por_red(modelo, clave):
     _pausa_modelo[k] = time.time() + min(PAUSA_RED_SEG * 2 ** n, PAUSA_MODELO_SEG)
 
 
-_gasto_tarea = {"tokens": 0}              # lo que lleva gastado la petición actual        # modelo -> momento hasta el que se salta
-_pausa_busqueda = [0.0]   # hasta cuándo no se usa la búsqueda de Google
+_gasto_tarea = {"tokens": 0}              # lo que lleva gastado la petición actual
 
 
 _espera_de_cuota = PG.espera_de_cuota                # (los nombres antiguos siguen valiendo para quien los importe)
@@ -159,12 +160,14 @@ HERRAMIENTA_SIN_BUSQUEDA = {"functionDeclarations": [{
 }]}
 
 
-def declaraciones_de_busqueda():
-    """Lo que se le da a la IA para buscar: buscar_web con Tavily y clave; necesito_datos_actuales si elegiste Tavily y falta la clave; nada con
-    google (la búsqueda va dentro del modelo) ni con ninguna (lo elegiste tú)."""
-    if hay_busqueda_tavily():
+def declaraciones_de_busqueda(forzar=False):
+    """Lo que se le da a la IA para buscar. Con «auto» (o `forzar`: «búscalo igualmente»), siempre buscar_web: por lo menos están Wikipedia y las wikis
+    de juegos. Con tavily, buscar_web si hay clave y necesito_datos_actuales si falta; con google, buscar_web si hay clave de pago con saldo (o DuckDuckGo
+    encendido) y nada si no (lina doctor lo avisa); con ninguna, nada (lo elegiste tú)."""
+    modo = "auto" if forzar else modo_busqueda()
+    if modo == "auto" or hay_busqueda_tavily() or (modo == "google" and (PRES.clave_de_pago_con_saldo() or hay_reserva())):
         return list(HERRAMIENTA_BUSCAR["functionDeclarations"])
-    if modo_busqueda() == "tavily":
+    if modo == "tavily":
         return list(HERRAMIENTA_SIN_BUSQUEDA["functionDeclarations"])
     return []
 
@@ -177,19 +180,21 @@ def dominio_valido(dominio):
 
 
 def modo_busqueda():
-    """La búsqueda en internet que has elegido (ia.busqueda en config.toml, se relee si cambia): tavily, google o ninguna."""
+    """La búsqueda en internet que has elegido (ia.busqueda en config.toml, se relee si cambia): auto, tavily, google o ninguna."""
     return AJ.actuales(log=lambda m: None).get("ia", "busqueda")
 
 
 def hay_busqueda_tavily():
-    """¿Se puede buscar con Tavily? Solo si la búsqueda elegida es tavily y hay clave."""
-    return modo_busqueda() == "tavily" and bool(CL.obtener("tavily"))
+    """¿Se puede buscar con Tavily? Si la búsqueda elegida es auto o tavily y hay clave."""
+    return modo_busqueda() in ("auto", "tavily") and bool(CL.obtener("tavily"))
 
 
 _pausa_tavily = [0.0]     # hasta cuándo no se llama a Tavily (agotó su cupo: hasta mañana)
 _pausa_reserva = [0.0]    # hasta cuándo no se pregunta a DuckDuckGo (nos ha tomado por un robot)
 RESERVA = "https://lite.duckduckgo.com/lite/"
 PAUSA_RESERVA_SEG = 1800
+ARCHIVO_RESERVA = "busqueda_reserva.json"       # cuándo nos tomó DuckDuckGo por un robot la última vez (lo cuenta lina doctor)
+AGENTE = f"Lina/{__version__} (asistente de voz de escritorio)"     # quiénes somos, tal cual: no nos hacemos pasar por un navegador
 
 
 def _manana():
@@ -199,7 +204,7 @@ def _manana():
 
 
 def hay_reserva():
-    """¿Se puede buscar en DuckDuckGo cuando Tavily no responde o agota su cupo? (ia.busqueda_reserva)"""
+    """¿Se puede buscar en DuckDuckGo cuando lo demás no responde? (ia.busqueda_reserva, apagado de fábrica)"""
     return bool(AJ.actuales(log=lambda m: None).get("ia", "busqueda_reserva"))
 
 
@@ -240,33 +245,54 @@ def resultados_reserva(consulta, dominio=None, maximo=5, post=None):
     q = (f"site:{dominio} " if dominio else "") + consulta[:300]
     inicio = time.time()
     try:
-        r = post(RESERVA, data={"q": q}, timeout=12, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0"})
+        r = post(RESERVA, data={"q": q}, timeout=12, headers={"User-Agent": AGENTE})
     except requests.RequestException as e:
         log(f"Búsqueda de reserva (DuckDuckGo): sin conexión ({e})")
         return "La búsqueda web no está disponible ahora mismo."
     if r.status_code == 202 or "anomaly" in r.text[:20000].lower():         # su detección de robots: insistir solo empeora el bloqueo
         _pausa_reserva[0] = time.time() + PAUSA_RESERVA_SEG
+        _apuntar_robot()
         log(f"Búsqueda de reserva (DuckDuckGo): me ha tomado por un robot; no vuelvo a preguntarle en {PAUSA_RESERVA_SEG // 60} min")
         return "La búsqueda web no está disponible ahora mismo."
     if not r.ok:
         log(f"Búsqueda de reserva (DuckDuckGo): error {r.status_code}")
         return "La búsqueda web no está disponible ahora mismo."
     resultados = leer_resultados_reserva(r.text, maximo)
+    AVB.apuntar(AVB.PRIMERA_DUCKDUCKGO)                                    # la primera vez se dice que la consulta ha ido a DuckDuckGo
     log(f"Búsqueda de reserva (DuckDuckGo) «{consulta}»{' en ' + dominio if dominio else ''}: {len(resultados)} resultados ({time.time() - inicio:.1f} s)")
     return resultados
 
 
+def _apuntar_robot(ahora=None):
+    try:
+        RUT.ESTADO.mkdir(parents=True, exist_ok=True)
+        (RUT.ESTADO / ARCHIVO_RESERVA).write_text(json.dumps({"robot": ahora or time.time()}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def ultimo_robot():
+    """Cuándo nos tomó DuckDuckGo por un robot la última vez (segundos), o None."""
+    try:
+        valor = json.loads((RUT.ESTADO / ARCHIVO_RESERVA).read_text(encoding="utf-8")).get("robot")
+        return float(valor) if isinstance(valor, (int, float)) else None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def reserva_sin_clave():
-    """¿Has elegido Tavily, no tienes clave y permites la reserva? Con `ninguna`, o con ia.busqueda_reserva apagado, no se busca."""
-    return modo_busqueda() == "tavily" and hay_reserva() and not CL.obtener("tavily")
+    """¿Buscas con auto o tavily, no tienes clave y permites la reserva? Con `ninguna`, o con ia.busqueda_reserva apagado, no se busca."""
+    return modo_busqueda() in ("auto", "tavily") and hay_reserva() and not CL.obtener("tavily")
 
 
-def resultados_tavily(consulta, dominio=None, maximo=5):
+def resultados_tavily(consulta, dominio=None, maximo=5, reserva=True, comprobar_modo=True):
     """Los resultados en bruto de Tavily ([{title, url, content}]) o, si no se pudo buscar, el texto que lo explica. Con `dominio`, solo en esa web.
     Si Tavily no responde o ha agotado su cupo, se busca en la reserva (DuckDuckGo, sin clave) salvo que ia.busqueda_reserva esté apagado. Tras un cupo
-    agotado (432/433) no se vuelve a llamar a Tavily hasta mañana: va directamente a la reserva."""
-    if not hay_busqueda_tavily():
+    agotado (432/433) no se vuelve a llamar a Tavily hasta mañana: va directamente a la reserva. `reserva=False`: sin DuckDuckGo (la escalera de «auto»
+    lo prueba ella misma); `comprobar_modo=False`: basta la clave (para «búscalo igualmente» con ia.busqueda = ninguna)."""
+    if not (hay_busqueda_tavily() if comprobar_modo else CL.obtener("tavily")):
         return "La búsqueda web no está configurada."
+    reserva_permitida = reserva
     maximo = max(1, min(int(maximo), 20))
     pedido = {"query": consulta[:380], "search_depth": "basic", "max_results": maximo}
     d = None
@@ -277,7 +303,7 @@ def resultados_tavily(consulta, dominio=None, maximo=5):
         pedido["include_domains"] = [d]
 
     def reserva(si_no):
-        if not hay_reserva():
+        if not (reserva_permitida and hay_reserva()):
             return si_no
         r = resultados_reserva(consulta, d, maximo)
         return r if isinstance(r, list) and r else si_no
@@ -330,6 +356,7 @@ def _resultados_como_texto(resultados):
         web = urlparse(res.get("url", "")).netloc.removeprefix("www.")
         otra = TU.de_otra_temporada(f"{res.get('url', '')} {res.get('title', '')}")       # fichas de temporadas pasadas con un nombre casi igual
         marca = f"\n[OJO: es de la temporada {otra}, NO de la actual ({actual}): no la abras si buscas lo de ahora]" if otra else ""
+        web = res.get("dominio") or web                       # la búsqueda de Google da enlaces de paso: su dominio de verdad viene aparte
         lineas.append(f"[{i}] {res.get('title', '')} ({web}) {res.get('url', '')}{marca}\n{(res.get('content') or '')[:900]}")
         log(f"   fuente {i}: {web}")
     varias = TU.competiciones_de_ahora([res.get("url", "") for res in resultados])
@@ -769,12 +796,8 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
         return None
     mensajes = [{"rol": h["rol"], "texto": h["texto"]} for h in historial]
     mensajes.append({"rol": "user", "texto": pregunta, "imagen": imagen})
-    nativa = bool(proveedor.busqueda_nativa and modo_busqueda() == "google" and time.time() >= _pausa_busqueda[0])
-    if nativa:
-        ejecutar_herramienta = None                  # la búsqueda va dentro del modelo (cuenta de pago): no hay herramientas nuestras
-    con_herramientas = bool(nativa or (herramientas and ejecutar_herramienta))
+    con_herramientas = bool(herramientas and ejecutar_herramienta)       # la búsqueda de Google va aparte (busqueda.py): con nuestras funciones da 400
     pasos = 0
-    busqueda_dio_429 = False
     corregido = False
     reintentos = 0
     esperas_cuota = 0
@@ -788,8 +811,8 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                 log(f"{modelo}: se acabó el plazo para esta petición")
                 return None
             espera_max = min(timeout, restante)
-        r = _turno_medido(proveedor, clave, modelo, sistema or instrucciones(), mensajes, herramientas=herramientas if con_herramientas and not nativa else None,
-                            nivel=nivel, busqueda_nativa=nativa and con_herramientas, timeout=espera_max, post=_post_cancelable)
+        r = _turno_medido(proveedor, clave, modelo, sistema or instrucciones(), mensajes, herramientas=herramientas if con_herramientas else None,
+                            nivel=nivel, timeout=espera_max, post=_post_cancelable)
         if isinstance(r, PROV.ErrorIA):
             if r.tipo == "red":
                 log(f"{modelo}: sin conexión o demasiado lento ({r.resumen})")
@@ -816,7 +839,6 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                     continue
             if r.estado in (400, 429) and con_herramientas and pasos == 0:
                 log(f"{modelo}: {r.resumen} -> reintento sin herramientas")
-                busqueda_dio_429 = nativa and r.estado == 429
                 con_herramientas = False
                 sistema = (sistema or instrucciones()) + AVISO_SIN_HERRAMIENTAS      # que no diga que ha hecho lo que no puede hacer
                 continue
@@ -832,10 +854,6 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
             return None
         reintentos = 0
         _fallos_red.pop(_id_pausa(modelo, clave), None)
-        if busqueda_dio_429:
-            _pausa_busqueda[0] = time.time() + PAUSA_BUSQUEDA_SEG
-            log("La búsqueda de Google da error de cuota: la desactivo unos minutos")
-            busqueda_dio_429 = False
         uso = r.uso
         PRES.registrar(clave, modelo, uso, r.modelo_real)
         log(f"{modelo}{' [' + nivel + ']' if nivel else ''}: tokens entrada={uso.get('promptTokenCount', '?')} "

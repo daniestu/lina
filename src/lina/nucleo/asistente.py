@@ -31,6 +31,7 @@ from pathlib import Path
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import autoconocimiento as AUTO
 from lina.nucleo import aviso_busqueda as AVB
+from lina.nucleo import busqueda as BUS
 from lina.nucleo import avisos as AVI
 from lina.nucleo import canal as CANAL
 from lina.nucleo.registro import log
@@ -63,7 +64,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, afirma_fuente, correccion_de_fuente, enlace_sin_comprobar, orden_de_cortesia, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo
+from lina.nucleo.turnos import HERRAMIENTAS_META, afirma_fuente, correccion_de_fuente, enlace_sin_comprobar, orden_de_cortesia, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo, es_pregunta, niega_internet
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -138,7 +139,7 @@ from lina.nucleo.constantes import (  # noqa: F401
     ESPERA_REINTENTO, FRECUENCIA, INSTRUCCIONES, INSTRUCCION_LOCAL, instrucciones, INTERRUPCION_IA, MAX_BUSQUEDAS, MAX_BUSQUEDAS_PROFUNDO,
     MAX_CONTINUACIONES, MAX_ESPERAS_CUOTA, MAX_MIRADAS, MAX_MIRADAS_PROFUNDO, MAX_PASOS, MAX_PASOS_PROFUNDO, MAX_TIEMPO_TAREA,
     MAX_TIEMPO_TAREA_PROFUNDO, MAX_TOKENS_TAREA, MAX_TOKENS_TAREA_PROFUNDO, MAX_TURNOS, MODELOS_CONFIRMACION, MODELOS_GEMINI,
-    MODELOS_PROFUNDO, MODELO_LOCAL, MODELO_WHISPER, NO_VE_PANTALLA, OLLAMA, PANTALLA_SESION_SEG, PAUSA_BUSQUEDA_SEG,
+    MODELOS_PROFUNDO, MODELO_LOCAL, MODELO_WHISPER, NO_VE_PANTALLA, OLLAMA, PANTALLA_SESION_SEG,
     PAUSA_MODELO_SEG, PLAZO_PENSAR_A_FONDO, PRIORIDAD, PROMPT_WHISPER_CARACTERES, REINTENTOS_SERVIDOR, SESION_MINUTOS,
     SIN_RESPUESTA, TIEMPO_INSISTIR_SIN_AJUSTES, TIEMPO_PENSAR_A_FONDO, TIMEOUT_CONFIRMACION, TIMEOUT_INSISTIR_SIN_AJUSTES,
     TIMEOUT_PENSAR_A_FONDO, TIMEOUT_PRIMERA_CLAVE, TIMEOUT_PROFUNDO, VOZ, SOLTAR_LOCAL_PLAN_B, ESPERA_TURNO_VOZ,
@@ -464,7 +465,7 @@ from lina.nucleo.ia import (  # noqa: F401
     BucleDeHerramienta, Cancelado, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
-    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_busqueda, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_reserva, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva, reserva_sin_clave,
+    ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_reserva, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva, modo_busqueda, reserva_sin_clave,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
     cabe_modelo_local, dominio_valido,
@@ -555,6 +556,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self.ejecutor = H.Ejecutor(avisar=self.avisar, confirmar=CONFIRMAR_ACCIONES)
         self.ejecutor.continuar = self._continuar_peticion
         self.busquedas_turno = 0
+        self.busquedas_hechas, self.forzar_busqueda = [], False
         self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
         self.fuente_cerrada = False                            # tras usar una fuente no se reintenta a fondo ni se pasa de la web
         self.reintento_solo_web = False                        # S12: al insistir en una pregunta solo cabe la web
@@ -1803,8 +1805,22 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if self.busquedas_turno >= self.max_busquedas:
             return "No hagas más búsquedas: responde con lo que ya tienes o di que no lo has encontrado."
         self.busquedas_turno += 1
-        resultado = buscar_tavily(consulta, args.get("dominio") or None)
-        self.ejecutor.contaminar("búsqueda web")      # A2e: lo que trae internet puede traer instrucciones escondidas
+        modo = "auto" if getattr(self, "forzar_busqueda", False) else modo_busqueda()
+        if modo == "tavily":                          # quien eligió tavily lo conserva tal cual: Tavily y, si la enciende, la reserva
+            resultado = buscar_tavily(consulta, args.get("dominio") or None)
+            self.ejecutor.contaminar("búsqueda web")  # A2e: lo que trae internet puede traer instrucciones escondidas
+            return resultado
+        res = BUS.buscar(consulta, args.get("dominio") or None, modo=modo)
+        if not hasattr(self, "busquedas_hechas"):
+            self.busquedas_hechas = []
+        self.busquedas_hechas.append(res)
+        self.ejecutor.contaminar("búsqueda web")
+        resultado = BUS.como_texto(res)
+        if res.escalon == "wiki":                     # un extracto de wiki casi nunca trae el dato: se lee la primera página (por su API), como haría la IA
+            primera = res.resultados[0]
+            pagina = self.leer_web({"url": primera["url"], "foco": consulta}, obstaculo=False, pagina=BUS.pagina_wiki(primera))
+            if str(pagina).startswith("CONTENIDO DE LA PÁGINA"):
+                resultado += "\n\n" + pagina
         return resultado
 
     def _h_usar_fuente(self, nombre, args):
@@ -2123,7 +2139,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if not G.pregunta_por_mi(peticion):
             return ""
         log("Preguntan por mí: paso a la IA lo que consta sobre lo que puedo hacer")
-        return f"\n[SISTEMA: {AUTO.resumen(bool(declaraciones_de_busqueda()) and hay_busqueda_tavily())}]"
+        return f"\n[SISTEMA: {AUTO.resumen(any(d['name'] == 'buscar_web' for d in declaraciones_de_busqueda()))}]"
 
     def _frase_de_no_hecho(self, motivo):
         """«No lo he abierto: …» (o «No lo he hecho: …»), con el motivo que dio la herramienta, escrita por el código."""
@@ -2141,7 +2157,32 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
 
     def asegurar_honestidad_final(self, texto):
         """Última red: lo que el código sabe y la respuesta no reconoce se añade o se sustituye. No se confía en que la IA lo diga."""
-        return self._avisar_fuente_sin_anadir(self._aclarar_fuente(self._honestidad_de_lo_hecho(texto)))
+        return self._sin_negar_internet(self._avisar_fuente_sin_anadir(self._aclarar_fuente(self._honestidad_de_lo_hecho(texto))))
+
+    def _buscar_igualmente(self, peticion):
+        """¿«Búscalo igualmente» con ia.busqueda = ninguna? Entonces esta petición busca como «auto»; la siguiente vuelve a lo que elegiste."""
+        if modo_busqueda() != "ninguna" or not BUS.pide_buscar_igualmente(peticion):
+            return False
+        log("«Búscalo igualmente»: busco en esta petición aunque ia.busqueda esté en «ninguna»")
+        return True
+
+    def _sin_negar_internet(self, texto):
+        """Lina nunca dice «no tengo acceso a internet»: es falso (lee webs y busca). La frase se cambia por lo que de verdad pasó en esta petición."""
+        frase = niega_internet(texto)
+        if not frase:
+            return texto
+        acciones = getattr(self, "acciones_turno", []) or []
+        hechas = getattr(self, "busquedas_hechas", []) or []
+        if any((n == "buscar_web" and str(r).startswith("RESULTADOS DE BÚSQUEDA")) or (n == "leer_web" and str(r).startswith("CONTENIDO DE LA PÁGINA")) for n, _, r in acciones):
+            nueva = T("Lo que te digo sale de lo que he buscado o leído ahora en internet.")
+        elif hechas:
+            nueva = BUS.frase_de_fallo(hechas)
+        elif modo_busqueda() == "ninguna" and not getattr(self, "forzar_busqueda", False):
+            nueva = T("No busco en internet porque lo tienes apagado (ia.busqueda = ninguna); si quieres, dime «búscalo igualmente».")
+        else:
+            nueva = T("Esta vez no he buscado en internet; si quieres, dime «búscalo».")
+        log(f"La respuesta decía no tener acceso a internet («{frase[:80]}»): se cambia por lo que pasó")
+        return re.sub(r"\s+", " ", texto.replace(frase, nueva + " ", 1)).strip()
 
     def _avisar_fuente_sin_anadir(self, texto):
         """Lo que se escapó de `FUE.entender` y llegó a la IA: si pedías añadir una fuente y la lista sigue igual, se dice, aunque la respuesta hable de otra cosa."""
@@ -2311,7 +2352,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         """S12: insistir en una pregunta de información no da derecho a mirar el equipo. Una orden, también dicha con cortesía («¿puedes abrir Steam?»), una pregunta con la que ya se
         cambió algo o «lee esa página» cuando la web bloquea (el código vio el obstáculo y se pidió esa página, sin preguntar) insisten como siempre."""
         peticion = str(self.pregunta_pura or pregunta)
-        if self.obstaculo and "?" not in peticion and "¿" not in peticion:
+        if self.obstaculo and not es_pregunta(peticion):
             return False
         return (not pide_accion(peticion) and not orden_de_cortesia(peticion) and not self.ejecutor.duda and not self.ejecutor.efecto_sin_comprobar
                 and solo_se_informo(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura"))
@@ -2553,6 +2594,8 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
     def _responder(self, pregunta, imagen, modo="rapido"):
         self.modo_actual = modo
         self.busquedas_turno = 0
+        self.busquedas_hechas = []                             # lo que dio cada buscar_web de esta petición (para no decir «no tengo acceso a internet»)
+        self.forzar_busqueda = self._buscar_igualmente(str(self.pregunta_pura or pregunta))
         self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
         self.fuente_cerrada = False                            # tras usar una fuente no se reintenta a fondo ni se pasa de la web
         self.reintento_solo_web = False                        # S12: al insistir en una pregunta solo cabe la web
@@ -2576,7 +2619,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if self.clave:
             grupos = self._preparar_grupos_mcp(self.elegir_grupos(pregunta))
             herramientas = G.herramientas(H.DECLARACIONES, grupos)
-            herramientas = declaraciones_de_busqueda() + herramientas     # sin clave de Tavily: necesito_datos_actuales, y el código avisa una vez
+            herramientas = declaraciones_de_busqueda(self.forzar_busqueda) + herramientas     # tavily sin clave: necesito_datos_actuales, y el código avisa una vez
             herramientas = self._herramienta_de_fuente() + herramientas   # delante, como se midió
             self.herramientas_turno = herramientas        # la misma lista que usa Gemini: mas_herramientas la amplía en sitio
             self.grupos_turno = set(grupos)

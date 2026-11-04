@@ -58,7 +58,8 @@ def test_cuando_se_ofrece(lina, monkeypatch, fuentes, activas, pregunta, esperad
     assert [d["name"] for d in lina._herramienta_de_fuente()] == esperado
 
 
-@pytest.mark.parametrize("proveedor, busqueda, esperado", [("gemini", "tavily", True), ("gemini", "ninguna", True), ("gemini", "google", False), ("anthropic", "tavily", False)])
+@pytest.mark.parametrize("proveedor, busqueda, esperado", [("gemini", "tavily", True), ("gemini", "ninguna", True), ("gemini", "google", True), ("gemini", "auto", True),
+                                                          ("anthropic", "tavily", False), ("anthropic", "auto", False)])
 def test_activas(monkeypatch, proveedor, busqueda, esperado):
     ia = MagicMock()
     ia.nombre = proveedor

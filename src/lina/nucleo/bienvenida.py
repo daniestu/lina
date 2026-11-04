@@ -41,6 +41,20 @@ TEXTO_TAVILY = N_(
     "    1) Abre esta página:  {ENLACE_TAVILY}\n"
     "    2) Regístrate y copia tu clave (suele empezar por «tvly-»).\n"
     "    3) Pégala aquí abajo con Ctrl+Mayús+V. Al pegarla no se ve nada: es normal. Pulsa Intro.")
+# Con ia.busqueda = auto (lo de fábrica). DuckDuckGo está apagado de fábrica: no se nombra. De la clave gratuita de Gemini solo se dice lo medido.
+TEXTO_AUTO_SIN_PAGO = N_(
+    "  Opcional, pero te lo recomiendo. Ahora mismo Lina solo consulta Wikipedia y algunas wikis de juegos (en las pruebas, la clave\n"
+    "  gratuita de Gemini no ha podido usar la búsqueda de Google). Para noticias, precios, horarios o resultados te recomiendo una clave\n"
+    "  gratuita de Tavily, un buscador para asistentes: tiene un plan gratuito sin tarjeta, y Lina gasta como mucho 2 búsquedas por pregunta.\n\n")
+TEXTO_AUTO_CON_PAGO = N_(
+    "  Opcional. Ya buscas en internet con Gemini y tu clave de pago (cuenta en tu tope de gasto). Una clave gratuita de Tavily\n"
+    "  sirve de alternativa sin coste: tiene un plan gratuito sin tarjeta.\n\n")
+PASOS_TAVILY = N_(
+    "  Qué se envía a Tavily: solo el texto de cada búsqueda. Puede incluir lo que preguntas o el nombre de un programa o juego\n"
+    "  que tengas abierto. No se envían tu voz, capturas de pantalla ni archivos.\n\n"
+    "    1) Abre esta página:  {ENLACE_TAVILY}\n"
+    "    2) Regístrate y copia tu clave (suele empezar por «tvly-»).\n"
+    "    3) Pégala aquí abajo con Ctrl+Mayús+V. Al pegarla no se ve nada: es normal. Pulsa Intro.")
 MARCA = "bienvenida.json"
 AVISO_SIN_CLAVE = (N_("Todavía no tengo clave de Gemini, así que no puedo responderte. Es gratis: abre una terminal y escribe lina bienvenida, "
                    "o directamente lina clave gemini."))
@@ -290,11 +304,15 @@ class Charla:
             self.salida(T("  ✔ Ya hay una clave de Tavily guardada."))
             self.resultado["busqueda"] = "ya estaba"
             return
-        self.salida(T(TEXTO_TAVILY, ENLACE_TAVILY=ENLACE_TAVILY))
+        if modo == "auto":
+            pago = bool(CL.obtener("gemini_pago"))
+            self.salida(T(TEXTO_AUTO_CON_PAGO if pago else TEXTO_AUTO_SIN_PAGO) + T(PASOS_TAVILY, ENLACE_TAVILY=ENLACE_TAVILY))
+        else:
+            self.salida(T(TEXTO_TAVILY, ENLACE_TAVILY=ENLACE_TAVILY))
         clave = limpiar_pegado(self.secreto(T("  Clave de Tavily (Intro para saltar este paso): "))) if self.si_no(T("  ¿La configuras ahora?"), False) else ""
         if not clave:
             self.salida(T("  Vale. Cuando la tengas:  lina clave tavily"))
-            self.resultado["busqueda"] = "saltado"
+            self.resultado["busqueda"] = "saltado" if modo != "auto" else ("con gemini" if CL.obtener("gemini_pago") else "solo wikis")
             return
         self.salida(T("  Recibida ({n} caracteres).", n=len(clave)))
         if not clave.startswith("tvly-") or len(clave) < 20 or re.search(r"\s", clave):
@@ -318,6 +336,8 @@ class Charla:
             self.salida(T("  Falta la clave de Gemini: sin ella no puedo responder.  →  lina clave gemini"))
         if s.get("busqueda") == "saltado":
             self.salida(T("  Sin búsqueda no tengo datos de hoy.  →  lina clave tavily"))
+        elif s.get("busqueda") == "solo wikis":
+            self.salida(T("  Sin Tavily solo busco en Wikipedia y wikis de juegos: nada de noticias, precios ni horarios.  →  lina clave tavily"))
         atajo = atajo_pendiente()
         if atajo:
             self.salida(T("  Tu atajo {tecla} se activa cuando cierres sesión y vuelvas a entrar (KDE no lo carga antes). Hasta entonces, di «Oye {v1}».", tecla=atajo["tecla"], v1=s.get('nombre', 'Lina')))

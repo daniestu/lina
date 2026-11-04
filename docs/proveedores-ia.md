@@ -94,6 +94,6 @@ compruébalo con `lina ia probar`.
   lo hacen bien; `lina ia probar` lo comprueba con una herramienta de prueba, pero un «sí» ahí no garantiza que lo haga bien con las cuarenta que tiene Lina.
 - **Imágenes:** mirar la pantalla exige un modelo con visión. Sin ella, esa función dirá que no ha podido.
 - **Gasto:** el tope en euros solo funciona con Gemini. Con los demás se cuentan tokens.
-- **Búsqueda de Google dentro del modelo:** es de Gemini; con otros proveedores la búsqueda web sigue siendo la de Tavily.
+- **Búsqueda de Google dentro de Gemini:** con `ia.busqueda = auto` se usa si hay una clave de Gemini guardada que pueda buscar (en las pruebas, la de pago sí y la gratuita no), sea cual sea el proveedor; si no, Tavily y, sin clave, Wikipedia y las wikis de juegos.
 - **Razonamiento:** el nivel de razonamiento solo se envía a modelos `openai` si activas `razonamiento`; con Anthropic todavía no se usa.
 - **Bienvenida:** `lina bienvenida` sigue guiando solo la clave de Gemini; los demás proveedores se configuran con `lina ia`.

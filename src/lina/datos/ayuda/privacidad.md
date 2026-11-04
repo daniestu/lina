@@ -12,11 +12,22 @@ Lina no tiene telemetría: no envía estadísticas ni datos de uso a nadie. Lo �
 - **El resultado de las órdenes y herramientas** que la IA usa para ayudarte (por ejemplo, la lista de programas instalados o el texto de una página que le pides leer).
 - Si has puesto una clave de **Tavily**, el texto de cada búsqueda web, que se envía a Tavily. Puede incluir lo que preguntas o el nombre de un programa o juego que tengas abierto; a Tavily no le llegan tu voz, capturas de pantalla ni archivos.
 
+## Adónde va cada búsqueda en internet (`ia.busqueda`)
+
+Con `auto`, lo de fábrica, Lina prueba en este orden y se queda con lo primero que dé resultados. En todos los casos solo sale **el texto de la búsqueda**: nunca tu voz, capturas ni archivos.
+
+1. **Google, dentro de Gemini**, si tienes clave de pago con saldo en tu tope (o una clave de Gemini que sí pueda buscar: en las pruebas, la gratuita no ha podido). Es una consulta aparte a Google, que ya recibe tus preguntas. Con la de pago, pasadas las búsquedas gratuitas del mes, cuesta dinero y cuenta en tu tope.
+2. **Tavily**, si tienes clave.
+3. **DuckDuckGo**, solo si lo enciendes (`lina config poner ia.busqueda_reserva true`). Está apagado de fábrica porque es poco fiable: suele tomar a los programas por robots y entonces no da nada. DuckDuckGo ve el texto de la búsqueda y tu dirección IP. Lina no se hace pasar por un navegador para evitar su bloqueo. La primera vez que se usa, te lo dice.
+4. **Wikipedia y algunas wikis de juegos** (Fandom, minecraft.wiki, wiki.gg, bg3.wiki, WikiDex), con su buscador, sin clave. Ven el texto de la búsqueda y tu dirección IP. Lina descarga también la primera página encontrada, cuyo texto llega a la IA. La primera vez que se usan, te llega una notificación.
+
+Con `tavily` solo se usa Tavily (y DuckDuckGo si lo enciendes); con `google`, solo la de Gemini (y DuckDuckGo si lo enciendes); con `ninguna`, nada, salvo que digas «búscalo igualmente», que busca como `auto` solo en esa petición.
+
 - Si guardas **fuentes** (una web para un tema) y usas Gemini, lo siguiente:
   - **A Gemini:** la lista de tus temas en cada petición que pueda usarlas, y cuando la IA elige una, una consulta más con solo ese tema y tu pregunta. Esa consulta va por tu clave de pago si la tienes y queda saldo de tu tope; si no, por la gratuita. Lo que traiga la web también le llega a la IA.
-  - **A Tavily o DuckDuckGo:** el texto de la búsqueda y el dominio de tu fuente, para buscar solo ahí. DuckDuckGo solo se usa si Tavily no responde y tienes la reserva activa.
-  - **Con `ia.busqueda` en `tavily` sin clave y `busqueda_reserva` activa:** tu consulta va a DuckDuckGo, limitada a esa web. Si no encuentra nada, se descarga la página guardada, como en el caso siguiente.
-  - **Con `ia.busqueda` en `ninguna`, o `tavily` sin clave y `busqueda_reserva` apagada:** no se usa ningún buscador. Tu equipo descarga directamente la página guardada, así que **esa web ve tu dirección IP**, y su texto se envía a la IA.
+  - **A Tavily o DuckDuckGo:** el texto de la búsqueda y el dominio de tu fuente, para buscar solo ahí. DuckDuckGo solo se usa si lo has encendido (`busqueda_reserva`) y Tavily no responde o no hay clave.
+  - **Con `ia.busqueda` en `auto` o `tavily` sin clave de Tavily y `busqueda_reserva` encendida:** tu consulta va a DuckDuckGo, limitada a esa web. Si no encuentra nada, se descarga la página guardada, como en el caso siguiente.
+  - **Con `ia.busqueda` en `ninguna` o `google`, o sin clave de Tavily y con `busqueda_reserva` apagada (lo de fábrica):** no se usa ningún buscador para tu fuente. Tu equipo descarga directamente la página guardada, así que **esa web ve tu dirección IP**, y su texto se envía a la IA.
 
 ## Qué NO se envía
 
@@ -39,7 +50,7 @@ Se activa con «activa el modo privado» y se quita solo con el atajo, diciendo 
 **Lo que NO cambia. No es un modo de incógnito:**
 
 - Lo que dices se sigue enviando a la IA en texto, con la conversación en curso, el nombre de la ventana activa y el resultado de las herramientas.
-- Las búsquedas se siguen enviando a Tavily o a DuckDuckGo.
+- Las búsquedas se siguen enviando adonde toque (Google dentro de Gemini, Tavily, DuckDuckGo si lo encendiste, Wikipedia y las wikis de juegos).
 - Lo que ya estaba en la conversación sigue ahí: activarlo no la borra.
 - Sigue guardándose lo demás: el registro (también tus preguntas, si `privacidad.registrar_preguntas` está activo), el registro de acciones, el diario de cambios, las recetas que aprendo, los tiempos y lo que me pidas recordar, y sigo usando esos recuerdos.
 

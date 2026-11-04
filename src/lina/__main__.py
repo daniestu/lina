@@ -32,6 +32,7 @@ AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
   lina probar-ponme [N]                 pasa una tanda de «ponme el partido / el capítulo…» por tu Lina sin abrir nada y mide si acierta, cuánto tarda y cuántas páginas abre
   lina avisos                qué avisos de disco, batería y actualizaciones tienes encendidos y qué dirían ahora
   lina probar-ia [N] [--grabar]         pasa una tanda de frases por tu Lina sin ejecutar nada y comprueba qué herramientas elige el modelo; --comparar enfrenta pasadas
+  lina probar-busqueda [gratis|tavily|pago] [N]   20 preguntas típicas con la Lina de un usuario nuevo: ¿responde con fuente? (con tavily o pago, al menos 18 de 20)
   lina tiempos [N|escucha|ia]   en qué fase se va el tiempo de tus últimas N peticiones (solo números, nada de lo que dices); «escucha»: cómo termina el atajo de escucharte; «ia»: tokens y caché de la IA
   lina manos-libres ORDEN    probar "frase" · eco · nivel   (ajustes del manos libres)
   lina indicador probar      enseña el resplandor de escucha
@@ -117,6 +118,9 @@ def main(argv=None):
     if orden == "probar-ponme":
         from lina.nucleo import probar_ponme
         return probar_ponme.principal(resto)
+    if orden == "probar-busqueda":
+        from lina.nucleo import probar_busqueda
+        return probar_busqueda.principal(resto)
     if orden == "memoria":
         from lina.nucleo import memoria
         return memoria.principal(resto)

@@ -101,9 +101,11 @@ ESQUEMA: dict = {
         "modelo_profundo": ("", "texto", None, N_("Modelo para el modo «a fondo». Vacío: el recomendado, o el rápido si no hay uno recomendado.")),
         "url_base": ("", "texto", None, N_("Solo con «openai»: dirección del servicio si no es OpenAI, p. ej. http://localhost:11434/v1 (Ollama). En local no hace falta clave.")),
         "razonamiento": (False, "bool", None, N_("Solo con «openai»: true si el modelo es de razonamiento (o3, gpt-5…) y admite indicar cuánto pensar.")),
-        "busqueda": ("tavily", "opcion", ("tavily", "google", "ninguna"), N_("Búsqueda en internet para lo que cambia (resultados, horarios, noticias, «ponme el partido»): "
-                     "tavily (gratis, con tu clave: lina clave tavily), google (la de Gemini, solo con clave de pago) o ninguna (Lina responde con lo que sabe y no avisa de que falta).")),
-        "busqueda_reserva": (True, "bool", None, N_("true: si Tavily no responde o agota su cupo, busca en DuckDuckGo (sin clave). false: sin reserva.")),
+        "busqueda": ("auto", "opcion", ("auto", "tavily", "google", "ninguna"), N_("Búsqueda en internet para lo que cambia (resultados, horarios, noticias, «ponme el partido»): "
+                     "auto (de fábrica: la de Gemini con tu clave de pago, Tavily si tienes clave, y si no Wikipedia y wikis de juegos), tavily (solo Tavily: lina clave tavily), "
+                     "google (solo la de Gemini, con clave de pago) o ninguna (Lina responde con lo que sabe y no avisa de que falta).")),
+        "busqueda_reserva": (False, "bool", None, N_("true: también busca en DuckDuckGo, sin clave, si lo demás no responde. Poco fiable: suele tomar a los programas por robots, "
+                             "y DuckDuckGo ve tu consulta y tu dirección IP. false (de fábrica): no se usa.")),
         "tope_vram_mb": (4096, "int", (512, 65536), N_("Lo máximo de memoria de vídeo (MB) que Lina ocupa a la vez, contando Whisper. El modelo local de reserva (Ollama) solo "
                          "se carga si cabe dentro de este tope.")),
     },

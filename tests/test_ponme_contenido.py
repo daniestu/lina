@@ -134,6 +134,7 @@ def test_buscar_web_pasa_el_dominio(monkeypatch):
     A, a, _ = _asistente("x", [])
     a.busquedas_turno, a.max_busquedas = 0, 2
     pedidas = []
+    monkeypatch.setattr(A, "modo_busqueda", lambda: "tavily")
     monkeypatch.setattr(A, "buscar_tavily", lambda consulta, dominio=None: pedidas.append((consulta, dominio)) or "ok")
     a._ejecutar_herramienta("buscar_web", {"consulta": "barcelona sevilla", "dominio": "movistarplus.es"})
     assert pedidas == [("barcelona sevilla", "movistarplus.es")]

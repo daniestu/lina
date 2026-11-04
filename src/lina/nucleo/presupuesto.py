@@ -31,6 +31,8 @@ TOPE_MAXIMO_POR_VOZ = 100            # por voz no se sube el tope de más de est
 TOPE_EUR = 10.0
 EUR_POR_USD = 0.92                    # conservador (si el dólar vale menos, la cuenta sale algo más alta que la real)
 AVISOS_PORCENTAJE = (50, 80, 100)
+BUSQUEDAS_GOOGLE_GRATIS_MES = 5000    # Gemini 3: las primeras búsquedas de Google del mes no se cobran (documentación de Google)…
+USD_POR_BUSQUEDA_GOOGLE = 0.014       # …y después, 14 $ cada 1000
 _FLASH_38 = [(None, 0.75, 3.75, 0.075), ("2027-01-01", 1.50, 7.50, 0.15)]        # Google lo sube el 1 de enero de 2027
 PRECIOS_DEFECTO = {                  # dólares por millón de tokens: (desde, entrada, salida —con el razonamiento—, entrada en caché)
     "gemini-3.8-flash": _FLASH_38, "gemini-3.7-flash": _FLASH_38, "gemini-3.6-flash": _FLASH_38,
@@ -79,6 +81,11 @@ def pago_disponible():
     with _lock:
         d = _cargar()
         return _gasto_eur(d) < _tope_eur(d)
+
+
+def clave_de_pago_con_saldo():
+    """La clave de pago si se puede usar ahora (hay saldo de tope este mes), o «»."""
+    return _claves["pago"] if pago_disponible() else ""
 
 
 def claves_para(modo):
@@ -190,7 +197,8 @@ def coste_usd(modelo_real, modelo_pedido, prompt, candidatos, razonamiento, cach
 
 # ======================= lo gastado =======================
 def _nuevo(mes):
-    return {"mes": mes, "usd": 0.0, "llamadas_pago": 0, "llamadas_gratis": 0, "tokens_pago": 0, "tokens_gratis": 0, "avisos": [], "por_modelo": {}}
+    return {"mes": mes, "usd": 0.0, "llamadas_pago": 0, "llamadas_gratis": 0, "tokens_pago": 0, "tokens_gratis": 0, "avisos": [], "por_modelo": {},
+            "busquedas_google_pago": 0, "busquedas_google_gratis": 0}
 
 
 def _cargar():
@@ -273,6 +281,26 @@ def _registrar(clave, modelo, uso, modelo_real=None):
                 else:
                     _avisos_pendientes.append(T("Ojo: llevas el {u} % del tope de gasto de este mes ({gasto} de {tope}).", u=u, gasto=_euros(gasto), tope=_euros(tope)))
         _guardar(d)
+
+
+def registrar_busquedas_google(clave, n):
+    """Las búsquedas de Google que hizo Gemini en una llamada. Con la de pago, pasadas las gratuitas del mes, cuestan dinero y cuentan en el tope. Nunca falla."""
+    try:
+        n = _entero(n)
+        with _lock:
+            d = _cargar()
+            tipo = nombre_de(clave)
+            antes = int(d.get(f"busquedas_google_{tipo}", 0))
+            d[f"busquedas_google_{tipo}"] = antes + n
+            if tipo == "pago":
+                cobradas = max(0, antes + n - BUSQUEDAS_GOOGLE_GRATIS_MES) - max(0, antes - BUSQUEDAS_GOOGLE_GRATIS_MES)
+                usd = cobradas * USD_POR_BUSQUEDA_GOOGLE
+                d["usd"] = float(d.get("usd", 0.0)) + usd
+                if usd:
+                    d["por_modelo"]["google_search"] = round(float(d["por_modelo"].get("google_search", 0.0)) + usd, 6)
+            _guardar(d)
+    except Exception as e:
+        log(f"No he podido apuntar las búsquedas de Google: {e!r}")
 
 
 def avisos_pendientes():

@@ -373,10 +373,10 @@ def pide_anadir_suelto(frase):
 
 
 def activas():
-    """¿Se usan las fuentes con esta configuración? Solo está medido con Gemini; con ia.busqueda en google la búsqueda va dentro del modelo y no hay herramientas nuestras."""
-    from lina.nucleo import ia as IA
+    """¿Se usan las fuentes con esta configuración? Solo está medido con Gemini. Con cualquier ia.busqueda: la de Google ya va en una consulta aparte y
+    no quita nuestras herramientas, como antes."""
     from lina.nucleo import ia_activa as IAC
-    return IAC.actual().nombre == "gemini" and IA.modo_busqueda() in ("tavily", "ninguna")
+    return IAC.actual().nombre == "gemini"
 
 
 def dominio_hablado(dominio):

@@ -1,0 +1,69 @@
+# Wikis de juegos en las que Lina busca sin clave (búsqueda de MediaWiki), cuando la consulta nombra el juego.
+# api: la dirección de api.php sin «https://» ni «/api.php». pagina: lo que va delante del título de la página.
+# es / en: la wiki en cada idioma; se prueba primero la del idioma de Lina y, si no da nada, la otra.
+# Todas comprobadas a mano (responden a la búsqueda sin clave). Para añadir una: que sea MediaWiki y que responda a
+#   https://<api>/api.php?action=query&list=search&srsearch=prueba&format=json
+
+[[wiki]]
+nombres = ["skyrim", "oblivion", "morrowind", "elder scrolls"]
+es = { api = "elderscrolls.fandom.com/es", pagina = "https://elderscrolls.fandom.com/es/wiki/" }
+en = { api = "elderscrolls.fandom.com", pagina = "https://elderscrolls.fandom.com/wiki/" }
+
+[[wiki]]
+nombres = ["lol esports", "worlds", "lec", "lck", "lpl", "superliga", "partidos de lol", "partido de lol", "lol matches", "mundial de lol", "mundial de league of legends"]
+en = { api = "lol.fandom.com", pagina = "https://lol.fandom.com/wiki/" }
+
+[[wiki]]
+nombres = ["league of legends", "lol"]
+es = { api = "leagueoflegends.fandom.com/es", pagina = "https://leagueoflegends.fandom.com/es/wiki/" }
+en = { api = "leagueoflegends.fandom.com", pagina = "https://leagueoflegends.fandom.com/wiki/" }
+
+[[wiki]]
+nombres = ["no man's sky", "no mans sky", "nms"]
+es = { api = "nomanssky.fandom.com/es", pagina = "https://nomanssky.fandom.com/es/wiki/" }
+en = { api = "nomanssky.fandom.com", pagina = "https://nomanssky.fandom.com/wiki/" }
+
+[[wiki]]
+nombres = ["minecraft"]
+es = { api = "es.minecraft.wiki", pagina = "https://es.minecraft.wiki/w/" }
+en = { api = "minecraft.wiki", pagina = "https://minecraft.wiki/w/" }
+
+[[wiki]]
+nombres = ["terraria"]
+es = { api = "terraria.wiki.gg/es", pagina = "https://terraria.wiki.gg/es/wiki/" }
+en = { api = "terraria.wiki.gg", pagina = "https://terraria.wiki.gg/wiki/" }
+
+[[wiki]]
+nombres = ["baldur's gate 3", "baldurs gate 3", "baldur's gate", "bg3"]
+en = { api = "bg3.wiki/w", pagina = "https://bg3.wiki/wiki/" }
+
+[[wiki]]
+nombres = ["cyberpunk", "cyberpunk 2077"]
+es = { api = "cyberpunk.fandom.com/es", pagina = "https://cyberpunk.fandom.com/es/wiki/" }
+en = { api = "cyberpunk.fandom.com", pagina = "https://cyberpunk.fandom.com/wiki/" }
+
+[[wiki]]
+nombres = ["witcher", "the witcher", "geralt"]
+es = { api = "witcher.fandom.com/es", pagina = "https://witcher.fandom.com/es/wiki/" }
+en = { api = "witcher.fandom.com", pagina = "https://witcher.fandom.com/wiki/" }
+
+[[wiki]]
+nombres = ["elden ring"]
+en = { api = "eldenring.fandom.com", pagina = "https://eldenring.fandom.com/wiki/" }
+
+[[wiki]]
+nombres = ["pokemon", "pokémon"]
+es = { api = "www.wikidex.net", pagina = "https://www.wikidex.net/wiki/" }
+
+[[wiki]]
+nombres = ["zelda"]
+es = { api = "zelda.fandom.com/es", pagina = "https://zelda.fandom.com/es/wiki/" }
+en = { api = "zelda.fandom.com", pagina = "https://zelda.fandom.com/wiki/" }
+
+[[wiki]]
+nombres = ["fortnite"]
+es = { api = "fortnite.fandom.com/es", pagina = "https://fortnite.fandom.com/es/wiki/" }
+
+[[wiki]]
+nombres = ["valorant"]
+en = { api = "valorant.fandom.com", pagina = "https://valorant.fandom.com/wiki/" }

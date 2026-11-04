@@ -10,6 +10,7 @@ import re
 import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from lina import __version__
@@ -83,6 +84,13 @@ class Sondas:
     def busqueda(self):
         """(ia.busqueda, dónde está la clave de Tavily, dónde está la clave de pago de Gemini). Solo mira: no gasta consultas."""
         return AJ.actuales(log=lambda m: None).get("ia", "busqueda"), CL.donde_esta("tavily"), CL.donde_esta("gemini_pago")
+
+    def busqueda_detalle(self):
+        """(¿DuckDuckGo encendido?, cuándo nos tomó por un robot la última vez o None, [(«pago»|«gratis», desde, hasta)] de las claves de Gemini que no se
+        prueban con la búsqueda de Google). Solo lee archivos de estado: no busca nada."""
+        from lina.nucleo import busqueda as BUS
+        from lina.nucleo import ia as IA
+        return IA.hay_reserva(), IA.ultimo_robot(), BUS.estado_google()
 
     def servicio(self):
         """'activo' | 'inactivo' | 'sin_systemd'."""
@@ -230,16 +238,39 @@ def comprobar(s=None, red=False):
         a(AVISO, T("Búsqueda en internet"), T("no he podido mirarla ({bus})", bus=bus))
     elif bus:
         modo, tavily, pago = bus
-        if modo == "tavily":
-            a(OK, T("Búsqueda en internet"), T("Tavily, clave guardada en {cl}", cl=tavily) if tavily else T("Tavily, pero sin clave: sin datos de hoy (resultados, horarios, noticias)"),
-              "" if tavily else T("lina clave tavily   (gratis en tavily.com)"))
+        if modo == "auto":
+            if pago or tavily:
+                que = " + ".join(([T("Gemini con tu clave de pago")] if pago else []) + ([T("Tavily (clave en {cl})", cl=tavily)] if tavily else []))
+                a(OK, T("Búsqueda en internet"), T("auto: {que}, y si no dan nada, Wikipedia y wikis de juegos", que=que))
+            else:
+                a(AVISO, T("Búsqueda en internet"), T("auto, sin Tavily ni clave de pago: solo Wikipedia y wikis de juegos (nada de noticias, precios, horarios ni resultados)"),
+                  T("lina bienvenida   (una clave gratuita de Tavily)"))
+        elif modo == "tavily":
+            a(OK, T("Búsqueda en internet"), T("tavily (lo elegiste tú): solo Tavily, clave guardada en {cl}", cl=tavily) if tavily
+              else T("tavily (lo elegiste tú), pero sin clave: sin datos de hoy (resultados, horarios, noticias)"),
+              T("Con «auto» también buscaría con tu clave de pago de Gemini y en Wikipedia:  lina config poner ia.busqueda auto") if tavily
+              else T("lina clave tavily   (gratis en tavily.com), o «auto» para buscar al menos en Wikipedia:  lina config poner ia.busqueda auto"))
         elif modo == "google" and nombre != "Gemini":
-            a(AVISO, T("Búsqueda en internet"), T("google solo existe con Gemini: ahora no hay búsqueda"), T("lina config   (cambia ia.busqueda a tavily)"))
+            a(AVISO, T("Búsqueda en internet"), T("google solo existe con Gemini: ahora no hay búsqueda"), T("lina config poner ia.busqueda auto"))
         elif modo == "google":
-            a(OK if pago else AVISO, T("Búsqueda en internet"), T("la de Gemini, con tu clave de pago") if pago else T("la de Gemini, pero no hay clave de pago: no funcionará"),
-              "" if pago else T("lina clave gemini_pago   (o cambia ia.busqueda a tavily:  lina config)"))
+            a(OK if pago else AVISO, T("Búsqueda en internet"), T("google (lo elegiste tú): solo la de Gemini, con tu clave de pago") if pago
+              else T("google (lo elegiste tú), pero no hay clave de pago: no funcionará"),
+              "" if pago else T("lina clave gemini_pago   (o «auto»:  lina config poner ia.busqueda auto)"))
         else:
-            a(OK, T("Búsqueda en internet"), T("desactivada en ia.busqueda"))
+            a(OK, T("Búsqueda en internet"), T("desactivada en ia.busqueda (ni Wikipedia); «búscalo igualmente» busca en esa petición"))
+        reserva, robot, bloqueos = _seguro(getattr(s, "busqueda_detalle", lambda: (False, None, [])), (False, None, []))
+        if modo in ("auto", "google"):
+            for tipo, desde, _hasta in bloqueos:
+                cuando = time.strftime("%d/%m %H:%M", time.localtime(desde))
+                a(AVISO, T("Búsqueda de Google"), T("tu clave de pago dio un 429 sin detalle el {cuando} (puede ser el tope de gasto de tu cuenta de Google); se vuelve a probar "
+                                                    "mañana o al cambiar la clave", cuando=cuando) if tipo == "pago"
+                  else T("en las pruebas tu clave de Gemini no ha podido usarla (429 sin detalle, {cuando}); se vuelve a probar al cambiar la clave de Gemini", cuando=cuando))
+        if reserva and modo != "ninguna":
+            detalle = T("encendido (ia.busqueda_reserva): poco fiable, suele tomar a los programas por robots; ve tu consulta y tu dirección IP")
+            if robot and time.time() - robot < 86400:
+                detalle += T(" · te bloqueó el {cuando}: suele ser por tu dirección IP y Lina no lo esquiva; vuelve a probar a los 30 min",
+                             cuando=time.strftime("%d/%m %H:%M", time.localtime(robot)))
+            a(AVISO, "DuckDuckGo", detalle, "lina config poner ia.busqueda_reserva false")
     if not _seguro(s.llavero, False):
         a(AVISO, T("Llavero del sistema"), T("no disponible: las claves van a un archivo solo tuyo (600)"), T("Opcional: instala libsecret (secret-tool) y un llavero (GNOME Keyring o KWallet)"))
     serv = _seguro(s.servicio)

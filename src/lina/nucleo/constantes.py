@@ -67,7 +67,6 @@ TIMEOUT_REVISOR = 4                         # segundos que espera el revisor «�
 TIMEOUT_TEMA = 2.5                          # R3 (¿esta pregunta es de ese tema?): segundos por intento. Fila A11
 INTENTOS_TEMA = 2                           # con la misma clave: la gratuita puede quedarse sin cupo justo cuando más falta hace
 PAUSA_MODELO_SEG = 180                      # tras un 503/429 o un timeout, se salta ese modelo este tiempo
-PAUSA_BUSQUEDA_SEG = 1800                   # si la búsqueda de Google da error de cuota, se prueba sin ella este tiempo
 MAX_BUSQUEDAS = 2                           # búsquedas máximas por pregunta
 CONFIRMAR_ACCIONES = True                   # True: lo que cambia el sistema espera tu "sí"; False: modo libre (solo se bloquea lo catastrófico)
 MAX_CONTINUACIONES = 3                      # veces seguidas que se retoma una petición tras una tarea en segundo plano (para que no dé vueltas sin fin)

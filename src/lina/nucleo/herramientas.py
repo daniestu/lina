@@ -1301,6 +1301,60 @@ def desinstala_sin_nombrar(comando, peticion):
     return None
 
 
+# Buscar en internet o leer una web con un comando se salta lo que hacen buscar_web y leer_web (resumir, marcar lo que viene de fuera, decir de dónde sale).
+# En el registro, la IA llegó a pedirle páginas a DuckDuckGo con python y a la API de lolesports con curl. Descargar a un archivo y curl -I siguen libres.
+_BUSCADORES = re.compile(r"(?:^|\.)(?:duckduckgo\.com|bing\.com|search\.brave\.com|startpage\.com|ecosia\.org|qwant\.com|yandex\.[a-z]+|search\.yahoo\.com|"
+                         r"mojeek\.com|kagi\.com|you\.com|api\.tavily\.com|serpapi\.com|customsearch\.googleapis\.com|searx[\w.-]*)$")
+_GOOGLE = re.compile(r"^(?:www\.)?google\.[a-z.]+$")
+_LEEN_WEB = {"curl", "wget", "http", "https", "xh", "lynx", "w3m", "links", "elinks"}
+_LOCAL = re.compile(r"^(?:localhost|127\.\d+\.\d+\.\d+|\[?::1\]?|0\.0\.0\.0|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+|[\w-]+\.(?:local|lan|home\.arpa|test|localhost))$")
+_URL = re.compile(r"(?:https?://)?((?:[a-z0-9-]+\.)+[a-z]{2,24}|localhost|\d+\.\d+\.\d+\.\d+)(?::\d+)?(/[^\s'\"<>|;)]*)?", re.I)
+
+
+def _anfitrion_y_ruta(texto):
+    m = _URL.fullmatch(str(texto).strip("'\""))
+    return (m.group(1).lower(), m.group(2) or "/") if m and ("://" in texto or "." in m.group(1)) else (None, None)
+
+
+def _es_buscador(anfitrion, ruta):
+    return bool(_BUSCADORES.search(anfitrion) or (_GOOGLE.match(anfitrion) and ruta.startswith("/search")))
+
+
+def lectura_web_por_comando(comando):
+    """Si el comando busca en internet o lee una web por la salida estándar (curl, wget -O -, lynx -dump, python -c con requests/urllib…), lo que se le
+    dice a la IA en lugar de ejecutarlo; si no, None. Las webs del propio equipo o de la red de casa, las descargas a archivo y curl -I no se tocan."""
+    for seg in _segmentos(comando):
+        t = _quitar_prefijos(_tokens(seg) or [])
+        if not t:
+            continue
+        base, args = os.path.basename(t[0]), t[1:]
+        if base in _LEEN_WEB:
+            webs = [_anfitrion_y_ruta(a) for a in args if not a.startswith("-")]
+        elif re.fullmatch(r"python[\d.]*|node|perl|ruby|php", base) and any(a in ("-c", "-e", "-r") for a in args):
+            codigo = " ".join(args)
+            if not re.search(r"requests\.|urllib|urlopen|httpx|fetch\(|LWP|Net::HTTP|open-uri|file_get_contents|curl_", codigo):
+                continue
+            webs = [_anfitrion_y_ruta(u) for u in re.findall(r"https?://[^\s'\"<>|;)]+", codigo)]
+        else:
+            continue
+        webs = [(a, r) for a, r in webs if a and not _LOCAL.match(a)]
+        for anfitrion, ruta in webs:
+            if _es_buscador(anfitrion, ruta):
+                return (f"BLOQUEADO: no se busca en internet con comandos ({anfitrion}). Usa la herramienta buscar_web; si no la tienes o no da nada, dile al "
+                        "usuario el motivo, sin decir que no tienes acceso a internet.")
+        if not webs:
+            continue
+        a_archivo = (base == "curl" and any(a in ("-o", "--output", "-O", "--remote-name", "-I", "--head") or re.fullmatch(r"-[a-zA-Z]*[oOI][a-zA-Z]*", a) for a in args)
+                     or base == "wget" and not any(a in ("-O-", "-qO-", "-O", "--output-document=-") and (a != "-O" or "-" in args) for a in args)
+                     or base in ("http", "https", "xh") and any(a in ("-d", "--download") for a in args))
+        if a_archivo or re.search(r">\s*[^&\s]", seg):
+            continue
+        anfitrion, ruta = webs[0]
+        return (f"No se ha ejecutado: para leer una web usa la herramienta leer_web con url=https://{anfitrion}{ruta} (lo resume y lo marca como contenido de "
+                "fuera). Para descargar un archivo, curl -o o wget a secas sí valen.")
+    return None
+
+
 class Ejecutor:
     def __init__(self, avisar=None, confirmar=True):
         self.avisar = avisar or (lambda texto: None)
@@ -1408,6 +1462,11 @@ class Ejecutor:
         if primera in {d["name"] for d in DECLARACIONES}:
             return (f"«{primera}» es una HERRAMIENTA del asistente, no un comando de shell: llámala como herramienta (no con ejecutar_comando). "
                     "No se ha ejecutado nada.")
+        web = lectura_web_por_comando(comando)
+        if web:
+            anotar(f"[a-buscar_web-o-leer_web] {comando}")
+            log(f"Acción [no ejecutada: buscar o leer la web con un comando]: {comando}")
+            return web
         if re.fullmatch(r"(?:sudo\s+(?:-n\s+)?)?(?:gio\s+trash\s+(?:--empty|-e)|trash-empty(?:\s+\d+)?)", comando):
             return self.preparar_accion("Vaciar la papelera (borra PARA SIEMPRE todo lo que hay en ella)", vaciar_papelera, motivo)
         original = comando
