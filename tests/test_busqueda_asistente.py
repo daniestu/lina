@@ -122,6 +122,17 @@ def test_los_dos_casos_reales_de_atribucion_inventada(lina, accion, dice, queda)
     assert lina.asegurar_honestidad_final(dice) == queda
 
 
+def test_the_guardian_ya_no_se_cambia_por_otra_web(lina):
+    """Caso grave de la pasada de pago: «The Guardian» estaba bien y se sustituyó por globenewswire.com."""
+    lina.acciones_turno = [("buscar_web", {}, "RESULTADOS DE BÚSQUEDA (…):\n\n[1] a (globenewswire.com) https://v/1\nx\n[2] b (theguardian.com) https://v/2\ny")]
+    assert lina._atribucion_real("Según The Guardian, Canva recorta puestos.") == "Según The Guardian, Canva recorta puestos."
+
+
+def test_segun_la_wiki_se_corrige_con_las_webs_de_la_busqueda(lina):
+    lina.acciones_turno = [GOOGLE_SKYRIM]
+    assert lina._atribucion_real("Según la wiki, lleva ectoplasma.") == "Según gamespot.com, skyrimalchemy.com y scribd.com, lleva ectoplasma."
+
+
 def test_la_atribucion_buena_o_sin_busqueda_no_se_toca(lina):
     lina.acciones_turno = [GOOGLE_SKYRIM]
     assert lina._atribucion_real("Según gamespot.com, lleva ectoplasma.") == "Según gamespot.com, lleva ectoplasma."

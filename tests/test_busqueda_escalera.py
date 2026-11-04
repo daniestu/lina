@@ -72,6 +72,18 @@ def test_google_va_aparte_forzado_y_cuenta_el_gasto(entorno):
     PRES.registrar_busquedas_google.assert_called_once_with("CLAVE-PAGO", 1)
 
 
+def test_la_busqueda_de_google_sabe_que_dia_es_hoy(entorno):
+    """La llamada aparte no lleva nuestras instrucciones (ni la fecha): sin ella dio como «próximo eclipse» uno de agosto de 2026 en noviembre de 2026."""
+    entorno(pago="CLAVE-PAGO")
+    post = MagicMock(return_value=respuesta(200, GROUNDING))
+    hoy = time.mktime((2026, 11, 5, 10, 0, 0, 0, 0, -1))
+    BUS.resultados_google("próximo eclipse visible en España", post=post, ahora=hoy)
+    texto = post.call_args.kwargs["json"]["contents"][0]["parts"][0]["text"]
+    assert texto.startswith("Busca en internet: próximo eclipse visible en España.")
+    assert "Hoy es 2026-11-05." in texto and "posterior a hoy" in texto and "descarta lo que ya haya pasado" in texto
+    assert "Hoy es 2026-11-05." in BUS.pedido_google("x", "ign.es", hoy) and BUS.pedido_google("x", "ign.es", hoy).startswith("Busca en internet solo dentro de la web ign.es: x.")
+
+
 def test_el_texto_para_la_ia_dice_el_dominio_de_verdad_y_no_el_enlace_de_paso(entorno):
     texto = IA._resultados_como_texto(BUS.resultados_de_google(GROUNDING))
     assert "(uesp.net)" in texto and "(vertexaisearch" not in texto
@@ -405,13 +417,52 @@ def test_la_ia_recibe_las_webs_reales_y_la_regla_de_citar_solo_esas():
     ("En la wiki de Skyrim dice que lleva ectoplasma.", ["elderscrolls.fandom.com"], "En la wiki de Skyrim dice que lleva ectoplasma."),
     ("Según la Agencia Estatal de Meteorología, lloverá.", ["aemet.es"], "Según la Agencia Estatal de Meteorología, lloverá."),
     # lo que no es una web no se toca
-    ("Según la búsqueda, lleva ectoplasma.", ["gamespot.com"], "Según la búsqueda, lleva ectoplasma."),
+    ("Según la búsqueda, lleva ectoplasma.", ["gamespot.com"], "Según gamespot.com, lleva ectoplasma."),       # vaga: se dice de dónde
     ("Según lo que he encontrado, lleva ectoplasma.", ["gamespot.com"], "Según lo que he encontrado, lleva ectoplasma."),
     # sin webs de verdad no hay con qué cambiarla
     ("Según la wiki UESP, lleva ectoplasma.", [], "Según la wiki UESP, lleva ectoplasma."),
 ])
 def test_la_atribucion_inventada_se_corrige_en_codigo(texto, dominios, queda):
     assert BUS.corregir_atribucion(texto, dominios) == queda
+
+
+# casos reales de la pasada de pago del 2026-11-05: estaban bien y se tomaron por inventados
+PAGO_05 = [
+    ("Según The Guardian, Canva recorta 1200 puestos.", ["globenewswire.com", "theguardian.com", "prnewswire.com"]),
+    ("Según La Vanguardia, mañana hará sol.", ["lavanguardia.com", "meteoensevilla.es", "aemet.es"]),
+    ("Según as.com, el Barcelona lidera LaLiga.", ["as.com"]),
+    ("Según xe.com, el euro está a 1,12 dólares.", ["xe.com", "europa.eu"]),
+    ("Según la comunidad de Steam, se hace con huevos de chaurus.", ["reddit.com", "steamcommunity.com"]),
+]
+
+
+@pytest.mark.parametrize("texto, dominios", PAGO_05)
+def test_una_atribucion_correcta_no_se_toca(texto, dominios):
+    assert BUS.atribuciones_inventadas(texto, dominios) == []
+    assert BUS.corregir_atribucion(texto, dominios) == texto
+
+
+@pytest.mark.parametrize("nombre, dominio, si", [
+    ("La Vanguardia", "lavanguardia.com", True), ("The Guardian", "theguardian.com", True), ("as.com", "as.com", True), ("xe.com", "xe.com", True),
+    ("la comunidad de Steam", "steamcommunity.com", True), ("GamesRadar", "gamesradar.com", True), ("www.as.com", "as.com", True),
+    ("as.com", "elcorreo.com", False), ("La Vanguardia", "globenewswire.com", False), ("The Guardian", "globenewswire.com", False),
+    ("Google News", "emergent.sh", False), ("la wiki UESP", "gamespot.com", False), ("Marca", "as.com", False),
+])
+def test_nombre_y_dominio(nombre, dominio, si):
+    assert BUS.nombra(dominio, nombre) is si
+
+
+@pytest.mark.parametrize("texto, queda", [
+    ("Según la wiki, la poción lleva flor de montaña azul.", "Según gamespot.com, reddit.com y scalacube.com, la poción lleva flor de montaña azul."),
+    ("Según los foros, lleva trigo.", "Según gamespot.com, reddit.com y scalacube.com, lleva trigo."),
+    ("Según la web, lleva trigo.", "Según gamespot.com, reddit.com y scalacube.com, lleva trigo."),
+    ("Según la wiki de Skyrim, lleva trigo.", "Según gamespot.com, reddit.com y scalacube.com, lleva trigo."),      # nombrada, pero no salió
+    ("Lleva trigo, según la comunidad.", "Lleva trigo, según gamespot.com, reddit.com y scalacube.com."),
+    ("Según gamespot.com, lleva trigo.", "Según gamespot.com, lleva trigo."),
+    ("Lo he mirado en la wiki y lleva trigo.", "Lo he mirado en la wiki y lleva trigo."),                       # no atribuye con «según»: no se toca
+])
+def test_la_atribucion_vaga_se_trata_como_no_citada_y_se_corrige(texto, queda):
+    assert BUS.corregir_atribucion(texto, ["gamespot.com", "reddit.com", "scalacube.com"]) == queda
 
 
 @pytest.mark.parametrize("dominios, dice", [

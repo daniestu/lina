@@ -159,6 +159,15 @@ def _claves_google():
     return [(c, t) for c, t in ((pago, "pago"), (gratis, "gratis")) if c and not (t == "gratis" and c == pago)]
 
 
+def pedido_google(consulta, dominio=None, ahora=None):
+    """Lo que se le pide a Gemini con la búsqueda. «Busca en internet:» delante (sin eso contestaba de memoria) y la fecha de hoy: esta llamada no lleva
+    nuestras instrucciones, y sin fecha dio como «próximo eclipse» uno de agosto de 2026 cuando ya era noviembre."""
+    hoy = time.strftime("%Y-%m-%d", time.localtime(ahora or time.time()))
+    return (f"Busca en internet{' solo dentro de la web ' + dominio if dominio else ''}: {consulta}. Hoy es {hoy}. Si se pregunta por algo próximo o futuro, "
+            "da solo lo que sea posterior a hoy y descarta lo que ya haya pasado; si se pregunta por lo último, lo más reciente hasta hoy. "
+            "Responde con los datos que encuentres, en pocas frases.")
+
+
 def resultados_google(consulta, dominio=None, post=None, ahora=None):
     """(resultados, motivo): la búsqueda de Google en una llamada aparte a Gemini. Cuenta en el gasto (tokens y búsquedas)."""
     claves = _claves_google()
@@ -172,7 +181,7 @@ def resultados_google(consulta, dominio=None, post=None, ahora=None):
         if (ahora or time.time()) < _pausa_google.get(huella(clave), 0):
             motivo = motivo or T(M_GOOGLE_FALLO)
             continue
-        pedido = f"Busca en internet{' solo dentro de la web ' + dominio if dominio else ''}: {consulta}. Responde con los datos que encuentres, en pocas frases."
+        pedido = pedido_google(consulta, dominio, ahora)
         cuerpo = {"contents": [{"role": "user", "parts": [{"text": pedido}]}], "tools": [{"google_search": {}}]}
         inicio = time.time()
         try:
@@ -454,39 +463,55 @@ def frase_de_fallo(resultados):
 ALIAS = {"steampowered.com": ("steam",), "store.steampowered.com": ("steam",), "ign.com": ("ign",), "ign.es": ("ign",), "x.com": ("twitter",),
          "elpais.com": ("el pais",), "elmundo.es": ("el mundo",), "rtve.es": ("rtve", "radiotelevision espanola"), "aemet.es": ("aemet", "agencia estatal de meteorologia"),
          "bbc.com": ("bbc",), "bbc.co.uk": ("bbc",), "nytimes.com": ("new york times",), "lolesports.com": ("lol esports",),
-         "uesp.net": ("uesp", "unofficial elder scrolls pages"), "wikipedia.org": ("wikipedia",), "pccomponentes.com": ("pc componentes", "pccomponentes")}
+         "uesp.net": ("uesp", "unofficial elder scrolls pages"), "wikipedia.org": ("wikipedia",), "pccomponentes.com": ("pc componentes", "pccomponentes"),
+         "steamcommunity.com": ("steam", "comunidad de steam", "steam community")}
 _GENERICAS = {"www", "com", "es", "org", "net", "en", "w", "wiki", "co", "uk", "io", "gg", "info", "html", "fandom", "store", "news", "blog"}
 _NO_SON_FUENTE = {"google", "internet", "la busqueda", "los resultados", "las fuentes", "la web", "mis datos", "wiki"}
+# «Según la wiki», «según los foros», «según la web»: una atribución sin ninguna web reconocible. Cuenta como no citada y se corrige igual que una inventada.
+_ATRIBUCION_VAGA = re.compile(
+    r"\b(?:[Ss]eg[uú]n|[Dd]e acuerdo con|[Aa]ccording to)\s+(?P<fuente>(?:(?:la|el|los|las|the)\s+)?(?:wiki|web|página|pagina|foros?|comunidad|internet|red|"
+    r"búsqueda|busqueda|resultados|fuentes|webs|wikis|website|forums?|community|search|results|sources))(?=\s*[,.;:]|\s*$|\s+(?:que|se|hay|dice|indica|mencionan?)\b)")
 _ATRIBUCION = re.compile(
     r"(?P<intro>\b(?:[Ss]eg[uú]n|[Dd]e acuerdo con|[Cc]omo (?:indica|dice|recoge|explica|publica)|[Ii]nforma|[Ff]uente:|[Aa]ccording to|[Ss]ource:|"
     r"[Ee]n(?=\s+(?:la|el)\s+(?:web|página|pagina|wiki|tienda|sitio|portal)\b))\s+)"
-    r"(?P<fuente>(?:(?:la|el|los|las|the)\s+)?(?:(?:web|página|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site)\s+(?:de\s+(?:la\s+|el\s+)?|del\s+|of\s+(?:the\s+)?)?)?"
+    r"(?P<fuente>(?:(?:la|el|los|las|the)\s+)?(?:(?:web|página|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site|comunidad|foros?|community|forums?)\s+(?:de\s+(?:la\s+|el\s+)?|del\s+|of\s+(?:the\s+)?)?)?"
     r"(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b|[A-Z0-9ÁÉÍÓÚÑ][\w'’.-]*(?:\s+(?:de\s+)?[A-Z0-9ÁÉÍÓÚÑ][\w'’.-]*){0,3}))")
 
 
 def _sin_relleno(nombre):
     t = C.normalizar(nombre).rstrip(".")
-    t = re.sub(r"^(?:(?:la|el|los|las|the) )?(?:(?:web|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site) (?:de (?:la |el )?|del |of (?:the )?)?)?", "", t)
+    t = re.sub(r"^(?:(?:la|el|los|las|the) )?(?:(?:web|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site|comunidad|foros?|community|forums?) (?:de (?:la |el )?|del |of (?:the )?)?)?", "", t)
     return t.strip()
 
 
 def nombra(dominio, nombre):
-    """¿Ese nombre («la wiki UESP», «Steam», «gamespot.com», «la wiki de Skyrim») es la web `dominio`?"""
+    """¿Ese nombre («la wiki UESP», «Steam», «gamespot.com», «La Vanguardia», «la comunidad de Steam») es la web `dominio`?"""
     n = _sin_relleno(nombre)
     if not n:
         return False
-    junto = n.replace(" ", "")
+    entero = C.normalizar(nombre).rstrip(".").strip()                 # con el artículo: «La Vanguardia» es lavanguardia.com, «The Guardian» theguardian.com
     dominio = dominio.lower().removeprefix("www.")
-    partes = [p for p in re.split(r"[.-]", dominio) if len(p) >= 3 and p not in _GENERICAS]
-    if any(re.search(rf"\b{re.escape(p)}\b", n) or p in junto for p in partes):
+    como_dominio = str(nombre).lower().strip().rstrip(".").removeprefix("www.")
+    if como_dominio == dominio or dominio.endswith("." + como_dominio) or como_dominio.endswith("." + dominio):    # «as.com», «xe.com»: etiquetas cortas
         return True
-    if any(dominio == d or dominio.endswith("." + d) for d, alias in ALIAS.items() for a in alias if re.search(rf"\b{re.escape(a)}\b", n)):
+    etiquetas = [p for p in re.split(r"[.-]", dominio) if p and p not in _GENERICAS]
+    juntos = {re.sub(r"[^a-z0-9]", "", t) for t in (n, entero)}
+    if any(e in juntos for e in etiquetas):                           # el nombre entero, sin espacios, es una etiqueta del dominio
+        return True
+    if any(len(e) >= 3 and (re.search(rf"\b{re.escape(e)}\b", n) or any(e in j for j in juntos)) for e in etiquetas):
+        return True
+    if any(dominio == d or dominio.endswith("." + d) for d, alias in ALIAS.items() for a in alias if re.search(rf"\b{re.escape(a)}\b", entero)):
         return True
     for w in wikis():
         hosts = {str(d.get("api", "")).split("/")[0] for d in (w.get("es"), w.get("en")) if isinstance(d, dict)}
         if dominio in hosts and any(re.search(rf"\b{re.escape(C.normalizar(x))}\b", n) for x in w.get("nombres", [])):
             return True
     return False
+
+
+def atribuciones_vagas(texto):
+    """[(inicio, fin, nombre)] de cada «según la wiki», «según los foros»…: atribuye el dato sin nombrar ninguna web."""
+    return [(m.start("fuente"), m.end("fuente"), m.group("fuente")) for m in _ATRIBUCION_VAGA.finditer(str(texto))]
 
 
 def fuentes_nombradas(texto):
@@ -519,14 +544,15 @@ def webs_de_verdad(dominios):
 
 
 def corregir_atribucion(texto, dominios):
-    """La respuesta con cada fuente inventada cambiada por las webs de verdad («Según la wiki UESP» → «Según gamespot.com, skyrimalchemy.com y
-    scribd.com»). Sin `dominios`, tal cual."""
+    """La respuesta con cada fuente inventada o vaga cambiada por las webs de verdad («Según la wiki UESP» o «Según la wiki» → «Según gamespot.com,
+    skyrimalchemy.com y scribd.com»). Sin `dominios`, tal cual."""
     if not dominios:
         return texto
     salida = str(texto)
-    for inicio, fin, nombre in reversed(fuentes_nombradas(salida)):
-        if not any(nombra(d, nombre) for d in dominios):
-            salida = salida[:inicio] + webs_de_verdad(dominios) + salida[fin:]
+    cambiar = [(i, f) for i, f, nombre in fuentes_nombradas(salida) if not any(nombra(d, nombre) for d in dominios)]
+    cambiar += [(i, f) for i, f, _ in atribuciones_vagas(salida)]
+    for inicio, fin in sorted(set(cambiar), reverse=True):
+        salida = salida[:inicio] + webs_de_verdad(dominios) + salida[fin:]
     return salida
 
 

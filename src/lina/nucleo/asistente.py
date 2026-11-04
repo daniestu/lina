@@ -2165,17 +2165,18 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         return self._atribucion_real(self._sin_negar_internet(self._avisar_fuente_sin_anadir(self._aclarar_fuente(self._honestidad_de_lo_hecho(texto)))))
 
     def _atribucion_real(self, texto):
-        """«Según la wiki UESP…» con resultados de gamespot.com: el dato se atribuye a una web que no salió de ninguna búsqueda ni lectura. Se cambia por una
-        de verdad. Con una fuente tuya de por medio no se toca: eso lo cuida _aclarar_fuente."""
+        """«Según la wiki UESP…» con resultados de gamespot.com: el dato se atribuye a una web que no salió de ninguna búsqueda ni lectura, o a ninguna
+        («según la wiki»). Se cambia por las de verdad. Con una fuente tuya de por medio no se toca: eso lo cuida _aclarar_fuente."""
         acciones = getattr(self, "acciones_turno", []) or []
         if getattr(self, "fuente_turno", None) or any(n == "usar_fuente" for n, _, _ in acciones):
             return texto
         dominios = BUS.dominios_de_acciones(acciones)
-        inventadas = BUS.atribuciones_inventadas(texto, dominios) if dominios else []
-        if not inventadas:
+        corregido = BUS.corregir_atribucion(texto, dominios) if dominios else texto
+        if corregido == texto:
             return texto
-        log(f"La respuesta atribuye el dato a {', '.join(inventadas)}, que no salió de la búsqueda ({', '.join(dominios[:4])}): se corrige")
-        return BUS.corregir_atribucion(texto, dominios)
+        malas = BUS.atribuciones_inventadas(texto, dominios) + [n for _, _, n in BUS.atribuciones_vagas(texto)]
+        log(f"La respuesta atribuye el dato a {', '.join(malas)}, que no es ninguna web de la búsqueda ({', '.join(dominios[:4])}): se corrige")
+        return corregido
 
     def _buscar_igualmente(self, peticion):
         """¿«Búscalo igualmente» con ia.busqueda = ninguna? Entonces esta petición busca como «auto»; la siguiente vuelve a lo que elegiste."""

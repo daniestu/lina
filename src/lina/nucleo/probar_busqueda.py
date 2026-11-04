@@ -41,10 +41,10 @@ AYUDA = N_("""lina probar-busqueda [gratis|tavily|pago] [N]
 PREGUNTAS = [
     "cómo se hace la poción de invisibilidad en Skyrim", "qué partidos de LoL hay esta semana", "cuánto cuesta la Steam Deck OLED",
     "cuál es la noticia de tecnología más importante de hoy", "quién ganó el último Gran Premio de Fórmula 1", "cuáles son los requisitos mínimos de Cyberpunk 2077",
-    "cuándo sale la próxima actualización de No Man's Sky", "qué tiempo hará mañana en Sevilla", "cuál es la versión actual del kernel de Linux",
+    "cuándo sale la próxima actualización de No Man's Sky", "qué tiempo hará mañana en Sevilla", "cuál es la última versión estable del kernel de Linux publicada en kernel.org",
     "cuánto mide la torre Eiffel", "qué es el protocolo MCP de los asistentes de IA", "cómo va la clasificación de LaLiga",
     "a cuánto está el euro frente al dólar", "qué estrenos de cine hay esta semana", "qué ingredientes lleva la poción de curación en Skyrim",
-    "cuál es el precio de la RTX 5070", "qué es un creeper en Minecraft", "cuál es la receta de la tortilla de patatas",
+    "cuál es el precio de la RTX 5070", "qué novedades trae la última actualización de Minecraft", "cuál es la receta de la tortilla de patatas",
     "quién ganó el último mundial de League of Legends", "cuándo es el próximo eclipse visible en España",
 ]
 NIVELES = {"gratis": ("gemini",), "tavily": ("gemini", "tavily"), "pago": ("gemini", "gemini_pago")}

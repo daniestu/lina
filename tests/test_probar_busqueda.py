@@ -51,6 +51,13 @@ def test_se_ha_publicado_no_cuenta_como_no_lo_se():
     (["Según la wiki UESP, lleva ectoplasma y pie de nirn."], [_buscar("gamespot.com", "skyrimalchemy.com", "scribd.com")], "mal", "mal"),
     (["Según Google News, la noticia del día es el nuevo chip; lo cuenta emergent.sh."], [_buscar("emergent.sh")], "mal", "bien"),
     (["Según gamespot.com, lleva ectoplasma."], [_buscar("gamespot.com", "skyrimalchemy.com")], "bien", "bien"),
+    # pasada de pago del 2026-11-05: atribuciones correctas que el juez no reconocía o tomaba por inventadas
+    (["Según la comunidad de Steam, se hace con huevos de chaurus."], [_buscar("reddit.com", "steamcommunity.com")], "bien", "mal"),
+    (["Según xe.com, el euro está a 1,12 dólares."], [_buscar("xe.com", "europa.eu")], "bien", "mal"),
+    (["Según as.com, el Barcelona lidera LaLiga."], [_buscar("as.com")], "bien", "mal"),
+    (["Según La Vanguardia, mañana hará sol."], [_buscar("lavanguardia.com", "aemet.es")], "bien", "bien"),
+    (["Según The Guardian, Canva recorta puestos."], [_buscar("globenewswire.com", "theguardian.com")], "bien", "bien"),
+    (["Según la wiki, lleva flor de montaña azul."], [_buscar("gamespot.com", "reddit.com", "scalacube.com")], "mal", "mal"),     # vaga: no citada
 ])
 def test_el_juez_nuevo_acepta_el_nombre_y_rechaza_la_atribucion_inventada(dicho, acciones, nota, antigua):
     assert PB.juzgar(dicho, acciones)[0] == nota
@@ -77,6 +84,8 @@ def test_el_criterio_escrito_antes(nivel, notas, estado):
 def test_las_preguntas_tipicas_estan():
     texto = " ".join(PB.PREGUNTAS).lower()
     assert "poción" in texto and "skyrim" in texto and "lol" in texto and "precio" in texto and "noticia" in texto
+    # sin preguntas que se contestan sin buscar: el kernel «actual» lo leía del equipo y el creeper se contestaba de memoria
+    assert "kernel.org" in texto and "creeper" not in texto and "última actualización de minecraft" in texto
 
 
 def test_el_usuario_nuevo_tiene_ajustes_de_fabrica_y_solo_las_claves_del_nivel(tmp_path, monkeypatch):
