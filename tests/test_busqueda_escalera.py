@@ -395,7 +395,8 @@ def test_la_ia_recibe_las_webs_reales_y_la_regla_de_citar_solo_esas():
 
 @pytest.mark.parametrize("texto, dominios, queda", [
     # los dos casos reales de la pasada de pago
-    ("Según la wiki UESP, la poción lleva ectoplasma.", ["gamespot.com", "skyrimalchemy.com", "scribd.com"], "Según gamespot.com, la poción lleva ectoplasma."),
+    ("Según la wiki UESP, la poción lleva ectoplasma.", ["gamespot.com", "skyrimalchemy.com", "scribd.com"],
+     "Según gamespot.com, skyrimalchemy.com y scribd.com, la poción lleva ectoplasma."),
     ("Según Google News, la noticia es el chip nuevo.", ["emergent.sh"], "Según emergent.sh, la noticia es el chip nuevo."),
     # lo que sí salió, por dominio o por nombre, se queda
     ("Según uesp.net, lleva ectoplasma.", ["uesp.net"], "Según uesp.net, lleva ectoplasma."),
@@ -411,6 +412,19 @@ def test_la_ia_recibe_las_webs_reales_y_la_regla_de_citar_solo_esas():
 ])
 def test_la_atribucion_inventada_se_corrige_en_codigo(texto, dominios, queda):
     assert BUS.corregir_atribucion(texto, dominios) == queda
+
+
+@pytest.mark.parametrize("dominios, dice", [
+    (["a.com"], "a.com"),
+    (["a.com", "b.es"], "a.com y b.es"),
+    (["a.com", "b.es", "c.org"], "a.com, b.es y c.org"),
+    (["a.com", "b.es", "c.org", "d.net"], "las webs consultadas (a.com, b.es, c.org…)"),
+    (["a.com", "a.com", "b.es"], "a.com y b.es"),
+])
+def test_la_correccion_no_elige_una_web_al_azar(dominios, dice):
+    """No se sabe de cuál de las webs sale el dato: se nombran todas (hasta tres) en vez de cambiar una atribución inventada por otra quizá errónea."""
+    assert BUS.webs_de_verdad(dominios) == dice
+    assert BUS.corregir_atribucion("Según Google News, pasó.", dominios) == f"Según {dice}, pasó."
 
 
 def test_las_webs_de_lo_que_vio_la_ia():

@@ -28,7 +28,7 @@ from lina.nucleo import proveedores as PROV
 from lina.nucleo import rutas as RUT
 from lina.nucleo import tiempos as TIE
 from lina.nucleo.constantes import (ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
-                                    MODELO_LOCAL, OLLAMA, PAUSA_MODELO_SEG, PAUSA_RED_SEG, TIMEOUT_REVISOR, TIMEOUT_TEMA, INTENTOS_TEMA, REINTENTOS_SERVIDOR,
+                                    MODELO_LOCAL, OLLAMA, PAUSA_MODELO_SEG, PAUSA_RED_SEG, PAUSA_SERVIDOR_SEG, TIMEOUT_REVISOR, TIMEOUT_TEMA, INTENTOS_TEMA, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, ESTIMACION_VRAM_LOCAL)
 from lina.nucleo.opcionales import PRES
 from lina.nucleo.registro import log
@@ -134,6 +134,20 @@ def _pausar_por_red(modelo, clave):
     _pausa_modelo[k] = time.time() + min(PAUSA_RED_SEG * 2 ** n, PAUSA_MODELO_SEG)
 
 
+def _pausar_por_fallo(modelo, clave, r):
+    """Tras un 429 o un 5xx que no se arregló reintentando. Cupo diario agotado (PerDay): ese modelo con esa clave, hasta la medianoche del Pacífico,
+    cuando Google lo renueva; probarlo antes solo gasta una llamada. Es por modelo: otro modelo de la misma clave, o el mismo con la clave de pago,
+    sigue disponible. Saturado (500/503): PAUSA_SERVIDOR_SEG. Otro 429: PAUSA_MODELO_SEG."""
+    if r.tipo not in ("cuota", "servidor"):
+        return
+    clase = clase_de_fallo(r)
+    hasta = medianoche_pacifico() if clase == "diario" else time.time() + (PAUSA_SERVIDOR_SEG if r.tipo == "servidor" else PAUSA_MODELO_SEG)
+    _pausa_modelo[_id_pausa(modelo, clave)] = hasta
+    if clase == "diario":
+        log(f"{modelo}: cupo diario agotado con la clave {PRES.nombre_de(clave)}; no lo vuelvo a probar con ella hasta que se renueve "
+            f"(en unas {horas_hasta_renovar_cupo()} h)")
+
+
 _gasto_tarea = {"tokens": 0}              # lo que lleva gastado la petición actual
 
 _fallos_peticion: list = []               # [(clase, «gratis»|«pago»)] de lo que falló al preguntar a la IA en la petición en curso
@@ -162,13 +176,18 @@ def fallos_de_la_peticion():
     return list(_fallos_peticion)
 
 
-def horas_hasta_renovar_cupo(ahora=None):
-    """Horas (redondeando hacia arriba) hasta la medianoche del Pacífico, cuando Google renueva el cupo diario de la API de Gemini."""
+def medianoche_pacifico(ahora=None):
+    """El momento (time.time()) de la próxima medianoche del Pacífico, cuando Google renueva el cupo diario de la API de Gemini."""
     from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
     pacifico = datetime.fromtimestamp(ahora or time.time(), ZoneInfo("America/Los_Angeles"))
-    medianoche = (pacifico + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    return max(1, -(-int((medianoche - pacifico).total_seconds()) // 3600))
+    return (pacifico + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+
+def horas_hasta_renovar_cupo(ahora=None):
+    """Horas (redondeando hacia arriba) hasta que se renueva el cupo diario."""
+    ahora = ahora or time.time()
+    return max(1, -(-int(medianoche_pacifico(ahora) - ahora) // 3600))
 
 
 _espera_de_cuota = PG.espera_de_cuota                # (los nombres antiguos siguen valiendo para quien los importe)
@@ -522,8 +541,7 @@ def _pedir_corto(proveedor, clave, modelo, sistema, mensajes, etiqueta, *, inten
                 ajustes[ajuste] = None
             continue
         log(f"{modelo}: {r.resumen} (al {etiqueta})")
-        if r.tipo in ("cuota", "servidor"):
-            _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
+        _pausar_por_fallo(modelo, clave, r)
         return None
     return None
 
@@ -885,8 +903,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                 _dormir(espera)
                 continue
             log(f"{modelo}: {r.resumen}")
-            if r.tipo in ("cuota", "servidor"):
-                _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
+            _pausar_por_fallo(modelo, clave, r)
             _apuntar_fallo(modelo, clave, clase_de_fallo(r))
             return None
         reintentos = 0

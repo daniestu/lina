@@ -3,6 +3,7 @@
 """El bloque C en el asistente: buscar_web pasa por la escalera de «auto» (y quien eligió tavily lo conserva), «búscalo igualmente» salta «ninguna» una vez,
 Lina nunca dice «no tengo acceso a internet», buscar o leer la web con un comando se manda a sus herramientas, y los avisos de la primera vez. Sin red."""
 import sys
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -110,7 +111,7 @@ GOOGLE_NOTICIA = ("buscar_web", {"consulta": "x"}, "RESULTADOS DE BÚSQUEDA (…
 
 
 @pytest.mark.parametrize("accion, dice, queda", [
-    (GOOGLE_SKYRIM, "Según la wiki UESP, la poción lleva ectoplasma y pie de nirn.", "Según gamespot.com, la poción lleva ectoplasma y pie de nirn."),
+    (GOOGLE_SKYRIM, "Según la wiki UESP, la poción lleva ectoplasma y pie de nirn.", "Según gamespot.com, skyrimalchemy.com y scribd.com, la poción lleva ectoplasma y pie de nirn."),
     (GOOGLE_NOTICIA, "Según Google News, lo más importante hoy es el chip nuevo.", "Según emergent.sh, lo más importante hoy es el chip nuevo."),
 ])
 def test_los_dos_casos_reales_de_atribucion_inventada(lina, accion, dice, queda):
@@ -189,6 +190,57 @@ def test_con_503_o_tiempo_agotado_dice_que_esta_saturado(lina, monkeypatch):
 @pytest.mark.parametrize("fallos", [[], [("auth", "gratis")], [("diario", "gratis"), ("auth", "pago")], [("diario", "pago")]])
 def test_si_no_esta_claro_la_frase_de_siempre(lina, monkeypatch, fallos):
     assert _sin_gemini(lina, monkeypatch, fallos) is None
+
+
+# ---------------------------------------------------------------- cuánto dura la pausa tras cada fallo
+@pytest.fixture
+def pausas(monkeypatch):
+    monkeypatch.setattr(IA, "_pausa_modelo", {})
+    monkeypatch.setattr(IA, "_clase_pausa", {})
+    monkeypatch.setattr(IA, "_dormir", lambda s: None)
+    monkeypatch.setattr(IA.PRES, "una_sola_clave", lambda: False)
+    monkeypatch.setattr(IA.PRES, "nombre_de", lambda c: "pago" if c == "PAGO" else "gratis")
+    return IA._pausa_modelo
+
+
+def _falla(monkeypatch, error, modelo="modelo-a", clave="GRATIS"):
+    monkeypatch.setattr(IA, "_turno_medido", lambda *a, **k: error)
+    assert IA.preguntar_ia(MagicMock(), clave, modelo, "hola", None) is None
+
+
+def test_el_cupo_diario_pausa_ese_modelo_hasta_que_se_renueva(pausas, monkeypatch):
+    _falla(monkeypatch, IA.PROV.ErrorIA("cuota", 429, DIARIO))
+    assert pausas == {"modelo-a|gratis": pytest.approx(IA.medianoche_pacifico(), abs=5)}
+    assert pausas["modelo-a|gratis"] - time.time() > IA.PAUSA_MODELO_SEG or IA.horas_hasta_renovar_cupo() == 1
+
+
+def test_el_cupo_diario_no_bloquea_otro_modelo_ni_la_clave_de_pago(pausas, monkeypatch):
+    """Un modelo agotado con la gratuita no deja en pausa a otro modelo de la misma clave, ni al mismo modelo con la de pago: los dos responden."""
+    _falla(monkeypatch, IA.PROV.ErrorIA("cuota", 429, DIARIO))
+    respuesta = MagicMock(llamadas=[], texto="hola", uso={}, modelo_real=None)
+    llamados = []
+    monkeypatch.setattr(IA, "_turno_medido", lambda prov, clave, modelo, *a, **k: (llamados.append((clave, modelo)), respuesta)[1])
+    monkeypatch.setattr(IA.PRES, "registrar", lambda *a, **k: None)
+    assert IA.preguntar_ia(MagicMock(), "GRATIS", "modelo-b", "hola", None) == "hola"
+    assert IA.preguntar_ia(MagicMock(), "PAGO", "modelo-a", "hola", None) == "hola"
+    assert IA.preguntar_ia(MagicMock(), "GRATIS", "modelo-a", "hola", None) is None       # este sí sigue en pausa
+    assert llamados == [("GRATIS", "modelo-b"), ("PAGO", "modelo-a")]
+
+
+@pytest.mark.parametrize("error, segundos", [
+    (IA.PROV.ErrorIA("servidor", 503, "error 503 UNAVAILABLE"), 60),
+    (IA.PROV.ErrorIA("cuota", 429, "error 429 | cuota=GenerateRequestsPerMinutePerProjectPerModel-FreeTier"), 180),
+])
+def test_el_503_pausa_un_minuto_y_otro_429_tres(pausas, monkeypatch, error, segundos):
+    _falla(monkeypatch, error)
+    assert pausas["modelo-a|gratis"] - time.time() == pytest.approx(segundos, abs=5)
+    assert IA.PAUSA_SERVIDOR_SEG == 60 and IA.PAUSA_MODELO_SEG == 180
+
+
+def test_las_consultas_cortas_pausan_igual(pausas, monkeypatch):
+    monkeypatch.setattr(IA, "_turno_medido", lambda *a, **k: IA.PROV.ErrorIA("cuota", 429, DIARIO))
+    assert IA._pedir_corto(MagicMock(), "GRATIS", "modelo-a", "s", [], "entender x", intentos=1, timeout=4) is None
+    assert pausas["modelo-a|gratis"] == pytest.approx(IA.medianoche_pacifico(), abs=5)
 
 
 def test_preguntar_ia_apunta_el_fallo_y_lo_recuerda_al_saltar_el_modelo_en_pausa(monkeypatch):

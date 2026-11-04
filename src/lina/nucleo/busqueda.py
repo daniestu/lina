@@ -505,14 +505,28 @@ def atribuciones_inventadas(texto, dominios):
     return [n for _, _, n in fuentes_nombradas(texto) if not any(nombra(d, n) for d in dominios)]
 
 
+MAX_WEBS_ATRIBUCION = 3
+
+
+def webs_de_verdad(dominios):
+    """Cómo se nombran las webs que salieron, sin elegir una: no se sabe de cuál sale el dato, y poner solo la primera cambiaría una atribución
+    inventada por otra quizá errónea. Hasta MAX_WEBS_ATRIBUCION, todas («gamespot.com, skyrimalchemy.com y scribd.com»); con más, «las webs consultadas
+    (las tres primeras…)»."""
+    dominios = list(dict.fromkeys(dominios))
+    if len(dominios) > MAX_WEBS_ATRIBUCION:
+        return T("las webs consultadas ({webs}…)", webs=", ".join(dominios[:MAX_WEBS_ATRIBUCION]))
+    return dominios[0] if len(dominios) == 1 else ", ".join(dominios[:-1]) + T(" y ") + dominios[-1]
+
+
 def corregir_atribucion(texto, dominios):
-    """La respuesta con cada fuente inventada cambiada por una web de verdad («Según la wiki UESP» → «Según gamespot.com»). Sin `dominios`, tal cual."""
+    """La respuesta con cada fuente inventada cambiada por las webs de verdad («Según la wiki UESP» → «Según gamespot.com, skyrimalchemy.com y
+    scribd.com»). Sin `dominios`, tal cual."""
     if not dominios:
         return texto
     salida = str(texto)
     for inicio, fin, nombre in reversed(fuentes_nombradas(salida)):
         if not any(nombra(d, nombre) for d in dominios):
-            salida = salida[:inicio] + dominios[0] + salida[fin:]
+            salida = salida[:inicio] + webs_de_verdad(dominios) + salida[fin:]
     return salida
 
 
