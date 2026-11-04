@@ -19,7 +19,7 @@ With `auto`, the default, Lina tries in this order and keeps the first thing tha
 1. **Google, inside Gemini**, if you have a paid key with room left in your cap (or a Gemini key that can search: in our tests, the free one could not). It is a separate query to Google, which already receives your questions. With the paid key, after the month's free searches, it costs money and counts towards your cap.
 2. **Tavily**, if you have a key.
 3. **DuckDuckGo**, only if you turn it on (`lina config poner ia.busqueda_reserva true`). It is off by default because it is unreliable: it often takes programs for robots and then returns nothing. DuckDuckGo sees the search text and your IP address. Lina does not pretend to be a browser to get around its block. The first time it is used, Lina tells you.
-4. **Wikipedia and some game wikis** (Fandom, minecraft.wiki, wiki.gg, bg3.wiki, WikiDex), with their own search, no key. They see the search text and your IP address. Lina also downloads the first page found, whose text reaches the AI. The first time they are used, you get a notification.
+4. **Wikipedia and some game wikis** (Fandom, minecraft.wiki, wiki.gg, bg3.wiki, WikiDex), with their own search, no key. They see the search text and your IP address. They are only used for encyclopedic questions (not prices, news, the weather or results). Lina also asks their API for the extract of the first page found, whose text reaches the AI. The first time they are used, you get a notification.
 
 With `tavily` only Tavily is used (and DuckDuckGo if you turn it on); with `google`, only Gemini's (and DuckDuckGo if you turn it on); with `ninguna`, nothing, unless you say «búscalo igualmente», which searches like `auto` for that request only.
 

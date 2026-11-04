@@ -136,6 +136,40 @@ def _pausar_por_red(modelo, clave):
 
 _gasto_tarea = {"tokens": 0}              # lo que lleva gastado la petición actual
 
+_fallos_peticion: list = []               # [(clase, «gratis»|«pago»)] de lo que falló al preguntar a la IA en la petición en curso
+_clase_pausa: dict = {}                   # id de pausa -> la clase del fallo que la puso (para explicarla al saltar el modelo)
+
+
+def clase_de_fallo(r):
+    """«diario» (429 del cupo por día: no se arregla esperando unos segundos), «saturado» (500/503 o tiempo agotado) u otra cosa (el tipo del error)."""
+    if r.estado == 429 and "perday" in str(r.resumen).lower().replace("_", "").replace(" ", ""):
+        return "diario"
+    if r.tipo == "servidor" or (r.tipo == "red" and re.search(r"timed? ?out|timeout", str(r.resumen), re.I)):
+        return "saturado"
+    return r.tipo
+
+
+def _apuntar_fallo(modelo, clave, clase):
+    _clase_pausa[_id_pausa(modelo, clave)] = clase
+    _fallos_peticion.append((clase, PRES.nombre_de(clave)))
+
+
+def empezar_peticion():
+    _fallos_peticion.clear()
+
+
+def fallos_de_la_peticion():
+    return list(_fallos_peticion)
+
+
+def horas_hasta_renovar_cupo(ahora=None):
+    """Horas (redondeando hacia arriba) hasta la medianoche del Pacífico, cuando Google renueva el cupo diario de la API de Gemini."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    pacifico = datetime.fromtimestamp(ahora or time.time(), ZoneInfo("America/Los_Angeles"))
+    medianoche = (pacifico + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(1, -(-int((medianoche - pacifico).total_seconds()) // 3600))
+
 
 _espera_de_cuota = PG.espera_de_cuota                # (los nombres antiguos siguen valiendo para quien los importe)
 resumen_error_gemini = PG.resumen_error
@@ -793,6 +827,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
     hasta que responde con texto. Devuelve el texto o None si no hubo respuesta (la causa queda en el registro)."""
     if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
         log(f"{modelo}: en pausa por un fallo reciente, lo salto")
+        _apuntar_fallo(modelo, clave, _clase_pausa.get(_id_pausa(modelo, clave), "pausa"))
         return None
     mensajes = [{"rol": h["rol"], "texto": h["texto"]} for h in historial]
     mensajes.append({"rol": "user", "texto": pregunta, "imagen": imagen})
@@ -817,6 +852,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
             if r.tipo == "red":
                 log(f"{modelo}: sin conexión o demasiado lento ({r.resumen})")
                 _pausar_por_red(modelo, clave)
+                _apuntar_fallo(modelo, clave, clase_de_fallo(r))
                 return None
             if r.tipo == "vacia":
                 log(f"{modelo}: {r.resumen}")
@@ -851,6 +887,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
             log(f"{modelo}: {r.resumen}")
             if r.tipo in ("cuota", "servidor"):
                 _pausa_modelo[_id_pausa(modelo, clave)] = time.time() + PAUSA_MODELO_SEG
+            _apuntar_fallo(modelo, clave, clase_de_fallo(r))
             return None
         reintentos = 0
         _fallos_red.pop(_id_pausa(modelo, clave), None)

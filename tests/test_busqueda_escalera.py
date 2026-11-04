@@ -150,7 +150,7 @@ def test_orden_google_y_luego_tavily(entorno, monkeypatch):
 
 
 def test_sin_tavily_ni_pago_acaba_en_las_wikis_y_lo_apunta_la_primera_vez(entorno, monkeypatch):
-    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta: ([{"title": "Poción", "url": "https://elderscrolls.fandom.com/es/wiki/P", "dominio": "elderscrolls.fandom.com",
+    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta, **k: ([{"title": "Poción", "url": "https://elderscrolls.fandom.com/es/wiki/P", "dominio": "elderscrolls.fandom.com",
                                                                   "content": "x"}], ""))
     res = BUS.buscar("poción de invisibilidad Skyrim")
     assert res.escalon == "wiki" and res.sin_tavily and AVB.PRIMERA_WIKI in AVB._pendientes
@@ -159,7 +159,7 @@ def test_sin_tavily_ni_pago_acaba_en_las_wikis_y_lo_apunta_la_primera_vez(entorn
 
 def test_duckduckgo_apagado_de_fabrica_ni_se_llama(entorno, monkeypatch):
     monkeypatch.setattr(IA, "resultados_reserva", MagicMock(side_effect=AssertionError("apagado: no se llama")))
-    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta: ([], BUS.T(BUS.M_WIKI_NADA)))
+    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta, **k: ([], BUS.T(BUS.M_WIKI_NADA)))
     res = BUS.buscar("noticias de hoy")
     assert res.resultados == [] and not any("DuckDuckGo" in m for m in res.motivos)
 
@@ -168,7 +168,7 @@ def test_duckduckgo_encendido_como_mucho_una_vez_cada_intervalo_y_sin_esperar(en
     entorno(reserva=True)
     ddg = MagicMock(return_value="La búsqueda web no está disponible ahora mismo.")
     monkeypatch.setattr(IA, "resultados_reserva", ddg)
-    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta: ([], BUS.T(BUS.M_WIKI_NADA)))
+    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta, **k: ([], BUS.T(BUS.M_WIKI_NADA)))
     ahora = 1_900_000_000.0
     primera = BUS.buscar("uno", ahora=ahora)
     segunda = BUS.buscar("dos", ahora=ahora + 5)
@@ -179,7 +179,7 @@ def test_duckduckgo_encendido_como_mucho_una_vez_cada_intervalo_y_sin_esperar(en
 
 def test_lo_encontrado_se_guarda_poco_rato(entorno, monkeypatch):
     llamadas = []
-    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta: (llamadas.append(consulta), ([{"title": "A", "url": "https://es.wikipedia.org/wiki/A", "content": ""}], ""))[1])
+    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta, **k: (llamadas.append(consulta), ([{"title": "A", "url": "https://es.wikipedia.org/wiki/A", "content": ""}], ""))[1])
     ahora = 1_900_000_000.0
     BUS.buscar("Capital de Australia", ahora=ahora)
     BUS.buscar("capital de  australia", ahora=ahora + 60)
@@ -191,7 +191,7 @@ def test_lo_encontrado_se_guarda_poco_rato(entorno, monkeypatch):
 
 def test_si_nada_encuentra_no_se_guarda(entorno, monkeypatch):
     llamadas = []
-    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta: (llamadas.append(1), ([], BUS.T(BUS.M_WIKI_NADA)))[1])
+    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta, **k: (llamadas.append(1), ([], BUS.T(BUS.M_WIKI_NADA)))[1])
     BUS.buscar("x")
     BUS.buscar("x")
     assert len(llamadas) == 2
@@ -206,7 +206,7 @@ def test_con_google_solo_gemini_y_duckduckgo(entorno, monkeypatch):
 
 # ---------------------------------------------------------------- lo que se dice si nada da resultados
 def test_sin_resultados_la_ia_recibe_el_motivo_y_la_prohibicion(entorno, monkeypatch):
-    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta: ([], BUS.T(BUS.M_WIKI_NADA)))
+    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta, **k: ([], BUS.T(BUS.M_WIKI_NADA)))
     texto = BUS.como_texto(BUS.buscar("calendario de LoL"))
     assert texto.startswith("NO SE HA PODIDO BUSCAR") and "no tienes clave de Tavily" in texto
     assert "NUNCA digas que no tienes acceso a internet" in texto and "clave gratuita de Tavily" in texto
@@ -215,7 +215,7 @@ def test_sin_resultados_la_ia_recibe_el_motivo_y_la_prohibicion(entorno, monkeyp
 def test_la_frase_del_codigo_da_el_motivo_y_sugiere_tavily(entorno, monkeypatch):
     entorno(gratis="GRATIS-1")
     BUS._bloquear("GRATIS-1", "gratis")
-    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta: ([], BUS.T(BUS.M_WIKI_NADA)))
+    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta, **k: ([], BUS.T(BUS.M_WIKI_NADA)))
     frase = BUS.frase_de_fallo([BUS.buscar("x")])
     assert frase.startswith("No he podido buscarlo: no tienes clave de Tavily y Wikipedia") and "lina bienvenida" in frase
     assert "acceso a internet" not in frase and "Google" not in frase       # lo de la gratuita no se dice en voz: solo lo que el usuario puede arreglar
@@ -298,16 +298,127 @@ def test_los_titulos_que_dice_la_pregunta_van_primero(entorno):
     assert [r["title"] for r in BUS.resultados_wiki("capital de Australia", "es", get=get)[0]] == ["Australia", "Biblioteca Nacional de Australia"]
 
 
-def test_la_pagina_de_la_wiki_se_pide_a_su_api(entorno):
-    """Fandom da 403 a los programas que piden la página, no a su API."""
+def test_la_pagina_de_la_wiki_es_su_extracto_y_donde_no_lo_hay_la_primera_seccion(entorno):
+    """Fandom no tiene prop=extracts (y da 403 a los programas que piden la página): su primera sección por action=parse, sin estilos, fichas ni tablas."""
     pedidas = []
 
     def get(url, params, headers, timeout):
-        pedidas.append((url, params["action"], params["page"]))
-        return respuesta(200, {"parse": {"text": "<style>.x{}</style><p>Se hace con <b>ectoplasma</b>.</p><script>malo()</script>"}})
+        pedidas.append((params["action"], params.get("prop"), params.get("exintro"), params.get("section")))
+        if params["action"] == "query":
+            return respuesta(200, {"query": {"pages": [{"title": "Invisibilidad (Skyrim)"}]}})
+        texto = "<style>.x{}</style><aside>ficha</aside><p>Se hace con <b>ectoplasma</b>. " + "Más texto. " * 120 + "</p><table><tr><td>t</td></tr></table><script>malo()</script>"
+        return respuesta(200, {"parse": {"text": texto}})
     p = BUS.pagina_wiki({"title": "Invisibilidad (Skyrim)", "url": "https://elderscrolls.fandom.com/es/wiki/I", "api": "elderscrolls.fandom.com/es"}, get=get)
-    assert pedidas == [("https://elderscrolls.fandom.com/es/api.php", "parse", "Invisibilidad (Skyrim)")]
-    assert p == {"url": "https://elderscrolls.fandom.com/es/wiki/I", "titulo": "Invisibilidad (Skyrim)", "texto": "Se hace con ectoplasma ."}
+    assert pedidas == [("query", "extracts", 1, None), ("parse", "text", None, 0)]
+    assert p["url"] == "https://elderscrolls.fandom.com/es/wiki/I" and p["titulo"] == "Invisibilidad (Skyrim)"
+    assert p["texto"].startswith("Se hace con ectoplasma .") and "ficha" not in p["texto"] and "malo" not in p["texto"] and "t " not in p["texto"][-5:]
+
+
+def test_el_extracto_cabe_entero_en_lo_que_lee_la_ia(entorno):
+    """Como mucho EXTRACTO_MAX caracteres, cortado en una frase: así leer_web no lo resume por trozos (no gasta llamadas a la IA)."""
+    def get(url, params, headers, timeout):
+        return respuesta(200, {"query": {"pages": [{"extract": "Una frase larga de la wiki. " * 400}]}})
+    p = BUS.pagina_wiki({"title": "T", "url": "https://es.wikipedia.org/wiki/T", "api": "es.wikipedia.org/w"}, get=get)
+    assert len(p["texto"]) <= BUS.EXTRACTO_MAX + 4 and p["texto"].endswith(". (…)")
+    assert BUS.EXTRACTO_MAX <= 3000 and BUS.EXTRACTO_MAX < 6000                 # 6000: lo que leer_web lee sin resumir
+
+
+def test_si_la_introduccion_es_corta_se_pide_mas(entorno):
+    pedidas = []
+
+    def get(url, params, headers, timeout):
+        pedidas.append(params.get("exintro"))
+        return respuesta(200, {"query": {"pages": [{"extract": "Corta." if params.get("exintro") else "Corta. Y luego mucho más. " * 60}]}})
+    p = BUS.pagina_wiki({"title": "T", "url": "https://minecraft.wiki/w/T", "api": "minecraft.wiki"}, get=get)
+    assert pedidas == [1, None] and len(p["texto"]) > BUS.EXTRACTO_MIN
+
+
+@pytest.mark.parametrize("consulta, peticion", [
+    ("precio Steam Deck OLED", ""), ("noticia tecnología", "cuál es la noticia de tecnología más importante de hoy"),
+    ("tiempo Sevilla", "qué tiempo hará mañana en Sevilla"), ("clasificación LaLiga", ""), ("euro dólar cotización", ""),
+    ("último Gran Premio Fórmula 1", ""), ("partidos LoL", "qué partidos de LoL hay esta semana"), ("Linux kernel", "cuál es la versión actual del kernel"),
+])
+def test_lo_del_momento_no_va_a_las_wikis(entorno, consulta, peticion):
+    get = MagicMock(side_effect=AssertionError("no se pregunta a ninguna wiki"))
+    assert BUS.resultados_wiki(consulta, "es", get=get, peticion=peticion) == ([], BUS.T(BUS.M_WIKI_ACTUALIDAD))
+
+
+@pytest.mark.parametrize("consulta", ["cuánto mide la torre Eiffel", "qué es un creeper en Minecraft", "poción de invisibilidad Skyrim",
+                                      "qué es el protocolo MCP", "receta de la tortilla de patatas"])
+def test_lo_enciclopedico_si(consulta):
+    assert not BUS.es_de_actualidad(consulta)
+
+
+def test_un_resultado_que_no_nombra_nada_de_la_consulta_no_vale(entorno):
+    """MediaWiki devuelve algo casi siempre: si ni el título ni el extracto dicen nada de lo que se busca, es como si no hubiera nada."""
+    def get(url, params, headers, timeout):
+        return respuesta(200, {"query": {"search": [{"title": "Lista de episodios", "snippet": "temporada uno"}]}})
+    assert BUS.resultados_wiki("receta de la tortilla de patatas", "es", get=get) == ([], BUS.T(BUS.M_WIKI_NADA))
+
+    def get2(url, params, headers, timeout):
+        return respuesta(200, {"query": {"search": [{"title": "Lista de episodios", "snippet": ""}, {"title": "Tortilla de patatas", "snippet": ""}]}})
+    assert [r["title"] for r in BUS.resultados_wiki("receta de la tortilla de patatas", "es", get=get2)[0]] == ["Tortilla de patatas"]
+
+
+def test_la_escalera_le_pasa_a_las_wikis_lo_que_dijo_el_usuario(entorno, monkeypatch):
+    entorno()
+    vistas = []
+    monkeypatch.setattr(BUS, "resultados_wiki", lambda consulta, **k: (vistas.append(k.get("peticion")), ([], BUS.T(BUS.M_WIKI_NADA)))[1])
+    BUS.buscar("noticia tecnología", modo="auto", peticion="cuál es la noticia más importante de hoy")
+    assert vistas == ["cuál es la noticia más importante de hoy"]
+
+
+@pytest.mark.parametrize("url, api, titulo", [
+    ("https://elderscrolls.fandom.com/es/wiki/Invisibilidad_(Skyrim)", "elderscrolls.fandom.com/es", "Invisibilidad (Skyrim)"),
+    ("https://es.wikipedia.org/wiki/Torre_Eiffel", "es.wikipedia.org/w", "Torre Eiffel"),
+    ("https://es.m.wikipedia.org/wiki/Torre_Eiffel", "es.wikipedia.org/w", "Torre Eiffel"),
+    ("https://minecraft.wiki/w/Creeper", "minecraft.wiki", "Creeper"),
+    ("https://www.wikidex.net/wiki/Pok%C3%A9mon", "www.wikidex.net", "Pokémon"),
+])
+def test_una_pagina_de_wiki_conocida_se_lee_por_su_api(url, api, titulo):
+    assert BUS.wiki_de_url(url) == {"api": api, "url": url, "title": titulo}
+
+
+@pytest.mark.parametrize("url", ["https://www.gamespot.com/articles/x", "https://elderscrolls.fandom.com/es/wiki/", "https://es.wikipedia.org/w/index.php?x",
+                                 "https://elderscrolls.fandom.com.malo.com/wiki/X", ""])
+def test_lo_demas_se_lee_como_siempre(url):
+    assert BUS.wiki_de_url(url) is None
+
+
+# ---------------------------------------------------------------- de dónde dice la respuesta que sale el dato
+def test_la_ia_recibe_las_webs_reales_y_la_regla_de_citar_solo_esas():
+    res = BUS.Resultado(resultados=[{"title": "a", "url": "https://vertexaisearch.cloud.google.com/a", "dominio": "gamespot.com", "content": "x"},
+                                    {"title": "b", "url": "https://vertexaisearch.cloud.google.com/b", "dominio": "skyrimalchemy.com", "content": "y"}], escalon="google")
+    texto = BUS.como_texto(res)
+    assert "WEBS DE ESTOS RESULTADOS: gamespot.com, skyrimalchemy.com" in texto and "SOLO una de estas webs" in texto and "vertexaisearch.cloud" not in texto.split("WEBS")[1]
+
+
+@pytest.mark.parametrize("texto, dominios, queda", [
+    # los dos casos reales de la pasada de pago
+    ("Según la wiki UESP, la poción lleva ectoplasma.", ["gamespot.com", "skyrimalchemy.com", "scribd.com"], "Según gamespot.com, la poción lleva ectoplasma."),
+    ("Según Google News, la noticia es el chip nuevo.", ["emergent.sh"], "Según emergent.sh, la noticia es el chip nuevo."),
+    # lo que sí salió, por dominio o por nombre, se queda
+    ("Según uesp.net, lleva ectoplasma.", ["uesp.net"], "Según uesp.net, lleva ectoplasma."),
+    ("Según la UESP, lleva ectoplasma.", ["uesp.net"], "Según la UESP, lleva ectoplasma."),
+    ("Según Steam, cuesta 569 euros.", ["store.steampowered.com"], "Según Steam, cuesta 569 euros."),
+    ("En la wiki de Skyrim dice que lleva ectoplasma.", ["elderscrolls.fandom.com"], "En la wiki de Skyrim dice que lleva ectoplasma."),
+    ("Según la Agencia Estatal de Meteorología, lloverá.", ["aemet.es"], "Según la Agencia Estatal de Meteorología, lloverá."),
+    # lo que no es una web no se toca
+    ("Según la búsqueda, lleva ectoplasma.", ["gamespot.com"], "Según la búsqueda, lleva ectoplasma."),
+    ("Según lo que he encontrado, lleva ectoplasma.", ["gamespot.com"], "Según lo que he encontrado, lleva ectoplasma."),
+    # sin webs de verdad no hay con qué cambiarla
+    ("Según la wiki UESP, lleva ectoplasma.", [], "Según la wiki UESP, lleva ectoplasma."),
+])
+def test_la_atribucion_inventada_se_corrige_en_codigo(texto, dominios, queda):
+    assert BUS.corregir_atribucion(texto, dominios) == queda
+
+
+def test_las_webs_de_lo_que_vio_la_ia():
+    acciones = [("buscar_web", {}, "RESULTADOS DE BÚSQUEDA (…):\n\n[1] T (gamespot.com) https://vertexaisearch/1\nx\n[2] U (skyrimalchemy.com) https://v/2\ny"),
+                ("leer_web", {"url": "https://www.uesp.net/wiki/Skyrim:Invisibility"}, "CONTENIDO DE LA PÁGINA «Invisibility» (uesp.net). …"),
+                ("leer_web", {"url": "https://bloqueada.com/x"}, "No he podido leer la página: error 403"),
+                ("buscar_web", {}, "NO SE HA PODIDO BUSCAR: no tienes clave de Tavily.")]
+    assert BUS.dominios_de_acciones(acciones) == ["gamespot.com", "skyrimalchemy.com", "uesp.net"]
 
 
 def test_sin_api_o_sin_red_no_hay_pagina(entorno):

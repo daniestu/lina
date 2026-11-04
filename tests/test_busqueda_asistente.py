@@ -40,7 +40,7 @@ def test_auto_pasa_por_la_escalera_y_lee_la_primera_pagina_de_la_wiki(lina, monk
     monkeypatch.setattr(BUS, "buscar", buscar)
     monkeypatch.setattr(BUS, "pagina_wiki", lambda r: {"url": r["url"], "titulo": "P", "texto": "ectoplasma"})
     r = lina._ejecutar_herramienta("buscar_web", {"consulta": "Skyrim invisibility potion"})
-    buscar.assert_called_once_with("Skyrim invisibility potion", None, modo="auto")
+    buscar.assert_called_once_with("Skyrim invisibility potion", None, modo="auto", peticion="cómo se hace la poción de invisibilidad en Skyrim")
     lina.leer_web.assert_called_once_with({"url": "https://elderscrolls.fandom.com/es/wiki/P", "foco": "Skyrim invisibility potion"}, obstaculo=False,
                                           pagina={"url": "https://elderscrolls.fandom.com/es/wiki/P", "titulo": "P", "texto": "ectoplasma"})
     assert r.startswith("RESULTADOS DE BÚSQUEDA") and "ectoplasma" in r and lina.busquedas_hechas == [WIKI]
@@ -103,7 +103,107 @@ def test_va_en_la_ultima_red(lina):
     assert "acceso a internet" not in lina.asegurar_honestidad_final("No tengo acceso a internet.")
 
 
-# ---------------------------------------------------------------- buscar o leer la web con un comando
+# ---------------------------------------------------------------- la atribución, corregida en código antes de contestar
+GOOGLE_SKYRIM = ("buscar_web", {"consulta": "x"}, "RESULTADOS DE BÚSQUEDA (…):\n\n[1] a (gamespot.com) https://vertexaisearch.cloud.google.com/a\nx\n"
+                 "[2] b (skyrimalchemy.com) https://vertexaisearch.cloud.google.com/b\ny\n[3] c (scribd.com) https://vertexaisearch.cloud.google.com/c\nz")
+GOOGLE_NOTICIA = ("buscar_web", {"consulta": "x"}, "RESULTADOS DE BÚSQUEDA (…):\n\n[1] a (emergent.sh) https://vertexaisearch.cloud.google.com/a\nx")
+
+
+@pytest.mark.parametrize("accion, dice, queda", [
+    (GOOGLE_SKYRIM, "Según la wiki UESP, la poción lleva ectoplasma y pie de nirn.", "Según gamespot.com, la poción lleva ectoplasma y pie de nirn."),
+    (GOOGLE_NOTICIA, "Según Google News, lo más importante hoy es el chip nuevo.", "Según emergent.sh, lo más importante hoy es el chip nuevo."),
+])
+def test_los_dos_casos_reales_de_atribucion_inventada(lina, accion, dice, queda):
+    lina._honestidad_de_lo_hecho = lambda t: t
+    lina._aclarar_fuente = lambda t: t
+    lina._avisar_fuente_sin_anadir = lambda t: t
+    lina.acciones_turno = [accion]
+    assert lina.asegurar_honestidad_final(dice) == queda
+
+
+def test_la_atribucion_buena_o_sin_busqueda_no_se_toca(lina):
+    lina.acciones_turno = [GOOGLE_SKYRIM]
+    assert lina._atribucion_real("Según gamespot.com, lleva ectoplasma.") == "Según gamespot.com, lleva ectoplasma."
+    lina.acciones_turno = []
+    assert lina._atribucion_real("Según la wiki UESP, lleva ectoplasma.") == "Según la wiki UESP, lleva ectoplasma."
+
+
+def test_con_una_fuente_tuya_la_atribucion_la_cuida_aclarar_fuente(lina):
+    lina.acciones_turno = [GOOGLE_SKYRIM, ("usar_fuente", {"dominio": "uesp.net"}, "Es la fuente que eligió el usuario…")]
+    assert lina._atribucion_real("Según la UESP, lleva ectoplasma.") == "Según la UESP, lleva ectoplasma."
+
+
+# ---------------------------------------------------------------- leer una wiki: su extracto, sin resumir por trozos
+def test_leer_una_wiki_conocida_va_por_su_api(lina, monkeypatch):
+    monkeypatch.setattr(BUS, "pagina_wiki", lambda w: {"url": w["url"], "titulo": w["title"], "texto": "extracto"})
+    lina._h_leer_web("leer_web", {"url": "https://minecraft.wiki/w/Creeper"})
+    lina.leer_web.assert_called_once_with({"url": "https://minecraft.wiki/w/Creeper"}, pagina={"url": "https://minecraft.wiki/w/Creeper", "titulo": "Creeper", "texto": "extracto"})
+
+
+def test_leer_otra_web_va_como_siempre(lina, monkeypatch):
+    monkeypatch.setattr(BUS, "pagina_wiki", MagicMock(side_effect=AssertionError("no es una wiki")))
+    lina._h_leer_web("leer_web", {"url": "https://www.gamespot.com/x"})
+    lina.leer_web.assert_called_once_with({"url": "https://www.gamespot.com/x"}, pagina=None)
+
+
+# ---------------------------------------------------------------- por qué no responde Gemini, dicho tal cual
+DIARIO = "error 429 RESOURCE_EXHAUSTED | cuota=GenerateRequestsPerDayPerProjectPerModel-FreeTier límite=20"
+
+
+@pytest.mark.parametrize("error, clase", [
+    (IA.PROV.ErrorIA("cuota", 429, DIARIO), "diario"),
+    (IA.PROV.ErrorIA("cuota", 429, "error 429 | cuota=GenerateRequestsPerMinutePerProjectPerModel-FreeTier límite=15", 9.0), "cuota"),
+    (IA.PROV.ErrorIA("servidor", 503, "error 503 UNAVAILABLE | The model is overloaded"), "saturado"),
+    (IA.PROV.ErrorIA("red", None, "HTTPSConnectionPool(...): Read timed out. (read timeout=8)"), "saturado"),
+    (IA.PROV.ErrorIA("red", None, "Failed to resolve 'generativelanguage.googleapis.com'"), "red"),
+])
+def test_la_clase_de_cada_fallo(error, clase):
+    assert IA.clase_de_fallo(error) == clase
+
+
+def test_el_cupo_diario_se_renueva_a_medianoche_del_pacifico():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    a_las_22 = datetime(2026, 11, 4, 22, 0, tzinfo=ZoneInfo("America/Los_Angeles")).timestamp()
+    assert IA.horas_hasta_renovar_cupo(a_las_22) == 2
+    assert IA.horas_hasta_renovar_cupo(a_las_22 + 2 * 3600 - 60) == 1
+    assert IA.horas_hasta_renovar_cupo(a_las_22 + 2 * 3600 + 60) == 24
+
+
+def _sin_gemini(lina, monkeypatch, fallos):
+    monkeypatch.setattr(lina.A, "fallos_de_la_peticion", lambda: fallos)
+    monkeypatch.setattr(lina.A, "horas_hasta_renovar_cupo", lambda: 7)
+    return lina._por_que_no_responde_gemini()
+
+
+def test_con_el_cupo_diario_agotado_lo_dice_y_cuando_vuelve(lina, monkeypatch):
+    t = _sin_gemini(lina, monkeypatch, [("diario", "gratis"), ("diario", "gratis")])
+    assert t == "Has agotado el límite diario de la clave gratuita de Gemini; se renueva en unas 7 horas. Con una clave de pago o con otro modelo funciona ya."
+
+
+def test_con_503_o_tiempo_agotado_dice_que_esta_saturado(lina, monkeypatch):
+    assert _sin_gemini(lina, monkeypatch, [("saturado", "gratis"), ("diario", "gratis")]) == "Gemini gratuito está saturado ahora. Inténtalo dentro de un rato."
+    assert _sin_gemini(lina, monkeypatch, [("diario", "gratis"), ("saturado", "pago")]) == "Gemini está saturado ahora. Inténtalo dentro de un rato."
+
+
+@pytest.mark.parametrize("fallos", [[], [("auth", "gratis")], [("diario", "gratis"), ("auth", "pago")], [("diario", "pago")]])
+def test_si_no_esta_claro_la_frase_de_siempre(lina, monkeypatch, fallos):
+    assert _sin_gemini(lina, monkeypatch, fallos) is None
+
+
+def test_preguntar_ia_apunta_el_fallo_y_lo_recuerda_al_saltar_el_modelo_en_pausa(monkeypatch):
+    monkeypatch.setattr(IA, "_pausa_modelo", {})
+    monkeypatch.setattr(IA, "_clase_pausa", {})
+    monkeypatch.setattr(IA.PRES, "una_sola_clave", lambda: True)
+    monkeypatch.setattr(IA, "_turno_medido", lambda *a, **k: IA.PROV.ErrorIA("cuota", 429, DIARIO))
+    IA.empezar_peticion()
+    assert IA.preguntar_ia(MagicMock(), "clave", "modelo-x", "hola", None) is None
+    assert IA.preguntar_ia(MagicMock(), "clave", "modelo-x", "hola", None) is None       # ahora en pausa: no llama, pero sabe por qué
+    assert IA.fallos_de_la_peticion() == [("diario", "gratis"), ("diario", "gratis")]
+    IA.empezar_peticion()
+    assert IA.fallos_de_la_peticion() == []
+
+
 @pytest.mark.parametrize("comando, empieza", [
     ("curl -s 'https://lite.duckduckgo.com/lite/?q=lol'", "BLOQUEADO"),
     ("python3 -c \"import requests; print(requests.post('https://html.duckduckgo.com/html', data={'q': 'x'}).text)\"", "BLOQUEADO"),

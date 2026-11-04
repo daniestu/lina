@@ -37,7 +37,7 @@ Lo que cambia (resultados, horarios, noticias, precios) lo busca en internet, y 
 - **Con una clave gratuita de Tavily** (`lina bienvenida` o `lina clave tavily`), busca con Tavily. Es lo recomendado si no tienes clave de pago.
 - **Si no tienes ninguna de las dos**, solo consulta Wikipedia y algunas wikis de juegos: sirven para «cómo se hace la poción de invisibilidad en Skyrim», no para noticias, precios ni horarios. En las pruebas, la clave gratuita de Gemini no ha podido usar la búsqueda de Google.
 
-Si no ha podido buscar, te dice por qué. Nunca te dirá que «no tiene acceso a internet». DuckDuckGo está apagado de fábrica porque es poco fiable; si lo quieres, `lina config poner ia.busqueda_reserva true`. Si apagaste la búsqueda (`ia.busqueda = ninguna`), «búscalo igualmente» busca solo esa vez. `lina doctor` te dice cómo la tienes y `lina probar-busqueda` la prueba con veinte preguntas típicas. Adónde va cada búsqueda está en el [manual de privacidad](privacidad.md).
+Lina solo nombra como fuente una web que salió de la búsqueda: si la IA atribuye el dato a otra, Lina la corrige antes de contestar. Si no ha podido buscar, te dice por qué. Nunca te dirá que «no tiene acceso a internet». DuckDuckGo está apagado de fábrica porque es poco fiable; si lo quieres, `lina config poner ia.busqueda_reserva true`. Si apagaste la búsqueda (`ia.busqueda = ninguna`), «búscalo igualmente» busca solo esa vez. `lina doctor` te dice cómo la tienes y `lina probar-busqueda` la prueba con veinte preguntas típicas. Adónde va cada búsqueda está en el [manual de privacidad](privacidad.md).
 
 ## Tus fuentes: una web para cada tema
 

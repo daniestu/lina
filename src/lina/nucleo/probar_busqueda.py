@@ -6,10 +6,16 @@ Usuario nuevo: config.toml de fábrica (ia.busqueda = auto) y un estado vacío, 
 historial; y solo las claves del nivel. La IA, la búsqueda y la lectura de webs son de verdad; ningún comando se ejecuta y nada mira tu pantalla.
 Las llamadas cuentan como medida (no salen en lina tiempos ia).
 
-Cada pregunta está bien si hay respuesta, no dice que no puede buscar ni que no lo sabe, y nombra una web que salió de una búsqueda o lectura de esa
-misma pregunta. Los errores del servicio (429, 500, 502, 503, 504, sin red) no son fallos de búsqueda: la pregunta se repite tras 20, 40 y 60 s y, si sigue
-igual, sale aparte como «api» y no cuenta. Criterio, escrito antes de medir: con Tavily o con la clave de pago, al menos 18 de 20; si más de 2 acaban en
-«api», la pasada no vale y hay que repetirla. Solo con la clave gratuita se informa de lo que haya, sin criterio.
+Cada pregunta está bien si hay respuesta, no dice que no puede buscar ni que no lo sabe, nombra una web que salió de una búsqueda o lectura de esa misma
+pregunta (por su dominio o por su nombre: Steam = steampowered.com, «la wiki de Skyrim» = elderscrolls.fandom.com) y no atribuye el dato a una web que
+no salió (atribución inventada). El juez antiguo (solo el dominio, sin mirar atribuciones) se imprime al lado, para que se vea el efecto del cambio.
+
+Los fallos del servicio de la IA no son fallos de búsqueda: si la respuesta es la del código cuando Gemini no responde (503, tiempo agotado, en pausa, 429)
+o alguna llamada dio un error pasajero sin respuesta buena, la pregunta se repite tras 20, 40 y 60 s y, si sigue igual, sale aparte como «api» y no cuenta.
+Cada pregunta, y cada repetición, empieza sin pausas de modelos ni caché, como un usuario nuevo.
+
+Criterio, escrito antes de repetir las pasadas (2026-11-04): con Tavily o con la clave de pago, al menos el 90 % de las preguntas válidas (las que no son
+«api») con respuesta y fuente, y al menos 15 válidas; con menos de 15, «inconclusivo». Solo con la clave gratuita se informa de lo que haya, sin criterio.
 """
 import re
 import shutil
@@ -20,6 +26,7 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock
 from urllib.parse import urlparse
 
+from lina.nucleo import busqueda as BUS
 from lina.nucleo import comandos as C
 from lina.nucleo.idioma import N_, T
 
@@ -27,9 +34,10 @@ AYUDA = N_("""lina probar-busqueda [gratis|tavily|pago] [N]
     Pasa 20 preguntas típicas (la poción de Skyrim, los partidos de LoL, precios, noticias…) por tu Lina como si fuera la de un usuario nuevo: ajustes de
     fábrica, sin fuentes, memoria ni historial, y solo las claves del nivel. Busca y lee webs de verdad; no ejecuta comandos ni mira tu pantalla.
       gratis  solo tu clave gratuita de Gemini (de fábrica). Dice lo que hay, sin criterio.
-      tavily  tu clave gratuita de Gemini y tu clave de Tavily. Criterio: al menos 18 de 20 con respuesta y fuente.
-      pago    tus claves de Gemini, también la de pago (gasta de tu tope). Criterio: al menos 18 de 20 con respuesta y fuente.
-    Los errores del servicio (429, 503…) se repiten con pausa y no cuentan; si quedan más de 2, la pasada no vale. N: solo las N primeras.""")
+      tavily  tu clave gratuita de Gemini y tu clave de Tavily. Criterio: el 90 % de las válidas con respuesta y fuente.
+      pago    tus claves de Gemini, también la de pago (gasta de tu tope). Criterio: el 90 % de las válidas con respuesta y fuente.
+    Los errores del servicio de la IA (429, 503, «Gemini no responde»…) se repiten con pausa y, si siguen, no cuentan: las demás son las válidas. Con
+    menos de 15 válidas el resultado es «inconclusivo». N: solo las N primeras.""")
 PREGUNTAS = [
     "cómo se hace la poción de invisibilidad en Skyrim", "qué partidos de LoL hay esta semana", "cuánto cuesta la Steam Deck OLED",
     "cuál es la noticia de tecnología más importante de hoy", "quién ganó el último Gran Premio de Fórmula 1", "cuáles son los requisitos mínimos de Cyberpunk 2077",
@@ -40,8 +48,8 @@ PREGUNTAS = [
     "quién ganó el último mundial de League of Legends", "cuándo es el próximo eclipse visible en España",
 ]
 NIVELES = {"gratis": ("gemini",), "tavily": ("gemini", "tavily"), "pago": ("gemini", "gemini_pago")}
-CRITERIO = {"gratis": None, "tavily": 18, "pago": 18}
-MAX_API = 2
+CRITERIO = {"gratis": None, "tavily": 0.9, "pago": 0.9}      # parte de las válidas que tiene que salir bien
+MIN_VALIDAS = 15
 PERMITIDAS = {"buscar_web", "leer_web", "mas_herramientas", "necesito_datos_actuales", "pensar_a_fondo"}
 NO_EJECUTA = "En esta prueba no se ejecuta nada en el equipo ni se mira la pantalla: responde con lo que hayas buscado o leído en internet."
 TRANSITORIOS = {"429", "500", "502", "503", "504", "red"}
@@ -51,6 +59,7 @@ TOPE_SEG = 90
 _NO_RESPONDE = re.compile(r"\b(?:no tengo acceso|no puedo (?:buscar|acceder|navegar|consultar)|no he podido (?:buscar|encontrar|leer)|no lo se\b|"
                           r"no lo he encontrado|no he encontrado|no dispongo)")
 _GENERICAS = {"www", "com", "es", "org", "net", "en", "w", "wiki", "co", "uk", "io", "gg", "info", "html"}
+_SIN_IA = re.compile(r"plan B|sin respuesta|dejó de responder")     # el origen de la respuesta cuando no contestó la IA, sino el código o el modelo local
 
 
 # ---------------------------------------------------------------- el juez
@@ -75,13 +84,20 @@ def cita(dominio, texto):
     return any(len(p) >= 3 and p not in _GENERICAS and (re.search(rf"\b{re.escape(p)}\b", t) or p in junto) for p in re.split(r"[.-]", dominio.lower()))
 
 
-def juzgar(dicho, acciones):
-    """(nota, motivo): «bien» o «mal»."""
+def _sin_respuesta(dicho):
     texto = " ".join(str(d) for d in dicho).strip()
     if not texto or texto.startswith("(cortada") or texto.startswith("(error"):
-        return "mal", T("sin respuesta")
+        return texto, T("sin respuesta")
     if _NO_RESPONDE.search(C.normalizar(texto)):
-        return "mal", T("dice que no puede o que no lo sabe")
+        return texto, T("dice que no puede o que no lo sabe")
+    return texto, None
+
+
+def juzgar_antiguo(dicho, acciones):
+    """El juez de la primera pasada: (nota, motivo), «bien» o «mal». Solo vale el dominio y no mira a quién se atribuye el dato."""
+    texto, falla = _sin_respuesta(dicho)
+    if falla:
+        return "mal", falla
     dominios = dominios_de(acciones)
     if not dominios:
         return "mal", T("ninguna búsqueda ni lectura dio resultados")
@@ -90,16 +106,55 @@ def juzgar(dicho, acciones):
     return "bien", T("cita {web}", web=next(d for d in dominios if cita(d, texto)))
 
 
+def cita_por_nombre(dominio, texto):
+    """¿La respuesta nombra esa web, por su dominio o por su nombre en una atribución («según Steam», «en la wiki de Skyrim»)?"""
+    return cita(dominio, texto) or any(BUS.nombra(dominio, n) for _, _, n in BUS.fuentes_nombradas(texto))
+
+
+def juzgar(dicho, acciones):
+    """El juez de ahora: (nota, motivo). Vale citar por nombre; atribuir el dato a una web que no salió de la búsqueda es «mal» aunque cite otra bien."""
+    texto, falla = _sin_respuesta(dicho)
+    if falla:
+        return "mal", falla
+    dominios = list(dict.fromkeys(dominios_de(acciones) + BUS.dominios_de_acciones(acciones)))
+    if not dominios:
+        return "mal", T("ninguna búsqueda ni lectura dio resultados")
+    inventadas = BUS.atribuciones_inventadas(texto, dominios)
+    if inventadas:
+        return "mal", T("atribución inventada: «{nombre}» no salió de la búsqueda ({webs})", nombre=inventadas[0], webs=", ".join(dominios[:3]))
+    if not any(cita_por_nombre(d, texto) for d in dominios):
+        return "mal", T("no nombra la web de donde sale ({webs})", webs=", ".join(dominios[:3]))
+    return "bien", T("cita {web}", web=next(d for d in dominios if cita_por_nombre(d, texto)))
+
+
 def veredicto(notas, nivel):
-    """(¿pasa?, frase). Las «api» no cuentan como fallo, pero si son más de MAX_API la pasada no vale."""
-    bien, api = notas.count("bien"), notas.count("api")
+    """(«pasa» | «no pasa» | «inconclusivo» | «informa», frase). Las «api» no cuentan: las demás son las válidas."""
+    validas = [n for n in notas if n != "api"]
+    bien = validas.count("bien")
     criterio = CRITERIO[nivel]
-    resumen = T("{bien} de {n} con respuesta y fuente ({api} fuera por errores del servicio)", bien=bien, n=len(notas), api=api)
+    resumen = T("{validas} válidas, {api} excluidas por errores del servicio, {bien} aprobadas", validas=len(validas), api=len(notas) - len(validas), bien=bien)
+    if validas:
+        resumen += f" ({100 * bien / len(validas):.0f} %)"
     if criterio is None:
-        return True, resumen + T(" · solo con la clave gratuita no hay criterio: es para saber lo que hay")
-    if api > MAX_API:
-        return False, resumen + T(" · la pasada no vale: más de {m} preguntas sin servicio. Repítela más tarde", m=MAX_API)
-    return bien >= criterio, resumen + (T(" · PASA (hace falta {c})", c=criterio) if bien >= criterio else T(" · NO PASA (hace falta {c})", c=criterio))
+        return "informa", resumen + T(" · solo con la clave gratuita no hay criterio: es para saber lo que hay")
+    if len(validas) < MIN_VALIDAS:
+        return "inconclusivo", resumen + T(" · INCONCLUSIVO: hacen falta al menos {m} válidas. Repítela más tarde", m=MIN_VALIDAS)
+    if bien >= criterio * len(validas):
+        return "pasa", resumen + T(" · PASA (hace falta el {p} % de las válidas)", p=round(criterio * 100))
+    return "no pasa", resumen + T(" · NO PASA (hace falta el {p} % de las válidas)", p=round(criterio * 100))
+
+
+def respuesta_sin_ia(origen):
+    """¿La respuesta final es la del código (o la del modelo local) porque Gemini no respondió? Entonces es «api», no un fallo de búsqueda."""
+    return bool(_SIN_IA.search(str(origen or "")))
+
+
+def reiniciar_pausas():
+    """Cada pregunta es la de un usuario nuevo: sin modelos en pausa por la anterior, sin caché de búsquedas y sin la espera de DuckDuckGo."""
+    from lina.nucleo import ia as IA
+    for d in (IA._pausa_modelo, IA._fallos_red, IA._clase_pausa, BUS._pausa_google, BUS._cache):
+        d.clear()
+    BUS._ultima_duckduckgo[0] = 0.0
 
 
 # ---------------------------------------------------------------- un usuario nuevo
@@ -153,7 +208,7 @@ def pasar(frase, A, a, llamadas, tope=TOPE_SEG):
     dicho = []
     a.decir = dicho.append
     a._hablar = lambda texto, *x, **k: None
-    a.historial, a.hechos_recientes, a.busquedas_hechas = [], [], []
+    a.historial, a.hechos_recientes, a.busquedas_hechas, a.origen_respuesta = [], [], [], ""
     llamadas.clear()
     corte = threading.Timer(tope, A._abortar.set)
     corte.start()
@@ -170,12 +225,13 @@ def pasar(frase, A, a, llamadas, tope=TOPE_SEG):
     return dicho, list(getattr(a, "acciones_turno", []) or []), list(llamadas), time.time() - t0
 
 
-def es_de_servicio(nota, llamadas):
-    """¿Falló por el servicio de la IA y no por la búsqueda? Solo si no salió bien y alguna llamada dio un error pasajero."""
-    return nota != "bien" and any(r in TRANSITORIOS for r in llamadas)
+def es_de_servicio(nota, llamadas, origen=""):
+    """¿Falló por el servicio de la IA y no por la búsqueda? Si contestó el código porque Gemini no respondía, o si no salió bien y alguna llamada dio un
+    error pasajero."""
+    return respuesta_sin_ia(origen) or (nota != "bien" and any(r in TRANSITORIOS for r in llamadas))
 
 
-def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=time.sleep):
+def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=time.sleep, reiniciar=reiniciar_pausas):
     if argv[:1] in (["-h"], ["--help"], ["ayuda"]):
         salida(T(AYUDA))
         return 0
@@ -192,32 +248,41 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
             return 2
         salida(T("Nivel «{nivel}»: paso {n} preguntas por una Lina de usuario nuevo (unos segundos cada una, con pausas)…", nivel=nivel, n=len(preguntas)))
         A, a, llamadas = (preparar or _asistente)()
-        filas, notas = [], []
+        filas, notas, antiguas = [], [], []
         with IA.solo_medida():
             for i, frase in enumerate(preguntas):
                 if i:
                     dormir(PAUSA_SEG)
                 for espera in (*REINTENTOS, None):
+                    reiniciar()
                     dicho, acciones, hechas, seg = (pasar_pregunta or pasar)(frase, A, a, llamadas)
+                    origen = getattr(a, "origen_respuesta", "")
                     nota, motivo = juzgar(dicho, acciones)
-                    if not es_de_servicio(nota, hechas):
+                    antigua, motivo_antiguo = juzgar_antiguo(dicho, acciones)
+                    if not es_de_servicio(nota, hechas, origen):
                         break
+                    codigos = ", ".join(sorted(set(hechas) & TRANSITORIOS)) or T("Gemini no respondió")
                     if espera is None:
-                        nota, motivo = "api", T("el servicio de la IA siguió fallando ({codigos})", codigos=", ".join(sorted(set(hechas) & TRANSITORIOS)))
+                        nota, motivo = "api", T("el servicio de la IA siguió fallando ({codigos})", codigos=codigos)
+                        antigua = "api"
                         break
-                    salida(T("   ({codigos}: error del servicio, repito en {s} s)", codigos=", ".join(sorted(set(hechas) & TRANSITORIOS)), s=espera))
+                    salida(T("   ({codigos}: error del servicio, repito en {s} s)", codigos=codigos, s=espera))
                     dormir(espera)
                 escalon = next((b.escalon or "-" for b in reversed(getattr(a, "busquedas_hechas", []) or [])), "-")
                 notas.append(nota)
+                antiguas.append(antigua)
                 filas.append((nota, seg, escalon, frase, motivo, " ".join(str(d) for d in dicho)))
-                salida(f"{nota:5} {seg:5.1f} s  {escalon:10} {frase}\n      {motivo}\n      dice: {' '.join(filas[-1][5].split())[:240]}")
-    pasa, frase_final = veredicto(notas, nivel)
+                distinto = T("\n      (juez antiguo: {nota}, {motivo})", nota=antigua, motivo=motivo_antiguo) if antigua != nota else ""
+                salida(f"{nota:5} {seg:5.1f} s  {escalon:10} {frase}\n      {motivo}{distinto}\n      dice: {' '.join(filas[-1][5].split())[:240]}")
+    estado, frase_final = veredicto(notas, nivel)
+    _, frase_antigua = veredicto(antiguas, nivel)
     por_escalon: dict = {}
     for nota, _, escalon, *_ in filas:
         if nota == "bien":
             por_escalon[escalon] = por_escalon.get(escalon, 0) + 1
     salida("")
-    salida(frase_final)
+    salida(T("Juez antiguo (solo el dominio): {frase}", frase=frase_antigua))
+    salida(T("Juez nuevo (también por nombre y sin atribuciones inventadas; es el que decide): {frase}", frase=frase_final))
     if por_escalon:
         salida(T("Respondidas con fuente, por escalón: {d}", d=", ".join(f"{k} {v}" for k, v in sorted(por_escalon.items()))))
-    return 0 if pasa else 1
+    return {"pasa": 0, "informa": 0, "no pasa": 1, "inconclusivo": 3}[estado]

@@ -468,7 +468,7 @@ from lina.nucleo.ia import (  # noqa: F401
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_reserva, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva, modo_busqueda, reserva_sin_clave,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
-    cabe_modelo_local, dominio_valido,
+    cabe_modelo_local, dominio_valido, empezar_peticion, fallos_de_la_peticion, horas_hasta_renovar_cupo,
 )
 
 
@@ -1231,6 +1231,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         try:
             with motivo_llamada("hechos" if hechos else "a_fondo" if modo == "profundo" else "normal"):
                 respuesta, origen = self.responder(pregunta, imagen, modo)
+            self.origen_respuesta = origen                         # quién contestó: un modelo, el local o el código (lina probar-busqueda lo mira)
         finally:
             self.crono = None
             crono.llamadas = recoger_llamadas()
@@ -1810,7 +1811,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             resultado = buscar_tavily(consulta, args.get("dominio") or None)
             self.ejecutor.contaminar("búsqueda web")  # A2e: lo que trae internet puede traer instrucciones escondidas
             return resultado
-        res = BUS.buscar(consulta, args.get("dominio") or None, modo=modo)
+        res = BUS.buscar(consulta, args.get("dominio") or None, modo=modo, peticion=str(getattr(self, "pregunta_pura", "") or ""))
         if not hasattr(self, "busquedas_hechas"):
             self.busquedas_hechas = []
         self.busquedas_hechas.append(res)
@@ -1897,7 +1898,11 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         return H.observar_config(str(args.get("fase", "")).strip().lower())
 
     def _h_leer_web(self, nombre, args):
-        return self.leer_web(args)
+        """Una página de las wikis conocidas o de Wikipedia se lee por su extracto (la API): cabe entera y no se resume por trozos, que en la pasada gratis
+        gastó hasta 8 llamadas de una clave con 20 al día. Tus fuentes guardadas no pasan por aquí: esas se leen enteras."""
+        wiki = BUS.wiki_de_url(str(args.get("url", "") or "").strip())
+        pagina = BUS.pagina_wiki(wiki) if wiki else None
+        return self.leer_web(args, pagina=pagina)
 
     def _h_notas(self, nombre, args):
         return self.herramienta_notas(args)
@@ -2157,7 +2162,20 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
 
     def asegurar_honestidad_final(self, texto):
         """Última red: lo que el código sabe y la respuesta no reconoce se añade o se sustituye. No se confía en que la IA lo diga."""
-        return self._sin_negar_internet(self._avisar_fuente_sin_anadir(self._aclarar_fuente(self._honestidad_de_lo_hecho(texto))))
+        return self._atribucion_real(self._sin_negar_internet(self._avisar_fuente_sin_anadir(self._aclarar_fuente(self._honestidad_de_lo_hecho(texto)))))
+
+    def _atribucion_real(self, texto):
+        """«Según la wiki UESP…» con resultados de gamespot.com: el dato se atribuye a una web que no salió de ninguna búsqueda ni lectura. Se cambia por una
+        de verdad. Con una fuente tuya de por medio no se toca: eso lo cuida _aclarar_fuente."""
+        acciones = getattr(self, "acciones_turno", []) or []
+        if getattr(self, "fuente_turno", None) or any(n == "usar_fuente" for n, _, _ in acciones):
+            return texto
+        dominios = BUS.dominios_de_acciones(acciones)
+        inventadas = BUS.atribuciones_inventadas(texto, dominios) if dominios else []
+        if not inventadas:
+            return texto
+        log(f"La respuesta atribuye el dato a {', '.join(inventadas)}, que no salió de la búsqueda ({', '.join(dominios[:4])}): se corrige")
+        return BUS.corregir_atribucion(texto, dominios)
 
     def _buscar_igualmente(self, peticion):
         """¿«Búscalo igualmente» con ia.busqueda = ninguna? Entonces esta petición busca como «auto»; la siguiente vuelve a lo que elegiste."""
@@ -2593,6 +2611,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
 
     def _responder(self, pregunta, imagen, modo="rapido"):
         self.modo_actual = modo
+        empezar_peticion()                                     # los fallos de Gemini de esta petición, para decir por qué no responde
         self.busquedas_turno = 0
         self.busquedas_hechas = []                             # lo que dio cada buscar_web de esta petición (para no decir «no tengo acceso a internet»)
         self.forzar_busqueda = self._buscar_igualmente(str(self.pregunta_pura or pregunta))
@@ -2644,6 +2663,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         cabe, motivo, por_vram = cabe_modelo_local()
         if not cabe:
             log(f"Plan B: no uso el modelo local ({motivo})")
+            sin_gemini = self._por_que_no_responde_gemini()
+            if sin_gemini:
+                return sin_gemini, "código (plan B: Gemini sin cupo o saturado)"
             if por_vram:
                 return (T("Gemini no responde y el modelo local no cabe en la tarjeta gráfica sin pasar del límite de memoria. Inténtalo dentro de un rato."),
                         "código (plan B sin VRAM)")
@@ -2657,6 +2679,23 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         r = preguntar_local(pregunta_local, imagen, permitir_escalar=False, historial=self.historial,
                             datos_sistema=H.hechos_sistema(), soltar_en=SOLTAR_LOCAL_PLAN_B)      # que no deje la VRAM ocupada después
         return (r or SIN_RESPUESTA), "local (plan B)"
+
+    def _por_que_no_responde_gemini(self):
+        """Lo que dice Lina si Gemini no ha respondido y no hay modelo local, cuando el motivo está claro: el límite diario de la clave gratuita (con
+        cuándo se renueva) o el servicio saturado (503, tiempo agotado). None si fue otra cosa o una mezcla: entonces, la frase de siempre."""
+        fallos = fallos_de_la_peticion()
+        clases = {c for c, _ in fallos}
+        if not fallos or not clases <= {"diario", "saturado"}:
+            return None
+        if clases == {"diario"} and all(n == "gratis" for _, n in fallos):
+            horas = horas_hasta_renovar_cupo()
+            cuando = T("se renueva en menos de una hora") if horas <= 1 else T("se renueva en unas {h} horas", h=horas)
+            return T("Has agotado el límite diario de la clave gratuita de Gemini; {cuando}. Con una clave de pago o con otro modelo funciona ya.", cuando=cuando)
+        if "saturado" not in clases:
+            return None                                        # el cupo diario de la clave de pago: eso no lo sabemos explicar mejor
+        if all(n == "gratis" for c, n in fallos if c == "saturado"):
+            return T("Gemini gratuito está saturado ahora. Inténtalo dentro de un rato.")
+        return T("Gemini está saturado ahora. Inténtalo dentro de un rato.")
 
     def decir(self, texto):
         """La respuesta de la petición en curso. Si deja algo pendiente de tu «sí», es una pregunta de confirmación: no se puede perder en silencio."""

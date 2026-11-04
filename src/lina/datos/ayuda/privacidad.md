@@ -19,7 +19,7 @@ Con `auto`, lo de fábrica, Lina prueba en este orden y se queda con lo primero 
 1. **Google, dentro de Gemini**, si tienes clave de pago con saldo en tu tope (o una clave de Gemini que sí pueda buscar: en las pruebas, la gratuita no ha podido). Es una consulta aparte a Google, que ya recibe tus preguntas. Con la de pago, pasadas las búsquedas gratuitas del mes, cuesta dinero y cuenta en tu tope.
 2. **Tavily**, si tienes clave.
 3. **DuckDuckGo**, solo si lo enciendes (`lina config poner ia.busqueda_reserva true`). Está apagado de fábrica porque es poco fiable: suele tomar a los programas por robots y entonces no da nada. DuckDuckGo ve el texto de la búsqueda y tu dirección IP. Lina no se hace pasar por un navegador para evitar su bloqueo. La primera vez que se usa, te lo dice.
-4. **Wikipedia y algunas wikis de juegos** (Fandom, minecraft.wiki, wiki.gg, bg3.wiki, WikiDex), con su buscador, sin clave. Ven el texto de la búsqueda y tu dirección IP. Lina descarga también la primera página encontrada, cuyo texto llega a la IA. La primera vez que se usan, te llega una notificación.
+4. **Wikipedia y algunas wikis de juegos** (Fandom, minecraft.wiki, wiki.gg, bg3.wiki, WikiDex), con su buscador, sin clave. Ven el texto de la búsqueda y tu dirección IP. Solo se usan para lo enciclopédico (no para precios, noticias, el tiempo ni resultados). Lina pide también, a su API, el extracto de la primera página encontrada, cuyo texto llega a la IA. La primera vez que se usan, te llega una notificación.
 
 Con `tavily` solo se usa Tavily (y DuckDuckGo si lo enciendes); con `google`, solo la de Gemini (y DuckDuckGo si lo enciendes); con `ninguna`, nada, salvo que digas «búscalo igualmente», que busca como `auto` solo en esa petición.
 

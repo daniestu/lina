@@ -9,7 +9,9 @@
   2. Tavily, si hay clave (gratis: 1000 búsquedas al mes).
   3. DuckDuckGo, solo si lo enciendes (ia.busqueda_reserva): en las medidas nos tomó por un robot 59 de 60 veces. Como mucho una consulta cada
      INTERVALO_DUCKDUCKGO_SEG; si no toca, se salta sin esperar. No nos hacemos pasar por un navegador para esquivarlo.
-  4. Wikipedia y algunas wikis de juegos (datos/wikis.toml), con su buscador MediaWiki, sin clave.
+  4. Wikipedia y algunas wikis de juegos (datos/wikis.toml), con su buscador MediaWiki, sin clave. Solo para lo enciclopédico: nada de precios,
+     noticias, el tiempo, resultados ni lo de «hoy» (es_de_actualidad), y solo resultados que nombren algo de la consulta. Se lee el extracto de la
+     página por su API (EXTRACTO_MAX caracteres, sin resumir por trozos: en la pasada gratis una pregunta gastó 8 llamadas de 20 al día).
 Si nada da resultados, el motivo concreto de cada paso, para decirlo tal cual: nunca «no tengo acceso a internet».
 Lo que sí encuentra se guarda CACHE_SEG (partidos, precios y noticias cambian: poco rato). Con «google», solo los pasos 1 y 3.
 """
@@ -19,7 +21,7 @@ import re
 import time
 import tomllib
 from dataclasses import dataclass, field
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlparse
 
 import requests
 
@@ -41,6 +43,7 @@ PAUSA_GOOGLE_SEG = 600                               # tras un error que no es d
 ARCHIVO_GOOGLE = "busqueda_google.json"
 WIKIS = RUT.PAQUETE / "datos" / "wikis.toml"
 TIMEOUT_GOOGLE, TIMEOUT_WIKI = 12, 8
+EXTRACTO_MIN, EXTRACTO_MAX = 1000, 3000              # el extracto de una wiki: la introducción y, si es muy corta, lo que siga hasta EXTRACTO_MAX
 ESCALONES = {"auto": ("google", "tavily", "duckduckgo", "wiki"), "google": ("google", "duckduckgo")}
 
 M_GOOGLE_GRATIS = N_("en las pruebas tu clave de Gemini no ha podido usar la búsqueda de Google")
@@ -55,6 +58,7 @@ M_DUCKDUCKGO = N_("DuckDuckGo no ha respondido o me ha bloqueado")
 M_DUCKDUCKGO_PRONTO = N_("a DuckDuckGo le pregunté hace muy poco y no insisto")
 M_WIKI_NADA = N_("Wikipedia y las wikis de juegos no tienen nada sobre esto")
 M_WIKI_RED = N_("no he podido conectar con Wikipedia")
+M_WIKI_ACTUALIDAD = N_("Wikipedia y las wikis no sirven para datos del momento como precios, noticias, el tiempo o resultados")
 
 _cache: dict = {}
 _pausa_google: dict = {}                              # huella de la clave -> hasta cuándo no se prueba (cuota por minuto u otro error)
@@ -223,8 +227,34 @@ def wikis_para(consulta, idioma):
     return salida
 
 
-def resultados_wiki(consulta, idioma=None, get=None, maximo=5):
-    """(resultados, motivo) de la primera wiki que encuentre algo."""
+_ACTUALIDAD = re.compile(
+    r"\b(?:hoy|manana|ayer|ahora|ahora mismo|esta (?:semana|noche|tarde|manana)|este (?:fin de semana|mes|ano)|actual(?:es|mente)?|ultim[oa]s?|proxim[oa]s?|"
+    r"precios?|cuesta|cuestan|vale|valen|cotiza\w*|cotizacion\w*|bolsa|euros?|dolar(?:es)?|bitcoin|noticias?|novedad(?:es)?|"
+    r"tiempo (?:hace|hara|en)|que tiempo|clima|lluvia|temperatura|prevision|resultados?|clasificacion|marcador|partidos?|jornada|gano|ganador|"
+    r"estrenos?|cartelera|horarios?|today|tomorrow|now|current|latest|next|price|cost|news|weather|forecast|score|results?|standings|"
+    r"matches|won|release date)\b")
+
+
+def es_de_actualidad(texto):
+    """¿Pide un dato del momento (precio, noticia, el tiempo, un resultado, lo de hoy)? Eso no lo trae una enciclopedia: las wikis no se usan."""
+    return bool(_ACTUALIDAD.search(C.normalizar(texto)))
+
+
+def terminos(consulta, nombres=()):
+    """Las palabras que importan de la consulta (sin palabras vacías ni el nombre del juego), para ver si un resultado de wiki habla de ello."""
+    return [p for p in re.findall(r"\w+", C.normalizar(consulta_wiki(consulta, nombres))) if len(p) >= 3 and p not in _VACIAS]
+
+
+def _nombra_termino(resultado, palabras):
+    texto = C.normalizar(f"{resultado.get('title', '')} {IA._texto_html(str(resultado.get('snippet', '')))}")
+    return any(re.search(rf"\b{re.escape(p)}", texto) for p in palabras)
+
+
+def resultados_wiki(consulta, idioma=None, get=None, maximo=5, peticion=""):
+    """(resultados, motivo) de la primera wiki que encuentre algo que nombre la consulta. Nada si se pide un dato del momento."""
+    if es_de_actualidad(f"{consulta} {peticion}"):
+        log(f"Wikis: «{consulta}» pide un dato del momento; no busco en ellas")
+        return [], T(M_WIKI_ACTUALIDAD)
     hubo_red = False
     for w in wikis_para(consulta, idioma or IDI.actual()):
         try:
@@ -237,6 +267,11 @@ def resultados_wiki(consulta, idioma=None, get=None, maximo=5):
         except (requests.RequestException, ValueError, AttributeError) as e:
             log(f"Wiki {w['api']}: {type(e).__name__}")
             continue
+        palabras = terminos(consulta, w.get("nombres", ()))
+        if palabras and encontrados:
+            antes, encontrados = len(encontrados), [e for e in encontrados if _nombra_termino(e, palabras)]
+            if len(encontrados) < antes:
+                log(f"Wiki {w['api']}: {antes - len(encontrados)} de {antes} resultados no nombran nada de la consulta ({', '.join(palabras)})")
         if encontrados:
             dominio = w["api"].split("/")[0]
             log(f"Búsqueda en {dominio} «{consulta}»: {len(encontrados)} resultados")
@@ -268,21 +303,66 @@ def _cubre(titulo, consulta):
 
 
 def pagina_wiki(resultado, get=None):
-    """{url, titulo, texto} de la página de una wiki, pedida a su API (action=parse): Fandom devuelve 403 a los programas que piden la página, no a la
-    API. None si no se puede."""
+    """{url, titulo, texto} con el extracto de la página de una wiki, pedido a su API: la introducción (prop=extracts) o, donde no lo hay (Fandom), la
+    primera sección (action=parse, section=0); si es más corta que EXTRACTO_MIN, la página entera, y siempre como mucho EXTRACTO_MAX caracteres. Así cabe
+    entero en lo que lee la IA y no se resume por trozos. Fandom devuelve 403 a los programas que piden la página, no a la API. None si no se puede."""
     api = resultado.get("api")
     if not api:
         return None
+    titulo = resultado.get("title", "")
+    texto = ""
+    for intro in (True, False):
+        texto = _extracto(api, titulo, intro, get)
+        if texto is None or len(texto) >= EXTRACTO_MIN:
+            break
+    if not texto:
+        return None
+    return {"url": resultado["url"], "titulo": titulo, "texto": _recortar(texto)}
+
+
+def _recortar(texto):
+    texto = re.sub(r"[ \t]+", " ", re.sub(r"\n{3,}", "\n\n", texto)).strip()
+    if len(texto) <= EXTRACTO_MAX:
+        return texto
+    corte = texto[:EXTRACTO_MAX]
+    return corte[:max(corte.rfind(". "), EXTRACTO_MAX // 2) + 1].rstrip() + " (…)"
+
+
+def _extracto(api, titulo, intro, get=None):
+    """El texto de la página (solo la introducción si `intro`) o None si no hay red."""
+    pedir = get or requests.get
+    comun = {"redirects": 1, "format": "json", "formatversion": 2}
     try:
-        r = (get or requests.get)(f"https://{api}/api.php", params={"action": "parse", "page": resultado.get("title", ""), "prop": "text", "redirects": 1,
-                                                                 "disabletoc": 1, "disableeditsection": 1, "format": "json", "formatversion": 2},
-                                  headers={"User-Agent": IA.AGENTE}, timeout=TIMEOUT_WIKI)
+        r = pedir(f"https://{api}/api.php", params={"action": "query", "prop": "extracts", "explaintext": 1, "titles": titulo, **({"exintro": 1} if intro else {}),
+                                                     **comun}, headers={"User-Agent": IA.AGENTE}, timeout=TIMEOUT_WIKI)
+        paginas = r.json().get("query", {}).get("pages", []) if r.ok else []
+        texto = str((paginas[0] if paginas else {}).get("extract") or "")
+        if texto:
+            return texto
+        r = pedir(f"https://{api}/api.php", params={"action": "parse", "page": titulo, "prop": "text", "disabletoc": 1, "disableeditsection": 1,
+                                                     **({"section": 0} if intro else {}), **comun}, headers={"User-Agent": IA.AGENTE}, timeout=TIMEOUT_WIKI)
         html = str(r.json().get("parse", {}).get("text", "")) if r.ok else ""
-    except (requests.RequestException, ValueError, AttributeError) as e:
+    except (requests.RequestException, ValueError, AttributeError, IndexError) as e:
         log(f"Wiki {api}: no he podido traer la página ({type(e).__name__})")
         return None
-    texto = IA._texto_html(re.sub(r"<(style|script)\b.*?</\1>", " ", html, flags=re.S | re.I))
-    return {"url": resultado["url"], "titulo": resultado.get("title", ""), "texto": texto} if texto else None
+    html = re.sub(r"<(style|script)\b.*?</\1>|<table\b.*?</table>|<aside\b.*?</aside>", " ", html, flags=re.S | re.I)    # sin fichas ni tablas
+    return IA._texto_html(html)
+
+
+def wiki_de_url(url):
+    """{api, url, title} si la dirección es de una página de las wikis conocidas (o de Wikipedia), para leerla por su API y no la página entera; o None."""
+    partes = urlparse(str(url))
+    host = partes.netloc.lower()
+    if re.fullmatch(r"[a-z]{2,3}(?:\.m)?\.wikipedia\.org", host):
+        host = host.replace(".m.", ".")                    # la versión para el móvil es la misma página
+        candidatas = [(f"{host}/w", f"https://{host}/wiki/")]
+    else:
+        candidatas = [(d["api"], d["pagina"]) for w in wikis() for d in (w.get("es"), w.get("en")) if isinstance(d, dict)]
+    for api, pagina in candidatas:
+        if f"https://{host}{partes.path}".startswith(pagina) and partes.scheme in ("http", "https") and len(partes.path) > len(urlparse(pagina).path):
+            titulo = unquote(partes.path[len(urlparse(pagina).path):]).replace("_", " ")
+            return {"api": api, "url": str(url), "title": titulo} if titulo and "/" not in titulo else None
+    return None
 
 
 # ---------------------------------------------------------------- la escalera
@@ -290,11 +370,12 @@ def _clave_cache(consulta, dominio, modo):
     return (" ".join(str(consulta).lower().split()), dominio or "", modo)
 
 
-def buscar(consulta, dominio=None, modo=None, ahora=None):
-    """Resultado de la escalera de `modo` (auto o google; por defecto el de ia.busqueda). Nunca lanza por la red."""
+def buscar(consulta, dominio=None, modo=None, ahora=None, peticion=""):
+    """Resultado de la escalera de `modo` (auto o google; por defecto el de ia.busqueda). `peticion`: lo que dijo el usuario, para no mandar a las wikis
+    lo que pide un dato del momento aunque la consulta no lo diga. Nunca lanza por la red."""
     modo = modo or IA.modo_busqueda()
     ahora_real = ahora or time.time()
-    clave = _clave_cache(consulta, dominio, modo)
+    clave = (*_clave_cache(consulta, dominio, modo), es_de_actualidad(peticion))
     guardado = _cache.get(clave)
     if guardado and ahora_real - guardado[0] < CACHE_SEG:
         log(f"Búsqueda «{consulta}»: la de hace {int(ahora_real - guardado[0])} s ({guardado[1].escalon})")
@@ -302,7 +383,7 @@ def buscar(consulta, dominio=None, modo=None, ahora=None):
     dom = IA.dominio_valido(dominio) if dominio else None
     res = Resultado()
     for escalon in ESCALONES.get(modo, ()):
-        encontrados, motivo = _escalon(escalon, consulta, dom, res, ahora_real)
+        encontrados, motivo = _escalon(escalon, consulta, dom, res, ahora_real, peticion)
         if encontrados:
             res.resultados, res.escalon = encontrados, escalon
             if escalon == "wiki":
@@ -319,7 +400,7 @@ def buscar(consulta, dominio=None, modo=None, ahora=None):
     return res
 
 
-def _escalon(escalon, consulta, dominio, res, ahora):
+def _escalon(escalon, consulta, dominio, res, ahora, peticion=""):
     if escalon == "google":
         return resultados_google(consulta, dominio, ahora=ahora)
     if escalon == "tavily":
@@ -341,14 +422,17 @@ def _escalon(escalon, consulta, dominio, res, ahora):
     if escalon == "wiki":
         if dominio and not re.search(r"(?:^|\.)(?:wikipedia\.org|fandom\.com|minecraft\.wiki|wiki\.gg|bg3\.wiki|wikidex\.net)$", dominio):
             return [], ""                                # buscar dentro de otra web no es cosa de las wikis
-        return resultados_wiki(consulta)
+        return resultados_wiki(consulta, peticion=peticion)
     return [], ""
 
 
 def como_texto(res):
     """Lo que recibe la IA: los resultados de siempre o, si nada dio resultados, el motivo y cómo decirlo."""
     if res.resultados:
-        return IA._resultados_como_texto(res.resultados)
+        webs = dominios_de_resultados(res.resultados)
+        return IA._resultados_como_texto(res.resultados) + (
+            f"\nWEBS DE ESTOS RESULTADOS: {', '.join(webs)}. Si dices de dónde sale el dato, nombra SOLO una de estas webs por su dominio (por ejemplo "
+            f"«según {webs[0]}»); no atribuyas nada a otra web, wiki o medio que no esté en esta lista." if webs else "")
     motivos = "; ".join(res.motivos) or T(M_WIKI_NADA)
     return (f"NO SE HA PODIDO BUSCAR: {motivos}. Díselo al usuario en una frase con ese motivo; NUNCA digas que no tienes acceso a internet. Si añades algo "
             "de memoria, di que no lo has comprobado."
@@ -362,6 +446,93 @@ def frase_de_fallo(resultados):
     utiles = [m for m in dict.fromkeys(motivos) if m != T(M_GOOGLE_GRATIS)] or list(dict.fromkeys(motivos))
     frase = T("No he podido buscarlo: {motivos}.", motivos=T(" y ").join(utiles[-2:])) if utiles else T("No he podido buscarlo.")
     return frase + (" " + T("Con una clave gratuita de Tavily buscaría noticias, precios y horarios: lina bienvenida.") if sin_tavily else "")
+
+
+# ---------------------------------------------------------------- de dónde dice la respuesta que sale el dato
+# Nombres con los que se cita una web que no salen de su dominio. Lo demás vale por la etiqueta del dominio («gamespot» = gamespot.com) o, en las wikis
+# de datos/wikis.toml, por el nombre del juego («la wiki de Skyrim» = elderscrolls.fandom.com).
+ALIAS = {"steampowered.com": ("steam",), "store.steampowered.com": ("steam",), "ign.com": ("ign",), "ign.es": ("ign",), "x.com": ("twitter",),
+         "elpais.com": ("el pais",), "elmundo.es": ("el mundo",), "rtve.es": ("rtve", "radiotelevision espanola"), "aemet.es": ("aemet", "agencia estatal de meteorologia"),
+         "bbc.com": ("bbc",), "bbc.co.uk": ("bbc",), "nytimes.com": ("new york times",), "lolesports.com": ("lol esports",),
+         "uesp.net": ("uesp", "unofficial elder scrolls pages"), "wikipedia.org": ("wikipedia",), "pccomponentes.com": ("pc componentes", "pccomponentes")}
+_GENERICAS = {"www", "com", "es", "org", "net", "en", "w", "wiki", "co", "uk", "io", "gg", "info", "html", "fandom", "store", "news", "blog"}
+_NO_SON_FUENTE = {"google", "internet", "la busqueda", "los resultados", "las fuentes", "la web", "mis datos", "wiki"}
+_ATRIBUCION = re.compile(
+    r"(?P<intro>\b(?:[Ss]eg[uú]n|[Dd]e acuerdo con|[Cc]omo (?:indica|dice|recoge|explica|publica)|[Ii]nforma|[Ff]uente:|[Aa]ccording to|[Ss]ource:|"
+    r"[Ee]n(?=\s+(?:la|el)\s+(?:web|página|pagina|wiki|tienda|sitio|portal)\b))\s+)"
+    r"(?P<fuente>(?:(?:la|el|los|las|the)\s+)?(?:(?:web|página|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site)\s+(?:de\s+(?:la\s+|el\s+)?|del\s+|of\s+(?:the\s+)?)?)?"
+    r"(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b|[A-Z0-9ÁÉÍÓÚÑ][\w'’.-]*(?:\s+(?:de\s+)?[A-Z0-9ÁÉÍÓÚÑ][\w'’.-]*){0,3}))")
+
+
+def _sin_relleno(nombre):
+    t = C.normalizar(nombre).rstrip(".")
+    t = re.sub(r"^(?:(?:la|el|los|las|the) )?(?:(?:web|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site) (?:de (?:la |el )?|del |of (?:the )?)?)?", "", t)
+    return t.strip()
+
+
+def nombra(dominio, nombre):
+    """¿Ese nombre («la wiki UESP», «Steam», «gamespot.com», «la wiki de Skyrim») es la web `dominio`?"""
+    n = _sin_relleno(nombre)
+    if not n:
+        return False
+    junto = n.replace(" ", "")
+    dominio = dominio.lower().removeprefix("www.")
+    partes = [p for p in re.split(r"[.-]", dominio) if len(p) >= 3 and p not in _GENERICAS]
+    if any(re.search(rf"\b{re.escape(p)}\b", n) or p in junto for p in partes):
+        return True
+    if any(dominio == d or dominio.endswith("." + d) for d, alias in ALIAS.items() for a in alias if re.search(rf"\b{re.escape(a)}\b", n)):
+        return True
+    for w in wikis():
+        hosts = {str(d.get("api", "")).split("/")[0] for d in (w.get("es"), w.get("en")) if isinstance(d, dict)}
+        if dominio in hosts and any(re.search(rf"\b{re.escape(C.normalizar(x))}\b", n) for x in w.get("nombres", [])):
+            return True
+    return False
+
+
+def fuentes_nombradas(texto):
+    """[(inicio, fin, nombre)] de cada «según X», «de acuerdo con X»… de la respuesta (X, la fuente a la que atribuye el dato)."""
+    salida = []
+    for m in _ATRIBUCION.finditer(str(texto)):
+        nombre = m.group("fuente").rstrip(".")
+        if _sin_relleno(nombre) in _NO_SON_FUENTE or C.normalizar(nombre) in _NO_SON_FUENTE:
+            continue
+        salida.append((m.start("fuente"), m.start("fuente") + len(nombre), nombre))
+    return salida
+
+
+def atribuciones_inventadas(texto, dominios):
+    """Los nombres de fuente de la respuesta que no son ninguna de las webs que de verdad salieron (`dominios`)."""
+    return [n for _, _, n in fuentes_nombradas(texto) if not any(nombra(d, n) for d in dominios)]
+
+
+def corregir_atribucion(texto, dominios):
+    """La respuesta con cada fuente inventada cambiada por una web de verdad («Según la wiki UESP» → «Según gamespot.com»). Sin `dominios`, tal cual."""
+    if not dominios:
+        return texto
+    salida = str(texto)
+    for inicio, fin, nombre in reversed(fuentes_nombradas(salida)):
+        if not any(nombra(d, nombre) for d in dominios):
+            salida = salida[:inicio] + dominios[0] + salida[fin:]
+    return salida
+
+
+def dominios_de_resultados(resultados):
+    return list(dict.fromkeys(d for d in ((r.get("dominio") or urlparse(str(r.get("url", ""))).netloc).lower().removeprefix("www.") for r in resultados) if d))
+
+
+def dominios_de_acciones(acciones):
+    """Las webs que salieron de una búsqueda o una lectura con éxito, según lo que vio la IA (también en modo tavily)."""
+    dominios = []
+    for nombre, args, resultado in acciones:
+        texto = str(resultado)
+        if nombre == "buscar_web" and texto.startswith("RESULTADOS DE BÚSQUEDA"):
+            dominios += re.findall(r"^\[\d+\] .*? \(([a-z0-9.-]+\.[a-z]{2,})\) ", texto, re.M)
+            if "CONTENIDO DE LA PÁGINA" in texto:                # la wiki: la escalera ya leyó la primera página
+                dominios += re.findall(r"^CONTENIDO DE LA PÁGINA «.*?» \(([a-z0-9.-]+\.[a-z]{2,})\)", texto, re.M)
+        if nombre in ("leer_web", "usar_fuente") and "CONTENIDO DE LA PÁGINA" in texto:
+            dominios.append(urlparse(str((args or {}).get("url", ""))).netloc.lower().removeprefix("www."))
+            dominios += re.findall(r"CONTENIDO DE LA PÁGINA «.*?» \(([a-z0-9.-]+\.[a-z]{2,})\)", texto)
+    return list(dict.fromkeys(d for d in dominios if d))
 
 
 # ---------------------------------------------------------------- «búscalo igualmente» con ia.busqueda = ninguna
