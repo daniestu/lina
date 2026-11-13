@@ -21,6 +21,8 @@ With `auto`, the default, Lina tries in this order and keeps the first thing tha
 3. **DuckDuckGo**, only if you turn it on (`lina config poner ia.busqueda_reserva true`). It is off by default because it is unreliable: it often takes programs for robots and then returns nothing. DuckDuckGo sees the search text and your IP address. Lina does not pretend to be a browser to get around its block. The first time it is used, Lina tells you.
 4. **Wikipedia and some game wikis** (Fandom, minecraft.wiki, wiki.gg, bg3.wiki, WikiDex), with their own search, no key. They see the search text and your IP address. They are only used for encyclopedic questions (not prices, news, the weather or results). Lina also asks their API for the extract of the first page found, whose text reaches the AI. The first time they are used, you get a notification.
 
+**Whether a game works on Linux.** When you ask whether a Steam game works on Linux or needs Proton, Lina checks the Steam store page and the ProtonDB summary, with any `ia.busqueda`. Both only see the game's Steam number and your IP address. The first time you get a notification.
+
 With `tavily` only Tavily is used (and DuckDuckGo if you turn it on); with `google`, only Gemini's (and DuckDuckGo if you turn it on); with `ninguna`, nothing, unless you say «búscalo igualmente», which searches like `auto` for that request only.
 
 - If you save **sources** (a website for a topic) and use Gemini, the following:

@@ -481,13 +481,13 @@ _ATRIBUCION_VAGA = re.compile(
 _ATRIBUCION = re.compile(
     r"(?P<intro>\b(?:[Ss]eg[uú]n|[Dd]e acuerdo con|[Cc]omo (?:indica|dice|recoge|explica|publica)|[Ii]nforma|[Ff]uente:|[Aa]ccording to|[Ss]ource:|"
     r"[Ee]n(?=\s+(?:la|el)\s+(?:web|página|pagina|wiki|tienda|sitio|portal)\b))\s+)"
-    r"(?P<fuente>(?:(?:la|el|los|las|the)\s+)?(?:(?:web|página|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site|comunidad|foros?|community|forums?)\s+(?:de\s+(?:la\s+|el\s+)?|del\s+|of\s+(?:the\s+)?)?)?"
+    r"(?P<fuente>(?:(?:la|el|los|las|the)\s+)?(?:(?:web|página|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site|comunidad|foros?|community|forums?)\s+(?:oficial(?:es)?\s+|official\s+)?(?:de\s+(?:la\s+|el\s+)?|del\s+|of\s+(?:the\s+)?)?)?"
     r"(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b|[A-Z0-9ÁÉÍÓÚÑ][\w'’.-]*(?:\s+(?:de\s+)?[A-Z0-9ÁÉÍÓÚÑ][\w'’.-]*){0,3}))")
 
 
 def _sin_relleno(nombre):
     t = C.normalizar(nombre).rstrip(".")
-    t = re.sub(r"^(?:(?:la|el|los|las|the) )?(?:(?:web|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site|comunidad|foros?|community|forums?) (?:de (?:la |el )?|del |of (?:the )?)?)?", "", t)
+    t = re.sub(r"^(?:(?:la|el|los|las|the) )?(?:(?:web|pagina|wiki|tienda|sitio|portal|revista|diario|blog|website|site|comunidad|foros?|community|forums?) (?:oficial(?:es)? |official )?(?:de (?:la |el )?|del |of (?:the )?)?)?", "", t)
     return t.strip()
 
 
@@ -621,6 +621,32 @@ def proximo_ya_pasado(peticion, respuesta, hoy=None):
     if not fechas or any(f >= hoy for f in fechas):
         return None
     return min(fechas)
+
+
+# ---------------------------------------------------------------- cifras que no salen de lo buscado
+_CIFRA = re.compile(r"\d[\d.,]*\d")
+
+
+def _digitos(texto):
+    return {re.sub(r"\D", "", c) for c in _CIFRA.findall(str(texto))}
+
+
+def _de_hoy(ahora=None):
+    """Las cifras de la fecha y la hora de ahora, que Lina le da a la IA en cada petición: decirlas no es inventar nada."""
+    t = time.localtime(ahora or time.time())
+    return {f"{t.tm_mday:02d}", str(t.tm_mday), f"{t.tm_mon:02d}", str(t.tm_year), f"{t.tm_hour:02d}", f"{t.tm_min:02d}", str(t.tm_year)[2:]}
+
+
+def cifras_sin_respaldo(respuesta, resultados, pregunta="", ahora=None):
+    """Las cifras de la respuesta (de dos dígitos o más) si NINGUNA sale en lo que devolvieron las búsquedas y lecturas: la IA las ha puesto de memoria. Caso
+    del banco de pruebas: sin el revisor, «la Steam Deck OLED cuesta 569 euros» con unos resultados sin ningún precio. No cuentan las de la fecha y la hora
+    de hoy (un reintento del banco saltó por «13 de noviembre de 2026») ni las que ya venían en la pregunta. [] si alguna sale o no quedan cifras."""
+    cifras = _digitos(respuesta) - _digitos(pregunta) - _de_hoy(ahora)
+    if not cifras:
+        return []
+    vistas = _digitos(" ".join(str(r) for r in resultados))
+    texto = re.sub(r"\D", "", " ".join(str(r) for r in resultados))
+    return [] if any(c in vistas or c in texto for c in cifras) else sorted(cifras)
 
 
 # ---------------------------------------------------------------- el aviso cuando no se pudo buscar

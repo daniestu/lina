@@ -71,7 +71,7 @@ def test_si_pidio_ponerlo_y_solo_se_informo_se_reintenta_sin_revisor(monkeypatch
 
 
 def test_una_pregunta_con_solo_busqueda_no_se_reintenta(monkeypatch):
-    A, a, enviadas = _asistente("¿A qué hora es el partido del Barça?", [("buscar_web", {"consulta": "x"}, "…")])
+    A, a, enviadas = _asistente("¿A qué hora es el partido del Barça?", [("buscar_web", {"consulta": "x"}, "… el partido es a las 21:00 …")])
     monkeypatch.setattr(A, "verificar_cumplimiento", lambda *x, **k: False)
     r, _ = a._insistir_si_hace_falta("Según Marca, a las 21:00.", "m", "rapido", "p", None, [], "s")
     assert r == "Según Marca, a las 21:00." and not enviadas

@@ -32,6 +32,7 @@ from lina.nucleo import ajustes as AJ
 from lina.nucleo import autoconocimiento as AUTO
 from lina.nucleo import aviso_busqueda as AVB
 from lina.nucleo import busqueda as BUS
+from lina.nucleo import compatibilidad as COMP
 from lina.nucleo import avisos as AVI
 from lina.nucleo import canal as CANAL
 from lina.nucleo.registro import log
@@ -2450,6 +2451,13 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
                     f"PASADO (hoy es {time.strftime('%Y-%m-%d')}); busca lo que venga después de hoy o di que aún no hay fecha; la respuesta fue: «{str(respuesta)[:200]}»")
             log(f"La respuesta da como próximo algo del {fecha.isoformat()}, que ya ha pasado: reintento con el modelo rápido")
             rapido = True
+        elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self._solo_busco_o_leyo()
+              and BUS.cifras_sin_respaldo(respuesta, [r for _, _, r in self.acciones_turno], str(self.pregunta_pura or pregunta))):
+            cifras = BUS.cifras_sin_respaldo(respuesta, [r for _, _, r in self.acciones_turno], str(self.pregunta_pura or pregunta))
+            obst = (f"las cifras de tu respuesta ({', '.join(cifras[:5])}) no salen en NADA de lo que has buscado o leído: no las des de memoria. Búscalas o, si no "
+                    f"las encuentras, dilo; la respuesta fue: «{str(respuesta)[:200]}»")
+            log(f"La respuesta da cifras que no salen en lo buscado ({', '.join(cifras[:5])}): reintento con el modelo rápido")
+            rapido = True
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
               and not self._acciones_comprobadas() and not self._solo_busco_o_leyo() and verificar_cumplimiento(self.clave, str(self.pregunta_pura or pregunta), self.acciones_turno, respuesta,
                                                      bool(imagen is not None or self.pantalla_adjunta))):
@@ -2660,6 +2668,10 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self.turno_aceptado = False
         self.ejecutor.recetas_diferidas = []
         self.acciones_confirmadas = []
+        directa, nota = self._comprobar_antes()          # D3: datos concretos de un juego, o le dices que se equivoca: se comprueba antes de contestar
+        if directa:
+            return directa, "código (comprobado antes)"
+        pregunta = pregunta + nota
         # 1) Modelo local primero, solo si PRIORIDAD = "local" y cabe en la gráfica
         if PRIORIDAD == "local":
             cabe, motivo, _ = cabe_modelo_local()
@@ -2735,6 +2747,37 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if all(n == "gratis" for c, n in fallos if c == "saturado"):
             return T("Gemini gratuito está saturado ahora. Inténtalo dentro de un rato.")
         return T("Gemini está saturado ahora. Inténtalo dentro de un rato.")
+
+    def _comprobar_antes(self):
+        """D3. Un dato concreto de un juego (Linux, Proton, versión, requisitos, fecha…) o «creo que estás equivocado» no se contestan de memoria: el modelo
+        rápido, seguro de sí, dijo que No Man's Sky era nativo de Linux y, al corregirle, se contradijo sin comprobar nada. Devuelve (respuesta escrita por
+        el código o None, nota con lo buscado para la IA o "")."""
+        peticion = str(getattr(self, "pregunta_pura", "") or "")
+        contexto = getattr(self, "contexto", None) or {}
+        discute = COMP.discute_un_dato(peticion)
+        if self.ejecutor.pendientes or not (discute or COMP.pide_dato_de_juego(peticion, contexto)):
+            return None, ""
+        anterior = next((h["texto"] for h in reversed(getattr(self, "historial", []) or []) if h.get("rol") == "user"), "") if discute else ""
+        tema = re.sub(r"\s*\[SISTEMA:.*?\]", "", f"{anterior} {peticion}", flags=re.S).strip()
+        if COMP.pide_compatibilidad(tema):
+            juego = COMP.juego_de(tema, contexto)
+            datos = COMP.consultar(juego["id"]) if juego and juego.get("id") else None
+            texto = COMP.frase(juego["nombre"], datos) if datos else None
+            if texto:
+                AVB.apuntar(AVB.PRIMERA_COMPATIBILIDAD)
+                self.acciones_turno.append(("compatibilidad", {"juego": juego["nombre"], "steam": juego["id"]}, f"COMPROBADO EN STEAM Y PROTONDB: {datos}"))
+                log(f"Compatibilidad de {juego['nombre']} (Steam {juego['id']}): {datos}")
+                return (T("Lo he comprobado: {texto}", texto=texto) if discute else texto), ""
+        if modo_busqueda() == "ninguna" and not getattr(self, "forzar_busqueda", False):
+            return (T("No lo he podido comprobar porque la búsqueda está apagada; puede que tengas razón.") if discute else None), ""
+        log(("Me dices que me equivoco" if discute else "Es un dato concreto de un juego") + f": lo busco antes de contestar («{tema[:120]}»)")
+        resultado = str(self.ejecutar_herramienta("buscar_web", {"consulta": tema[:200]}))
+        if not resultado.startswith("RESULTADOS DE BÚSQUEDA"):
+            return (T("No lo he podido comprobar; puede que tengas razón.") if discute else None), ""
+        aviso = (" El usuario dice que tu respuesta anterior está mal: compruébalo con estos resultados. Si le dan la razón, dilo; si no confirman ni lo uno "
+                 "ni lo otro, di que no estás segura. No defiendas lo de antes sin datos." if discute else "")
+        return None, (f"\n[SISTEMA: es un dato concreto que no se da de memoria, así que ya lo he buscado; contesta con estos resultados y di de qué web sale.{aviso}\n"
+                      f"{resultado}]")
 
     def decir(self, texto):
         """La respuesta de la petición en curso. Si deja algo pendiente de tu «sí», es una pregunta de confirmación: no se puede perder en silencio."""

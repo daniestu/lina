@@ -16,8 +16,8 @@ from lina.nucleo.idioma import N_, T
 ARCHIVO = "aviso_busqueda.json"
 ARCHIVO_PRIMERA = "aviso_busqueda_primera.json"
 SIN_BUSQUEDA, LIMITE_PLAN, LIMITE_GASTO = "sin_busqueda", "limite_432", "limite_433"
-PRIMERA_DUCKDUCKGO, PRIMERA_WIKI = "primera_duckduckgo", "primera_wiki"
-UNA_VEZ = {PRIMERA_DUCKDUCKGO, PRIMERA_WIKI}
+PRIMERA_DUCKDUCKGO, PRIMERA_WIKI, PRIMERA_COMPATIBILIDAD = "primera_duckduckgo", "primera_wiki", "primera_compatibilidad"
+UNA_VEZ = {PRIMERA_DUCKDUCKGO, PRIMERA_WIKI, PRIMERA_COMPATIBILIDAD}
 # Lo que le llega a la IA cuando Tavily dice que no por cupo (432: el plan; 433: el tope de gasto que pusiste). El 429 es de ritmo y no cuenta.
 POR_CODIGO = {432: LIMITE_PLAN, 433: LIMITE_GASTO}
 PARA_LA_IA_LIMITE = "La búsqueda en internet ha llegado a su límite de uso: responde con lo que sabes y di en pocas palabras que puede no estar al día."
@@ -27,7 +27,8 @@ HABLADO = {SIN_BUSQUEDA: N_("Para tener datos de hoy necesito poder buscar en in
            LIMITE_PLAN: N_("Se han acabado las búsquedas en internet por ahora; respondo con lo que sé."),
            LIMITE_GASTO: N_("Se han acabado las búsquedas en internet por ahora; respondo con lo que sé."),
            PRIMERA_DUCKDUCKGO: N_("Esta vez he buscado en DuckDuckGo; te dejo los detalles en una notificación."),
-           PRIMERA_WIKI: ""}                         # solo la notificación: es lo de fábrica sin Tavily y no merece interrumpir la respuesta
+           PRIMERA_WIKI: "",                         # solo la notificación: es lo de fábrica sin Tavily y no merece interrumpir la respuesta
+           PRIMERA_COMPATIBILIDAD: ""}
 NOTIFICACION = {SIN_BUSQUEDA: (N_("Lina: sin búsqueda en internet"),
                                N_("Sin búsqueda no tengo datos de hoy (resultados, horarios, noticias). Es gratis:  lina clave tavily  (o  lina bienvenida). "
                                   "Si no la quieres: pon ia.busqueda en «ninguna» con  lina config")),
@@ -40,7 +41,10 @@ NOTIFICACION = {SIN_BUSQUEDA: (N_("Lina: sin búsqueda en internet"),
                                         "el texto de la búsqueda y tu dirección IP. Para apagarlo:  lina config poner ia.busqueda_reserva false")),
                 PRIMERA_WIKI: (N_("Lina: he buscado en Wikipedia"),
                                N_("Sin clave de Tavily busco en Wikipedia y en algunas wikis de juegos: ven el texto de la búsqueda y tu dirección IP. Para noticias, "
-                                  "precios, horarios o resultados, una clave gratuita de Tavily va mucho mejor:  lina bienvenida"))}
+                                  "precios, horarios o resultados, una clave gratuita de Tavily va mucho mejor:  lina bienvenida")),
+                PRIMERA_COMPATIBILIDAD: (N_("Lina: he mirado Steam y ProtonDB"),
+                                         N_("Para saber si un juego funciona en Linux pregunto a la tienda de Steam y a ProtonDB: ven el número del juego en Steam y tu "
+                                            "dirección IP, nada más."))}
 
 MIENTRAS_RESERVA = N_("Mientras tanto busco en DuckDuckGo.")
 

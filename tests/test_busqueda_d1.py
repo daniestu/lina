@@ -119,3 +119,29 @@ def test_un_titulo_que_no_nombra_lo_buscado_no_vale_aunque_lo_nombre_el_extracto
 
 def test_la_wiki_del_juego_se_elige_tambien_por_la_peticion():
     assert BUS.wikis_para("creeper", "es", peticion="qué es un creeper en Minecraft")[0]["api"] == "es.minecraft.wiki"
+
+
+@pytest.mark.parametrize("respuesta_ia, resultados, sin", [
+    ("Cuesta 569 euros.", ["Te lo cuenta aquí."], ["569"]),
+    ("Cuesta 569 euros y 679 la grande.", ["Desde 569 €."], []),                 # una sale: vale
+    ("El euro está a 1,12 dólares.", ["EUR/USD 1.12"], []),                      # separadores distintos
+    ("Mide 330 metros.", ["La torre mide 330 m con antenas."], []),
+    ("Ganó Verstappen.", ["Ganó Verstappen"], []),                               # sin cifras
+])
+def test_cifras_sin_respaldo(respuesta_ia, resultados, sin):
+    assert BUS.cifras_sin_respaldo(respuesta_ia, resultados) == sin
+
+
+def test_la_tienda_oficial_de_steam_es_una_atribucion():
+    assert BUS.atribuciones_inventadas("Según la tienda oficial de Steam, cuesta 569 euros.", ["movistarplus.es"]) == ["la tienda oficial de Steam"]
+    assert BUS.atribuciones_inventadas("Según la tienda oficial de Steam, cuesta 569 euros.", ["store.steampowered.com"]) == []
+
+
+def test_la_fecha_de_hoy_y_las_cifras_de_la_pregunta_no_cuentan():
+    """Banco de pruebas, D3: «¿A qué hora juega hoy el Betis?» contestado con «hoy, 13 de noviembre de 2026» se reintentó por esas cifras, que da Lina."""
+    hoy = time.mktime((2026, 11, 13, 1, 30, 0, 0, 0, -1))
+    assert BUS.cifras_sin_respaldo("Hoy, 13 de noviembre de 2026, no juega.", ["El Betis descansa esta jornada."], ahora=hoy) == []
+    assert BUS.cifras_sin_respaldo("Son las 01:30.", ["x"], ahora=hoy) == []
+    assert BUS.cifras_sin_respaldo("La RTX 5070 cuesta 549 dólares.", ["Sin precios."], pregunta="cuál es el precio de la RTX 5070", ahora=hoy) == ["549"]
+    assert BUS.cifras_sin_respaldo("La RTX 5070 es de la serie 50.", ["Sin precios."], pregunta="qué es la RTX 5070", ahora=hoy) == ["50"]
+

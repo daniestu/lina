@@ -21,6 +21,8 @@ Con `auto`, lo de fábrica, Lina prueba en este orden y se queda con lo primero 
 3. **DuckDuckGo**, solo si lo enciendes (`lina config poner ia.busqueda_reserva true`). Está apagado de fábrica porque es poco fiable: suele tomar a los programas por robots y entonces no da nada. DuckDuckGo ve el texto de la búsqueda y tu dirección IP. Lina no se hace pasar por un navegador para evitar su bloqueo. La primera vez que se usa, te lo dice.
 4. **Wikipedia y algunas wikis de juegos** (Fandom, minecraft.wiki, wiki.gg, bg3.wiki, WikiDex), con su buscador, sin clave. Ven el texto de la búsqueda y tu dirección IP. Solo se usan para lo enciclopédico (no para precios, noticias, el tiempo ni resultados). Lina pide también, a su API, el extracto de la primera página encontrada, cuyo texto llega a la IA. La primera vez que se usan, te llega una notificación.
 
+**Si un juego funciona en Linux.** Cuando preguntas si un juego de Steam funciona en Linux o necesita Proton, Lina mira la ficha de la tienda de Steam y el resumen de ProtonDB, con cualquier `ia.busqueda`. Los dos ven solo el número del juego en Steam y tu dirección IP. La primera vez te llega una notificación.
+
 Con `tavily` solo se usa Tavily (y DuckDuckGo si lo enciendes); con `google`, solo la de Gemini (y DuckDuckGo si lo enciendes); con `ninguna`, nada, salvo que digas «búscalo igualmente», que busca como `auto` solo en esa petición.
 
 - Si guardas **fuentes** (una web para un tema) y usas Gemini, lo siguiente:

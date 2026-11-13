@@ -39,6 +39,8 @@ Lo que cambia (resultados, horarios, noticias, precios) lo busca en internet, y 
 
 Lina solo nombra como fuente una web que salió de la búsqueda: si la IA atribuye el dato a otra, Lina la corrige antes de contestar. Si no ha podido buscar, te dice por qué. Nunca te dirá que «no tiene acceso a internet». DuckDuckGo está apagado de fábrica porque es poco fiable; si lo quieres, `lina config poner ia.busqueda_reserva true`. Si apagaste la búsqueda (`ia.busqueda = ninguna`), «búscalo igualmente» busca solo esa vez. `lina doctor` te dice cómo la tienes y `lina probar-busqueda` la prueba con veinte preguntas típicas. Adónde va cada búsqueda está en el [manual de privacidad](privacidad.md).
 
+Los datos concretos de un juego (si funciona en Linux o con Proton, versiones, requisitos, fechas) no los contesta de memoria: los busca antes. Si preguntas si un juego de Steam funciona en Linux, lo mira en la tienda de Steam y en ProtonDB. Y si le dices que se equivoca («creo que no es así»), lo comprueba antes de responder; si no puede, te dice que no lo ha podido comprobar en vez de defender lo que dijo.
+
 ## Tus fuentes: una web para cada tema
 
 Puedes decirle a Lina qué web usar para un tema concreto, por ejemplo las recetas de refinería de un juego. Para lo demás, aunque sea del mismo juego, seguirá buscando como siempre.

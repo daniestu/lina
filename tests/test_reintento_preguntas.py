@@ -207,7 +207,7 @@ def test_lo_proximo_con_una_fecha_ya_pasada_se_reintenta_con_el_modelo_rapido(li
 
 
 def test_lo_proximo_con_fecha_futura_no_se_reintenta(lina):
-    lina.acciones_turno = [("buscar_web", {"consulta": "eclipse"}, "RESULTADOS DE BÚSQUEDA (…)")]
+    lina.acciones_turno = [("buscar_web", {"consulta": "eclipse"}, "RESULTADOS DE BÚSQUEDA (…): el eclipse del 2 de agosto de 2999")]
     r, _ = _insistir(lina, "cuándo es el próximo eclipse visible en España", "Según ign.es, será el 2 de agosto de 2999.")
     assert r == "Según ign.es, será el 2 de agosto de 2999." and not lina._gemini.called
 
@@ -242,3 +242,17 @@ def test_cumplido_nunca_rechaza(monkeypatch):
     assert IA.verificar_cumplimiento("clave", "p", [("ejecutar_comando", {}, "x")], "Hecho.") is False
     monkeypatch.setattr(IA, "_mini_consulta_json", lambda *a, **k: None)
     assert IA.verificar_cumplimiento("clave", "p", [("ejecutar_comando", {}, "x")], "Hecho.") is False
+
+
+def test_cifras_que_no_salen_en_lo_buscado_se_reintentan(lina):
+    """Banco de pruebas, D2: sin el revisor, «la Steam Deck OLED cuesta 569 euros» con unos resultados sin ningún precio."""
+    lina.acciones_turno = [("buscar_web", {"consulta": "precio Steam Deck"}, "RESULTADOS DE BÚSQUEDA (…):\n\n[1] Ficha (movistarplus.es) https://x\nTe lo cuenta aquí.")]
+    r, _ = _insistir(lina, "¿Cuánto cuesta ahora una Steam Deck?", "Según la tienda oficial de Steam, la OLED de 512 GB cuesta 569 euros.")
+    args, _ = _llamada(lina)
+    assert r == "Respuesta del reintento." and "no salen en NADA" in args[2] and "569" in args[2]
+
+
+def test_cifras_que_si_salen_no_se_tocan(lina):
+    lina.acciones_turno = [("buscar_web", {"consulta": "precio"}, "RESULTADOS DE BÚSQUEDA (…):\n\n[1] Steam (steamdeck.com) https://x\nDesde 569 €.")]
+    r, _ = _insistir(lina, "¿Cuánto cuesta ahora una Steam Deck?", "Según steamdeck.com, la OLED cuesta 569 euros y la de 1 TB 679.")
+    assert r.startswith("Según steamdeck.com") and not lina._gemini.called

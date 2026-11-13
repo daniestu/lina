@@ -64,6 +64,7 @@ CASOS = [
     Caso("Crea un Excel con mis gastos de enero.", debe=("hoja_calculo",), nunca=("ejecutar_comando",)),
     Caso("Conéctate a mi GitHub y dime mis repositorios.", debe=("mcp_servidores",)),
     Caso("Escribe /tmp en la barra de ruta de Dolphin.", debe=("interfaz",)),
+    Caso("¿Cuándo sale la próxima actualización de No Man's Sky?", debe=("buscar_web",), nunca=("ejecutar_comando",)),     # D3: un dato de un juego se busca
     Caso("Cuéntame un chiste corto.", sin_herramientas=True),
 ]
 
