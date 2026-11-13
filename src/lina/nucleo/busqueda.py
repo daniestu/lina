@@ -224,15 +224,15 @@ def wikis():
         return []
 
 
-def wikis_para(consulta, idioma):
-    """[{api, pagina}] en el orden en que se prueban: las wikis del juego que nombra la consulta (su idioma primero) y luego Wikipedia."""
-    t = C.normalizar(consulta)
+def wikis_para(consulta, idioma, peticion=""):
+    """[{api, pagina, idioma}] en el orden en que se prueban: las wikis del juego que nombra la consulta o la petición (su idioma primero) y luego Wikipedia."""
+    t = C.normalizar(f"{consulta} {peticion}")
     otro = "en" if idioma != "en" else "es"
     salida = []
     for w in wikis():
         if any(re.search(rf"(?<!\w){re.escape(C.normalizar(n))}(?!\w)", t) for n in w.get("nombres", [])):
-            salida += [{**w[i], "nombres": w["nombres"]} for i in (idioma, otro) if isinstance(w.get(i), dict)]
-    salida += [{"api": f"{i}.wikipedia.org/w", "pagina": f"https://{i}.wikipedia.org/wiki/"} for i in dict.fromkeys((idioma, "en"))]
+            salida += [{**w[i], "nombres": w["nombres"], "idioma": i} for i in (idioma, otro) if isinstance(w.get(i), dict)]
+    salida += [{"api": f"{i}.wikipedia.org/w", "pagina": f"https://{i}.wikipedia.org/wiki/", "idioma": i} for i in dict.fromkeys((idioma, "en"))]
     return salida
 
 
@@ -255,8 +255,9 @@ def terminos(consulta, nombres=()):
 
 
 def _nombra_termino(resultado, palabras):
-    texto = C.normalizar(f"{resultado.get('title', '')} {IA._texto_html(str(resultado.get('snippet', '')))}")
-    return any(re.search(rf"\b{re.escape(p)}", texto) for p in palabras)
+    """El título tiene que nombrar algo de la consulta: que lo nombre solo el extracto no basta («Torre de Watkin» menciona la Eiffel, pero no es ella)."""
+    titulo = C.normalizar(str(resultado.get("title", "")))
+    return any(re.search(rf"\b{re.escape(p)}", titulo) for p in palabras)
 
 
 def resultados_wiki(consulta, idioma=None, get=None, maximo=5, peticion=""):
@@ -265,9 +266,11 @@ def resultados_wiki(consulta, idioma=None, get=None, maximo=5, peticion=""):
         log(f"Wikis: «{consulta}» pide un dato del momento; no busco en ellas")
         return [], T(M_WIKI_ACTUALIDAD)
     hubo_red = False
-    for w in wikis_para(consulta, idioma or IDI.actual()):
+    idioma = idioma or IDI.actual()
+    for w in wikis_para(consulta, idioma, peticion):
+        texto = peticion if peticion and w.get("idioma") == idioma else consulta   # en la wiki de tu idioma, tus palabras: la IA suele escribir la consulta en inglés
         try:
-            r = (get or requests.get)(f"https://{w['api']}/api.php", params={"action": "query", "list": "search", "srsearch": consulta_wiki(consulta, w.get("nombres", ())),
+            r = (get or requests.get)(f"https://{w['api']}/api.php", params={"action": "query", "list": "search", "srsearch": consulta_wiki(texto, w.get("nombres", ())),
                                                                            "srlimit": maximo,
                                                                            "srprop": "snippet", "format": "json"},
                                       headers={"User-Agent": IA.AGENTE}, timeout=TIMEOUT_WIKI)
@@ -276,15 +279,15 @@ def resultados_wiki(consulta, idioma=None, get=None, maximo=5, peticion=""):
         except (requests.RequestException, ValueError, AttributeError) as e:
             log(f"Wiki {w['api']}: {type(e).__name__}")
             continue
-        palabras = terminos(consulta, w.get("nombres", ()))
+        palabras = terminos(texto, w.get("nombres", ()))
         if palabras and encontrados:
             antes, encontrados = len(encontrados), [e for e in encontrados if _nombra_termino(e, palabras)]
             if len(encontrados) < antes:
                 log(f"Wiki {w['api']}: {antes - len(encontrados)} de {antes} resultados no nombran nada de la consulta ({', '.join(palabras)})")
         if encontrados:
             dominio = w["api"].split("/")[0]
-            log(f"Búsqueda en {dominio} «{consulta}»: {len(encontrados)} resultados")
-            encontrados = sorted(encontrados[:maximo], key=lambda e: -_cubre(str(e.get("title", "")), consulta))
+            log(f"Búsqueda en {dominio} «{texto}»: {len(encontrados)} resultados")
+            encontrados = sorted(encontrados[:maximo], key=lambda e: -_cubre(str(e.get("title", "")), texto))
             return [{"title": e.get("title", ""), "url": w["pagina"] + quote(str(e.get("title", "")).replace(" ", "_"), safe=":/()_,'!"),
                      "dominio": dominio, "api": w["api"], "content": IA._texto_html(str(e.get("snippet", "")))} for e in encontrados], ""
     return [], T(M_WIKI_NADA if hubo_red else M_WIKI_RED)
@@ -573,6 +576,63 @@ def dominios_de_acciones(acciones):
             dominios.append(urlparse(str((args or {}).get("url", ""))).netloc.lower().removeprefix("www."))
             dominios += re.findall(r"CONTENIDO DE LA PÁGINA «.*?» \(([a-z0-9.-]+\.[a-z]{2,})\)", texto)
     return list(dict.fromkeys(d for d in dominios if d))
+
+
+# ---------------------------------------------------------------- lo «próximo» que ya ha pasado
+_MESES = {m: i for i, m in enumerate("enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre".split(), 1)} | {"setiembre": 9} | \
+         {m: i for i, m in enumerate("january february march april may june july august september october november december".split(), 1)}
+_FECHA_ES = re.compile(r"\b(\d{1,2}) de (" + "|".join(_MESES) + r") (?:de |del )?(\d{4})\b")
+_FECHA_EN = re.compile(r"\b(" + "|".join(_MESES) + r") (\d{1,2})(?:st|nd|rd|th)?,? (\d{4})\b")
+_FECHA_ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+_PIDE_PROXIMO = re.compile(r"\b(?:proxim[oa]s?|siguiente|cuando (?:es|sera|sale|toca|hay|empieza|llega)|next|upcoming|when (?:is|will|does))\b")
+_SIN_FECHA = re.compile(r"\b(?:no (?:hay|tiene|se ha (?:anunciado|confirmado|dado))(?: \w+){0,3} fecha|sin fecha|aun no se sabe|todavia no se sabe|no date|not (?:been )?announced)\b")
+
+
+def fechas_completas(texto):
+    """Las fechas con día, mes y año de un texto («12 de agosto de 2026», «August 12, 2026», «2026-08-12»), como datetime.date."""
+    import datetime as _dt
+    t = C.normalizar(texto)
+    salida = []
+    for d, m, a in _FECHA_ES.findall(t):
+        salida.append((int(a), _MESES[m], int(d)))
+    for m, d, a in _FECHA_EN.findall(t):
+        salida.append((int(a), _MESES[m], int(d)))
+    salida += [(int(a), int(m), int(d)) for a, m, d in _FECHA_ISO.findall(t)]
+    fechas = []
+    for a, m, d in salida:
+        try:
+            fechas.append(_dt.date(a, m, d))
+        except ValueError:
+            pass
+    return fechas
+
+
+def proximo_ya_pasado(peticion, respuesta, hoy=None):
+    """Si se preguntó por lo próximo y la respuesta solo da fechas ya pasadas (y no dice que aún no hay fecha), la primera de ellas; si no, None."""
+    import datetime as _dt
+    hoy = hoy or _dt.date.today()
+    if not _PIDE_PROXIMO.search(C.normalizar(peticion)) or _SIN_FECHA.search(C.normalizar(respuesta)):
+        return None
+    fechas = fechas_completas(respuesta)
+    if not fechas or any(f >= hoy for f in fechas):
+        return None
+    return min(fechas)
+
+
+# ---------------------------------------------------------------- el aviso cuando no se pudo buscar
+def aviso_de_fallo(resultados, hay_tavily=None):
+    """Lo que dice Lina, escrito por el código, si la pregunta pedía un dato actual y ninguna búsqueda dio nada: el motivo real y, al final, qué hacer.
+    Sin clave de Tavily, la clave gratuita con lina bienvenida; si ya la tienes y lo que falló fue Tavily, lina doctor (sugerir lo que ya tienes sería falso)."""
+    hay_tavily = bool(CL.obtener("tavily")) if hay_tavily is None else hay_tavily
+    motivos = [m for r in resultados for m in r.motivos]
+    utiles = [m for m in dict.fromkeys(motivos) if m != T(M_GOOGLE_GRATIS)] or list(dict.fromkeys(motivos))
+    frase = T("No he podido buscarlo: {motivos}.", motivos=T(" y ").join(utiles[-2:])) if utiles else T("No he podido buscarlo.")
+    tavily_fallo = any(m in (T(M_TAVILY_FALLO), T(M_TAVILY_LIMITE)) for m in motivos)
+    if hay_tavily and tavily_fallo:
+        return frase + " " + T("Mira qué le pasa con lina doctor.")
+    if hay_tavily:
+        return frase
+    return frase + " " + T("Con una clave gratuita de Tavily buscaría noticias, precios y horarios: lina bienvenida.")
 
 
 # ---------------------------------------------------------------- «búscalo igualmente» con ia.busqueda = ninguna

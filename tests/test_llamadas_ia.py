@@ -265,3 +265,10 @@ def test_solo_medida_llega_hasta_el_registro_y_lina_tiempos_la_separa(archivo):
     assert [x["motivo"] for x in lineas] == ["medida", "medida", "normal"]
     resumen = TIE.resumir_ia(lineas)[0]
     assert resumen["medida"] == 2 and resumen["n"] == 1
+
+
+def test_la_recomendacion_no_vuelve_a_pedir_v4c():
+    """V4c se probó y se descartó el 2026-11-02 (ahorraba un 1,5–2 % y cambió la respuesta de GitHub): si el tamaño pesa, se dice eso, no «toca V4c»."""
+    texto = TIE.T(TIE.DECISIONES["aligerar"])
+    assert "toca V4c" not in texto and "descartó" in texto and "No se toca" in texto
+

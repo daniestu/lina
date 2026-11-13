@@ -2162,7 +2162,29 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
 
     def asegurar_honestidad_final(self, texto):
         """Última red: lo que el código sabe y la respuesta no reconoce se añade o se sustituye. No se confía en que la IA lo diga."""
-        return self._atribucion_real(self._sin_negar_internet(self._avisar_fuente_sin_anadir(self._aclarar_fuente(self._honestidad_de_lo_hecho(texto)))))
+        texto = self._atribucion_real(self._sin_negar_internet(self._avisar_fuente_sin_anadir(self._aclarar_fuente(self._honestidad_de_lo_hecho(texto)))))
+        return self._avisar_fecha_pasada(self._aviso_de_fallo_de_busqueda(texto))
+
+    def _aviso_de_fallo_de_busqueda(self, texto):
+        """Pedía un dato actual y ninguna búsqueda ni lectura dio nada: la respuesta la escribe el código (motivo real y qué hacer), no la IA, que en la
+        pasada gratis lo contaba cada vez de una forma. Si la pregunta no pedía nada actual, la respuesta de la IA (que puede saberlo) se queda."""
+        hechas = getattr(self, "busquedas_hechas", []) or []
+        acciones = getattr(self, "acciones_turno", []) or []
+        if (not hechas or any(r.resultados for r in hechas) or getattr(self, "fuente_turno", None) or self.ejecutor.pendientes
+                or not BUS.es_de_actualidad(str(getattr(self, "pregunta_pura", "") or ""))
+                or any(str(r).startswith(("RESULTADOS DE BÚSQUEDA", "CONTENIDO DE LA PÁGINA")) for _, _, r in acciones)):
+            return texto
+        aviso = BUS.aviso_de_fallo(hechas)
+        log(f"Ninguna búsqueda dio nada para un dato actual: contesta el código («{aviso[:80]}»)")
+        return aviso
+
+    def _avisar_fecha_pasada(self, texto):
+        """Última red: preguntó por lo próximo y la respuesta solo da una fecha que ya pasó (y no lo dice). Se avisa."""
+        fecha = BUS.proximo_ya_pasado(str(getattr(self, "pregunta_pura", "") or ""), texto)
+        if not fecha:
+            return texto
+        log(f"La respuesta da como próximo algo del {fecha.isoformat()}, que ya ha pasado: se avisa")
+        return texto.rstrip() + " " + T("Ojo: esa fecha ya ha pasado, así que puede que no sea lo próximo.")
 
     def _atribucion_real(self, texto):
         """«Según la wiki UESP…» con resultados de gamespot.com: el dato se atribuye a una web que no salió de ninguna búsqueda ni lectura, o a ninguna
@@ -2413,6 +2435,13 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             url, por_que = pagina_que_no_es(self.acciones_turno, str(self.pregunta_pura or pregunta), lambda c: H.clasificar(c)[0] == "lectura")
             obst = self._nota_pagina_de_contenido(url, por_que, pregunta)
             log(f"Pidió poner algo y {por_que} (lo dice el código): reintento con el modelo rápido")
+            rapido = True
+        elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes
+              and BUS.proximo_ya_pasado(str(self.pregunta_pura or pregunta), str(respuesta))):
+            fecha = BUS.proximo_ya_pasado(str(self.pregunta_pura or pregunta), str(respuesta))
+            obst = (f"el usuario preguntó por lo próximo («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») y la respuesta da el {fecha.isoformat()}, que YA HA "
+                    f"PASADO (hoy es {time.strftime('%Y-%m-%d')}); busca lo que venga después de hoy o di que aún no hay fecha; la respuesta fue: «{str(respuesta)[:200]}»")
+            log(f"La respuesta da como próximo algo del {fecha.isoformat()}, que ya ha pasado: reintento con el modelo rápido")
             rapido = True
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
               and not self._acciones_comprobadas() and verificar_cumplimiento(self.clave, str(self.pregunta_pura or pregunta), self.acciones_turno, respuesta,

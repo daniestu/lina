@@ -196,3 +196,17 @@ def test_las_ordenes_sin_interrogacion_siguen_insistiendo_como_siempre(lina, fra
 def test_es_pregunta(frase, es):
     from lina.nucleo import turnos as TU
     assert TU.es_pregunta(frase) is es
+
+
+def test_lo_proximo_con_una_fecha_ya_pasada_se_reintenta_con_el_modelo_rapido(lina):
+    """D1: «el próximo eclipse» respondido con el 12 de agosto de 2026 cuando ya ha pasado: un reintento rápido, solo con la web, diciendo que esa fecha pasó."""
+    lina.acciones_turno = [("buscar_web", {"consulta": "eclipse"}, "RESULTADOS DE BÚSQUEDA (…)")]
+    r, _ = _insistir(lina, "cuándo es el próximo eclipse visible en España", "Según ign.es, será el 12 de agosto de 2020.")
+    args, k = _llamada(lina)
+    assert r == "Respuesta del reintento." and args[0] == "rapido" and "YA HA PASADO" in args[2] and k["herramientas"] == [WEB, LEER]
+
+
+def test_lo_proximo_con_fecha_futura_no_se_reintenta(lina):
+    lina.acciones_turno = [("buscar_web", {"consulta": "eclipse"}, "RESULTADOS DE BÚSQUEDA (…)")]
+    r, _ = _insistir(lina, "cuándo es el próximo eclipse visible en España", "Según ign.es, será el 2 de agosto de 2999.")
+    assert r == "Según ign.es, será el 2 de agosto de 2999." and not lina._gemini.called

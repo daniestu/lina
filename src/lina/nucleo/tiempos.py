@@ -475,7 +475,8 @@ def _pct(x):
 
 DECISIONES = {"arreglar": N_("menos del 30 % desde la caché aunque el principio se repite: toca V4b (dejar estable el principio)"),
               "bien": N_("la caché ya sirve el 30 % o más cuando el principio se repite: no se toca"),
-              "aligerar": N_("el tamaño pesa: toca V4c (pasar reglas de situaciones concretas a sus grupos)"),
+              "aligerar": N_("el tamaño pesa, pero V4c (pasar reglas a sus grupos) ya se probó y se descartó el 2 de noviembre: ahorraba un 2 % y cambió una "
+                             "respuesta. No se toca salvo que cambie el gasto"),
               "no tocar": N_("el tamaño no pesa lo bastante: no se aligeran las instrucciones")}
 
 
