@@ -1174,3 +1174,4 @@
 "las webs consultadas ({webs}…)" = "the websites consulted ({webs}…)"
 "Mira qué le pasa con lina doctor." = "Check what is wrong with lina doctor."
 "Ojo: esa fecha ya ha pasado, así que puede que no sea lo próximo." = "Careful: that date has already passed, so it may not be the next one."
+"Llamadas a la IA por pregunta (la última vez que se pasó cada una): media {m}, máximo {x}, {t} en total" = "AI calls per question (the last time each was run): mean {m}, maximum {x}, {t} in total"

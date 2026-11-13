@@ -194,3 +194,12 @@ def test_ningun_comando_ni_la_pantalla(monkeypatch):
     """Solo buscar y leer: lo demás recibe el texto de que en la prueba no se ejecuta nada."""
     assert "ejecutar_comando" not in PB.PERMITIDAS and "mirar_pantalla" not in PB.PERMITIDAS and "ver_pantalla" not in PB.PERMITIDAS
     assert {"buscar_web", "leer_web"} <= PB.PERMITIDAS
+
+
+def test_dice_cuantas_llamadas_gasta_cada_pregunta(monkeypatch):
+    """D2: el criterio de recortar llamadas se mide con esta línea."""
+    bien = (["Según la UESP, ectoplasma."], [BUSQUEDA], ["ok", "ok", "ok"], 1.0)
+    otra = (["Según la UESP, ectoplasma."], [BUSQUEDA], ["ok", "ok"], 1.0)
+    _, texto, _ = _principal(monkeypatch, [bien, otra], n=2)
+    assert "Llamadas a la IA por pregunta (la última vez que se pasó cada una): media 2,50, máximo 3, 5 en total" in texto
+

@@ -2398,6 +2398,13 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         return (not pide_accion(peticion) and not orden_de_cortesia(peticion) and not self.ejecutor.duda and not self.ejecutor.efecto_sin_comprobar
                 and solo_se_informo(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura"))
 
+    def _solo_busco_o_leyo(self):
+        """¿En esta petición solo se buscó o leyó en internet? Entonces no se llama al revisor «¿se cumplió lo pedido?»: lo que él no ve (si hubo resultados,
+        a quién se atribuye el dato, si niega tener internet, una fecha ya pasada) lo comprueba ya el código, y en las pasadas de probar-busqueda sus rechazos
+        fueron falsos. Ahorra una de las tres llamadas de una pregunta con búsqueda."""
+        acciones = getattr(self, "acciones_turno", []) or []
+        return bool(acciones) and all(n in SOLO_WEB or n in HERRAMIENTAS_META or n == "necesito_datos_actuales" for n, _, _ in acciones)
+
     def _tarea_de_ajustes(self):
         """¿Esta petición tiene que ver con ajustes de configuración (donde insistir a fondo sí compensa)?"""
         return (any(n in {"probar_ajuste_kde", "buscar_ajuste_kde", "observar_config", "buscar_clave_en_binarios"} for n, _, _ in self.acciones_turno)
@@ -2444,7 +2451,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             log(f"La respuesta da como próximo algo del {fecha.isoformat()}, que ya ha pasado: reintento con el modelo rápido")
             rapido = True
         elif (not obst and not pide and not self.ejecutor.duda and modo != "profundo" and not self.ejecutor.pendientes and self.acciones_turno and self.clave
-              and not self._acciones_comprobadas() and verificar_cumplimiento(self.clave, str(self.pregunta_pura or pregunta), self.acciones_turno, respuesta,
+              and not self._acciones_comprobadas() and not self._solo_busco_o_leyo() and verificar_cumplimiento(self.clave, str(self.pregunta_pura or pregunta), self.acciones_turno, respuesta,
                                                      bool(imagen is not None or self.pantalla_adjunta))):
             obst = (f"lo que pidió el usuario («{str(getattr(self, 'pregunta_pura', '') or pregunta)[:150]}») no se ha cumplido tal cual o la respuesta no se apoya "
                     f"en lo que se hizo de verdad; la respuesta fue: «{str(respuesta)[:200]}»")

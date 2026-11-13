@@ -210,3 +210,35 @@ def test_lo_proximo_con_fecha_futura_no_se_reintenta(lina):
     lina.acciones_turno = [("buscar_web", {"consulta": "eclipse"}, "RESULTADOS DE BÚSQUEDA (…)")]
     r, _ = _insistir(lina, "cuándo es el próximo eclipse visible en España", "Según ign.es, será el 2 de agosto de 2999.")
     assert r == "Según ign.es, será el 2 de agosto de 2999." and not lina._gemini.called
+
+
+# ---------------------------------------------------------------- D2: el revisor «¿se cumplió lo pedido?»
+def test_si_solo_se_busco_o_leyo_no_se_llama_al_revisor(lina, monkeypatch):
+    """Caso real: estrenos y F1 bien contestados que el revisor rechazó y la repetición fue igual o peor. Lo que él no ve lo comprueba el código."""
+    monkeypatch.setattr(lina.A, "verificar_cumplimiento", MagicMock(side_effect=AssertionError("no se llama al revisor")))
+    lina.acciones_turno = [("buscar_web", {"consulta": "F1"}, "RESULTADOS DE BÚSQUEDA (…)"), ("leer_web", {"url": "https://formula1.com"}, "CONTENIDO DE LA PÁGINA «x» (formula1.com).")]
+    r, _ = _insistir(lina, "quién ganó el último Gran Premio de Fórmula 1", "Según formula1.com, ganó Norris en São Paulo.")
+    assert r == "Según formula1.com, ganó Norris en São Paulo." and not lina._gemini.called
+
+
+def test_con_acciones_en_el_equipo_el_revisor_sigue(lina, monkeypatch):
+    revisor = MagicMock(return_value=True)
+    monkeypatch.setattr(lina.A, "verificar_cumplimiento", revisor)
+    lina.acciones_turno = [CAMBIO]
+    _insistir(lina, "activa la luz nocturna", "Listo, activada.")
+    assert revisor.called and lina._gemini.called
+
+
+@pytest.mark.parametrize("motivo, rechaza", [("afirma_sin_accion", True), ("tapa_error", True), ("no_hecho", False), ("sustituido", False), ("ninguno", False)])
+def test_el_revisor_solo_cuenta_lo_que_ve_en_las_acciones(monkeypatch, motivo, rechaza):
+    from lina.nucleo import ia as IA
+    monkeypatch.setattr(IA, "_mini_consulta_json", lambda *a, **k: ({"decision": "no_cumplido", "motivo": motivo}, "m"))
+    assert IA.verificar_cumplimiento("clave", "p", [("ejecutar_comando", {"comando": "x"}, "código de salida: 1")], "Hecho.") is rechaza
+
+
+def test_cumplido_nunca_rechaza(monkeypatch):
+    from lina.nucleo import ia as IA
+    monkeypatch.setattr(IA, "_mini_consulta_json", lambda *a, **k: ({"decision": "cumplido", "motivo": "afirma_sin_accion"}, "m"))
+    assert IA.verificar_cumplimiento("clave", "p", [("ejecutar_comando", {}, "x")], "Hecho.") is False
+    monkeypatch.setattr(IA, "_mini_consulta_json", lambda *a, **k: None)
+    assert IA.verificar_cumplimiento("clave", "p", [("ejecutar_comando", {}, "x")], "Hecho.") is False

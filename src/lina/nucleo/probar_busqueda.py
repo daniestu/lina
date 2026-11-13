@@ -248,7 +248,7 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
             return 2
         salida(T("Nivel «{nivel}»: paso {n} preguntas por una Lina de usuario nuevo (unos segundos cada una, con pausas)…", nivel=nivel, n=len(preguntas)))
         A, a, llamadas = (preparar or _asistente)()
-        filas, notas, antiguas = [], [], []
+        filas, notas, antiguas, gastadas = [], [], [], []
         with IA.solo_medida():
             for i, frase in enumerate(preguntas):
                 if i:
@@ -272,6 +272,7 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
                 notas.append(nota)
                 antiguas.append(antigua)
                 filas.append((nota, seg, escalon, frase, motivo, " ".join(str(d) for d in dicho)))
+                gastadas.append(len(hechas))
                 distinto = T("\n      (juez antiguo: {nota}, {motivo})", nota=antigua, motivo=motivo_antiguo) if antigua != nota else ""
                 salida(f"{nota:5} {seg:5.1f} s  {escalon:10} {frase}\n      {motivo}{distinto}\n      dice: {' '.join(filas[-1][5].split())[:240]}")
     estado, frase_final = veredicto(notas, nivel)
@@ -285,4 +286,7 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
     salida(T("Juez nuevo (también por nombre y sin atribuciones inventadas; es el que decide): {frase}", frase=frase_final))
     if por_escalon:
         salida(T("Respondidas con fuente, por escalón: {d}", d=", ".join(f"{k} {v}" for k, v in sorted(por_escalon.items()))))
+    if gastadas:
+        salida(T("Llamadas a la IA por pregunta (la última vez que se pasó cada una): media {m}, máximo {x}, {t} en total",
+                 m=f"{sum(gastadas) / len(gastadas):.2f}".replace(".", ","), x=max(gastadas), t=sum(gastadas)))
     return {"pasa": 0, "informa": 0, "no pasa": 1, "inconclusivo": 3}[estado]
