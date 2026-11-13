@@ -256,3 +256,28 @@ def test_cifras_que_si_salen_no_se_tocan(lina):
     lina.acciones_turno = [("buscar_web", {"consulta": "precio"}, "RESULTADOS DE BÚSQUEDA (…):\n\n[1] Steam (steamdeck.com) https://x\nDesde 569 €.")]
     r, _ = _insistir(lina, "¿Cuánto cuesta ahora una Steam Deck?", "Según steamdeck.com, la OLED cuesta 569 euros y la de 1 TB 679.")
     assert r.startswith("Según steamdeck.com") and not lina._gemini.called
+
+
+def test_un_429_de_la_gratuita_pasa_a_la_de_pago_con_herramientas(monkeypatch):
+    """Bloque del 429: la gratuita da 429 en el primer paso y la respuesta sale de la de pago, con sus herramientas; nunca un «no puedo» sin ellas."""
+    for m in ("sounddevice", "faster_whisper"):
+        sys.modules.setdefault(m, MagicMock())
+    from lina.nucleo import asistente as A
+    from lina.nucleo import ia as IA
+    a = A.Asistente.__new__(A.Asistente)
+    monkeypatch.setattr(a, "_claves", lambda modo: ["GRATIS", "PAGO"], raising=False)
+    monkeypatch.setattr(IA, "_pausa_modelo", {})
+    monkeypatch.setattr(IA.PRES, "una_sola_clave", lambda: False)
+    monkeypatch.setattr(IA.PRES, "nombre_de", lambda c: "pago" if c == "PAGO" else "gratis")
+    monkeypatch.setattr(IA.PRES, "registrar", lambda *x, **k: None)
+    vistas = []
+
+    def turno(prov, clave, modelo, sistema, mensajes, herramientas=None, **k):
+        vistas.append((clave, bool(herramientas)))
+        if clave == "GRATIS":
+            return IA.PROV.ErrorIA("cuota", 429, "error 429 | cuota=GenerateRequestsPerMinutePerProjectPerModel-FreeTier")
+        return MagicMock(llamadas=[], texto="Hecho con la de pago.", uso={}, modelo_real=None)
+    monkeypatch.setattr(IA, "_turno_medido", turno)
+    monkeypatch.setattr(A, "preguntar_ia", IA.preguntar_ia)
+    r = a._gemini("rapido", "gemini-flash-lite-latest", "hola", None, herramientas=[{"name": "a"}], ejecutar_herramienta=lambda n, x: "x")
+    assert r == "Hecho con la de pago." and vistas == [("GRATIS", True), ("PAGO", True)]

@@ -145,11 +145,18 @@ def test_400_con_nivel_reintenta_sin_el(ia):
     assert "generationConfig" in s.peticiones[0]["json"] and "generationConfig" not in s.peticiones[1]["json"]
 
 
-@pytest.mark.parametrize("estado", [400, 429])
-def test_error_con_herramientas_reintenta_sin_ellas(ia, estado):
-    s = ia(error(estado), texto("ok"))
+def test_un_400_con_herramientas_reintenta_sin_ellas(ia):
+    s = ia(error(400), texto("ok"))
     assert preguntar(herramientas=[{"name": "a"}], ejecutar_herramienta=lambda n, a: "x") == "ok"
     assert "tools" in s.peticiones[0]["json"] and "tools" not in s.peticiones[1]["json"]
+
+
+def test_un_429_por_cupo_no_reintenta_sin_herramientas(ia):
+    """En las medidas del 2026-11-13, un 429 de la gratuita en el primer paso reintentaba con la misma clave y sin herramientas, y la respuesta era «no puedo,
+    las herramientas no están disponibles». Ahora la llamada termina sin respuesta y quien llama pasa a la otra clave o al otro modelo."""
+    s = ia(error(429), texto("No puedo, las herramientas no están disponibles."))
+    assert preguntar(herramientas=[{"name": "a"}], ejecutar_herramienta=lambda n, a: "x") is None
+    assert len(s.peticiones) == 1
 
 
 def test_sin_herramientas_se_avisa_a_la_ia_de_que_no_puede_actuar(ia):

@@ -923,7 +923,7 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                         al_esperar()
                     _dormir(r.espera + 1)
                     continue
-            if r.estado in (400, 429) and con_herramientas and pasos == 0:
+            if r.estado == 400 and con_herramientas and pasos == 0:     # un 429 no: sin herramientas solo contestaba «no puedo»; se pasa a la otra clave o modelo
                 log(f"{modelo}: {r.resumen} -> reintento sin herramientas")
                 con_herramientas = False
                 sistema = (sistema or instrucciones()) + AVISO_SIN_HERRAMIENTAS      # que no diga que ha hecho lo que no puede hacer
