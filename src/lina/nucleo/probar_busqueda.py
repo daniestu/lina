@@ -37,7 +37,8 @@ AYUDA = N_("""lina probar-busqueda [gratis|tavily|pago] [N]
       tavily  tu clave gratuita de Gemini y tu clave de Tavily. Criterio: el 90 % de las válidas con respuesta y fuente.
       pago    tus claves de Gemini, también la de pago (gasta de tu tope). Criterio: el 90 % de las válidas con respuesta y fuente.
     Los errores del servicio de la IA (429, 503, «Gemini no responde»…) se repiten con pausa y, si siguen, no cuentan: las demás son las válidas. Con
-    menos de 15 válidas el resultado es «inconclusivo». N: solo las N primeras.""")
+    menos de 15 válidas el resultado es «inconclusivo». N: solo las N primeras.
+    Con «pago», antes de empezar dice el gasto máximo con la clave de pago, que es el tope (--tope-eur=N lo cambia): si lo pasa, se para. --estimar: solo lo dice.""")
 PREGUNTAS = [
     "cómo se hace la poción de invisibilidad en Skyrim", "qué partidos de LoL hay esta semana", "cuánto cuesta la Steam Deck OLED",
     "cuál es la noticia de tecnología más importante de hoy", "quién ganó el último Gran Premio de Fórmula 1", "cuáles son los requisitos mínimos de Cyberpunk 2077",
@@ -56,6 +57,7 @@ TRANSITORIOS = {"429", "500", "502", "503", "504", "red"}
 REINTENTOS = (20, 40, 60)
 PAUSA_SEG = 8                                        # entre pregunta y pregunta: la clave gratuita admite 15 llamadas por minuto
 TOPE_SEG = 90
+LLAMADAS_POR_PREGUNTA_MAX = 5            # para el gasto máximo con la clave de pago (medido: 2 a 3 por pregunta, más la búsqueda de Google), por cada intento posible
 _NO_RESPONDE = re.compile(r"\b(?:no tengo acceso|no puedo (?:buscar|acceder|navegar|consultar)|no he podido (?:buscar|encontrar|leer)|no lo se\b|"
                           r"no lo he encontrado|no he encontrado|no dispongo)")
 _GENERICAS = {"www", "com", "es", "org", "net", "en", "w", "wiki", "co", "uk", "io", "gg", "info", "html"}
@@ -240,6 +242,14 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
     preguntas = PREGUNTAS[:int(numeros[0])] if numeros else PREGUNTAS
     from lina.nucleo import claves as CL
     from lina.nucleo import ia as IA
+    from lina.nucleo import medida_gasto as MG
+    con_pago = "gemini_pago" in NIVELES[nivel]
+    maximo = MG.maximo_estimado(len(preguntas) * (1 + len(REINTENTOS)), LLAMADAS_POR_PREGUNTA_MAX) if con_pago else 0.0
+    tope = MG.Tope(MG.tope_de(argv, maximo)) if con_pago else None
+    if con_pago:
+        salida(MG.frase_estimacion(maximo, tope.eur))
+    if "--estimar" in argv:
+        return 0
     CL.proteger_salida()
     with usuario_nuevo(nivel) as claves:
         faltan = [n for n, v in claves.items() if not v]
@@ -251,6 +261,9 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
         filas, notas, antiguas, gastadas = [], [], [], []
         with IA.solo_medida():
             for i, frase in enumerate(preguntas):
+                if tope and tope.superado():
+                    salida(MG.frase_parada(tope))
+                    return 4
                 if i:
                     dormir(PAUSA_SEG)
                 for espera in (*REINTENTOS, None):

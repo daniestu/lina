@@ -31,7 +31,7 @@ class Respuesta:
 
 @dataclass
 class ErrorIA:
-    tipo: str                                      # cuota | servidor | peticion | auth | red | vacia | otro
+    tipo: str                                      # cuota | saldo | servidor | peticion | auth | red | vacia | otro
     estado: int | None = None                      # código HTTP, si lo hubo
     resumen: str = ""
     espera: float | None = None                    # segundos que el servicio pide esperar (solo si esperar sirve de algo)
@@ -43,6 +43,8 @@ SIN_CLAVE = "sin-clave"        # marcador para los servidores locales o de empre
 def tipo_de_estado(estado):
     if estado == 429:
         return "cuota"
+    if estado == 402:                                   # Gemini: «Your prepayment credits are depleted» (el saldo prepago de la cuenta)
+        return "saldo"
     if estado in (500, 502, 503, 504, 529):            # 529: «sobrecargado» (Anthropic)
         return "servidor"
     if estado in (401, 403):

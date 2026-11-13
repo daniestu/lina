@@ -2718,10 +2718,12 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         return (r or SIN_RESPUESTA), "local (plan B)"
 
     def _por_que_no_responde_gemini(self):
-        """Lo que dice Lina si Gemini no ha respondido y no hay modelo local, cuando el motivo está claro: el límite diario de la clave gratuita (con
-        cuándo se renueva) o el servicio saturado (503, tiempo agotado). None si fue otra cosa o una mezcla: entonces, la frase de siempre."""
+        """Lo que dice Lina si Gemini no ha respondido y no hay modelo local, cuando el motivo está claro: la clave de pago sin saldo prepago (402), el
+        límite diario de la clave gratuita (con cuándo se renueva) o el servicio saturado (503, tiempo agotado). None si fue otra cosa o una mezcla: entonces, la frase de siempre."""
         fallos = fallos_de_la_peticion()
         clases = {c for c, _ in fallos}
+        if "sin_saldo" in clases or (fallos and PRES.hay_clave_de_pago() and PRES.sin_saldo()):
+            return T("La clave de pago se ha quedado sin saldo prepago; recárgalo en AI Studio.")
         if not fallos or not clases <= {"diario", "saturado"}:
             return None
         if clases == {"diario"} and all(n == "gratis" for _, n in fallos):

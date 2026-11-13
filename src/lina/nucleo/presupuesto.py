@@ -74,9 +74,47 @@ def nombre_de(clave):
     return "pago" if clave and clave == _claves["pago"] else "gratis"
 
 
-def pago_disponible():
-    """¿Se puede usar la clave de pago ahora? Hay clave y no se ha llegado al tope de este mes."""
+ARCHIVO_SIN_SALDO = "gemini_sin_saldo.json"
+HORAS_SIN_SALDO = 6                   # tras un 402 «prepayment credits are depleted», la clave de pago no se prueba en este tiempo (o hasta que la cambies)
+
+
+def _huella(clave):
+    import hashlib
+    return hashlib.sha256(str(clave).encode()).hexdigest()[:16]
+
+
+def marcar_sin_saldo(clave=None, ahora=None):
+    """Google dijo 402: el saldo prepago de la cuenta de la clave de pago se ha acabado. No se vuelve a probar en HORAS_SIN_SALDO o hasta que cambie la clave
+    (el aviso va a un archivo: aguanta reinicios). Sin esto, cada petición la probaba y fallaba."""
+    clave = clave or _claves["pago"]
+    if not clave:
+        return
+    ahora = ahora or time.time()
+    try:
+        RUT.ESTADO.mkdir(parents=True, exist_ok=True)
+        (RUT.ESTADO / ARCHIVO_SIN_SALDO).write_text(json.dumps({"huella": _huella(clave), "desde": ahora, "hasta": ahora + HORAS_SIN_SALDO * 3600}),
+                                                    encoding="utf-8")
+    except OSError:
+        pass
+    log(f"La clave de pago se ha quedado sin saldo prepago: no la pruebo en {HORAS_SIN_SALDO} h o hasta que la cambies")
+
+
+def sin_saldo(ahora=None):
+    """{desde, hasta} si la clave de pago actual está marcada sin saldo prepago y no ha pasado el plazo; si no, None."""
     if not _claves["pago"]:
+        return None
+    try:
+        d = json.loads((RUT.ESTADO / ARCHIVO_SIN_SALDO).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(d, dict) or d.get("huella") != _huella(_claves["pago"]) or (ahora or time.time()) >= float(d.get("hasta") or 0):
+        return None
+    return d
+
+
+def pago_disponible():
+    """¿Se puede usar la clave de pago ahora? Hay clave, no se ha llegado al tope de este mes y Google no ha dicho que se acabó el saldo prepago."""
+    if not _claves["pago"] or sin_saldo():
         return False
     with _lock:
         d = _cargar()

@@ -196,6 +196,10 @@ def resultados_google(consulta, dominio=None, post=None, ahora=None):
                    if tipo == "pago" else "No la vuelvo a probar con esta clave hasta que la cambies"))
             motivo = motivo or T(M_GOOGLE_PAGO if tipo == "pago" else M_GOOGLE_GRATIS)
             continue
+        if r.status_code == 402 and tipo == "pago":
+            PRES.marcar_sin_saldo(clave)
+            motivo = motivo or T(M_SIN_PAGO)
+            continue
         if not r.ok:
             espera = PG.espera_de_cuota(r) if r.status_code == 429 else None
             _pausa_google[huella(clave)] = (ahora or time.time()) + (espera if espera is not None else PAUSA_GOOGLE_SEG)

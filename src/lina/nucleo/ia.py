@@ -138,6 +138,10 @@ def _pausar_por_fallo(modelo, clave, r):
     """Tras un 429 o un 5xx que no se arregló reintentando. Cupo diario agotado (PerDay): ese modelo con esa clave, hasta la medianoche del Pacífico,
     cuando Google lo renueva; probarlo antes solo gasta una llamada. Es por modelo: otro modelo de la misma clave, o el mismo con la clave de pago,
     sigue disponible. Saturado (500/503): PAUSA_SERVIDOR_SEG. Otro 429: PAUSA_MODELO_SEG."""
+    if r.tipo == "saldo":
+        if PRES.nombre_de(clave) == "pago":
+            PRES.marcar_sin_saldo(clave)
+        return
     if r.tipo not in ("cuota", "servidor"):
         return
     clase = clase_de_fallo(r)
@@ -155,9 +159,12 @@ _clase_pausa: dict = {}                   # id de pausa -> la clase del fallo qu
 
 
 def clase_de_fallo(r):
-    """«diario» (429 del cupo por día: no se arregla esperando unos segundos), «saturado» (500/503 o tiempo agotado) u otra cosa (el tipo del error)."""
+    """«diario» (429 del cupo por día: no se arregla esperando unos segundos), «sin_saldo» (402: se acabó el saldo prepago), «saturado» (500/503 o tiempo
+    agotado) u otra cosa (el tipo del error)."""
     if r.estado == 429 and "perday" in str(r.resumen).lower().replace("_", "").replace(" ", ""):
         return "diario"
+    if r.tipo == "saldo":
+        return "sin_saldo"
     if r.tipo == "servidor" or (r.tipo == "red" and re.search(r"timed? ?out|timeout", str(r.resumen), re.I)):
         return "saturado"
     return r.tipo
