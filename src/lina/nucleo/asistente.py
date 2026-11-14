@@ -463,7 +463,7 @@ def escuchar_mandos(al_pulsar):
 
 
 from lina.nucleo.ia import (  # noqa: F401
-    BucleDeHerramienta, Cancelado, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
+    BucleDeHerramienta, Cancelado, NecesitaReglasCompletas, REGLAS_COMPLETAS, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_reserva, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva, modo_busqueda, reserva_sin_clave,
@@ -1766,6 +1766,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if (self.fuente_cerrada or self.reintento_solo_web) and nombre not in SOLO_WEB:
             log(f"{nombre} rechazada: en esta parte de la petición solo cabe la web")
             return "Aquí no hace falta nada más: responde ya con lo que tienes, sin más herramientas."
+        if getattr(self, "reglas_reducidas", False) and self._es_accion(nombre, args):
+            log(f"{nombre}: es una acción y van las reglas solo de información; no la ejecuto")
+            raise NecesitaReglasCompletas()
         clave = (nombre, json.dumps(args, sort_keys=True, ensure_ascii=False, default=str))
         if self.paso_guion < len(self.guion_herramientas) and self.guion_herramientas[self.paso_guion][0] == clave:
             resultado = self.guion_herramientas[self.paso_guion][1]
@@ -2691,13 +2694,25 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             herramientas = self._herramienta_de_fuente() + herramientas   # delante, como se midió
             self.herramientas_turno = herramientas        # la misma lista que usa Gemini: mas_herramientas la amplía en sitio
             self.grupos_turno = set(grupos)
-            sistema = G.sistema(instrucciones(), H.hechos_sistema(), G.ordenar(grupos))
-            log(f"Herramientas: núcleo + {', '.join(G.ordenar(grupos)) or 'ningún grupo'} ({len(herramientas)} en total)")
+            self.reglas_reducidas = modo == "rapido" and self._es_solo_informacion()
+            sistema = G.sistema(instrucciones(), H.hechos_sistema(), G.ordenar(grupos), solo_informacion=self.reglas_reducidas)
+            log(f"Herramientas: núcleo + {', '.join(G.ordenar(grupos)) or 'ningún grupo'} ({len(herramientas)} en total)"
+                + (" · reglas solo de información" if self.reglas_reducidas else ""))
             for modelo in IAC.modelos("profundo" if modo == "profundo" else "rapido"):
                 self.paso_guion = 0   # cada modelo empieza su turno desde el principio
                 r = self._gemini("profundo" if modo == "profundo" else "rapido", modelo, pregunta, imagen, self.historial, herramientas=herramientas,
                                      ejecutar_herramienta=self.ejecutar_herramienta, sistema=sistema,
                                      nivel=nivel_razonamiento(modelo, modo), revisor=self.revisar_respuesta)
+                if r == REGLAS_COMPLETAS or (r and self.reglas_reducidas):     # lo que siga (insistir, pantalla) va con todas las reglas
+                    if r == REGLAS_COMPLETAS:                 # E1c, la red: pidió actuar en una «pregunta»; se repite con todas las reglas
+                        log("Pidió una acción con las reglas solo de información: repito la petición con las reglas completas")
+                    self.reglas_reducidas = False
+                    sistema = G.sistema(instrucciones(), H.hechos_sistema(), G.ordenar(self.grupos_turno or grupos))
+                    if r == REGLAS_COMPLETAS:
+                        self.paso_guion = 0
+                        r = self._gemini("profundo" if modo == "profundo" else "rapido", modelo, pregunta, imagen, self.historial, herramientas=herramientas,
+                                         ejecutar_herramienta=self.ejecutar_herramienta, sistema=sistema,
+                                         nivel=nivel_razonamiento(modelo, modo), revisor=self.revisar_respuesta)
                 if r:
                     r, modelo = self._con_pantalla_si_la_pide(r, modelo, modo, pregunta, herramientas, sistema)
                     imagen = imagen or (self.captura_guardada if self.pantalla_adjunta else None)
@@ -2728,6 +2743,34 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         r = preguntar_local(pregunta_local, imagen, permitir_escalar=False, historial=self.historial,
                             datos_sistema=H.hechos_sistema(), soltar_en=SOLTAR_LOCAL_PLAN_B)      # que no deje la VRAM ocupada después
         return (r or SIN_RESPUESTA), "local (plan B)"
+
+    # E1c: las herramientas que no cambian nada; con las reglas solo de información, cualquier otra corta el turno y se repite con todas las reglas
+    SOLO_CONSULTA = {"buscar_web", "leer_web", "usar_fuente", "necesito_datos_actuales", "mas_herramientas", "pensar_a_fondo", "ver_pantalla", "mirar_pantalla",
+                     "ver_juegos", "ver_gasto", "ver_diario", "procesos", "observar_config", "buscar_archivos"}
+
+    # E1c: preguntas sobre el estado del propio equipo, que se contestan con un comando: van con todas las reglas desde el principio. En la medida, «¿cuánta
+    # memoria RAM…?» y «¿qué juegos tengo instalados?» hacían saltar la red (primer intento perdido y la petición entera otra vez).
+    _ESTADO_DEL_EQUIPO = re.compile(r"\b(?:memoria|ram|cpu|procesador|disco|discos|espacio (?:libre|en disco|ocupado)|temperatura|procesos?|"
+                                    r"(?:tengo|hay) instalad[oa]s?|instalad[oa]s? en (?:el|mi) (?:equipo|pc|ordenador)|"
+                                    r"memory|disk|disk space|temperature|process(?:es)?|installed)\b")
+
+    def _es_solo_informacion(self):
+        """E1c: ¿la petición es una pregunta de información (ni orden, ni cortesía, ni «ponme…», ni sobre el estado del propio equipo, sin nada pendiente)?
+        Entonces van las reglas reducidas."""
+        peticion = str(getattr(self, "pregunta_pura", "") or "")
+        return bool(peticion) and es_pregunta(peticion) and not (pide_accion(peticion) or orden_de_cortesia(peticion) or pide_contenido(peticion)
+                                                               or self._ESTADO_DEL_EQUIPO.search(C.normalizar(peticion))
+                                                               or self.ejecutor.pendientes or getattr(self, "forzar_busqueda", False))
+
+    def _es_accion(self, nombre, args):
+        if nombre in self.SOLO_CONSULTA:
+            return False
+        conocidas = {d.get("name") for d in (getattr(self, "herramientas_turno", None) or []) if isinstance(d, dict)}
+        if conocidas and nombre not in conocidas:      # una herramienta que no existe no hace nada: repetir con todas las reglas no serviría
+            return False
+        if nombre == "ejecutar_comando":
+            return H.clasificar(str((args or {}).get("comando", "")))[0] != "lectura"
+        return True
 
     def _por_que_no_responde_gemini(self):
         """Lo que dice Lina si Gemini no ha respondido y no hay modelo local, cuando el motivo está claro: la clave de pago sin saldo prepago (402), el

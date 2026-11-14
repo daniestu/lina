@@ -22,7 +22,8 @@ AYUDA = N_("""lina probar-ia [N] [--grabar] [--solo-gratis] [--estimar] [--tope-
     Pasa una tanda fija de frases por tu Lina con el modelo de verdad y comprueba qué herramientas elige. No ejecuta ninguna: la IA recibe respuestas enlatadas.
     N: solo las N primeras. --grabar: guarda lo que ha elegido en la carpeta de estado. Gasta unas pocas llamadas a la IA por frase. No cuenta en lina tiempos ia.
     Cada frase empieza sin modelos en pausa. Antes de empezar dice el gasto máximo con la clave de pago, que es el tope (--tope-eur=N lo cambia): si lo pasa,
-    se para. --estimar: solo lo dice, sin gastar nada. --solo-gratis: sin la clave de pago.
+    se para. --estimar: solo lo dice, sin gastar nada. --solo-gratis: sin la clave de pago. --pausa=N: N segundos entre frases (con solo la gratuita, que
+    admite 15 llamadas por minuto en Flash-Lite, unos 20).
 lina probar-ia --comparar ANTES1 ANTES2 DESPUES1 DESPUES2
     Compara dos pasadas de antes con dos de después, guardadas en archivos. Ignora las frases que ya cambian entre las dos de antes y lo dice, y avisa si la respuesta cambia de forma.""")
 ARCHIVO = "banco_ia.json"
@@ -199,7 +200,7 @@ def informe_comparar(rutas, salida):
     return 1 if r["regresiones"] else 0
 
 
-def principal(argv, salida=print, reiniciar=None):
+def principal(argv, salida=print, reiniciar=None, dormir=None):
     if argv[:1] in (["-h"], ["--help"], ["ayuda"]):
         salida(T(AYUDA))
         return 0
@@ -223,14 +224,17 @@ def principal(argv, salida=print, reiniciar=None):
     CL.proteger_salida()
     salida(T("Paso {n} frases por tu Lina, sin ejecutar nada (unos segundos cada una)…", n=len(casos)))
     with (MG.solo_gratis() if solo_gratis else nullcontext()):
-        return _pasar_todas(casos, PON, IA, MG, MG.Tope(tope_eur), grabar, salida, reiniciar or PB.reiniciar_pausas)
+        pausa = next((float(x.split("=", 1)[1].replace(",", ".")) for x in argv if re.fullmatch(r"--pausa=\d+(?:[.,]\d+)?", x)), 0.0)
+        return _pasar_todas(casos, PON, IA, MG, MG.Tope(tope_eur), grabar, salida, reiniciar or PB.reiniciar_pausas, pausa, dormir)
 
 
-def _pasar_todas(casos, PON, IA, MG, tope, grabar, salida, reiniciar):
+def _pasar_todas(casos, PON, IA, MG, tope, grabar, salida, reiniciar, pausa=0.0, dormir=None):
     A, a, abiertas = PON._asistente()
     grabadas, malas = {}, 0
     with IA.solo_medida():
-        for caso in casos:
+        for i, caso in enumerate(casos):
+            if i and pausa:                                  # con solo la gratuita: 15 llamadas por minuto en Flash-Lite
+                (dormir or __import__("time").sleep)(pausa)
             if tope.superado():
                 salida(MG.frase_parada(tope))
                 return 4

@@ -245,9 +245,23 @@ def reglas(grupos):
     return " ".join(REGLAS[g] for g in ordenar(grupos) if g in REGLAS)
 
 
-def sistema(instrucciones, hechos, grupos=()):
-    """El texto de sistema: igual de una vez a otra salvo que cambien los grupos (y hechos va al final)."""
-    partes = [instrucciones, REGLAS_NUCLEO]
+# E1c: las reglas del núcleo que solo sirven para ACTUAR. A una pregunta de información (ni orden, ni cortesía, ni «ponme») no le hacen falta: son unos
+# 6 500 de sus 12 300 caracteres. Nunca se quitan las de seguridad ni las de honestidad (1, 4, 19, 21) ni las que también valen para informar. Si en una
+# pregunta así la IA pide una acción, el asistente no la ejecuta y repite la petición con las reglas completas (asistente._comprobar_accion_en_informacion).
+REGLAS_SOLO_ACCIONES = (3, 5, 6, 8, 9, 14, 15, 16, 17, 22)
+
+
+def reglas_nucleo(solo_informacion=False):
+    """Las reglas del núcleo; con `solo_informacion`, sin las de REGLAS_SOLO_ACCIONES."""
+    if not solo_informacion:
+        return REGLAS_NUCLEO
+    trozos = re.split(r"(?=(?<!\S)\d{1,2}\) )", REGLAS_NUCLEO)
+    return " ".join(t.strip() for t in trozos if not (re.match(r"(\d{1,2})\) ", t.strip()) and int(re.match(r"(\d{1,2})", t.strip()).group(1)) in REGLAS_SOLO_ACCIONES))
+
+
+def sistema(instrucciones, hechos, grupos=(), solo_informacion=False):
+    """El texto de sistema: igual de una vez a otra salvo que cambien los grupos (y hechos va al final). `solo_informacion`: E1c, sin las reglas de actuar."""
+    partes = [instrucciones, reglas_nucleo(solo_informacion)]
     r = reglas(grupos)
     if r:
         partes.append(r)

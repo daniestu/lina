@@ -87,3 +87,16 @@ def test_probar_busqueda_pago_dice_el_maximo_y_se_para(monkeypatch):
     r = PB.principal(["pago", "3"], salida.append, preparar=lambda: (MagicMock(), MagicMock(busquedas_hechas=[]), []),
                      pasar_pregunta=lambda *a: bien, dormir=lambda s: None, reiniciar=lambda: None)
     assert r == 4 and any(t.startswith("Parada:") for t in salida)
+
+
+def test_probar_ia_puede_esperar_entre_frases(monkeypatch):
+    """Con solo la gratuita (15 llamadas por minuto en Flash-Lite), las frases seguidas acababan en 429 y la medida no valía."""
+    from lina.nucleo import probar_ponme as PON
+    monkeypatch.setattr(PON, "_asistente", lambda: (MagicMock(), MagicMock(), []))
+    monkeypatch.setattr(B, "pasar", lambda caso, *a: ([("buscar_web", {})], "Vale."))
+    esperas = []
+    B.principal(["3", "--solo-gratis", "--pausa=20"], lambda t: None, reiniciar=lambda: None, dormir=esperas.append)
+    assert esperas == [20.0, 20.0]
+    esperas.clear()
+    B.principal(["3", "--solo-gratis"], lambda t: None, reiniciar=lambda: None, dormir=esperas.append)
+    assert esperas == []

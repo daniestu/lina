@@ -57,6 +57,7 @@ TRANSITORIOS = {"429", "500", "502", "503", "504", "red"}
 REINTENTOS = (20, 40, 60)
 PAUSA_SEG = 8                                        # entre pregunta y pregunta: la clave gratuita admite 15 llamadas por minuto
 TOPE_SEG = 90
+TOKENS: list = []                        # tokens de cada llamada a la IA de la pregunta en curso (E1: el criterio es la media de tokens por pregunta)
 LLAMADAS_POR_PREGUNTA_MAX = 5            # para el gasto máximo con la clave de pago (medido: 2 a 3 por pregunta, más la búsqueda de Google), por cada intento posible
 _NO_RESPONDE = re.compile(r"\b(?:no tengo acceso|no puedo (?:buscar|acceder|navegar|consultar)|no he podido (?:buscar|encontrar|leer)|no lo se\b|"
                           r"no lo he encontrado|no he encontrado|no dispongo)")
@@ -200,6 +201,8 @@ def _asistente():
     def apuntar(*x, **k):
         r = medido(*x, **k)
         llamadas.append("ok" if not isinstance(r, IA.PROV.ErrorIA) else ("red" if r.tipo == "red" else str(r.estado or r.tipo)))
+        uso = getattr(r, "uso", None) or {}
+        TOKENS.append(sum(int(uso.get(c) or 0) for c in ("promptTokenCount", "candidatesTokenCount", "thoughtsTokenCount")))
         return r
     IA._turno_medido = apuntar
     return A, a, llamadas
@@ -212,6 +215,7 @@ def pasar(frase, A, a, llamadas, tope=TOPE_SEG):
     a._hablar = lambda texto, *x, **k: None
     a.historial, a.hechos_recientes, a.busquedas_hechas, a.origen_respuesta = [], [], [], ""
     llamadas.clear()
+    TOKENS.clear()
     corte = threading.Timer(tope, A._abortar.set)
     corte.start()
     t0 = time.time()
@@ -258,7 +262,7 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
             return 2
         salida(T("Nivel «{nivel}»: paso {n} preguntas por una Lina de usuario nuevo (unos segundos cada una, con pausas)…", nivel=nivel, n=len(preguntas)))
         A, a, llamadas = (preparar or _asistente)()
-        filas, notas, antiguas, gastadas = [], [], [], []
+        filas, notas, antiguas, gastadas, tokens = [], [], [], [], []
         with IA.solo_medida():
             for i, frase in enumerate(preguntas):
                 if tope and tope.superado():
@@ -286,6 +290,7 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
                 antiguas.append(antigua)
                 filas.append((nota, seg, escalon, frase, motivo, " ".join(str(d) for d in dicho)))
                 gastadas.append(len(hechas))
+                tokens.append(sum(TOKENS))
                 distinto = T("\n      (juez antiguo: {nota}, {motivo})", nota=antigua, motivo=motivo_antiguo) if antigua != nota else ""
                 salida(f"{nota:5} {seg:5.1f} s  {escalon:10} {frase}\n      {motivo}{distinto}\n      dice: {' '.join(filas[-1][5].split())[:240]}")
     estado, frase_final = veredicto(notas, nivel)
@@ -302,4 +307,8 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
     if gastadas:
         salida(T("Llamadas a la IA por pregunta (la última vez que se pasó cada una): media {m}, máximo {x}, {t} en total",
                  m=f"{sum(gastadas) / len(gastadas):.2f}".replace(".", ","), x=max(gastadas), t=sum(gastadas)))
+    if filas:
+        import statistics
+        salida(T("Tokens por pregunta: media {t} · segundos por pregunta: mediana {s}", t=round(sum(tokens) / len(tokens)),
+                 s=f"{statistics.median(f[1] for f in filas):.1f}".replace(".", ",")))
     return {"pasa": 0, "informa": 0, "no pasa": 1, "inconclusivo": 3}[estado]

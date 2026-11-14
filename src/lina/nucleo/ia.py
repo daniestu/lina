@@ -871,6 +871,15 @@ class BucleDeHerramienta(Exception):
         self.respuesta = respuesta
 
 
+REGLAS_COMPLETAS = "\x00reglas-completas\x00"         # E1c: lo que devuelve el turno si la IA pidió actuar con las reglas solo de información
+
+
+class NecesitaReglasCompletas(BucleDeHerramienta):
+    """E1c: en una petición tratada como pregunta, la IA ha pedido una acción. No se ejecuta: el turno termina y se repite con todas las reglas."""
+    def __init__(self):
+        super().__init__(REGLAS_COMPLETAS)
+
+
 def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herramientas=None, ejecutar_herramienta=None,
                  sistema=None, nivel=None, revisor=None, max_pasos=None, esperar_cuota=False, al_esperar=None, timeout=20, plazo=None):
     """La pregunta con su bucle de herramientas, contra el proveedor dado: la IA pide herramientas, se ejecutan y se le devuelven los resultados

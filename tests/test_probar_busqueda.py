@@ -144,7 +144,7 @@ def test_la_respuesta_del_codigo_sin_gemini_es_api_aunque_las_llamadas_no_lo_dig
     """«Gemini no responde y el modelo local no cabe…» llega tras saltar los modelos «en pausa»: ninguna llamada dio error y aun así no es un fallo de búsqueda."""
     sin_gemini = (["Gemini no responde y el modelo local no cabe en la tarjeta gráfica."], [], [], 0.1, "código (plan B sin VRAM)")
     r, texto, esperas = _principal(monkeypatch, [sin_gemini] * 4, n=1)
-    assert esperas == [20, 40, 60] and texto.splitlines()[-2].endswith("INCONCLUSIVO: hacen falta al menos 15 válidas. Repítela más tarde")
+    assert esperas == [20, 40, 60] and "INCONCLUSIVO: hacen falta al menos 15 válidas. Repítela más tarde" in texto
     assert "\napi " in "\n" + texto
     for origen in ("código (plan B: Gemini sin cupo o saturado)", "local (plan B)", "local (plan B no disponible)", "código (Gemini dejó de responder tras actuar)"):
         assert PB.respuesta_sin_ia(origen)
@@ -203,3 +203,15 @@ def test_dice_cuantas_llamadas_gasta_cada_pregunta(monkeypatch):
     _, texto, _ = _principal(monkeypatch, [bien, otra], n=2)
     assert "Llamadas a la IA por pregunta (la última vez que se pasó cada una): media 2,50, máximo 3, 5 en total" in texto
 
+
+
+def test_dice_los_tokens_y_la_mediana_de_segundos_por_pregunta(monkeypatch):
+    """E1: el criterio es la media de tokens por pregunta y que la mediana de segundos no suba más de 1 s."""
+    def pasar(frase, A, a, llamadas):
+        PB.TOKENS[:] = [1000, 500] if "Skyrim" in frase else [300]
+        return (["Según la UESP, ectoplasma."], [BUSQUEDA], ["ok"], 2.0 if "Skyrim" in frase else 4.0)
+    monkeypatch.setattr(PB, "usuario_nuevo", _sin_cambios)
+    salida = []
+    PB.principal(["tavily", "2"], salida.append, preparar=lambda: (MagicMock(), MagicMock(busquedas_hechas=[]), []), pasar_pregunta=pasar,
+                 dormir=lambda s: None, reiniciar=lambda: None)
+    assert "Tokens por pregunta: media 900 · segundos por pregunta: mediana 3,0" in "\n".join(salida)
