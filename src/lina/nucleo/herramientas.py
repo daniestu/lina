@@ -30,6 +30,7 @@ from pathlib import Path
 import fnmatch
 
 from lina.escritorio import sesion as SES
+from lina.nucleo import aislamiento as AIS
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import comandos
 from lina.nucleo import dependencias as DEP
@@ -1421,6 +1422,11 @@ def lectura_web_por_comando(comando):
     return None
 
 
+def modo_aislar():
+    """ia.aislar: no (de fábrica), auto o si (S9)."""
+    return AJ.actuales(log=lambda m: None).get("ia", "aislar")
+
+
 class Ejecutor:
     def __init__(self, avisar=None, confirmar=True):
         self.avisar = avisar or (lambda texto: None)
@@ -1596,7 +1602,7 @@ class Ejecutor:
                 anotar(f"[sin-reproductor] {comando}")
                 return sin
         if clase in {"lectura", "inocuo"}:
-            return self.ejecutar(comando, motivo)
+            return self.ejecutar(comando, motivo, clase=clase)
         if clase == "lanzar":
             return self.lanzar(comando)
         if clase == "autonomo":
@@ -1677,7 +1683,7 @@ class Ejecutor:
                 notas.append("no he podido preparar el deshacer")
         self._ctx_fondo = (id_entrada, intenciones, payloads) if id_entrada else None
         try:
-            resultado = self.ejecutar(comando, motivo)
+            resultado = self.ejecutar(comando, motivo, clase=clase)
         finally:
             self._ctx_fondo = None
         rc = _codigo_de_salida(resultado)
@@ -2209,15 +2215,40 @@ class Ejecutor:
         """'sudo' como comando pasa a 'sudo -n' (no preguntar contraseña); la palabra dentro de un texto se deja."""
         return re.sub(r"(^|&&|\|\||;|\|)(\s*)sudo\b(?!\s+-n\b)", r"\1\2sudo -n", comando)
 
-    def ejecutar(self, comando, motivo="tarea"):
+    def _jaula(self, comando, cmd, clase):
+        """S9: cómo se aísla esta orden (aislamiento.Jaula), None si va sin aislar, o el texto para la IA si no se puede ejecutar (ia.aislar = si sin bwrap).
+        Sin aislar, a propósito: ia.aislar = no (de fábrica), lo inocuo (una lista cerrada que necesita PipeWire y el bus) y lo que lleva sudo, pkexec o run0 o
+        va por el ayudante de root (límite decidido: eso ya pide tu «sí» o es instalar paquetes). En una tarea que ha leído de fuera, sin red ni bus, salvo
+        que la orden la hayas confirmado tú."""
+        modo = modo_aislar()
+        if modo == "no" or clase == "inocuo":
+            return None
+        if cmd != self.normalizar_sudo(comando) or any(_con_sudo(s) for s in _segmentos(comando)):
+            return None
+        puede, por_que = AIS.disponible()
+        if not puede:
+            if modo == "si" and clase != "lectura":
+                anotar(f"[sin-aislamiento] {comando}  # {por_que}")
+                return (f"NO SE HA EJECUTADO: el usuario pidió aislar las órdenes (ia.aislar = si) y este sistema no puede ({por_que}). Díselo en una frase: "
+                        "puede instalar bubblewrap o poner ia.aislar en auto. No lo intentes de otra forma.")
+            return None
+        confirmada = clase == "confirmado"
+        limpia = confirmada or not self.contaminado
+        return AIS.Jaula(casa=_HOME, red=limpia, bus=limpia, confirmada=confirmada, escribibles=[RUTA_DATOS])
+
+    def ejecutar(self, comando, motivo="tarea", clase=""):
         fuente = _fuente_externa(comando)
         if fuente:
             self.contaminar(fuente)                  # lo que devuelva puede traer instrucciones: ver A2e
         cmd = PRIV.adaptar(self.normalizar_sudo(comando), analizar_instalacion(comando))      # según el permiso que haya: ayudante de root, pkexec o tal cual
+        jaula = self._jaula(comando, cmd, clase)
+        if isinstance(jaula, str):
+            return jaula
+        orden = AIS.orden(["bash", "-c", cmd], jaula) if jaula else ["bash", "-c", cmd]
         kernel_antes = modulos_del_kernel_presentes()                   # para avisar si este comando cambia el kernel (hay que reiniciar)
         inicio = time.time()
         try:
-            proc = subprocess.Popen(["bash", "-c", cmd], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            proc = subprocess.Popen(orden, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, text=True, errors="replace", cwd=_HOME,
                                     env=self._entorno(), start_new_session=True)
         except OSError as e:
@@ -2238,6 +2269,12 @@ class Ejecutor:
             return (f"SIGUE EN SEGUNDO PLANO (lleva más de {TIMEOUT_ESPERA} s). El asistente avisará por voz al terminar.{retomar} "
                     f"Todavía NO ha terminado: no digas que ya está hecho, ni que has cumplido la petición.")
         resultado = self._resultado(proc.returncode, salida, time.time() - inicio, comando)
+        if jaula and proc.returncode != 0 and re.search(r"Read-only file system|Sistema de archivos de sólo lectura|Permission denied|Permiso denegado|"
+                                                        r"Temporary failure in name resolution|Network is unreachable|Could not resolve host", salida):
+            anotar(f"[aislamiento] {os.path.basename((_tokens(comando) or ['?'])[0])} rc={proc.returncode}")      # S9f: qué falla por el aislamiento (sin texto)
+            resultado += ("\n[Puede que esto lo haya impedido el AISLAMIENTO de las órdenes (ia.aislar): las claves, los datos de Lina y lo que arranca solo "
+                          "están protegidos" + ("" if jaula.red else ", y en esta petición, tras leer contenido de fuera, no hay red") + ". No lo intentes de otra "
+                          "forma: si de verdad hace falta, díselo al usuario; puede pedírtelo de nuevo para confirmarlo o hacerlo en su terminal.]")
         if kernel_antes and not modulos_del_kernel_presentes():
             anotar(f"[kernel-cambiado] {comando}")
             resultado += ("\nAVISO: con esto se ha actualizado el kernel. Hasta reiniciar no se pueden cargar módulos nuevos (modprobe fallará): díselo al "

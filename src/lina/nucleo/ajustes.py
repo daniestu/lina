@@ -104,6 +104,7 @@ ESQUEMA: dict = {
         "busqueda": ("auto", "opcion", ("auto", "tavily", "google", "ninguna"), N_("Búsqueda en internet para lo que cambia (resultados, horarios, noticias, «ponme el partido»): "
                      "auto (de fábrica: la de Gemini con tu clave de pago, Tavily si tienes clave, y si no Wikipedia y wikis de juegos), tavily (solo Tavily: lina clave tavily), "
                      "google (solo la de Gemini, con clave de pago) o ninguna (Lina responde con lo que sabe y no avisa de que falta).")),
+        "aislar": ("no", "opcion", ("no", "auto", "si"), N_("no (de fábrica): las órdenes de la IA se ejecutan como siempre. auto: se aíslan con bwrap si el sistema lo permite (sin tocar tus claves ni los datos de Lina, sin dejar nada que arranque solo y, tras leer contenido de fuera, sin red); si no, como siempre, y lina doctor dice por qué. si: sin aislamiento solo se ejecuta lo que solo lee y lo inocuo. Solo lo cambias tú.")),
         "busqueda_reserva": (False, "bool", None, N_("true: también busca en DuckDuckGo, sin clave, si lo demás no responde. Poco fiable: suele tomar a los programas por robots, "
                              "y DuckDuckGo ve tu consulta y tu dirección IP. false (de fábrica): no se usa.")),
         "tope_vram_mb": (4096, "int", (512, 65536), N_("Lo máximo de memoria de vídeo (MB) que Lina ocupa a la vez, contando Whisper. El modelo local de reserva (Ollama) solo "

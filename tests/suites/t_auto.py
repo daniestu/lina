@@ -16,7 +16,7 @@ pre=src.split("from lina.nucleo import comandos")[0].replace("fallos = 0","fallo
 exec(pre)
 e=H.Ejecutor(avisar=lambda *a,**k:None, confirmar=True); e.pregunta_pura="sube el volumen"
 ejec=[]
-e.ejecutar=lambda c,m="tarea":(ejec.append(c) or "código de salida: 0\n(sin salida)")
+e.ejecutar=lambda c,m="tarea",**k:(ejec.append(c) or "código de salida: 0\n(sin salida)")
 H.SNAPSHOT_AUTOMATICA=False
 estado["vol"]="Volume: 0.50"
 def ej2(argv,timeout=8):
@@ -43,7 +43,7 @@ r=e.sistema("pantalla",{"accion":"modo","salida":"DP-1","valor":"1920x1080@144"}
 KS["outputs"][0]["currentModeId"]="2"
 r=e.sistema("pantalla",{"accion":"escala","salida":"DP-1","valor":"1.5"}); ok("guardará como receta" not in r,"escala no aplicada → no")
 # no se apunta si el comando falla
-e.ejecutar=lambda c,m="tarea":"código de salida: 1\nerror"
+e.ejecutar=lambda c,m="tarea",**k:"código de salida: 1\nerror"
 estado["vol"]="Volume: 0.20"
 r=e.sistema("audio",{"accion":"volumen","valor":"20"}); ok("guardará como receta" not in r,"comando fallido no se apunta")
 

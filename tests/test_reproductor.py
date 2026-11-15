@@ -80,7 +80,7 @@ def test_el_comando_playerctl_se_detiene_ante_la_falta_de_reproductor(monkeypatc
     monkeypatch.setattr(H, "_sin_reproductor", lambda: "código de salida: 1 (0 s)\n\nNo se ha hecho nada")
     ejecutados = []
     ej = H.Ejecutor()
-    ej.ejecutar = lambda comando, motivo: ejecutados.append(comando) or "código de salida: 0 (0 s)"
+    ej.ejecutar = lambda comando, motivo, **k: ejecutados.append(comando) or "código de salida: 0 (0 s)"
     assert "No se ha hecho nada" in ej.herramienta({"comando": "playerctl pause", "motivo": "x"})
     assert ejecutados == []
     ej.herramienta({"comando": "playerctl status", "motivo": "x"})          # leer el estado no se frena

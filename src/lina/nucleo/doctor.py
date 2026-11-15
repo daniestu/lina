@@ -85,6 +85,11 @@ class Sondas:
         """(ia.busqueda, dónde está la clave de Tavily, dónde está la clave de pago de Gemini). Solo mira: no gasta consultas."""
         return AJ.actuales(log=lambda m: None).get("ia", "busqueda"), CL.donde_esta("tavily"), CL.donde_esta("gemini_pago")
 
+    def aislamiento(self):
+        """(ia.aislar, ¿se puede aislar?, por qué no). S9: prueba bwrap con una orden vacía de solo lectura."""
+        from lina.nucleo import aislamiento as AIS
+        return (AJ.actuales(log=lambda m: None).get("ia", "aislar"),) + tuple(AIS.disponible())
+
     def busqueda_detalle(self):
         """(¿DuckDuckGo encendido?, cuándo nos tomó por un robot la última vez o None, [(«pago»|«gratis», desde, hasta)] de las claves de Gemini que no se
         prueban con la búsqueda de Google). Solo lee archivos de estado: no busca nada."""
@@ -271,6 +276,20 @@ def comprobar(s=None, red=False):
                 detalle += T(" · te bloqueó el {cuando}: suele ser por tu dirección IP y Lina no lo esquiva; vuelve a probar a los 30 min",
                              cuando=time.strftime("%d/%m %H:%M", time.localtime(robot)))
             a(AVISO, "DuckDuckGo", detalle, "lina config poner ia.busqueda_reserva false")
+    ais = _seguro(getattr(s, "aislamiento", lambda: None))
+    if isinstance(ais, tuple):
+        modo, puede, motivo = ais
+        titulo = T("Aislar las órdenes de la IA")
+        if modo == "no":
+            a(OK, titulo, T("apagado (ia.aislar = no, de fábrica)") + ("" if puede else T("; este sistema tampoco podría: {motivo}", motivo=motivo)),
+              T("Para probarlo:  lina config poner ia.aislar auto") if puede else "")
+        elif puede:
+            a(OK, titulo, T("{modo}: las órdenes de la IA se ejecutan aisladas con bwrap", modo=modo))
+        elif modo == "auto":
+            a(AVISO, titulo, T("auto, pero no se puede: {motivo}. Las órdenes se ejecutan sin aislar, como siempre", motivo=motivo))
+        else:
+            a(MAL, titulo, T("si, pero no se puede: {motivo}. Solo se ejecuta lo que solo lee y lo inocuo", motivo=motivo),
+              T("lina config poner ia.aislar auto   (o instala bubblewrap)"))
     if not _seguro(s.llavero, False):
         a(AVISO, T("Llavero del sistema"), T("no disponible: las claves van a un archivo solo tuyo (600)"), T("Opcional: instala libsecret (secret-tool) y un llavero (GNOME Keyring o KWallet)"))
     serv = _seguro(s.servicio)

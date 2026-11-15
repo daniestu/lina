@@ -14,7 +14,8 @@ from lina.nucleo import rutas as RUT
 
 CARPETA = RUT.PAQUETE / "datos" / "ayuda"
 # Lo que la IA nunca cambia por su cuenta: dinero y claves (los cambia el usuario con su voz o en la terminal)
-INTOCABLES = {("gasto", "tope_mensual_eur"), ("gasto", "eur_por_usd"), ("gasto", "avisos_porcentaje"), ("privacidad", "almacen_claves"), ("privacidad", "capturas")}
+INTOCABLES = {("gasto", "tope_mensual_eur"), ("gasto", "eur_por_usd"), ("gasto", "avisos_porcentaje"), ("privacidad", "almacen_claves"), ("privacidad", "capturas"),
+              ("ia", "aislar")}                        # S9: el aislamiento de sus propias órdenes, tampoco
 
 
 # Lo que NO se puede sacar de las herramientas. Una prueba comprueba que lo que se nombra aquí existe y que cada límite sigue siendo verdad en el código.
@@ -89,7 +90,7 @@ def cambiar(clave, valor, voz_libre=False, contaminado=False, aj=None):
     if not n:
         return False, f"No existe el ajuste «{clave}». Mira los que hay con accion=ayuda."
     if n in INTOCABLES:
-        return False, ("Eso no lo cambias tú: el dinero, las claves y el consentimiento de privacidad los cambia solo el usuario. Dile que use el atajo "
+        return False, ("Eso no lo cambias tú: el dinero, las claves, el consentimiento de privacidad y el aislamiento de tus órdenes los cambia solo el usuario. Dile que use el atajo "
                        "(«sube el tope de gasto a N euros») o la terminal: «lina config poner», «lina clave» o «lina privacidad».")
     try:
         nuevo = AJ.validar(n[0], n[1], valor)

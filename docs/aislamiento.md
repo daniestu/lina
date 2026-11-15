@@ -121,7 +121,23 @@ de regresiones; (3) las órdenes peligrosas de la lista de pruebas fallan aislad
 **Coste:** sin IA ni clave de pago. Unas cinco piezas de código (S9a–S9e, M+S+M+S+M) más una semana de uso para S9f. Se puede parar tras S9c: con eso ya
 cubre carpetas y red, que es lo que pide la fila S9.
 
-## Preguntas para el mantenedor
+## Decidido por el mantenedor (2026-11-15)
+
+1. **`~/.local/bin` en solo lectura**, salvo en las órdenes que confirme.
+2. **El bus tapado solo en las tareas contaminadas** en la primera versión (S9e, el filtro con `xdg-dbus-proxy`, queda para después). En esas tareas también se
+   tapan el bus del sistema y el socket de systemd-resolved. Fuera de ellas, el bus y `$XDG_RUNTIME_DIR` se quedan como hoy: el registro de acciones del
+   mantenedor muestra órdenes autónomas que los necesitan (`warp-cli`, `kdotool`, `playerctl`, `kscreen-doctor`, `systemctl --user`, `bluetoothctl`, `mpv`).
+3. **`ia.aislar` apagado de fábrica** (`no`). El mantenedor lo activa en su equipo una semana para medirlo (S9f) y pasa a `auto` antes del servicio de pago.
+4. **`sudo`, `pkexec` y `run0`, fuera del aislamiento**, documentado como límite.
+
+**Hecho el 2026-11-15: S9a, S9b y S9c** (`nucleo/aislamiento.py`, `ia.aislar` con su línea en `lina doctor`, `Ejecutor.ejecutar`; la IA no puede cambiar `ia.aislar`). Cuando una orden aislada falla por algo que el aislamiento impide, la IA recibe una nota para no intentarlo de otra forma, y en el registro de acciones queda `[aislamiento] PROGRAMA rc=N`, sin más texto: es lo que se cuenta en la semana de S9f. S9d (reconducir a `lanzar`), S9e y S9f, después.
+
+**Para la semana de medida (S9f):** `lina config poner ia.aislar auto`, y al cabo de la semana `grep -c '\[aislamiento\]' ~/.local/state/lina/acciones.log` y `grep '\[aislamiento\]' ~/.local/state/lina/acciones.log | sort | uniq -c` para ver qué programas fallan. Lo esperable que falle hasta S9d: abrir el navegador con `ejecutar_comando` cuando no estaba abierto (su perfil está tapado).
+
+**Límites de la primera versión** (además del de `sudo`): una ruta protegida que **no existe** no se puede tapar sin crearla en tu carpeta, así que no se
+tapa (la sigue vigilando el filtro de texto: `politica.txt` y `_lectura_amplia`); los sockets abstractos del bus, si tu sistema los usa, siguen al alcance
+mientras haya red, porque van con el espacio de red y no con las carpetas.
+## Preguntas que se le hicieron
 
 1. ¿`~/.local/bin` en solo lectura, salvo en órdenes confirmadas?
 2. ¿Bus tapado solo en tareas contaminadas (primera versión), o esperar a `xdg-dbus-proxy` (S9e) para activarlo?
