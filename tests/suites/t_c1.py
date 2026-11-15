@@ -46,7 +46,7 @@ for p,txt in [("/img","no es una página"),("/vacia","casi no tiene texto"),("/n
 W.PERMITIR_PRIVADAS=False
 orig=W._comprobar_destino
 def sel(url):
-    if "169.254" in url: return orig(url)
+    return orig(url) if "169.254" in url else "127.0.0.1"
 W._comprobar_destino=sel
 try: W.leer(base+"/redir"); ok(False,"redirección interna")
 except W.ErrorWeb as e: ok("interna" in str(e),f"redirección: {e}")

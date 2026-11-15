@@ -53,25 +53,70 @@ def normalizar_url(url):
 
 
 def _comprobar_destino(url):
-    """Nunca se descarga de una dirección interna (127.x, 192.168.x, 10.x, enlace local, la red de metadatos...)."""
+    """Nunca se descarga de una dirección interna (127.x, 192.168.x, 10.x, enlace local, la red de metadatos...). Devuelve la IP comprobada a la que hay que
+    conectar: el nombre se resuelve UNA sola vez (S11), para que un dominio que cambie de IP entre la revisión y la descarga no la salte (DNS rebinding)."""
     host = urlparse(url).hostname
     try:
         infos = socket.getaddrinfo(host, None)
     except socket.gaierror:
         raise ErrorWeb(f"No encuentro el servidor {host}.")
+    ips = []
     for info in infos:
         ip = ipaddress.ip_address(info[4][0].split("%")[0])
         if not ip.is_global and not PERMITIR_PRIVADAS:
             raise ErrorWeb("Esa dirección es de la red interna de este equipo o de tu casa: no la leo.")
+        ips.append(str(ip))
+    if not ips:
+        raise ErrorWeb(f"No encuentro el servidor {host}.")
+    return ips[0]
+
+
+class _AdaptadorFijado(requests.adapters.HTTPAdapter):
+    """Conecta a la IP ya comprobada y no a lo que diga el DNS en ese momento. El nombre se conserva para el SNI y el certificado (y va en la cabecera Host)."""
+
+    def __init__(self, ip, host):
+        self.ip, self.host = ip, host
+        super().__init__()
+
+    def get_connection_with_tls_context(self, request, verify, proxies=None, cert=None):
+        if requests.utils.select_proxy(request.url, proxies):          # con proxy resuelve él: se queda como antes (límite documentado en el plan, S11)
+            return super().get_connection_with_tls_context(request, verify, proxies, cert)
+        datos, ajustes = self.build_connection_pool_key_attributes(request, verify, cert)
+        datos["host"] = self.ip
+        if datos["scheme"] == "https":
+            ajustes["server_hostname"] = ajustes["assert_hostname"] = self.host
+        return self.poolmanager.connection_from_host(**datos, pool_kwargs=ajustes)
+
+
+def _pedir(url, ip):
+    """Un GET sin seguir redirecciones, conectando a `ip` (la comprobada) con el nombre de `url` para el certificado."""
+    p = urlparse(url)
+    sesion = requests.Session()
+    adaptador = _AdaptadorFijado(ip, p.hostname)
+    sesion.mount("http://", adaptador)
+    sesion.mount("https://", adaptador)
+    cabeceras = dict(CABECERAS, Host=p.netloc)
+    try:
+        r = sesion.get(url, headers=cabeceras, timeout=TIMEOUT, stream=True, allow_redirects=False)
+    except BaseException:
+        sesion.close()
+        raise
+    cerrar = r.close
+
+    def cerrar_todo():                      # la respuesta se lee a trozos (stream): la sesión se cierra con ella, no antes
+        cerrar()
+        sesion.close()
+    r.close = cerrar_todo
+    return r
 
 
 def descargar(url):
     """(bytes, tipo, url_final). Sigue las redirecciones a mano para revisar cada salto."""
     url = normalizar_url(url)
     for _ in range(MAX_REDIRECCIONES + 1):
-        _comprobar_destino(url)
+        ip = _comprobar_destino(url)
         try:
-            r = requests.get(url, headers=CABECERAS, timeout=TIMEOUT, stream=True, allow_redirects=False)
+            r = _pedir(url, ip)
         except requests.exceptions.SSLError:
             raise ErrorWeb("El certificado de esa web no es válido: no la leo.")
         except requests.RequestException:

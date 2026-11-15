@@ -201,11 +201,11 @@ def test_la_pagina_guardada_no_puede_redirigir_a_una_direccion_interna(sin_busqu
     monkeypatch.setattr(W.socket, "getaddrinfo", lambda host, *a, **k: [(2, 1, 6, "", ("93.184.216.34", 0))] if host == DOMINIO else real(host, *a, **k))
     pedidas = []
 
-    def obtener(url, **k):
+    def obtener(url, ip):
         pedidas.append(url)
-        assert k["allow_redirects"] is False
+        assert ip == "93.184.216.34"                       # se conecta a la IP comprobada (S11), no a lo que diga el DNS después
         return _respuesta_http(302, destino)
-    monkeypatch.setattr(W.requests, "get", obtener)
+    monkeypatch.setattr(W, "_pedir", obtener)
     with pytest.raises(sin_busqueda.A.BucleDeHerramienta):
         _usar(sin_busqueda)
     assert pedidas == [FUENTE["url"]]
