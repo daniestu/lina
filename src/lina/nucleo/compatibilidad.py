@@ -7,9 +7,9 @@ versión nativa para Linux (falso: en Steam solo tiene Windows y Mac) y, cuando 
 
   · `pide_dato_de_juego`: la frase pregunta un dato concreto (Linux, Proton, versión, requisitos, actualización, fecha de salida…) de un juego (el que
     tienes delante, uno de tu biblioteca o «juego»). Entonces el código busca ANTES de llamar a la IA y le da los resultados.
-  · `compatibilidad`: si pregunta si funciona en Linux o con Proton y el juego es de Steam (sabemos su número), lo decide el código con la ficha de la
-    tienda de Steam (¿tiene versión para Linux?) y el resumen de ProtonDB, sin llamar a la IA. Los dos ven el número del juego y tu dirección IP (aviso la
-    primera vez). Si ProtonDB no responde, basta Steam; si tampoco, sigue la búsqueda normal.
+  · `compatibilidad_linux` (herramienta de la IA, A13): la ficha de la tienda de Steam (¿tiene versión para Linux?) y el resumen de ProtonDB. Contesta la
+    IA con esos datos y el código comprueba que no los contradiga (`contradice`). Los dos ven el número del juego y tu dirección IP (aviso la primera vez,
+    antes de la respuesta). Si ProtonDB no responde, basta Steam. La detección por frases solo adelanta los datos.
   · `discute_un_dato`: le dices que se equivoca («creo que estás equivocado», «eso no es así»): se comprueba buscando antes de responder.
 Conservador a propósito: solo preguntas (nunca una orden) y solo con un juego de por medio.
 """
@@ -107,15 +107,43 @@ def consultar(appid, get=None):
     return {"linux": linux, "nivel": nivel}
 
 
-def frase(nombre, datos):
-    """Lo que dice Lina, corto y natural para la voz, sin cifras. None si no hay nada que decir."""
-    nombre = nombre or T("este juego")
-    como = NIVELES.get(str(datos.get("nivel") or ""))
-    if datos.get("linux") is True:
-        return T("Según la tienda de Steam, {juego} tiene versión para Linux, así que no necesita Proton.", juego=nombre)
+def appid_por_nombre(nombre, get=None):
+    """El número de Steam de un juego que no está en tu biblioteca, con el buscador de la tienda (solo envía el nombre). None si no lo encuentra."""
+    try:
+        r = (get or requests.get)("https://store.steampowered.com/api/storesearch/", params={"term": str(nombre)[:80], "l": "spanish", "cc": "ES"},
+                                  headers={"User-Agent": IA.AGENTE}, timeout=TIMEOUT)
+        items = (r.json() or {}).get("items") or [] if r.ok else []
+    except (requests.RequestException, ValueError, AttributeError) as e:
+        log(f"Steam (buscar «{nombre}»): {type(e).__name__}")
+        return None
+    return (str(items[0].get("id")), str(items[0].get("name") or nombre)) if items and items[0].get("id") else None
+
+
+def como_texto(nombre, datos):
+    """Lo que recibe la IA: los hechos comprobados, para que conteste ella (A13: la respuesta la escribe la IA; el código solo vigila que no los contradiga)."""
+    linux = {True: "sí", False: "NO (se juega con Proton)", None: "no se sabe"}[datos.get("linux")]
+    nivel = datos.get("nivel")
+    protondb = f"{nivel} ({T(NIVELES[nivel])})" if nivel in NIVELES else "sin datos"
+    return (f"DATOS COMPROBADOS en la tienda de Steam y en ProtonDB para {nombre}: versión para Linux: {linux}; ProtonDB: {protondb}. Contesta con estos datos, "
+            "en una o dos frases cortas para la voz y sin cifras, y di que salen de la tienda de Steam y de ProtonDB. No digas nada que los contradiga.")
+
+
+_DICE_NATIVO = re.compile(r"\b(?:es nativ[oa]|version nativa|tiene version (?:nativa )?para linux|funciona (?:de forma )?nativ\w*|no (?:necesita|hace falta|requiere) proton)\b")
+_DICE_PROTON = re.compile(r"\b(?:no tiene version (?:nativa )?para linux|no es nativ[oa]|necesita proton|requiere proton|hace falta proton|se juega con proton)\b")
+
+
+def contradice(texto, datos):
+    """¿La respuesta dice lo contrario de lo comprobado? Con linux: false no puede decir que es nativo; con linux: true, que necesita Proton."""
+    t = re.sub(r"\b(?:no tiene (?:una )?version (?:nativa )?para linux|no es nativ[oa]|no (?:tiene|hay) version nativa)\b", " sin linux ", C.normalizar(texto))
     if datos.get("linux") is False:
-        texto = T("Según la tienda de Steam, {juego} no tiene versión para Linux: se juega con Proton.", juego=nombre)
-        return texto + (" " + T("Y según ProtonDB, con Proton funciona {como}.", como=T(como)) if como else "")
-    if como:
-        return T("Según ProtonDB, {juego} funciona {como} con Proton.", juego=nombre, como=T(como))
-    return None
+        return bool(_DICE_NATIVO.search(t))
+    if datos.get("linux") is True:
+        return bool(_DICE_PROTON.search(C.normalizar(texto)))
+    return False
+
+
+def correccion(nombre, datos):
+    if datos.get("linux") is False:
+        return T("Corrijo: según la tienda de Steam, {juego} no tiene versión para Linux; se juega con Proton.", juego=nombre)
+    return T("Corrijo: según la tienda de Steam, {juego} tiene versión para Linux, así que no necesita Proton.", juego=nombre)
+

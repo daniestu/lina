@@ -90,6 +90,12 @@ def contenido_tema(tema, pregunta):
     return f"<tema>{tema}</tema>\n<pregunta>{pregunta}</pregunta>"
 
 
+def declaracion_gestionar(declaracion, fuentes):
+    """La declaración de gestionar_fuentes con la lista de ahora a la vista de la IA (A13: decide ella cuál quieres decir; si no está, pregunta)."""
+    lista = "; ".join(f"{f['id']}: {f['tema']} ({f['dominio']})" for f in fuentes) or "ninguna"
+    return {**declaracion, "description": declaracion["description"] + f" Fuentes que tiene ahora: {lista}."}
+
+
 def declaracion_usar_fuente(fuentes, descripcion=DESCRIPCION_BASE):
     """La herramienta con la que la IA elige una fuente por significado: lleva cada tema en la descripción y solo admite ids de la lista. Solo elige: no añade ni cambia nada.
     El id lo revisa el código, y la pregunta la comprueba R3 con lo que dijo el usuario, no con lo que escriba la IA."""

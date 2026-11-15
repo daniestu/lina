@@ -463,7 +463,7 @@ def escuchar_mandos(al_pulsar):
 
 
 from lina.nucleo.ia import (  # noqa: F401
-    BucleDeHerramienta, Cancelado, NecesitaReglasCompletas, REGLAS_COMPLETAS, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
+    BucleDeHerramienta, BUSQUEDA_APAGADA, Cancelado, NecesitaReglasCompletas, REGLAS_COMPLETAS, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_reserva, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva, modo_busqueda, reserva_sin_clave,
@@ -1173,7 +1173,8 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if confirmado:
             modo, motivo_modo = self.ultimo_modo, "continúa la tarea"
         else:
-            modo, motivo_modo = self.elegir_modo(self.pregunta_pura)
+            modo, motivo_modo, pista_a_fondo = self._modo_y_pista(*self.elegir_modo(self.pregunta_pura))
+            nota_sistema += pista_a_fondo
             if modo == "rapido" and self._hechos_al_caso():         # explicar qué pasó pide razonar, no contestar de corrido
                 modo, motivo_modo = "profundo", "preguntas por lo que ha pasado"
         self.ultimo_modo = modo
@@ -1642,6 +1643,17 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         """'profundo' (más razonamiento y modelo más fuerte) o 'rapido'. Las palabras están en comandos.txt."""
         return C.elegir_modo(texto, self.contexto.get("tipo"))
 
+    PISTA_A_FONDO = ("\n[SISTEMA: puede que esta petición merezca pensarla a fondo (decidir cómo hacerlo antes de hacerlo); si es así, llama a pensar_a_fondo. "
+                     "Si es sencilla, contéstala directamente.]")
+
+    def _modo_y_pista(self, modo, motivo):
+        """A13: las listas que adivinan si una petición es pesada (peticiones abiertas, palabras sueltas) no deciden: se lo dicen a la IA, que tiene
+        pensar_a_fondo. Lo que pides tú con palabras claras («piénsalo bien», «analiza…») sigue yendo a fondo directamente (atajo). (modo, motivo, pista)."""
+        if modo == "profundo" and str(motivo).startswith(("petición abierta", "palabra")):
+            log(f"Podría merecer pensarlo a fondo ({motivo}): lo decide la IA")
+            return "rapido", "", self.PISTA_A_FONDO
+        return modo, motivo, ""
+
     def resolver_pendientes(self, texto):
         """Si había acciones esperando confirmación: se ejecutan si dices que sí y se descartan si no. Lo decide el código."""
         if not self.ejecutor.pendientes:
@@ -1766,6 +1778,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if (self.fuente_cerrada or self.reintento_solo_web) and nombre not in SOLO_WEB:
             log(f"{nombre} rechazada: en esta parte de la petición solo cabe la web")
             return "Aquí no hace falta nada más: responde ya con lo que tienes, sin más herramientas."
+        log(f"Herramienta: {nombre}")                          # solo el nombre, nunca los datos: para saber qué se usó (caso del Atlético con la búsqueda apagada)
         if getattr(self, "reglas_reducidas", False) and self._es_accion(nombre, args):
             log(f"{nombre}: es una acción y van las reglas solo de información; no la ejecuto")
             raise NecesitaReglasCompletas()
@@ -1809,8 +1822,15 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             return "Falta la consulta."
         if self.busquedas_turno >= self.max_busquedas:
             return "No hagas más búsquedas: responde con lo que ya tienes o di que no lo has encontrado."
-        self.busquedas_turno += 1
         modo = "auto" if getattr(self, "forzar_busqueda", False) else modo_busqueda()
+        if modo == "ninguna":
+            if not self._autoriza_buscar(args.get("autorizacion")):
+                self.busqueda_apagada_turno = True              # un hecho: no se buscó por tu ajuste (sin reintento a fondo por esto)
+                log("buscar_web con la búsqueda apagada y sin que lo pidieras en esta petición: no busco")
+                return BUSQUEDA_APAGADA
+            log(f"Búsqueda apagada, pero insistes en esta petición («{str(args.get('autorizacion'))[:60]}»): busco solo esta vez")
+            modo = "auto"
+        self.busquedas_turno += 1
         if modo == "tavily":                          # quien eligió tavily lo conserva tal cual: Tavily y, si la enciende, la reserva
             resultado = buscar_tavily(consulta, args.get("dominio") or None)
             self.ejecutor.contaminar("búsqueda web")  # A2e: lo que trae internet puede traer instrucciones escondidas
@@ -1827,6 +1847,20 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             if str(pagina).startswith("CONTENIDO DE LA PÁGINA"):
                 resultado += "\n\n" + pagina
         return resultado
+
+    def _autoriza_buscar(self, autorizacion):
+        """¿Las palabras con las que la IA dice que insistes son de verdad tuyas, de esta petición o de la anterior? Lo leído en una web nunca cuenta: solo se
+        compara con lo que dijiste. Basta que estén casi todas sus palabras (Whisper y la IA pueden cambiar alguna)."""
+        cita = [w for w in C.normalizar(str(autorizacion or "")).split() if len(w) > 1]
+        if not cita:
+            return False
+        tuyas = [str(getattr(self, "pregunta_pura", "") or "")]
+        tuyas += [h["texto"] for h in reversed(getattr(self, "historial", []) or []) if h.get("rol") == "user"][:1]
+        for frase in tuyas:
+            dichas = set(C.normalizar(re.sub(r"\[SISTEMA:.*?\]", "", frase, flags=re.S)).split())
+            if dichas and sum(w in dichas for w in cita) >= max(1, round(0.8 * len(cita))):
+                return True
+        return False
 
     def _h_usar_fuente(self, nombre, args):
         return self.usar_fuente(args)
@@ -1989,6 +2023,67 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
     def _h_steam(self, nombre, args):
         return self.ejecutor.steam_config(nombre, args)
 
+    def _h_compatibilidad_linux(self, nombre, args):
+        """La tienda de Steam y ProtonDB, para la IA. El juego: el de tu biblioteca con ese nombre (casi exacto) o, si no está, el primero del buscador de la
+        tienda. El aviso de privacidad sale la primera vez, ANTES de la respuesta."""
+        pedido = str(args.get("juego", "") or "").strip()
+        juego = COMP.juego_de(pedido, getattr(self, "contexto", None) or {}) if pedido else None
+        if not (juego and juego.get("id")):
+            encontrado = COMP.appid_por_nombre(pedido) if pedido else None
+            juego = {"nombre": encontrado[1], "id": encontrado[0]} if encontrado else None
+        if not juego:
+            return "No he encontrado ese juego en la tienda de Steam: dilo y no afirmes nada de memoria sobre si funciona en Linux."
+        aviso = AVB.primera_vez(AVB.PRIMERA_COMPATIBILIDAD)
+        if aviso:
+            H.notificar(*aviso)
+        datos = COMP.consultar(juego["id"])
+        if not datos:
+            return "La tienda de Steam y ProtonDB no han respondido: dilo y no afirmes nada de memoria sobre si funciona en Linux."
+        self.compatibilidad_turno = (juego["nombre"], datos)
+        log(f"Compatibilidad de {juego['nombre']} (Steam {juego['id']}): {datos}")
+        return COMP.como_texto(juego["nombre"], datos)
+
+    def _h_gestionar_fuentes(self, nombre, args):
+        """A13: la IA entiende qué fuente quieres quitar o añadir; el código comprueba los hechos (que exista, que la dirección valga, que lo digas tú y no
+        una web leída en esta petición) y lo deja pendiente de tu «sí». Por manos libres, nada: lo podría decir otra voz."""
+        accion = str(args.get("accion", "")).strip()
+        fuentes = FUE.listar()
+        lista = "; ".join(f"{f['id']}: {f['tema']}" for f in fuentes) or "ninguna"
+        if accion == "listar":
+            return f"Fuentes del usuario: {lista}."
+        if getattr(self, "origen_voz_libre", False):
+            return "Por manos libres no se cambian las fuentes (lo podría decir otra voz): dile que pulse el atajo y lo pida otra vez."
+        if accion == "quitar":
+            ids = [str(i).strip().lower() for i in (args.get("ids") or []) if str(i).strip()]
+            existen = {f["id"]: f for f in fuentes}
+            faltan = [i for i in ids if i not in existen]
+            if not ids or faltan:
+                return (f"No existe {', '.join(faltan) or 'esa fuente'}. Sus fuentes: {lista}. No quites nada: pregúntale cuál quiere decir.")
+            temas = "; ".join(existen[i]["tema"] for i in ids)
+            return self.ejecutor.preparar_accion(T("Quitar la fuente: {temas}", temas=temas), lambda: FUE.quitar_ids(ids), "quitar fuentes",
+                                                 razon="quita una web que elegiste para un tema")
+        if accion == "anadir":
+            if self.ejecutor.contaminado:
+                return ("En esta petición se ha leído contenido de fuera: no se añaden fuentes ahora (podría venir de una web). Dile que se lo pida de nuevo "
+                        "en una petición aparte.")
+            tema, direccion = str(args.get("tema", "")).strip(), str(args.get("direccion", "")).strip()
+            try:
+                FUE.validar_direccion(direccion)
+            except ValueError:
+                return "Esa dirección no vale. Pídele la web exacta (o que la copie y lo pida con el atajo)."
+            if not tema:
+                return "Falta el tema: pregúntale para qué tema quiere esa web."
+            return self.ejecutor.preparar_accion(T("Guardar la fuente: para {tema}, {web}", tema=tema, web=direccion), lambda: FUE.anadir(tema, direccion)[1],
+                                                 "añadir fuente", razon="guarda una web para usarla en un tema")
+        return "Acción desconocida: usa listar, quitar o anadir."
+
+    def _h_parar(self, nombre, args):
+        """A13: «cállate», «ya está bien», «déjalo»… lo entiende la IA. Parar es seguro: se cancela lo pendiente y se corta la voz; no se borra ni se deshace nada."""
+        habia = len(self.ejecutor.pendientes)
+        self.ejecutor.cancelar()
+        self.callar()
+        return ("Hecho: he cancelado lo que esperaba tu «sí» y he dejado de hablar." if habia else "Hecho: he dejado de hablar.") + " Contesta solo «Vale.»"
+
     def _h_ver_juegos(self, nombre, args):
         return self.ejecutor.ver_juegos(args.get("buscar"), bool(args.get("diagnostico")))
 
@@ -2034,6 +2129,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
 
     _HERRAMIENTAS = {
         "buscar_web": _h_buscar_web, "usar_fuente": _h_usar_fuente, "necesito_datos_actuales": _h_necesito_datos_actuales,
+        "compatibilidad_linux": _h_compatibilidad_linux, "gestionar_fuentes": _h_gestionar_fuentes, "parar": _h_parar,
         "ejecutar_comando": _h_ejecutar_comando, "disenar_documento": _h_disenar_documento, "crear_documento": _h_crear_documento,
         "buscar_youtube": _h_buscar_youtube, "ver_papelera": _h_ver_papelera, "vaciar_papelera": _h_vaciar_papelera,
         "restaurar_de_papelera": _h_restaurar_de_papelera, "copiar_portapapeles": _h_copiar_portapapeles, "buscar_ajuste_kde": _h_buscar_ajuste_kde,
@@ -2167,20 +2263,24 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
     def asegurar_honestidad_final(self, texto):
         """Última red: lo que el código sabe y la respuesta no reconoce se añade o se sustituye. No se confía en que la IA lo diga."""
         texto = self._atribucion_real(self._sin_negar_internet(self._avisar_fuente_sin_anadir(self._aclarar_fuente(self._honestidad_de_lo_hecho(texto)))))
+        texto = self._no_contradice_lo_comprobado(texto)
         return self._avisar_fecha_pasada(self._aviso_de_fallo_de_busqueda(texto))
 
+    _RECONOCE_FALLO = re.compile(r"\bno (?:he podido|lo he podido|he encontrado|lo he encontrado|he conseguido|puedo (?:confirmar|comprobar)|tengo ese dato)|"
+                                 r"\bsin resultados\b|\bapagad[ao]\b|\bcould(?:n ?t| not) (?:find|search|check)\b")
+
     def _aviso_de_fallo_de_busqueda(self, texto):
-        """Pedía un dato actual y ninguna búsqueda ni lectura dio nada: la respuesta la escribe el código (motivo real y qué hacer), no la IA, que en la
-        pasada gratis lo contaba cada vez de una forma. Si la pregunta no pedía nada actual, la respuesta de la IA (que puede saberlo) se queda."""
+        """Ninguna búsqueda ni lectura dio nada (un hecho) y la respuesta no lo reconoce: se añade el motivo real, escrito por el código. La IA decide qué
+        decir (A13); el código solo comprueba que no se calle que no encontró nada."""
         hechas = getattr(self, "busquedas_hechas", []) or []
         acciones = getattr(self, "acciones_turno", []) or []
         if (not hechas or any(r.resultados for r in hechas) or getattr(self, "fuente_turno", None) or self.ejecutor.pendientes
-                or not BUS.es_de_actualidad(str(getattr(self, "pregunta_pura", "") or ""))
-                or any(str(r).startswith(("RESULTADOS DE BÚSQUEDA", "CONTENIDO DE LA PÁGINA")) for _, _, r in acciones)):
+                or any(str(r).startswith(("RESULTADOS DE BÚSQUEDA", "CONTENIDO DE LA PÁGINA", "DATOS COMPROBADOS")) for _, _, r in acciones)
+                or self._RECONOCE_FALLO.search(C.normalizar(texto))):
             return texto
         aviso = BUS.aviso_de_fallo(hechas)
-        log(f"Ninguna búsqueda dio nada para un dato actual: contesta el código («{aviso[:80]}»)")
-        return aviso
+        log(f"Ninguna búsqueda dio nada y la respuesta no lo dice: se añade («{aviso[:80]}»)")
+        return (texto.rstrip() + " " + aviso).strip()
 
     def _avisar_fecha_pasada(self, texto):
         """Última red: preguntó por lo próximo y la respuesta solo da una fecha que ya pasó (y no lo dice). Se avisa."""
@@ -2197,12 +2297,54 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if getattr(self, "fuente_turno", None) or any(n == "usar_fuente" for n, _, _ in acciones):
             return texto
         dominios = BUS.dominios_de_acciones(acciones)
+        if any(n == "compatibilidad_linux" for n, _, _ in acciones):
+            dominios += ["store.steampowered.com", "protondb.com"]
+        if not dominios:
+            return self._atribucion_sin_busqueda(texto)
+        texto = self._lo_dijo_el_usuario(texto, acciones)
         corregido = BUS.corregir_atribucion(texto, dominios) if dominios else texto
         if corregido == texto:
             return texto
         malas = BUS.atribuciones_inventadas(texto, dominios) + [n for _, _, n in BUS.atribuciones_vagas(texto)]
         log(f"La respuesta atribuye el dato a {', '.join(malas)}, que no es ninguna web de la búsqueda ({', '.join(dominios[:4])}): se corrige")
         return corregido
+
+    def _lo_dijo_el_usuario(self, texto, acciones):
+        """Caso real: le dijiste «va ganando 2-1» y contestó «2-1 según reddit.com». Un hecho: si las cifras de la respuesta están en lo que dijiste y en
+        ninguno de los resultados, la fuente eres tú: «según me dices»."""
+        def cifras(t):                                    # números de dos o más dígitos y marcadores («2-1», «3 - 0»)
+            return BUS._digitos(t) | {f"{a}-{b}" for a, b in re.findall(r"\b(\d{1,3})\s*[-–:]\s*(\d{1,3})\b", str(t))}
+        dichas = cifras(" ".join([str(getattr(self, "pregunta_pura", "") or "")]
+                                 + [h["texto"] for h in (getattr(self, "historial", []) or [])[-4:] if h.get("rol") == "user"]))
+        comunes = cifras(texto) & dichas
+        if not comunes or not BUS.fuentes_nombradas(texto):
+            return texto
+        resultados = " ".join(str(r) for _, _, r in acciones)
+        if comunes & cifras(resultados):
+            return texto
+        cifras = comunes
+        log(f"Las cifras {', '.join(sorted(cifras))} las dijo el usuario y no salen de los resultados: la fuente es él")
+        salida = str(texto)
+        for inicio, fin, _ in reversed(BUS.fuentes_nombradas(salida)):
+            antes = salida[:inicio]
+            m = re.search(r"(?:[Ss]eg[uú]n|[Dd]e acuerdo con|[Aa]ccording to)\s+$", antes)
+            salida = (antes[:m.start()] + T("según me dices") if m else antes + T("lo que me dices")) + salida[fin:]
+            salida = salida[0].upper() + salida[1:] if salida else salida
+        return salida
+
+    def _atribucion_sin_busqueda(self, texto):
+        """Caso real: con la búsqueda apagada, «Según google.com, el equipo juega mañana contra tal otro» (falso, y no se había buscado nada). Un hecho
+        que verifica el código: si la respuesta atribuye el dato a una web y en esta petición no se buscó ni se leyó ninguna, la fuente se quita."""
+        nombradas = BUS.fuentes_nombradas(texto) + BUS.atribuciones_vagas(texto)
+        if not nombradas:
+            return texto
+        log(f"La respuesta cita {', '.join(n for _, _, n in nombradas)} sin haber buscado ni leído nada: se quita la fuente")
+        salida = str(texto)
+        for inicio, fin in sorted({(i, f) for i, f, _ in nombradas}, reverse=True):
+            salida = salida[:inicio] + T("lo que recuerdo, sin comprobarlo") + salida[fin:]
+        if modo_busqueda() == "ninguna" and not getattr(self, "forzar_busqueda", False):
+            salida = salida.rstrip() + " " + T("La búsqueda está apagada; si quieres, lo busco solo esta vez.")
+        return salida
 
     def _buscar_igualmente(self, peticion):
         """¿«Búscalo igualmente» con ia.busqueda = ninguna? Entonces esta petición busca como «auto»; la siguiente vuelve a lo que elegiste."""
@@ -2403,11 +2545,11 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
                 and solo_se_informo(self.acciones_turno, lambda c: H.clasificar(c)[0] == "lectura"))
 
     def _solo_busco_o_leyo(self):
-        """¿En esta petición solo se buscó o leyó en internet? Entonces no se llama al revisor «¿se cumplió lo pedido?»: lo que él no ve (si hubo resultados,
+        """¿En esta petición solo se buscó, se leyó en internet o se consultó el equipo sin cambiar nada (herramientas de consulta y comandos de solo lectura)? Entonces no se llama al revisor «¿se cumplió lo pedido?»: lo que él no ve (si hubo resultados,
         a quién se atribuye el dato, si niega tener internet, una fecha ya pasada) lo comprueba ya el código, y en las pasadas de probar-busqueda sus rechazos
         fueron falsos. Ahorra una de las tres llamadas de una pregunta con búsqueda."""
         acciones = getattr(self, "acciones_turno", []) or []
-        return bool(acciones) and all(n in SOLO_WEB or n in HERRAMIENTAS_META or n == "necesito_datos_actuales" for n, _, _ in acciones)
+        return bool(acciones) and all(not self._es_accion(n, a) for n, a, _ in acciones)    # también lo que solo lee el equipo (caso real: «¿cuánta RAM…?», 4 s de espera)
 
     def _tarea_de_ajustes(self):
         """¿Esta petición tiene que ver con ajustes de configuración (donde insistir a fondo sí compensa)?"""
@@ -2418,6 +2560,12 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         """Si el intento rápido terminó SIN poder comprobar el último cambio (⚠, ✘ o error), no se da por bueno: se vuelve a
         intentar una vez con el razonamiento a fondo y topes más amplios, contándole lo ya hecho. Devuelve (respuesta, modelo)."""
         if self.fuente_cerrada:        # una pregunta con fuente: «no he podido» es la respuesta, no un fracaso que arreglar a fondo
+            self.pedir_profundo, self.obstaculo = "", ""
+            self._cerrar_receta_interfaz(False)
+            return respuesta, modelo
+        if getattr(self, "busqueda_apagada_turno", False) and not self.ejecutor.pendientes and all(
+                n in SOLO_WEB or n in HERRAMIENTAS_META for n, _, _ in (self.acciones_turno or [])):
+            log("No se pudo buscar porque la búsqueda está apagada (es tu ajuste): no reintento")    # en un caso real, 7 llamadas para nada
             self.pedir_profundo, self.obstaculo = "", ""
             self._cerrar_receta_interfaz(False)
             return respuesta, modelo
@@ -2662,6 +2810,8 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         empezar_peticion()                                     # los fallos de Gemini de esta petición, para decir por qué no responde
         self.busquedas_turno = 0
         self.busquedas_hechas = []                             # lo que dio cada buscar_web de esta petición (para no decir «no tengo acceso a internet»)
+        self.busqueda_apagada_turno = False                    # buscar_web no buscó porque la tienes apagada (un hecho: no se reintenta por eso)
+        self.compatibilidad_turno = None                       # (juego, datos) de Steam y ProtonDB en esta petición: la respuesta no puede contradecirlos
         self.forzar_busqueda = self._buscar_igualmente(str(self.pregunta_pura or pregunta))
         self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
         self.fuente_cerrada = False                            # tras usar una fuente no se reintenta a fondo ni se pasa de la web
@@ -2671,9 +2821,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self.turno_aceptado = False
         self.ejecutor.recetas_diferidas = []
         self.acciones_confirmadas = []
-        directa, nota = self._comprobar_antes()          # D3: datos concretos de un juego, o le dices que se equivoca: se comprueba antes de contestar
-        if directa:
-            return directa, "código (comprobado antes)"
+        _, nota = self._comprobar_antes()                # D3, atajo: datos de un juego o «te equivocas» adelantan lo comprobado a la IA, que contesta
         pregunta = pregunta + nota
         # 1) Modelo local primero, solo si PRIORIDAD = "local" y cabe en la gráfica
         if PRIORIDAD == "local":
@@ -2692,6 +2840,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             herramientas = G.herramientas(H.DECLARACIONES, grupos)
             herramientas = declaraciones_de_busqueda(self.forzar_busqueda) + herramientas     # tavily sin clave: necesito_datos_actuales, y el código avisa una vez
             herramientas = self._herramienta_de_fuente() + herramientas   # delante, como se midió
+            herramientas = [FUE.declaracion_gestionar(h, FUE.listar()) if h.get("name") == "gestionar_fuentes" else h for h in herramientas]
             self.herramientas_turno = herramientas        # la misma lista que usa Gemini: mas_herramientas la amplía en sitio
             self.grupos_turno = set(grupos)
             self.reglas_reducidas = modo == "rapido" and self._es_solo_informacion()
@@ -2746,6 +2895,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
 
     # E1c: las herramientas que no cambian nada; con las reglas solo de información, cualquier otra corta el turno y se repite con todas las reglas
     SOLO_CONSULTA = {"buscar_web", "leer_web", "usar_fuente", "necesito_datos_actuales", "mas_herramientas", "pensar_a_fondo", "ver_pantalla", "mirar_pantalla",
+                     "compatibilidad_linux", "parar",
                      "ver_juegos", "ver_gasto", "ver_diario", "procesos", "observar_config", "buscar_archivos"}
 
     # E1c: preguntas sobre el estado del propio equipo, que se contestan con un comando: van con todas las reglas desde el principio. En la medida, «¿cuánta
@@ -2792,9 +2942,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         return T("Gemini está saturado ahora. Inténtalo dentro de un rato.")
 
     def _comprobar_antes(self):
-        """D3. Un dato concreto de un juego (Linux, Proton, versión, requisitos, fecha…) o «creo que estás equivocado» no se contestan de memoria: el modelo
-        rápido, seguro de sí, dijo que No Man's Sky era nativo de Linux y, al corregirle, se contradijo sin comprobar nada. Devuelve (respuesta escrita por
-        el código o None, nota con lo buscado para la IA o "")."""
+        """D3, atajo que solo acelera (A13): un dato concreto de un juego o «creo que estás equivocado» con las palabras de siempre adelantan los datos a la IA
+        (la compatibilidad, con compatibilidad_linux; lo demás, una búsqueda). Contesta siempre la IA, con lo que se le da; si no encaja ninguna frase, la
+        regla de las instrucciones hace lo mismo con la decisión de la IA. Devuelve (None, nota con lo comprobado para la IA o "")."""
         peticion = str(getattr(self, "pregunta_pura", "") or "")
         contexto = getattr(self, "contexto", None) or {}
         discute = COMP.discute_un_dato(peticion)
@@ -2802,25 +2952,32 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             return None, ""
         anterior = next((h["texto"] for h in reversed(getattr(self, "historial", []) or []) if h.get("rol") == "user"), "") if discute else ""
         tema = re.sub(r"\s*\[SISTEMA:.*?\]", "", f"{anterior} {peticion}", flags=re.S).strip()
+        aviso = (" El usuario dice que tu respuesta anterior está mal: compruébalo con estos datos. Si le dan la razón, dilo; si no confirman ni lo uno ni lo "
+                 "otro, di que no estás segura. No defiendas lo de antes sin datos." if discute else "")
         if COMP.pide_compatibilidad(tema):
             juego = COMP.juego_de(tema, contexto)
-            datos = COMP.consultar(juego["id"]) if juego and juego.get("id") else None
-            texto = COMP.frase(juego["nombre"], datos) if datos else None
-            if texto:
-                AVB.apuntar(AVB.PRIMERA_COMPATIBILIDAD)
-                self.acciones_turno.append(("compatibilidad", {"juego": juego["nombre"], "steam": juego["id"]}, f"COMPROBADO EN STEAM Y PROTONDB: {datos}"))
-                log(f"Compatibilidad de {juego['nombre']} (Steam {juego['id']}): {datos}")
-                return (T("Lo he comprobado: {texto}", texto=texto) if discute else texto), ""
+            if juego and juego.get("id"):
+                resultado = str(self.ejecutar_herramienta("compatibilidad_linux", {"juego": juego["nombre"]}))
+                if resultado.startswith("DATOS COMPROBADOS"):
+                    return None, f"\n[SISTEMA: ya lo he comprobado.{aviso}\n{resultado}]"
         if modo_busqueda() == "ninguna" and not getattr(self, "forzar_busqueda", False):
-            return (T("No lo he podido comprobar porque la búsqueda está apagada; puede que tengas razón.") if discute else None), ""
+            return None, ("\n[SISTEMA: el usuario discute tu respuesta anterior, pero la búsqueda está apagada y no lo he podido comprobar: dile que no lo has "
+                          "podido comprobar, que puede tener razón y que, si quiere, lo buscas solo esta vez. No defiendas lo de antes.]" if discute else "")
         log(("Me dices que me equivoco" if discute else "Es un dato concreto de un juego") + f": lo busco antes de contestar («{tema[:120]}»)")
         resultado = str(self.ejecutar_herramienta("buscar_web", {"consulta": tema[:200]}))
         if not resultado.startswith("RESULTADOS DE BÚSQUEDA"):
-            return (T("No lo he podido comprobar; puede que tengas razón.") if discute else None), ""
-        aviso = (" El usuario dice que tu respuesta anterior está mal: compruébalo con estos resultados. Si le dan la razón, dilo; si no confirman ni lo uno "
-                 "ni lo otro, di que no estás segura. No defiendas lo de antes sin datos." if discute else "")
+            return None, ("\n[SISTEMA: el usuario discute tu respuesta anterior y no lo he podido comprobar (la búsqueda no ha dado nada): dile que no lo has "
+                          "podido comprobar y que puede tener razón. No defiendas lo de antes.]" if discute else "")
         return None, (f"\n[SISTEMA: es un dato concreto que no se da de memoria, así que ya lo he buscado; contesta con estos resultados y di de qué web sale.{aviso}\n"
                       f"{resultado}]")
+
+    def _no_contradice_lo_comprobado(self, texto):
+        """La IA escribe la respuesta, pero no puede contradecir lo que dijeron Steam y ProtonDB (con linux: false, nada de «es nativo»). Si lo hace, se corrige."""
+        comprobado = getattr(self, "compatibilidad_turno", None)
+        if not comprobado or not COMP.contradice(texto, comprobado[1]):
+            return texto
+        log(f"La respuesta contradice lo comprobado en Steam ({comprobado[1]}): se corrige")
+        return texto.rstrip() + " " + COMP.correccion(*comprobado)
 
     def decir(self, texto):
         """La respuesta de la petición en curso. Si deja algo pendiente de tu «sí», es una pregunta de confirmación: no se puede perder en silencio."""

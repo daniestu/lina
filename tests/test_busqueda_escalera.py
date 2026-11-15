@@ -346,13 +346,16 @@ def test_si_la_introduccion_es_corta_se_pide_mas(entorno):
 
 
 @pytest.mark.parametrize("consulta, peticion", [
-    ("precio Steam Deck OLED", ""), ("noticia tecnología", "cuál es la noticia de tecnología más importante de hoy"),
-    ("tiempo Sevilla", "qué tiempo hará mañana en Sevilla"), ("clasificación LaLiga", ""), ("euro dólar cotización", ""),
-    ("último Gran Premio Fórmula 1", ""), ("partidos LoL", "qué partidos de LoL hay esta semana"), ("Linux kernel", "cuál es la versión actual del kernel"),
+    ("precio Steam Deck OLED", ""), ("noticia tecnología", "cuál es la noticia de tecnología más importante de hoy"), ("tiempo Sevilla", "qué tiempo hará mañana"),
 ])
-def test_lo_del_momento_no_va_a_las_wikis(entorno, consulta, peticion):
-    get = MagicMock(side_effect=AssertionError("no se pregunta a ninguna wiki"))
-    assert BUS.resultados_wiki(consulta, "es", get=get, peticion=peticion) == ([], BUS.T(BUS.M_WIKI_ACTUALIDAD))
+def test_las_wikis_siempre_y_su_aviso_para_lo_del_momento(entorno, consulta, peticion):
+    """A13 (2026-11-15): las wikis no se bloquean por palabras; la IA juzga, con el aviso de que una wiki no sirve para un dato del momento."""
+    def get(url, params, headers, timeout):
+        return respuesta(200, {"query": {"search": [{"title": consulta.split()[0].capitalize(), "snippet": ""}]}})
+    r, _ = BUS.resultados_wiki(consulta, "es", get=get, peticion=peticion)
+    assert r
+    texto = BUS.como_texto(BUS.Resultado(resultados=r, escalon="wiki"))
+    assert "no sirve para un dato del momento" in texto
 
 
 @pytest.mark.parametrize("consulta", ["cuánto mide la torre Eiffel", "qué es un creeper en Minecraft", "poción de invisibilidad Skyrim",

@@ -5,7 +5,8 @@
 Caso real (2026-11-13): una tarde de medidas gastó 431 llamadas de pago (unos 0,91 €) y agotó el saldo prepago de la cuenta de Google sin que nadie lo
 viera venir. Ahora cada tanda dice antes cuánto puede gastar como mucho (todas sus llamadas posibles a la clave de pago, al precio medio por llamada de pago de
 los últimos 30 días) y, si al terminar una frase lo gastado con la de pago pasa de ese tope, se para y lo dice. `--estimar` solo dice el máximo, sin
-gastar nada; `--tope-eur=N` cambia el tope. `solo_gratis()` mide sin la clave de pago.
+gastar nada; `--tope-eur=N` cambia el tope. `solo_gratis()` mide sin la clave de pago. Desde el 2026-11-15, lo de pago de las medidas va a su propio
+contador (presupuesto.medidas_eur), no cuenta para tu tope de uso real y tiene su tope mensual (TOPE_MEDIDAS_EUR): cada tanda se recorta a lo que quede.
 """
 import json
 import re
@@ -53,12 +54,24 @@ def tope_de(argv, por_defecto):
 
 
 def gastado_eur():
-    """Lo gastado este mes con la clave de pago, según presupuesto (en euros)."""
+    """Lo gastado este mes en medidas con la clave de pago (su contador aparte), en euros."""
     from lina.nucleo import presupuesto as PRES
     try:
-        return float(PRES._cargar().get("usd") or 0.0) * PRES.EUR_POR_USD
+        return PRES.medidas_eur()
     except Exception:
         return 0.0
+
+
+def restante_del_mes():
+    """Lo que queda este mes del tope de las medidas (presupuesto.TOPE_MEDIDAS_EUR), en euros."""
+    from lina.nucleo import presupuesto as PRES
+    return max(0.0, PRES.TOPE_MEDIDAS_EUR - gastado_eur())
+
+
+def frase_sin_tope_del_mes():
+    from lina.nucleo import presupuesto as PRES
+    return T("Este mes las medidas ya han gastado {g} € de {t} € con la clave de pago: no lanzo más hasta el mes que viene (o mide con --solo-gratis).",
+             g=f"{gastado_eur():.2f}".replace(".", ","), t=f"{PRES.TOPE_MEDIDAS_EUR:.2f}".replace(".", ","))
 
 
 class Tope:

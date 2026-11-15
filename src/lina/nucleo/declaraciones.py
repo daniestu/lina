@@ -189,6 +189,24 @@ DECLARACIONES: list[dict] = [
     {"name": "ver_recetas",
      "description": "Dice qué ajustes sabe cambiar ya este equipo (las recetas aprendidas). Úsala si el usuario pregunta qué has aprendido o qué sabes hacer con los ajustes.",
      "parameters": {"type": "object", "properties": {}}},
+    {"name": "gestionar_fuentes",
+     "description": ("Las webs que el usuario eligió para cada tema (sus «fuentes»). Úsala cuando quiera quitar una («olvida esa web», «ya no te fíes de la "
+                     "de recetas», «quita la fuente f2»), añadir una («para las recetas usa tal web») o saber cuáles tiene. Tú entiendes cuál quiere con la lista "
+                     "de abajo; si no hay ninguna con ese nombre o no está claro, NO llames a quitar: pregúntale cuál. Quitar y añadir quedan pendientes de su «sí»."),
+     "parameters": {"type": "object", "properties": {
+         "accion": {"type": "string", "enum": ["listar", "quitar", "anadir"]},
+         "ids": {"type": "array", "items": {"type": "string"}, "description": "Para quitar: los ids de la lista («f1»)."},
+         "tema": {"type": "string", "description": "Para añadir: el tema, con las palabras del usuario."},
+         "direccion": {"type": "string", "description": "Para añadir: la dirección o el dominio que dijo el usuario."}}, "required": ["accion"]}},
+    {"name": "parar",
+     "description": ("El usuario quiere que pares (con las palabras que sean: «cállate», «ya está bien», «déjalo», «para de hablar», «no sigas con eso»). "
+                     "Cancela lo que esperaba su «sí» y corta lo que estabas diciendo. No borra ni deshace nada."),
+     "parameters": {"type": "object", "properties": {}}},
+    {"name": "compatibilidad_linux",
+     "description": ("Dice si un juego de Steam tiene versión para Linux y cómo funciona con Proton según ProtonDB, consultando la tienda de Steam y ProtonDB "
+                     "(ven solo el número del juego y la dirección IP). Úsala SIEMPRE antes de afirmar si un juego funciona en Linux, si es nativo o si "
+                     "necesita Proton; nunca lo digas de memoria. Contesta con lo que devuelva."),
+     "parameters": {"type": "object", "properties": {"juego": {"type": "string", "description": "El nombre del juego."}}, "required": ["juego"]}},
     {"name": "ver_juegos",
      "description": ("Lista los juegos instalados en Steam, Heroic y Lutris (o los que encajan con un nombre). Úsala si el usuario pregunta qué juegos tiene "
                      "o si tiene uno concreto. Con diagnostico=true no lista juegos: dice qué hay y qué falta para jugar bien (GameMode, Vulkan, MangoHud, LSFG); solo mira, no cambia nada. "

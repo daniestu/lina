@@ -37,7 +37,7 @@ Lo que cambia (resultados, horarios, noticias, precios) lo busca en internet, y 
 - **Con una clave gratuita de Tavily** (`lina bienvenida` o `lina clave tavily`), busca con Tavily. Es lo recomendado si no tienes clave de pago.
 - **Si no tienes ninguna de las dos**, solo consulta Wikipedia y algunas wikis de juegos: sirven para «cómo se hace la poción de invisibilidad en Skyrim», no para noticias, precios ni horarios. En las pruebas, la clave gratuita de Gemini no ha podido usar la búsqueda de Google.
 
-Lina solo nombra como fuente una web que salió de la búsqueda: si la IA atribuye el dato a otra, Lina la corrige antes de contestar. Si no ha podido buscar, te dice por qué. Nunca te dirá que «no tiene acceso a internet». DuckDuckGo está apagado de fábrica porque es poco fiable; si lo quieres, `lina config poner ia.busqueda_reserva true`. Si apagaste la búsqueda (`ia.busqueda = ninguna`), «búscalo igualmente» busca solo esa vez. `lina doctor` te dice cómo la tienes y `lina probar-busqueda` la prueba con veinte preguntas típicas. Adónde va cada búsqueda está en el [manual de privacidad](privacidad.md).
+Lina solo nombra como fuente una web que salió de la búsqueda: si la IA atribuye el dato a otra, Lina la corrige antes de contestar. Si no ha podido buscar, te dice por qué. Nunca te dirá que «no tiene acceso a internet». DuckDuckGo está apagado de fábrica porque es poco fiable; si lo quieres, `lina config poner ia.busqueda_reserva true`. Si apagaste la búsqueda (`ia.busqueda = ninguna`), no busca ni te da datos de hoy como si estuvieran comprobados: te ofrece buscarlo solo esa vez, y lo hace si insistes, con las palabras que quieras («aun así, quiero saberlo», «búscalo en Google»). Solo cuenta lo que dices tú, nunca lo que diga una web. `lina doctor` te dice cómo la tienes y `lina probar-busqueda` la prueba con veinte preguntas típicas. Adónde va cada búsqueda está en el [manual de privacidad](privacidad.md).
 
 Los datos concretos de un juego (si funciona en Linux o con Proton, versiones, requisitos, fechas) no los contesta de memoria: los busca antes. Si preguntas si un juego de Steam funciona en Linux, lo mira en la tienda de Steam y en ProtonDB. Y si le dices que se equivoca («creo que no es así»), lo comprueba antes de responder; si no puede, te dice que no lo ha podido comprobar en vez de defender lo que dijo.
 
@@ -45,7 +45,7 @@ Los datos concretos de un juego (si funciona en Linux o con Proton, versiones, r
 
 Puedes decirle a Lina qué web usar para un tema concreto, por ejemplo las recetas de refinería de un juego. Para lo demás, aunque sea del mismo juego, seguirá buscando como siempre.
 
-**Añadir una fuente**, solo con el atajo, con `lina di` o en la terminal. Por «Oye Lina» se niega, por si lo dijera otra voz:
+**Añadir o quitar una fuente** con tus palabras («olvida esa web», «ya no te fíes de la de recetas»): Lina entiende cuál dices, lo deja preparado y lo hace cuando le dices «sí». Si no tienes ninguna con ese nombre, te pregunta cuál. Solo con el atajo, con `lina di` o en la terminal; por «Oye Lina» se niega, por si lo dijera otra voz, y tampoco añade una si en esa misma petición ha leído una web. También valen las frases de siempre:
 
 - «para las recetas de refinería usa esta web: nomanssky punto fandom punto com»
 - Copia la dirección y di «para las recetas de refinería usa la página que tengo copiada», o «añade la fuente que tengo en el portapapeles a recetas de refinería». El portapapeles solo se mira si lo pides, con el atajo, y lo copiado no se repite.

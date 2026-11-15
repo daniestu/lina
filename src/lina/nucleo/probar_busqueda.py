@@ -249,7 +249,10 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
     from lina.nucleo import medida_gasto as MG
     con_pago = "gemini_pago" in NIVELES[nivel]
     maximo = MG.maximo_estimado(len(preguntas) * (1 + len(REINTENTOS)), LLAMADAS_POR_PREGUNTA_MAX) if con_pago else 0.0
-    tope = MG.Tope(MG.tope_de(argv, maximo)) if con_pago else None
+    if con_pago and MG.restante_del_mes() <= 0:
+        salida(MG.frase_sin_tope_del_mes())
+        return 5
+    tope = MG.Tope(min(MG.tope_de(argv, maximo), MG.restante_del_mes())) if con_pago else None
     if con_pago:
         salida(MG.frase_estimacion(maximo, tope.eur))
     if "--estimar" in argv:

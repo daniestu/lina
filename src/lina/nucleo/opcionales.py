@@ -25,5 +25,8 @@ except ImportError:                   # actualización a medias: sin presupuesto
         def registrar_busquedas_google(self, clave, n): pass
         def marcar_sin_saldo(self, clave=None, ahora=None): pass
         def sin_saldo(self, ahora=None): return None
+        def medidas_eur(self): return 0.0
+        EN_MEDIDA = [False]
+        TOPE_MEDIDAS_EUR = 3.0
     PRES = _SinPresupuesto()  # type: ignore[assignment]
     print("Aviso: falta presupuesto.py; arranco sin la clave de pago", flush=True)

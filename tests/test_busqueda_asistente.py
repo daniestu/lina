@@ -136,8 +136,8 @@ def test_segun_la_wiki_se_corrige_con_las_webs_de_la_busqueda(lina):
 def test_la_atribucion_buena_o_sin_busqueda_no_se_toca(lina):
     lina.acciones_turno = [GOOGLE_SKYRIM]
     assert lina._atribucion_real("Según gamespot.com, lleva ectoplasma.") == "Según gamespot.com, lleva ectoplasma."
-    lina.acciones_turno = []
-    assert lina._atribucion_real("Según la wiki UESP, lleva ectoplasma.") == "Según la wiki UESP, lleva ectoplasma."
+    lina.acciones_turno = []                                      # sin buscar ni leer nada, no hay fuente que valga (A13, 2026-11-15)
+    assert lina._atribucion_real("Según la wiki UESP, lleva ectoplasma.") == "Según lo que recuerdo, sin comprobarlo, lleva ectoplasma."
 
 
 def test_con_una_fuente_tuya_la_atribucion_la_cuida_aclarar_fuente(lina):

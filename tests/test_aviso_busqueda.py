@@ -52,8 +52,8 @@ def con(monkeypatch):
 @pytest.mark.parametrize("busqueda, clave, nombres", [
     ("tavily", None, ["necesito_datos_actuales"]),
     ("tavily", "tvly-x", ["buscar_web"]),
-    ("ninguna", None, []),
-    ("ninguna", "tvly-x", []),
+    ("ninguna", None, ["buscar_web"]),                 # A13: la apagada, que solo busca si el usuario insiste (y el código comprueba sus palabras)
+    ("ninguna", "tvly-x", ["buscar_web"]),
     ("google", None, []),
 ])
 def test_necesito_datos_actuales_solo_con_tavily_sin_clave(con, busqueda, clave, nombres):
@@ -231,3 +231,9 @@ def test_con_reserva_el_cupo_agotado_se_notifica_pero_no_se_dice(monkeypatch):
     AVB.apuntar(AVB.LIMITE_PLAN)
     a._dar_avisos_de_busqueda()
     assert a.dicho == [] and len(notas) == 1 and "DuckDuckGo" in notas[0][1]
+
+
+def test_con_ninguna_buscar_web_pide_las_palabras_del_usuario():
+    decl = IA.declaraciones_de_busqueda.__globals__["HERRAMIENTA_BUSCAR_APAGADA"]["functionDeclarations"][0]
+    assert decl["parameters"]["required"] == ["consulta", "autorizacion"] and "APAGADA" in decl["description"]
+

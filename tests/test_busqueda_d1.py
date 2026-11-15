@@ -72,13 +72,20 @@ def lina(monkeypatch):
 
 
 @pytest.mark.parametrize("dice", ["No tengo forma de saberlo ahora.", "Creo que hoy hará sol en Sevilla, unos 24 grados.", ""])
-def test_un_dato_actual_sin_resultados_lo_contesta_el_codigo_diga_lo_que_diga_la_ia(lina, dice):
+def test_si_nada_dio_resultados_y_no_lo_dice_se_anade_el_motivo(lina, dice):
+    """A13: contesta la IA; el código solo comprueba el hecho de que no se encontró nada y, si la respuesta lo calla, añade el motivo real."""
     lina.pregunta_pura = "qué tiempo hará mañana en Sevilla"
-    assert lina._aviso_de_fallo_de_busqueda(dice) == BUS.aviso_de_fallo([NADA_SIN_TAVILY], hay_tavily=False)
+    assert lina._aviso_de_fallo_de_busqueda(dice) == (dice + " " + BUS.aviso_de_fallo([NADA_SIN_TAVILY], hay_tavily=False)).strip()
+
+
+@pytest.mark.parametrize("dice", ["No he podido buscarlo: no tienes clave de Tavily.", "No lo he encontrado en ninguna web.", "No puedo confirmarlo ahora mismo."])
+def test_si_ya_reconoce_que_no_encontro_nada_no_se_toca(lina, dice):
+    lina.pregunta_pura = "qué tiempo hará mañana en Sevilla"
+    assert lina._aviso_de_fallo_de_busqueda(dice) == dice
 
 
 def test_si_no_pedia_nada_actual_la_respuesta_de_la_ia_se_queda(lina):
-    """La IA buscó algo que sabía de memoria y la búsqueda falló: no se le tapa la respuesta."""
+    """La IA buscó algo que sabía de memoria, la búsqueda falló y lo dice: no se le tapa la respuesta."""
     lina.pregunta_pura = "cuánto mide la torre Eiffel"
     assert lina._aviso_de_fallo_de_busqueda("Mide unos 330 metros (no lo he podido comprobar).") == "Mide unos 330 metros (no lo he podido comprobar)."
 

@@ -33,6 +33,8 @@ EUR_POR_USD = 0.92                    # conservador (si el dólar vale menos, la
 AVISOS_PORCENTAJE = (50, 80, 100)
 BUSQUEDAS_GOOGLE_GRATIS_MES = 5000    # Gemini 3: las primeras búsquedas de Google del mes no se cobran (documentación de Google)…
 USD_POR_BUSQUEDA_GOOGLE = 0.014       # …y después, 14 $ cada 1000
+TOPE_MEDIDAS_EUR = 3.0                # lo que pueden gastar al mes las medidas (lina probar-ia, lina probar-busqueda) con la clave de pago, aparte de tu tope
+EN_MEDIDA = [False]                   # dentro de ia.solo_medida(): lo de pago va al contador de medidas, no al de tu uso real
 _FLASH_38 = [(None, 0.75, 3.75, 0.075), ("2027-01-01", 1.50, 7.50, 0.15)]        # Google lo sube el 1 de enero de 2027
 PRECIOS_DEFECTO = {                  # dólares por millón de tokens: (desde, entrada, salida —con el razonamiento—, entrada en caché)
     "gemini-3.8-flash": _FLASH_38, "gemini-3.7-flash": _FLASH_38, "gemini-3.6-flash": _FLASH_38,
@@ -236,7 +238,7 @@ def coste_usd(modelo_real, modelo_pedido, prompt, candidatos, razonamiento, cach
 # ======================= lo gastado =======================
 def _nuevo(mes):
     return {"mes": mes, "usd": 0.0, "llamadas_pago": 0, "llamadas_gratis": 0, "tokens_pago": 0, "tokens_gratis": 0, "avisos": [], "por_modelo": {},
-            "busquedas_google_pago": 0, "busquedas_google_gratis": 0}
+            "busquedas_google_pago": 0, "busquedas_google_gratis": 0, "medidas_usd": 0.0, "llamadas_medida": 0}
 
 
 def _cargar():
@@ -245,11 +247,39 @@ def _cargar():
         datos = json.loads(ARCHIVO_GASTO.read_text(encoding="utf-8"))
         if not isinstance(datos, dict) or datos.get("mes") != mes:
             return _nuevo(mes)                           # mes nuevo: se empieza de cero (y el tope vuelve al del archivo)
+        if "medidas_usd" not in datos:                   # un mes empezado antes del contador de medidas: lo de las medidas se pasa a su contador
+            estimado = min(float(datos.get("usd", 0.0)), _medidas_del_mes_usd(mes))
+            datos["medidas_usd"], datos["usd"] = estimado, float(datos.get("usd", 0.0)) - estimado
+            datos["medidas_estimadas"] = True
+            log(f"Gasto: paso al contador de medidas lo que ya gastaron este mes, estimado con llamadas_ia.jsonl: {_euros(estimado * EUR_POR_USD)}")
         for k, v in _nuevo(mes).items():
             datos.setdefault(k, v)
         return datos
     except (OSError, ValueError):
         return _nuevo(mes)
+
+
+def _medidas_del_mes_usd(mes):
+    """Lo que costaron este mes las llamadas de medida con la clave de pago, según llamadas_ia.jsonl (solo tokens, sin texto)."""
+    total = 0.0
+    try:
+        lineas = (RUT.ESTADO / "llamadas_ia.jsonl").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return 0.0
+    for linea in lineas:
+        try:
+            x = json.loads(linea)
+        except ValueError:
+            continue
+        if str(x.get("dia", "")).startswith(mes) and x.get("pago") and x.get("res") == "ok" and x.get("motivo") == "medida":
+            total += coste_usd(x.get("modelo"), x.get("modelo"), x.get("ent", 0), x.get("sal", 0), x.get("raz", 0), x.get("cache", 0))
+    return total
+
+
+def medidas_eur():
+    """Lo gastado este mes en medidas con la clave de pago (no cuenta para tu tope)."""
+    with _lock:
+        return float(_cargar().get("medidas_usd", 0.0)) * EUR_POR_USD
 
 
 def _guardar(datos):
@@ -300,7 +330,10 @@ def _registrar(clave, modelo, uso, modelo_real=None):
         tipo = nombre_de(clave)
         d[f"llamadas_{tipo}"] = d.get(f"llamadas_{tipo}", 0) + 1
         d[f"tokens_{tipo}"] = d.get(f"tokens_{tipo}", 0) + prompt + cand + pens
-        if tipo == "pago":
+        if tipo == "pago" and EN_MEDIDA[0]:                 # una medida: a su contador, sin tocar tu tope ni sus avisos
+            d["medidas_usd"] = float(d.get("medidas_usd", 0.0)) + coste_usd(modelo_real, modelo, prompt, cand, pens, cache)
+            d["llamadas_medida"] = int(d.get("llamadas_medida", 0)) + 1
+        elif tipo == "pago":
             usd = coste_usd(modelo_real, modelo, prompt, cand, pens, cache)
             d["usd"] = float(d.get("usd", 0.0)) + usd
             real = str(modelo_real or modelo)
@@ -333,7 +366,7 @@ def registrar_busquedas_google(clave, n):
             if tipo == "pago":
                 cobradas = max(0, antes + n - BUSQUEDAS_GOOGLE_GRATIS_MES) - max(0, antes - BUSQUEDAS_GOOGLE_GRATIS_MES)
                 usd = cobradas * USD_POR_BUSQUEDA_GOOGLE
-                d["usd"] = float(d.get("usd", 0.0)) + usd
+                d["medidas_usd" if EN_MEDIDA[0] else "usd"] = float(d.get("medidas_usd" if EN_MEDIDA[0] else "usd", 0.0)) + usd
                 if usd:
                     d["por_modelo"]["google_search"] = round(float(d["por_modelo"].get("google_search", 0.0)) + usd, 6)
             _guardar(d)

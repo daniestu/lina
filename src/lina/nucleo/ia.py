@@ -212,6 +212,22 @@ HERRAMIENTA_BUSCAR = {"functionDeclarations": [{
 }]}
 
 
+# Con ia.busqueda = ninguna: la IA decide si el usuario insiste en que se busque (A13: la intención la entiende la IA, no una lista de frases) y copia sus
+# palabras; el código comprueba que esas palabras las dijo el usuario en esta petición o en la anterior, así que nada leído en una web puede autorizarlo.
+HERRAMIENTA_BUSCAR_APAGADA = {"functionDeclarations": [{
+    "name": "buscar_web",
+    "description": ("La búsqueda en internet está APAGADA por el usuario (ia.busqueda = ninguna). Úsala SOLO si en esta petición el usuario insiste en que lo "
+                    "busques igualmente (con las palabras que sean); entonces copia en «autorizacion» sus palabras exactas. Si no insiste, no la uses: dile en una "
+                    "frase que la búsqueda está apagada y que, si quiere, lo buscas solo esta vez. No des datos de hoy de memoria como si fueran comprobados."),
+    "parameters": {"type": "object",
+                   "properties": {"consulta": {"type": "string", "description": "Texto de búsqueda corto y concreto"},
+                                  "autorizacion": {"type": "string", "description": "Las palabras exactas del usuario con las que insiste en que busques"}},
+                   "required": ["consulta", "autorizacion"]},
+}]}
+BUSQUEDA_APAGADA = ("NO SE HA BUSCADO: la búsqueda en internet está apagada (ia.busqueda = ninguna) y el usuario no ha pedido en esta petición que se busque "
+                    "igualmente. Díselo en una frase y ofrécele buscarlo solo esta vez. No des el dato de memoria como si estuviera comprobado.")
+
+
 # Sin búsqueda (tavily elegido y sin clave): la IA dice cuándo le faltan datos de hoy y el código avisa (A10). Mínima a propósito: ~160 caracteres.
 HERRAMIENTA_SIN_BUSQUEDA = {"functionDeclarations": [{
     "name": "necesito_datos_actuales",
@@ -229,6 +245,8 @@ def declaraciones_de_busqueda(forzar=False):
         return list(HERRAMIENTA_BUSCAR["functionDeclarations"])
     if modo == "tavily":
         return list(HERRAMIENTA_SIN_BUSQUEDA["functionDeclarations"])
+    if modo == "ninguna":
+        return list(HERRAMIENTA_BUSCAR_APAGADA["functionDeclarations"])
     return []
 
 
@@ -487,10 +505,15 @@ def motivo_llamada(motivo):
 def solo_medida():
     """Todo lo que se llame dentro, desde cualquier hilo, cuenta como medida: `lina probar-ia` y `lina probar-ponme` pasan por `_atender`, que pone su propio motivo."""
     _motivo_fijo[0] = "medida"
+    en_medida = getattr(PRES, "EN_MEDIDA", None)
+    if en_medida is not None:
+        en_medida[0] = True                             # lo de pago, al contador de medidas: no cuenta contra tu tope de uso real
     try:
         yield
     finally:
         _motivo_fijo[0] = None
+        if en_medida is not None:
+            en_medida[0] = False
 
 
 _huellas: dict = {}                    # huella del principio → cuándo se usó por última vez (para saber si se repite; no sale de la memoria)

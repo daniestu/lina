@@ -18,14 +18,14 @@ from lina.nucleo import plataforma as PL
 
 # ---- herramientas de cada grupo (el orden final lo manda el orden de herramientas.DECLARACIONES) ----
 NUCLEO = ["ejecutar_comando", "abrir_app", "ver_pantalla", "mirar_pantalla", "pensar_a_fondo", "empezar_de_cero",
-          "deshacer_cambio", "usar_receta", "modo_privado"]
+          "deshacer_cambio", "usar_receta", "modo_privado", "gestionar_fuentes", "parar"]
 META = "mas_herramientas"
 
 GRUPOS = {
     "ajustes_kde": ["buscar_ajuste_kde", "probar_ajuste_kde", "buscar_clave_en_binarios", "observar_config",
                     "guardar_receta", "olvidar_receta", "ver_recetas"],
     "sistema": ["ventanas", "procesos", "servicios", "red", "energia", "pantalla", "audio", "kde_dbus", "gpu"],
-    "juegos": ["ver_juegos", "mangohud", "opciones_lanzamiento", "proton"],
+    "juegos": ["ver_juegos", "compatibilidad_linux", "mangohud", "opciones_lanzamiento", "proton"],
     "archivos": ["crear_documento", "disenar_documento", "hoja_calculo", "presentacion", "copiar_portapapeles", "buscar_youtube", "ver_papelera", "restaurar_de_papelera", "vaciar_papelera"],
     "memoria": ["ver_diario", "alias_de_voz", "ver_gasto", "ver_recetas", "olvidar_receta"],
     "web": ["leer_web"],
@@ -49,7 +49,7 @@ def _disponible(nombre):
 DESCRIPCION = {
     "ajustes_kde": "cambiar ajustes de KDE/Plasma y aprender recetas",
     "sistema": "ventanas, procesos, servicios, red/Bluetooth, energía, pantallas, audio, D-Bus, tarjeta gráfica (si hay), copias de seguridad",
-    "juegos": "lista de juegos, MangoHud, Proton y opciones de lanzamiento de Steam",
+    "juegos": "lista de juegos, si un juego funciona en Linux o con Proton, MangoHud, Proton y opciones de lanzamiento de Steam",
     "archivos": "documentos, portapapeles, vídeos de YouTube y papelera",
     "memoria": "diario de cambios, alias de voz, gasto de Gemini y recetas aprendidas",
     "web": "leer una página web o un enlace y resumirla",
@@ -348,7 +348,7 @@ REGLAS_NUCLEO = (
     "19) FUENTES HONRADAS: solo dices «según la página X», «he leído», «he comprobado» o «he abierto» de lo que has leído o hecho de verdad en esta petición. Si el usuario "
     "pide leer una página concreta (la que tiene copiada, un enlace), tu primer paso es leer_web de esa dirección (mas_herramientas(web) si no la tienes); una búsqueda "
     "NO es leer esa página. Si no has podido leerla, dilo y sigue intentándolo por otra vía; nunca la sustituyas por otras fuentes sin avisar de que son otras. "
-    "20) LO QUE CAMBIA: la hora y la fecha de ahora te las doy yo en cada petición dentro de [SISTEMA: Ahora mismo son…]; úsalas, nunca respondas una hora de memoria ni repitas la de una respuesta anterior. Lo demás que cambia (tiempo, precios, quién ocupa un cargo, resultados) se consulta antes de afirmarlo. "
+    "20) LO QUE CAMBIA: la hora y la fecha de ahora te las doy yo en cada petición dentro de [SISTEMA: Ahora mismo son…]; úsalas, nunca respondas una hora de memoria ni repitas la de una respuesta anterior. Lo demás que cambia (tiempo, precios, quién ocupa un cargo, resultados) se consulta antes de afirmarlo. Un evento EN DIRECTO (un partido, una final) no lo des por terminado ni des su marcador sin una fuente que lo diga; si no puedes confirmarlo, dilo. Una wiki o una enciclopedia no sirve para un dato del momento (precio, resultado, noticia, el tiempo): si es lo único que tienes, dilo. Si el usuario DISCUTE un dato tuyo (con las palabras que sean: «no ha acabado», «eso no es así», «te equivocas»), compruébalo con buscar_web antes de responder; si no puedes, di que no lo has podido comprobar y que puede tener razón, sin defender lo de antes. Un dato que te da el usuario se atribuye a él («según me dices»), no a una web. Si la frase parece MAL TRANSCRITA (palabras sin sentido, un nombre que no existe), pide que lo repita en vez de contestar otra cosa. "
     "21) DESTRUCCIÓN TOTAL: si te piden formatear el ordenador o un disco, borrar el sistema, todas las particiones o «dejarlo de fábrica» (con las palabras que sean), "
     "NO lo ofrezcas, NO preguntes «¿lo hago?» y NO lo prepares: está bloqueado y no se hace ni con confirmación. Dilo en una frase, sin dramatizar, y pregunta qué "
     "quiere conseguir de verdad (liberar espacio, reinstalar, vaciar un disco de datos) para ofrecer algo seguro: copia o snapshot, limpiar cachés, o que lo haga él "

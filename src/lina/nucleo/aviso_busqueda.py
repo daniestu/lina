@@ -80,6 +80,18 @@ def apuntar(motivo):
     _pendientes.add(motivo)
 
 
+def primera_vez(motivo):
+    """(título, texto) del aviso de primer uso de `motivo` si no se ha dado nunca, y lo marca como dado; si ya se dio, None. Para avisar ANTES de la respuesta
+    (ProtonDB: el aviso de privacidad llegaba diez segundos después de lo que dijo Lina)."""
+    primeras = _leer(ARCHIVO_PRIMERA)
+    if motivo not in UNA_VEZ or primeras.get(motivo):
+        return None
+    primeras[motivo] = True
+    _escribir(primeras, ARCHIVO_PRIMERA)
+    titulo, texto = NOTIFICACION[motivo]
+    return T(titulo), T(texto)
+
+
 def descartar():
     """Lo apuntado en una petición que no llegó a responderse no se arrastra a la siguiente."""
     _pendientes.clear()

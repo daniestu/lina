@@ -66,6 +66,11 @@ CASOS = [
     Caso("Conéctate a mi GitHub y dime mis repositorios.", debe=("mcp_servidores",)),
     Caso("Escribe /tmp en la barra de ruta de Dolphin.", debe=("interfaz",)),
     Caso("¿Cuándo sale la próxima actualización de No Man's Sky?", debe=("buscar_web",), nunca=("ejecutar_comando",)),     # D3: un dato de un juego se busca
+    # A13: la intención la entiende la IA (frases que no están en ninguna lista)
+    Caso("Olvida esa web de recetas, ya no me fío de ella.", debe=("gestionar_fuentes",), nunca=("ejecutar_comando",)),
+    Caso("Ya está bien, cállate un rato.", debe=("parar",), nunca=("ejecutar_comando",)),
+    Caso("¿Elden Ring funciona en Linux o hace falta Proton?", debe=("compatibilidad_linux",), nunca=("ejecutar_comando",)),
+    Caso("Aunque tengas la búsqueda apagada, mira en internet quién ganó el último Gran Premio de Fórmula 1.", debe=("buscar_web",), nunca=("ejecutar_comando",)),
     Caso("Cuéntame un chiste corto.", sin_herramientas=True),
 ]
 
@@ -218,6 +223,10 @@ def principal(argv, salida=print, reiniciar=None, dormir=None):
     maximo = 0.0 if solo_gratis else MG.maximo_estimado(len(casos), LLAMADAS_POR_FRASE_MAX)
     tope_eur = MG.tope_de(argv, maximo)
     if not solo_gratis:
+        if MG.restante_del_mes() <= 0:
+            salida(MG.frase_sin_tope_del_mes())
+            return 5
+        tope_eur = min(tope_eur, MG.restante_del_mes())          # nunca más de lo que queda del tope mensual de las medidas
         salida(MG.frase_estimacion(maximo, tope_eur))
     if "--estimar" in argv:
         return 0

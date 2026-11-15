@@ -37,6 +37,7 @@ def _banco(monkeypatch, argv, gastos=(0.0,)):
     monkeypatch.setattr(MG, "eur_por_llamada", lambda *a, **k: 0.002)
     gastado = iter(list(gastos) + [gastos[-1]] * 100)
     monkeypatch.setattr(MG, "gastado_eur", lambda: next(gastado))
+    monkeypatch.setattr(MG, "restante_del_mes", lambda: 10.0)
     reinicios, salida = [], []
     r = B.principal(argv, salida.append, reiniciar=lambda: reinicios.append(1))
     return r, "\n".join(salida), reinicios
@@ -78,10 +79,12 @@ def test_probar_busqueda_pago_dice_el_maximo_y_se_para(monkeypatch):
         def __exit__(self, *a): return False
     monkeypatch.setattr(PB, "usuario_nuevo", Sin)
     monkeypatch.setattr(MG, "eur_por_llamada", lambda *a, **k: 0.002)
+    monkeypatch.setattr(MG, "restante_del_mes", lambda: 10.0)
     salida = []
     assert PB.principal(["pago", "--estimar"], salida.append) == 0 and "Gasto máximo estimado con la clave de pago: 0,80 €" in salida[0]
     gastado = iter([1.0, 1.0, 2.0] + [2.0] * 50)
     monkeypatch.setattr(MG, "gastado_eur", lambda: next(gastado))
+    monkeypatch.setattr(MG, "restante_del_mes", lambda: 10.0)
     bien = (["Según la UESP, ectoplasma."], [("buscar_web", {}, "RESULTADOS DE BÚSQUEDA (…):\n\n[1] P (uesp.net) https://x\ny")], ["ok"], 1.0)
     salida.clear()
     r = PB.principal(["pago", "3"], salida.append, preparar=lambda: (MagicMock(), MagicMock(busquedas_hechas=[]), []),

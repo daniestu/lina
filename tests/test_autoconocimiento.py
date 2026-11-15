@@ -101,8 +101,8 @@ def test_cada_comando_que_nombra_existe():
 
 
 def test_los_limites_siguen_siendo_verdad_en_el_codigo():
-    # no hay ninguna herramienta para escribir en la memoria ni para guardar fuentes
-    assert not {n for n in NOMBRES if re.search(r"recordar|memoria|fuente", n)}
+    # no hay ninguna herramienta para escribir en la memoria; las fuentes, solo con gestionar_fuentes, que deja la acción pendiente de tu «sí»
+    assert not {n for n in NOMBRES if re.search(r"recordar|memoria", n)} and {n for n in NOMBRES if "fuente" in n} <= {"usar_fuente", "gestionar_fuentes"}
     # dinero y permisos no se tocan desde aquí
     assert ("gasto", "tope_mensual_eur") in AUTO.INTOCABLES and ("privacidad", "capturas") in AUTO.INTOCABLES
     # ni contraseñas, ni cookies, ni su propio código ni sus permisos

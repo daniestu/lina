@@ -265,10 +265,8 @@ def _nombra_termino(resultado, palabras):
 
 
 def resultados_wiki(consulta, idioma=None, get=None, maximo=5, peticion=""):
-    """(resultados, motivo) de la primera wiki que encuentre algo que nombre la consulta. Nada si se pide un dato del momento."""
-    if es_de_actualidad(f"{consulta} {peticion}"):
-        log(f"Wikis: «{consulta}» pide un dato del momento; no busco en ellas")
-        return [], T(M_WIKI_ACTUALIDAD)
+    """(resultados, motivo) de la primera wiki que encuentre algo que nombre la consulta. Siempre disponible (A13): si la pregunta es de un dato del momento,
+    lo juzga la IA, con la regla de que una wiki no sirve para eso (en los resultados y en las instrucciones)."""
     hubo_red = False
     idioma = idioma or IDI.actual()
     for w in wikis_para(consulta, idioma, peticion):
@@ -446,7 +444,9 @@ def como_texto(res):
     """Lo que recibe la IA: los resultados de siempre o, si nada dio resultados, el motivo y cómo decirlo."""
     if res.resultados:
         webs = dominios_de_resultados(res.resultados)
-        return IA._resultados_como_texto(res.resultados) + (
+        aviso_wiki = ("\nESTO ES DE UNA WIKI O UNA ENCICLOPEDIA: no sirve para un dato del momento (precio, resultado, noticia, el tiempo, lo de hoy); si eso es "
+                      "lo que se pide, dilo en vez de dar el dato." if res.escalon == "wiki" else "")
+        return IA._resultados_como_texto(res.resultados) + aviso_wiki + (
             f"\nWEBS DE ESTOS RESULTADOS: {', '.join(webs)}. Si dices de dónde sale el dato, nombra SOLO una de estas webs por su dominio (por ejemplo "
             f"«según {webs[0]}»); no atribuyas nada a otra web, wiki o medio que no esté en esta lista." if webs else "")
     motivos = "; ".join(res.motivos) or T(M_WIKI_NADA)

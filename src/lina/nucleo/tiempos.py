@@ -480,6 +480,16 @@ DECISIONES = {"arreglar": N_("menos del 30 % desde la caché aunque el principio
               "no tocar": N_("el tamaño no pesa lo bastante: no se aligeran las instrucciones")}
 
 
+def _linea_de_medidas(salida):
+    """Lo gastado en medidas este mes, aparte de tu uso real (no cuenta para tu tope)."""
+    try:
+        from lina.nucleo import presupuesto as PRES
+        salida(T("Medidas con la clave de pago este mes: {g} € de {t} € (van aparte: no cuentan para tu tope de uso real).",
+                 g=f"{PRES.medidas_eur():.2f}".replace(".", ","), t=f"{PRES.TOPE_MEDIDAS_EUR:.2f}".replace(".", ",")))
+    except Exception:
+        pass
+
+
 def principal_ia(argv, salida=print, archivo=None, hoy=None, precio=None):
     dias = DIAS_IA
     if argv:
@@ -506,6 +516,7 @@ def principal_ia(argv, salida=print, archivo=None, hoy=None, precio=None):
     informe_comprobaciones(salida, archivo.with_name(ARCHIVO_COMPROBACIONES.name), apuntando)      # junto al de llamadas
     if not modelos:
         salida(T("Todavía no hay llamadas a la IA apuntadas en los últimos {d} días.", d=dias))
+        _linea_de_medidas(salida)
         return 0
     salida(T("Llamadas a la IA, últimos {d} días (solo las que respondieron):", d=dias))
     for m in modelos:
@@ -534,6 +545,7 @@ def principal_ia(argv, salida=print, archivo=None, hoy=None, precio=None):
         else:
             salida("    → " + T("Tamaño: hacen falta al menos {n} llamadas para decidir.", n=MIN_LLAMADAS_TAMANO))
     salida(T("Se guardan solo números, el modelo y una huella del principio en {archivo}; lo borras con:  lina olvidar tiempos", archivo=archivo))
+    _linea_de_medidas(salida)
     return 0
 
 

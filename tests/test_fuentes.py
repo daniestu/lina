@@ -92,7 +92,18 @@ def test_la_ia_no_puede_tocarlas(comando):
 
 
 def test_ninguna_herramienta_escribe_fuentes():
-    assert not [d["name"] for d in H.DECLARACIONES if "fuente" in d["name"]]
+    """A13 (2026-11-15): la IA entiende qué fuente quieres quitar o añadir con gestionar_fuentes, pero esa herramienta no escribe: solo deja la acción
+    pendiente de tu «sí» (preparar_accion). Nada más puede tocar las fuentes."""
+    assert [d["name"] for d in H.DECLARACIONES if "fuente" in d["name"]] == ["gestionar_fuentes"]
+    import inspect
+    import sys
+    from unittest.mock import MagicMock
+    sys.modules.setdefault("sounddevice", MagicMock())
+    sys.modules.setdefault("faster_whisper", MagicMock())
+    from lina.nucleo import asistente as A
+    cuerpo = inspect.getsource(A.Asistente._h_gestionar_fuentes)
+    for llamada in ("FUE.quitar_ids(", "FUE.anadir("):
+        assert all("preparar_accion(" in linea or "lambda" in linea for linea in cuerpo.splitlines() if llamada in linea), llamada
     usar = F.declaracion_usar_fuente([{"id": "f1", "tema": "t"}])
     assert set(usar["parameters"]["properties"]) == {"id", "consulta"}                  # solo elige: ni dirección ni tema
     from pathlib import Path
@@ -320,7 +331,7 @@ def test_los_manuales_de_las_fuentes_dicen_lo_que_hace():
 def test_la_ayuda_de_la_ia_sobre_si_misma_sabe_lo_de_las_fuentes():
     from lina.nucleo import autoconocimiento as AUTO
     limites = " ".join(AUTO.LIMITES)
-    assert "no puedes añadirlas ni quitarlas" in limites and "quita la última fuente" in limites and "puede ir a la búsqueda general" in limites
+    assert "gestionar_fuentes" in limites and "pendiente de su «sí»" in limites and "pregúntale cuál" in limites and "puede ir a la búsqueda general" in limites
 
 
 # ---------------------------------------------------------------- quitar por id, varias o todas (bloque B)
