@@ -990,6 +990,13 @@ _NAVEGADORES = {"xdg-open", "firefox", "chromium", "chromium-browser", "google-c
 _SALIDA_DE_ORDEN = re.compile(r"\$\(|`")
 _REMOTO = re.compile(r"^(?:[\w.-]+@)?[\w.-]+:(?!//)|^rsync://|^[a-z][\w+.-]*://", re.I)
 _PARECE_URL = re.compile(r"^(?:[a-z][\w+.-]*://|[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:[/:?]|$))", re.I)
+# S5d: los rodeos del mismo agujero. ssh hacia otro equipo, código en línea que usa la red (no se distingue con fiabilidad si trae o envía: una petición
+# «GET» también lleva datos en la dirección) y el correo.
+_SSH_CON_VALOR = {"-b", "-B", "-c", "-D", "-E", "-e", "-F", "-I", "-i", "-J", "-L", "-l", "-m", "-O", "-o", "-p", "-Q", "-R", "-S", "-W", "-w"}
+_CODIGO_USA_RED = re.compile(r"urlopen|\brequests\.|urllib|http\.client|\bhttpx\b|aiohttp|fetch\s*\(|XMLHttpRequest|\bsocket\b|smtplib|ftplib|telnetlib|"
+                             r"paramiko|Net::(?:HTTP|SMTP|FTP)|LWP::|HTTP::Tiny|IO::Socket|TCPSocket|open-uri|\bhttps?\.(?:get|request)\b|"
+                             r"require\(\s*['\"](?:https?|net|dgram|tls)['\"]|\bcurl\b|\bwget\b|https?://", re.I)
+_CORREO = {"mail", "mailx", "s-nail", "bsd-mailx", "sendmail", "msmtp", "mutt", "neomutt", "swaks", "ssmtp", "mpack"}
 _URL_GIT = re.compile(r"^(?:[a-z][\w+.-]*://|[\w.-]+@[\w.-]+:)", re.I)
 
 
@@ -1030,6 +1037,19 @@ def _envia_segmento(seg, _prof):
         sueltos = [a for a in args if not a.startswith("-")]
         if sueltos[:1] == ["push"] and any(_URL_GIT.match(a) for a in sueltos[1:]):
             return "subiría el repositorio a una dirección que no es un remoto configurado"
+    if base == "ssh" and not any(a in ("-V", "-G", "-Q") for a in args):
+        i = 0
+        while i < len(args) and args[i].startswith("-"):
+            i += 2 if args[i] in _SSH_CON_VALOR else 1
+        if i < len(args):                                    # hay un equipo: con una orden, con la entrada redirigida o como sesión, le llegan datos
+            return "abriría una sesión en otro equipo y le pasaría datos u órdenes"
+    codigo = _codigo_en_linea(base, args)
+    if codigo and _CODIGO_USA_RED.search(codigo):
+        return "ejecutaría código que usa la red, y no se puede revisar qué manda"
+    if base in _CORREO and not any(a in ("-V", "--version", "-h", "--help") for a in args):
+        return "mandaría un correo"
+    if base == "curl" and (any(a.startswith(("--mail-rcpt", "--mail-from")) for a in args) or any(re.match(r"smtps?://", a, re.I) for a in args)):
+        return "mandaría un correo"
     if base in _NAVEGADORES or (base == "gio" and args[:1] == ["open"]):
         if any(re.search(r"\$\(|`|\$\{?(?!HOME\b)[A-Za-z_]", a) for a in args if not a.startswith("-")):          # $HOME es abrir algo tuyo
             return "abriría el navegador con datos de tu equipo metidos en la dirección"
@@ -1038,7 +1058,8 @@ def _envia_segmento(seg, _prof):
 
 def envia_fuera(comando, _prof=0):
     """S5: el motivo si la orden manda datos a otro equipo (subir con curl o wget, una conexión con nc o socat, copiar a otro equipo, git push a una URL,
-    o el navegador con una sustitución en la dirección); None si no. Traer cosas (descargar, clonar, consultar) no cuenta."""
+    o el navegador con una sustitución en la dirección; y desde S5d, ssh a otro equipo, código en línea que usa la red y el correo); None si no. Traer
+    cosas con curl, wget o git (descargar, clonar, consultar) no cuenta."""
     for seg in _segmentos(comando):
         motivo = _envia_segmento(seg, _prof)
         if motivo:

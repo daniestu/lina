@@ -279,9 +279,7 @@ el usuario: si era suyo, lo pide en una petición nueva, que empieza limpia.
   `BLOQUEADO: …` con el motivo y que no lo intente de otra forma; al usuario, por voz (`avisar`), qué ha pasado y que puede pedirlo en una petición nueva o
   hacerlo en su terminal (`T()` con su entrada en inglés). Se anota en el registro de acciones como `[envio-bloqueado]`. Sin contenido de fuera, nada cambia.
 - **S5c, la comprobación con la IA** (pendiente: necesita cupo gratuito): banco `--solo-gratis`, una pasada con referencia y otra con el cambio, 0 regresiones.
-**Fuera de estas piezas, a propósito** (para una pieza más si hace falta): `ssh equipo 'orden'` con la entrada redirigida, código en línea (`python -c`) que
-envía por la red, correo (`mail`, `sendmail`) y servicios de subida con su propio programa. Siguen pidiendo tu «sí» si el perfil frena tras leer de fuera,
-y la defensa de fondo es S9 (red solo cuando haga falta).
+- **S5d, los rodeos del mismo agujero** *(hecha el 2026-11-15, aprobada por el mantenedor)*: `ssh` a otro equipo (con una orden, con la entrada redirigida o como sesión; `ssh -V` y `ssh -G` no), el código en línea (`python -c`, `node -e`, `perl -e`, `ruby -e`) que **usa la red** —no se distingue con fiabilidad si trae o envía: una petición «GET» también lleva datos en la dirección—, y el correo (`mail`, `sendmail`, `msmtp`, `mutt`, `swaks`, `curl` a `smtp://`). Lo que sigue fuera: los programas de subida con su propio nombre que no están en la lista; la defensa de fondo es S9 (sin red en una tarea contaminada).
 
 **S8b (firma de las etiquetas), antes de empezar.** Pasos para el mantenedor, en su equipo (no los ejecuta Claude):
 1. Crear la clave de firma, solo para esto y con frase de paso: `ssh-keygen -t ed25519 -C "firma de releases de Lina" -f ~/.ssh/lina_firma`.
