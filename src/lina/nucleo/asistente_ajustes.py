@@ -93,7 +93,7 @@ class MixinAjustes:
                     "nada. Díselo al usuario tal cual (ya estaba así); no digas que lo has cambiado tú.")
         partes = [escribir, "--file", archivo] + [x for g in grupos for x in ("--group", g)] + ["--key", clave, valor]
         r1 = ej.herramienta({"comando": " ".join(shlex.quote(x) for x in partes), "motivo": f"probar {clave}={valor} en {archivo}"})
-        if not r1.startswith("código de salida: 0"):
+        if not EJ.salio_bien(r1):
             return "No se ha podido escribir el ajuste (no se ha probado nada): " + r1[:400]
         id_escritura = (H.diario.listar(1) or [{}])[0].get("id") if H.diario else None      # para revertir EXACTAMENTE esta escritura
         aviso_rec = ""
@@ -247,7 +247,7 @@ class MixinAjustes:
             return
         cambios = []
         for i, (n, a, r) in enumerate(hechas):
-            if n != "ejecutar_comando" or not r.startswith("código de salida: 0"):
+            if n != "ejecutar_comando" or not EJ.salio_bien(r):
                 continue
             cmd = " ".join(str(a.get("comando", "")).split())
             if H.clasificar(cmd)[0] in {"autonomo", "inocuo"}:
@@ -264,7 +264,7 @@ class MixinAjustes:
             return
         if self._NO_AJUSTE.match(base):
             return
-        leer = next((cmd for j, (n, a, r) in enumerate(hechas) if j > i and n == "ejecutar_comando" and r.startswith("código de salida: 0")
+        leer = next((cmd for j, (n, a, r) in enumerate(hechas) if j > i and n == "ejecutar_comando" and EJ.salio_bien(r)
                      for cmd in [" ".join(str(a.get("comando", "")).split())]
                      if H.clasificar(cmd)[0] in {"lectura", "inocuo"} and self._relacionado(cambiar, cmd)), None)
         if not leer:

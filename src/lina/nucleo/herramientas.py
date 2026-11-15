@@ -1989,7 +1989,7 @@ class Ejecutor:
             resultado += self._recordar_aur(p["comando"], resultado)
             self.ultimas.append((p["comando"], p["motivo"], resultado))
             partes.append(f"$ {p['comando']}\n{resultado}")
-            if resultado.startswith("código de salida: ") and not resultado.startswith("código de salida: 0"):
+            if EJ.es_salida_de_orden(resultado) and not EJ.salio_bien(resultado):
                 restantes = len(pend) - i - 1
                 if restantes:
                     partes.append(f"(No se ejecutaron {restantes} acciones más porque ésta falló.)")
@@ -2162,7 +2162,7 @@ class Ejecutor:
     def _receta_automatica(self, nombre, args, plan, resultado, real):
         """Un ajuste cambiado con una herramienta de sistema y COMPROBADO en el estado real se apunta solo como receta."""
         rec = plan.get("receta")
-        if not rec or REC is None or not str(resultado).startswith("código de salida: 0"):
+        if not rec or REC is None or not EJ.salio_bien(str(resultado)):
             return False
         try:
             if not SIS.verificar_plan(nombre, args, plan, real):

@@ -141,9 +141,9 @@ _RECARGA_FALLIDA = re.compile(r"command not found|No such file or directory|Fail
 def aviso_recarga(comando, resultado):
     """'' si la recarga fue bien. Si no (código distinto de 0, o un error en la salida aunque el código sea 0 por un «|| true»),
     el aviso que debe ver la IA, con las pistas que el ejecutor ya añadió (programa parecido instalado, paquete...)."""
-    if resultado.startswith("código de salida: 0") and not _RECARGA_FALLIDA.search(resultado):
+    if EJ.salio_bien(resultado) and not _RECARGA_FALLIDA.search(resultado):
         return ""
-    cuerpo = resultado.split("\n", 1)[1] if resultado.startswith("código de salida") and "\n" in resultado else resultado
+    cuerpo = resultado.split("\n", 1)[1] if EJ.es_salida_de_orden(resultado) and "\n" in resultado else resultado
     detalle = " | ".join(l.strip() for l in cuerpo.splitlines() if l.strip())[:500] or "(sin salida)"
     if "NO EJECUTADO" in resultado:
         return (f" OJO: el comando de recarga `{comando[:80]}` NO se ha ejecutado (queda pendiente de la confirmación del usuario): {detalle} "

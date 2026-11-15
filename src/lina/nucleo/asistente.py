@@ -36,6 +36,7 @@ from lina.nucleo import compatibilidad as COMP
 from lina.nucleo import avisos as AVI
 from lina.nucleo import canal as CANAL
 from lina.nucleo import registro as REG
+from lina.nucleo import ejecucion as EJ
 from lina.nucleo.registro import log
 from lina.nucleo import claves as CL
 from lina.nucleo import ia_activa as IAC
@@ -1360,7 +1361,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
                     r = str(self.ejecutor.herramienta({"comando": f"xdg-open {shlex.quote(url)}", "motivo": f"poner lo que pediste en {dominio}"}))
             finally:
                 self.ejecutor.continuar = self._continuar_peticion
-            if not (r.startswith("Lanzado") or r.startswith("código de salida: 0")):
+            if not (r.startswith("Lanzado") or EJ.salio_bien(r)):
                 log(f"Contenido: no se ha podido abrir ({r[:120]}); se lo dejo a la IA")
                 self.ejecutor.cancelar()
                 return None
@@ -1409,7 +1410,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             return DIR.frase_de_fecha(ahora) if datos["que"] == "fecha" else DIR.frase_de_hora(ahora)
         if ident == "ventanas":
             r = str(self.ejecutor.sistema("ventanas", dict(datos)))
-            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
+            if not EJ.salio_bien(r) or H.MENSAJE_PREPARADO in r:
                 return None
             return T("Hecho.")
         if ident == "reproduccion":
@@ -1422,7 +1423,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             return {"pausar": T("Pausado."), "reanudar": T("Reanudado."), "siguiente": T("Siguiente."), "anterior": T("Anterior."), "detener": T("Parada.")}[accion]
         if ident == "bluetooth":
             r = str(self.ejecutor.sistema("red", dict(datos)))
-            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
+            if not EJ.salio_bien(r) or H.MENSAJE_PREPARADO in r:
                 return None                                       # no está emparejado, hay varios que encajan… lo decide la IA con las pistas del error
             if datos["accion"] == "bluetooth_encender":
                 return T("Bluetooth encendido.") if "Powered: yes" in r else None
@@ -1432,7 +1433,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             return T("Conectado.") if quedo_conectado else T("Desconectado.")
         if ident in ("volumen", "silencio"):
             r = str(self.ejecutor.sistema("audio", dict(datos)))
-            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
+            if not EJ.salio_bien(r) or H.MENSAJE_PREPARADO in r:
                 return None
             if datos["accion"] == "silenciar":
                 return T("Silenciado.")
@@ -1451,17 +1452,17 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             return "sin_cola"                                     # suena una sola canción de Lina: no hay otra a la que saltar (y el navegador no es lo que quieres)
         lista = str(ej.herramienta({"comando": "playerctl -l", "motivo": "mirar qué reproductores hay"}))
         hay = " ".join(lista.splitlines()[1:]).strip()
-        if lista.startswith("código de salida: 0") and hay and hay != "(sin salida)":
+        if EJ.salio_bien(lista) and hay and hay != "(sin salida)":
             sub = {"pausar": "pause", "reanudar": "play", "siguiente": "next", "anterior": "previous", "detener": "stop"}[accion]
             r = str(ej.herramienta({"comando": f"playerctl {sub}", "motivo": "controlar la reproducción"}))
-            if accion == "detener" and not r.startswith("código de salida: 0"):
+            if accion == "detener" and not EJ.salio_bien(r):
                 r = str(ej.herramienta({"comando": "playerctl pause", "motivo": "controlar la reproducción"}))      # no todos los reproductores saben parar: se deja en pausa
-            if not r.startswith("código de salida: 0") or H.MENSAJE_PREPARADO in r:
+            if not EJ.salio_bien(r) or H.MENSAJE_PREPARADO in r:
                 return False
             if accion in ("pausar", "reanudar", "detener"):       # se mira que ha quedado como se pidió, en vez de fiarse del «hecho»
                 estado = str(ej.herramienta({"comando": "playerctl status", "motivo": "comprobar la reproducción"}))
                 if accion == "reanudar":
-                    return estado.startswith("código de salida: 0") and "Playing" in estado
+                    return EJ.salio_bien(estado) and "Playing" in estado
                 return "Playing" not in estado
             return True
         return False
@@ -1495,7 +1496,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             r = str(res)
             if nombre == "abrir_app" and re.match(r"(?:Abierto|Abriendo) «", r):
                 continue
-            if nombre == "audio" and r.startswith("código de salida: 0") and "COMPROBADO AHORA" in r:
+            if nombre == "audio" and EJ.salio_bien(r) and "COMPROBADO AHORA" in r:
                 continue
             return False
         return True
@@ -1585,7 +1586,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         hecho = []
         for nombre, args, resultado in self.acciones_turno:
             r = str(resultado)
-            if nombre == "ejecutar_comando" and r.startswith("código de salida: 0") and H.clasificar(str(args.get("comando", "")))[0] not in ("lectura", "inocuo"):
+            if nombre == "ejecutar_comando" and EJ.salio_bien(r) and H.clasificar(str(args.get("comando", "")))[0] not in ("lectura", "inocuo"):
                 hecho.append(str(args.get("motivo") or args.get("comando"))[:60])
             elif nombre == "probar_ajuste_kde" and r.startswith("COMPROBADO"):
                 hecho.append(f"cambiar el ajuste {args.get('clave', '')}")

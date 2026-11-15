@@ -7,6 +7,7 @@ from datetime import datetime
 
 from lina.nucleo import comandos as C
 from lina.nucleo import idioma as IDI
+from lina.nucleo import ejecucion as EJ
 from lina.nucleo.registro import log
 
 
@@ -149,9 +150,9 @@ def numeros_a_palabras(texto):
 def estado_de_resultado(resultado):
     """Traduce el resultado de una herramienta a una frase corta («terminó bien», «falló»...). None si no hay que contarlo."""
     r = str(resultado)
-    if r.startswith("código de salida: 0"):
+    if EJ.salio_bien(r):
         return "terminó bien"
-    if r.startswith("código de salida:"):
+    if EJ.es_salida_de_orden(r):
         return "terminó con un error"
     if r.startswith("SIGUE EN SEGUNDO PLANO"):
         return "sigue en segundo plano y te avisaré al terminar"

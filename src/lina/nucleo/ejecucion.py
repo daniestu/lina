@@ -37,3 +37,17 @@ def _como_root(argv, **k):
 def _codigo_de_salida(resultado):
     m = re.match(r"código de salida: (-?\d+)", str(resultado))
     return int(m.group(1)) if m else None
+
+
+SALIDA_DE_ORDEN = "código de salida: "        # así empieza el resultado de una orden (herramientas.Ejecutor._resultado)
+
+
+def es_salida_de_orden(resultado):
+    """¿Es el resultado de haber ejecutado una orden (con su código de salida)?"""
+    return str(resultado).startswith(SALIDA_DE_ORDEN)
+
+
+def salio_bien(resultado):
+    """¿La orden acabó bien (código 0)? M4, primer paso: un solo sitio donde se mira, en vez de comparar el prefijo del texto en cada módulo. Cuando los
+    resultados lleven su estructura (rc, salida, comprobado…), solo cambia esto."""
+    return str(resultado).startswith(SALIDA_DE_ORDEN + "0")

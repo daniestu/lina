@@ -13,6 +13,7 @@ import shlex
 from lina.nucleo import comandos as C
 from lina.nucleo import herramientas as H
 from lina.nucleo.idioma import T
+from lina.nucleo import ejecucion as EJ
 from lina.nucleo.registro import log
 
 # Herramientas que solo miran o ayudan a encontrar el camino: no forman parte de la receta
@@ -33,7 +34,7 @@ def _ok(herr, resultado):
         return False
     if herr == "abrir_app":
         return bool(_ABIERTO.match(r))
-    return r.startswith("código de salida: 0")
+    return EJ.salio_bien(r)
 
 
 def _mira_lo_mismo(cambio, lectura):
@@ -147,7 +148,7 @@ class MixinPasos:
             esperado = receta.get("esperado", "")
             if receta.get("valor_usado") and valor:
                 esperado = esperado.replace(receta["valor_usado"], str(valor))
-            if not r.startswith("código de salida: 0") or not REC.coincide_salida(esperado, " ".join(r.splitlines()[1:])):
+            if not EJ.salio_bien(r) or not REC.coincide_salida(esperado, " ".join(r.splitlines()[1:])):
                 return None, (f"se repitió la receta «{receta['ajuste']}» (r. {receta['id']}) pero la comprobación no dio lo de la vez anterior "
                               f"(esperaba «{esperado[:80]}», dio «{' '.join(r.splitlines()[1:])[:80]}»); los pasos ya están hechos. Mira el estado y arréglalo si hace falta")
         REC.resultado_pasos(receta["id"], True)
