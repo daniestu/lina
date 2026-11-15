@@ -291,7 +291,9 @@ def normalizar(texto):
 
 def _parsear(texto):
     """Devuelve ({sección: [entradas]}, [avisos])."""
-    secciones, avisos, actual = {}, [], None
+    secciones: dict[str, list] = {}
+    avisos: list[str] = []
+    actual = None
     for n, linea in enumerate(texto.splitlines(), 1):
         l = re.split(r"\s#", linea.strip(), maxsplit=1)[0].strip()   # permite comentario al final de la línea
         if not l or l.startswith("#"):
@@ -344,7 +346,7 @@ def _preparar(secciones, avisos, avisar_faltantes=True):
     return datos
 
 
-_cache = {"marca": "sin leer", "datos": None}
+_cache: dict = {"marca": "sin leer", "datos": None}
 
 
 def _datos():
@@ -575,9 +577,9 @@ _cache_apps: dict = {"firma": None, "datos": []}
 def _dirs_apps():
     base = [Path("/usr/share/applications"), Path("/usr/local/share/applications"), Path.home() / ".local/share/applications",
             Path("/var/lib/flatpak/exports/share/applications"), Path.home() / ".local/share/flatpak/exports/share/applications"]
-    for d in os.environ.get("XDG_DATA_DIRS", "").split(":"):
-        if d:
-            base.append(Path(d) / "applications")
+    for carpeta in os.environ.get("XDG_DATA_DIRS", "").split(":"):
+        if carpeta:
+            base.append(Path(carpeta) / "applications")
     vistos, dirs = set(), []
     for d in base:
         if str(d) not in vistos:
@@ -589,9 +591,16 @@ def _dirs_apps():
 DIRS_APPS = _dirs_apps
 
 
+def _signos(patron, palabra):
+    """Los signos pegados al principio o al final de una palabra («¿», «,», «.»), para conservarlos al cambiarla. Vacío si no hay."""
+    m = re.search(patron, palabra)
+    return m.group() if m else ""
+
+
 def _leer_desktop(ruta):
     """{'nombre', 'comando'} de un .desktop que sea un programa con ventana; None si no lo es."""
-    campos, dentro = {}, False
+    campos: dict[str, str] = {}
+    dentro = False
     try:
         lineas = ruta.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
@@ -833,7 +842,7 @@ def _usos_de_apps(apps, ruta_log, ultimas=3000):
         lineas = Path(ruta_log).read_text(encoding="utf-8", errors="replace").splitlines()[-ultimas:]
     except OSError:
         return {}
-    cuentas = {}
+    cuentas: dict = {}
     for l in lineas:
         m = re.search(r"\[fin rc=-?\d+\]\s+(?:sudo\s+)?(\S+)", l)
         if m:
@@ -866,7 +875,8 @@ def lista_de_apps_para_la_ia(texto, apps=None, ruta_log=None, maximo=70, caracte
         for n in {normalizar(a["nombre"]), normalizar(a.get("es", "")), normalizar(a["comando"].split()[0].rsplit("/", 1)[-1]) if a["comando"].split() else ""}:
             if len(n) >= 3 and re.search(r"(?<![a-z0-9])" + re.escape(n) + r"(?![a-z0-9])", dicho):
                 return ""                                  # ya has dicho el nombre de uno: no hace falta la lista
-    nombres, total = [], 0
+    nombres: list = []
+    total = 0
     for a in ordenar_apps(apps, ruta_log):
         if total + len(a["nombre"]) + 2 > caracteres or len(nombres) >= maximo:
             break
@@ -1027,8 +1037,8 @@ def aplicar_alias(texto, ruta=None):
             tramo = norm[i:i + n]
             if all(tramo) and " ".join(tramo) in alias:
                 oido, significa = alias[" ".join(tramo)]
-                pre = re.match(r"^[^\w]*", tokens[i]).group()
-                post = re.search(r"[^\w]*$", tokens[i + n - 1]).group()
+                pre = _signos(r"^[^\w]*", tokens[i])
+                post = _signos(r"[^\w]*$", tokens[i + n - 1])
                 salida.append(pre + significa + post)
                 hechos.append((oido, significa))
                 i += n
@@ -1116,7 +1126,7 @@ def aplicar_variantes(texto, apps=None):
             instalada = buscar_app(destino, apps)
             if not instalada or instalada[0][0] < 100:
                 continue
-            post = re.search(r"[^\w]*$", tokens[j + n - 1]).group()
+            post = _signos(r"[^\w]*$", tokens[j + n - 1])
             salida.append(instalada[0][1]["nombre"] + post)
             hechos.append((" ".join(tokens[j:j + n]), instalada[0][1]["nombre"]))
             i = j + n

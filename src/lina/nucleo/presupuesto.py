@@ -36,7 +36,7 @@ USD_POR_BUSQUEDA_GOOGLE = 0.014       # …y después, 14 $ cada 1000
 TOPE_MEDIDAS_EUR = 3.0                # lo que pueden gastar al mes las medidas (lina probar-ia, lina probar-busqueda) con la clave de pago, aparte de tu tope
 EN_MEDIDA = [False]                   # dentro de ia.solo_medida(): lo de pago va al contador de medidas, no al de tu uso real
 _FLASH_38 = [(None, 0.75, 3.75, 0.075), ("2027-01-01", 1.50, 7.50, 0.15)]        # Google lo sube el 1 de enero de 2027
-PRECIOS_DEFECTO = {                  # dólares por millón de tokens: (desde, entrada, salida —con el razonamiento—, entrada en caché)
+PRECIOS_DEFECTO: dict[str, list] = {      # dólares por millón de tokens: (desde, entrada, salida —con el razonamiento—, entrada en caché)
     "gemini-3.8-flash": _FLASH_38, "gemini-3.7-flash": _FLASH_38, "gemini-3.6-flash": _FLASH_38,
     "gemini-3.5-flash": [(None, 1.50, 9.00, 0.15)], "gemini-3.5-flash-lite": [(None, 0.30, 2.50, 0.03)],
     "gemini-3.1-flash-lite": [(None, 0.25, 1.50, 0.025)], "gemini-3-flash-preview": [(None, 0.50, 3.00, 0.05)],
@@ -48,7 +48,7 @@ PRECIOS_DEFECTO = {                  # dólares por millón de tokens: (desde, e
 _lock = threading.RLock()
 _claves = {"gratis": "", "pago": ""}
 _avisos_pendientes: list = []
-_cache_conf = {"marca": "x", "datos": None}
+_cache_conf: dict = {"marca": "x", "datos": None}
 _precio_desconocido_avisado: set = set()
 
 
@@ -155,9 +155,9 @@ def configuracion():
     if _cache_conf["datos"] is not None and _cache_conf["marca"] == marca:
         return _cache_conf["datos"]
     marca_txt = marca[0]
-    datos = {"tope_eur": TOPE_EUR, "eur_por_usd": EUR_POR_USD, "avisos": AVISOS_PORCENTAJE,
+    datos: dict = {"tope_eur": TOPE_EUR, "eur_por_usd": EUR_POR_USD, "avisos": AVISOS_PORCENTAJE,
              "precios": {m: list(v) for m, v in PRECIOS_DEFECTO.items()}}
-    propios = {}
+    propios: dict[str, list] = {}
     if marca_txt is not None:
         seccion = ""
         try:

@@ -12,9 +12,13 @@ from urllib.parse import urlparse
 import re
 import subprocess
 import time
+from typing import Any
 
 
 class MixinOrganizacion:
+    # Declarados (solo el tipo, sin valor) para mypy: el valor de partida está en asistente.TareaActual
+    fuente_turno: Any
+
     def herramienta_oficina(self, nombre, args):
         """C3: Excel y PowerPoint. Leer marca la tarea como «contenido de fuera» (un archivo descargado puede traer instrucciones); escribir sigue la misma regla que las notas."""
         funcion = H.oficina_hoja if nombre == "hoja_calculo" else H.oficina_presentacion

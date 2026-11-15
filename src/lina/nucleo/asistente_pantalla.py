@@ -14,11 +14,16 @@ from lina.nucleo.registro import log
 from lina.nucleo import rutas as RUT
 from pathlib import Path
 import threading
+from typing import Any
 import time
 
 
 
 class MixinPantalla:
+    # Declarados (solo el tipo, sin valor) para mypy: el valor de partida está en asistente.TareaActual
+    _n_captura: int
+    imagen_del_turno: Any
+
     def _permiso_de_capturas(self):
         """Lo que se le dice a la IA cuando necesita ver la pantalla y el usuario no ha dado permiso (o «» si no es ese el problema).
         Sin decidir: se deja PENDIENTE de la confirmación del usuario (solo con el atajo) pedirlo, porque lo ha necesitado ella, no porque él lo pidiera.

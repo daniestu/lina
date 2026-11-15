@@ -27,6 +27,7 @@ import time
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import autoconocimiento as AUTO
@@ -134,7 +135,7 @@ try:
     import evdev
     from evdev import ecodes
 except ImportError:  # sin la librería evdev el asistente funciona igual, pero sin mando
-    evdev = None  # type: ignore[assignment]
+    evdev = None
 
 from lina.nucleo.constantes import (  # noqa: F401
     ANCHO_MAX_CAPTURA, ARCHIVO_PID, ARCHIVO_PRIVADO, ARCHIVO_VOCABULARIO, AUDIO_RESPUESTA, AVISO_ESPERA_A_FONDO,
@@ -413,7 +414,8 @@ def escuchar_mandos(al_pulsar):
     """Vigila los mandos conectados (y los que se conecten después).
     Una pulsación corta de Home, sin tocar otro botón, equivale al atajo del teclado.
     Los juegos no usan Home, así que no reciben nada que les afecte."""
-    vigilados, descartados = {}, set()
+    vigilados: dict = {}
+    descartados: set = set()
     ultima_vez = [0.0]
 
     def vigilar(mando):
@@ -500,14 +502,25 @@ _ACCION_DESTRUCTIVA = IDI.PorIdioma({
 class TareaActual:
     """El estado de cada petición, con su valor antes de que empiece la primera. `nueva_tarea` y `_atender` lo van poniendo en cada Asistente; lo que aquí es mutable nunca se modifica en su sitio."""
     pregunta_pura = ""
-    acciones_turno = ()
-    fuente_turno = None
+    acciones_turno: Any = ()         # [(herramienta, datos, resultado)]; cada petición pone su lista (aquí, vacía e inmutable a propósito)
+    fuente_turno: Any = None
+    compatibilidad_turno: Any = None
     fuente_cerrada = reintento_solo_web = turno_aceptado = insistiendo = False
     max_tiempo, max_tokens, max_busquedas = MAX_TIEMPO_TAREA, MAX_TOKENS_TAREA, MAX_BUSQUEDAS
     obstaculo = pedir_profundo = modo_actual = nota_captura = ""
-    miradas = pasos_interfaz = _n_peticion = _n_respondida = _n_captura = 0
+    miradas: int = 0
+    pasos_interfaz: int = 0
+    _n_peticion: int = 0
+    _n_respondida: int = 0
+    _n_captura: int = 0
     pasos_receta: list = []
-    receta_interfaz_pendiente = ultima_tecla = _repetida = _fuentes_antes = imagen_del_turno = turno_voz = crono = None
+    receta_interfaz_pendiente: Any = None
+    ultima_tecla: Any = None
+    _repetida: Any = None
+    _fuentes_antes: Any = None
+    imagen_del_turno: Any = None
+    turno_voz: Any = None
+    crono: Any = None
     ultima_pantalla_t = 0.0
 
 
@@ -523,7 +536,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
     origen_texto = False          # la petición en curso viene de «lina di»: como el atajo, pero NO confirma acciones ni sube el tope de gasto
     canal_salida = None           # con «lina di»: a dónde va lo que diría (la terminal); None = solo la voz
     canal_voz = False             # con «lina di --voz»: además lo dice en voz alta
-    manos_libres = None           # el oyente de «Oye Lina» (manos_libres.py)
+    manos_libres: Any = None      # el oyente de «Oye Lina» (manos_libres.py)
+    indicador: Any = None         # el icono de la bandeja (indicador.py), si lo hay
+    microfono: Any = None         # la entrada de sonido mientras te escucha
     sustituida = False            # la tarea en curso se abandona porque has pedido otra cosa (no hace falta que diga «lo dejo»)
     _grabacion_n = 0              # qué grabación del atajo está en curso: un corte por silencio que llega tarde no cierra la siguiente
     _corte_pedido = False         # el detector ya pidió terminar esta grabación (solo se pide una vez)
@@ -1024,7 +1039,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
     def _cola(self):
         """Lo que has pedido con «además…» mientras trabajaba: se hace al terminar lo actual."""
         if getattr(self, "cola_peticiones", None) is None:
-            self.cola_peticiones = []
+            self.cola_peticiones: list = []
         return self.cola_peticiones
 
     def _tarea(self, funcion, *args):
@@ -2330,8 +2345,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         resultados = " ".join(str(r) for _, _, r in acciones)
         if comunes & cifras(resultados):
             return texto
-        cifras = comunes
-        log(f"Las cifras {', '.join(sorted(cifras))} las dijo el usuario y no salen de los resultados: la fuente es él")
+        log(f"Las cifras {', '.join(sorted(comunes))} las dijo el usuario y no salen de los resultados: la fuente es él")
         salida = str(texto)
         for inicio, fin, _ in reversed(BUS.fuentes_nombradas(salida)):
             antes = salida[:inicio]
@@ -2473,7 +2487,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             hay_otra = i + 1 < len(claves)
             # Si hay otra clave a la que recurrir, no se espera 20 s a la primera: lo normal es 1-3 s, y si no responde en 8 se prueba con la otra
             extra = {"timeout": TIMEOUT_PRIMERA_CLAVE} if hay_otra and modo_claves == "rapido" and "timeout" not in kwargs else {}
-            r = preguntar_ia(proveedor, clave, modelo, *args, **kwargs, **extra)
+            r = preguntar_ia(proveedor, clave, modelo, *args, **kwargs, **extra)  # type: ignore[misc]  # reenvía *args y **kwargs tal cual: mypy no sabe que no se pisan
             if r:
                 return r
             if i + 1 < len(claves):

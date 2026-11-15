@@ -60,7 +60,9 @@ def log(mensaje):
 
 def _parsear(texto):
     """Devuelve ({sección: [(nº de línea, tipo, resto)]}, [avisos])."""
-    secciones, avisos, actual = {}, [], None
+    secciones: dict[str, list] = {}
+    avisos: list[str] = []
+    actual = None
     for n, linea in enumerate(texto.splitlines(), 1):
         l = re.split(r"\s#", linea.strip(), maxsplit=1)[0].strip()
         if not l or l.startswith("#"):
@@ -87,7 +89,7 @@ def _parsear(texto):
 
 def _construir(secciones, avisos):
     """Convierte las líneas en reglas listas para usar, validándolas."""
-    datos = {"modo": "alta", "limites": {"borrados_masivos": 10}, "frenar_contenido_de_fuera": False, "secciones": [], "desechables": []}
+    datos: dict = {"modo": "alta", "limites": {"borrados_masivos": 10}, "frenar_contenido_de_fuera": False, "secciones": [], "desechables": []}
     for n, tipo, resto in secciones.get("contenido_de_fuera", []):
         if tipo == "frenar_cambios" and resto in ("si", "no"):
             datos["frenar_contenido_de_fuera"] = resto == "si"
@@ -106,7 +108,7 @@ def _construir(secciones, avisos):
         else:
             avisos.append(f"línea {n}: en [limites] solo vale «borrados_masivos NÚMERO» (1 o más); ignorada")
     for nombre in SECCIONES_CRITICAS:
-        sec = {"nombre": nombre, "motivo": "es una acción crítica", "reglas": []}
+        sec: dict = {"nombre": nombre, "motivo": "es una acción crítica", "reglas": []}
         for n, tipo, resto in secciones.get(nombre, []):
             if tipo == "motivo":
                 if resto:
@@ -144,7 +146,7 @@ def _construir(secciones, avisos):
     return datos
 
 
-_cache = {"marca": "sin leer", "datos": None}
+_cache: dict = {"marca": "sin leer", "datos": None}
 
 
 def datos():

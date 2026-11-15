@@ -7,9 +7,15 @@ from lina.nucleo.ia import _abortar
 from lina.nucleo.registro import log
 from lina.nucleo.turnos import peticion_de_receta
 import re
+from typing import Any
 
 
 class MixinInterfaz:
+    # Declarados (solo el tipo, sin valor) para mypy: el valor de partida está en asistente.TareaActual
+    pasos_interfaz: int
+    pasos_receta: list
+    receta_interfaz_pendiente: Any
+
     def _paso_hecho(self, paso):
         """Apunta un paso de interfaz que SÍ se hizo (con el nombre del control, no su id) por si luego se guarda como receta."""
         self.pasos_receta = (self.pasos_receta + [paso])[-20:]

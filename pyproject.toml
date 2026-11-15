@@ -93,5 +93,7 @@ module = ["lina.nucleo.registro", "lina.nucleo.procesos", "lina.nucleo.ejecucion
           # M5 (2026-11-15): los que ya pasaban o tenían 1–4 avisos (uno de ellos un fallo de verdad: «find|xargs» rompía el clasificador)
           "lina.nucleo.clasificador", "lina.nucleo.papelera", "lina.nucleo.recetas", "lina.nucleo.memoria", "lina.nucleo.compatibilidad",
           "lina.nucleo.fuentes", "lina.nucleo.grupos", "lina.nucleo.busqueda", "lina.nucleo.ia", "lina.modulos.web",
-          "lina.nucleo.aislamiento"]
+          "lina.nucleo.aislamiento",
+          # M5 (2026-11-15, por la tarde): los cinco que quedaban de los medidos
+          "lina.nucleo.asistente", "lina.nucleo.resolver", "lina.nucleo.comandos", "lina.nucleo.politica", "lina.nucleo.presupuesto"]
 check_untyped_defs = true

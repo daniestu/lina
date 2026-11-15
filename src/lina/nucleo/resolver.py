@@ -23,7 +23,7 @@ from lina.nucleo.ejecucion import _abs
 # de KDE. Los ajustes de KDE guardan su valor anterior y avisan si la clave no existía (suele ser una clave inventada).
 # Los paquetes del AUR en los que confías (los que ya confirmaste una vez) se instalan sin preguntar.
 _estado_fdb = {"sincronizada": False}                 # la base de archivos de pacman (pacman -F) se sincroniza una vez por sesión
-_cache_paneles = {"t": 0.0, "datos": {}}
+_cache_paneles: dict = {"t": 0.0, "datos": {}}
 _AUR_HELPERS = {"paru", "yay", "pikaur", "aurman"}
 ARCHIVO_CONFIABLES = RUT.editable("paquetes_confiables.txt")
 _cache_conf: dict = {"marca": None, "datos": set()}
@@ -301,7 +301,7 @@ def _aur_todo_confiable(base, args):
 # ---- Ajustes de KDE (kwriteconfig6) ----
 def _parse_kwriteconfig(args):
     """kwriteconfig6 --file F --group G [--group G2] --key K [--type T] [--delete] [VALOR] → dict, o None si no se entiende."""
-    d = {"archivo": None, "grupos": [], "clave": None, "valor": "", "borrar": False}
+    d: dict = {"archivo": None, "grupos": [], "clave": None, "valor": "", "borrar": False}
     pos, i = [], 0
     while i < len(args):
         a = args[i]
@@ -422,7 +422,8 @@ def buscar_clave_en_binarios(app, palabras):
                     ficheros.append(ruta)
     if not ficheros:
         return f"No encuentro binarios de «{app}» en /usr/lib. Prueba con otro nombre del programa o busca en internet (buscar_web, en inglés)."
-    encontrados, leidos, inicio = {}, 0, time.time()
+    encontrados: dict = {}
+    leidos, inicio = 0, time.time()
     for ruta in sorted(ficheros)[:60]:
         try:
             if os.path.getsize(ruta) > 40 * 1024 * 1024 or leidos > 150 * 1024 * 1024 or time.time() - inicio > 20:
@@ -469,7 +470,7 @@ def _parsear_ini(texto):
 
 def _fotografiar_config(carpeta):
     """Los archivos de configuración de KDE de primer nivel (los acabados en «rc» y kdeglobals): solo esos, nunca archivos con secretos."""
-    datos = {}
+    datos: dict = {}
     try:
         nombres = os.listdir(carpeta)
     except OSError:
@@ -586,7 +587,7 @@ def observar_config(fase, carpeta=None):
 # Cada aplicación de KDE declara sus ajustes en un archivo .kcfg (grupo, clave, tipo, valor por defecto). Los valores por
 # defecto NO se escriben en tu archivo de configuración: que una clave no esté ahí no significa que sea inválida.
 DIRS_KCFG = [Path("/usr/share/config.kcfg"), Path("/usr/local/share/config.kcfg")]
-_cache_esquemas = {"t": 0.0, "datos": []}
+_cache_esquemas: dict = {"t": 0.0, "datos": []}
 
 
 def _esquemas_kcfg():
@@ -606,7 +607,7 @@ def _esquemas_kcfg():
                 continue                                   # un esquema roto no tumba el resto
             nombre = lambda e: e.tag.rsplit("}", 1)[-1]
             archivos = [h.get("name") for h in raiz if nombre(h) == "kcfgfile" and h.get("name")]
-            archivo = os.path.basename(archivos[0]) if archivos else ""
+            archivo = os.path.basename(str(archivos[0])) if archivos else ""
             for g in raiz:
                 if nombre(g) != "group":
                     continue
@@ -614,7 +615,8 @@ def _esquemas_kcfg():
                     clave = en.get("key") or en.get("name")
                     if nombre(en) != "entry" or not clave:
                         continue
-                    textos, calculado = {}, False
+                    textos: dict = {}
+                    calculado = False
                     for h in en:
                         if nombre(h) == "default" and "default" not in textos:
                             calculado = h.get("code") == "true"           # <default code="true">: lo calcula el programa
