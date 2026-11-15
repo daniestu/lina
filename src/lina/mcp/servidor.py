@@ -44,7 +44,7 @@ def _consultar_pc(a):
         return "Falta el comando."
     if re.search(r"[|;&<>`$()\n\\]", cmd):
         return "Solo se admite un comando sencillo, sin tuberías ni redirecciones."
-    if re.search(r"(^|\s)(sudo|doas|pkexec|su)(\s|$)|/proc/|environ|kwallet|keyring|\.config/lina|\.local/share/lina", cmd, re.I):
+    if re.search(r"(^|\s)(sudo|doas|pkexec|run0|su)(\s|$)|/proc/|environ|kwallet|keyring|\.config/lina|\.local/share/lina", cmd, re.I):
         return "No lo ejecuto: ese comando toca privilegios de administrador, variables de otros procesos, carteras de claves o la configuración del asistente."
     clase, motivo = H.clasificar(cmd)
     if clase != "lectura":

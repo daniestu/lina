@@ -158,7 +158,14 @@ _AYUDANTE_ROOT = r"/usr/lib/lina\b|org\.lina\.instalar|sudoers\.d/lina|nucleo/ra
 _PREFIJOS = {"sudo": {"-u", "-g", "-C", "-h", "-p", "-r", "-t", "-U", "-D", "-R"}, "doas": {"-u", "-C"}, "pkexec": {"--user", "-u"},
              "nohup": set(), "time": set(), "nice": {"-n"}, "ionice": {"-c", "-n", "-p"}, "command": set(),
              "exec": set(), "builtin": set(), "setsid": set(), "stdbuf": {"-i", "-o", "-e"},
-             "timeout": {"-s", "-k"}, "env": {"-u", "-C", "-S"}}
+             "timeout": {"-s", "-k"}, "env": {"-u", "-C", "-S"},
+             # S6: lo que llaman se analiza como si se escribiera solo («busybox rm -rf ~» es rm; «systemd-run --user x» y «run0 x» son x)
+             "busybox": set(), "toybox": set(),
+             "systemd-run": {"-u", "--unit", "-p", "--property", "-E", "--setenv", "--description", "--slice", "-H", "--host", "-M", "--machine",
+                             "--uid", "--gid", "--nice", "--working-directory", "--on-active", "--on-boot", "--on-startup", "--on-unit-active",
+                             "--on-unit-inactive", "--on-calendar", "--timer-property", "--path-property", "--socket-property", "--service-type"},
+             "run0": {"-u", "--user", "-g", "--group", "--nice", "-D", "--chdir", "--setenv", "--unit", "--property", "--description", "--slice",
+                      "--machine", "--background"}}
 _HERRAMIENTAS_DISCO = {"wipefs", "blkdiscard", "sgdisk", "sfdisk", "gdisk", "cgdisk", "mke2fs"}
 
 
@@ -250,16 +257,36 @@ _A_UN_INTERPRETE = re.compile(r"\|\s*(?:sudo\s+(?:-\S+\s+)*)?(?:python[\d.]*|per
 _SUSTITUCION_A_SHELL = re.compile(r"(?:^|[;&|\s])(?:(?:ba|z|da|fi|k)?sh\s+(?:-\w+\s+)*[\"']?\$\(|(?:ba|z|da|fi|k)?sh\s+<\(|eval\s+[\"']?\$\(|(?:source|\.)\s+<\()")
 _CODIGO_CON_RED = re.compile(r"urlopen|requests\.(?:get|post)|urllib|http\.client|fetch\(|\bcurl\b|\bwget\b|https?://")
 _CODIGO_QUE_EJECUTA = re.compile(r"\b(?:exec|eval|system|popen|execSync|spawnSync|spawn|subprocess)\b")
-_CODIGO_DESTRUCTIVO = re.compile(r"\brm\s+-\w*[rf]|rmtree|os\.(?:remove|unlink|rmdir)|\bunlink\(|\brmdir\(|\bshred\b|\bmkfs|\bdd\s+if=|truncate\(")
+_CODIGO_DESTRUCTIVO = re.compile(r"\brm\s+-\w*[rf]|rmtree|os\.(?:remove|unlink|rmdir)|\bunlink\b|\brmdir\(|\bshred\b|\bmkfs|\bdd\s+if=|truncate\(|"
+                                 r"File\.delete|FileUtils\.rm|fs\.(?:rm|unlink|rmdir)")
+# S6: código en línea que lanza otras órdenes (system(), popen, subprocess, `…`, y en awk «print | "orden"» o «"orden" | getline»): no se puede revisar qué
+_CODIGO_LANZA_ORDENES = re.compile(r"\b(?:system|popen|subprocess|execSync|spawnSync|spawn|exec[lv]p?e?|child_process|shell_exec|passthru|proc_open)\b|`[^`]+`|"
+                                   r"\|\s*\"|\|&|\"\s*\|\s*getline|%x[({]|\bqx[({/]|\bos\.(?:system|popen)|\bIO\.popen|\bOpen3\b")
+_AWKS = {"awk", "gawk", "mawk", "nawk"}
+_AWK_CON_VALOR = {"-F", "-v", "--assign", "--field-separator"}
 
 
 def _codigo_en_linea(base, args):
-    """El texto de «python -c '…'», «node -e '…'», «perl -e '…'», o None."""
+    """El texto de «python -c '…'», «node -e '…'», «perl -e '…'», el programa de awk, o None."""
+    if base in _AWKS:                                   # S6: «awk 'BEGIN{system("…")}'» es código en línea, como python -c
+        i = 0
+        while i < len(args):
+            a = args[i]
+            if a in ("-f", "--file") or a.startswith("--file="):
+                return None                             # el programa está en un archivo: lo vigila quien ejecuta scripts
+            if a in _AWK_CON_VALOR:
+                i += 2
+                continue
+            if a.startswith("-") and a != "-":
+                i += 1
+                continue
+            return a
+        return None
     if not _es_interprete(base) or base in _SHELLS:
         return None
     for i, a in enumerate(args):
-        if a in ("-c", "-e", "-E", "--eval", "--command") and i + 1 < len(args):
-            return args[i + 1]
+        if (a in ("-c", "-e", "-E", "--eval", "--command") or (base in ("perl", "ruby") and re.fullmatch(r"-\w*[eE]", a))) and i + 1 < len(args):
+            return args[i + 1]                          # perl -ne / -pe / -lane '…' también llevan el código detrás
     return None
 
 
@@ -342,6 +369,24 @@ def _bloqueado_hostil(comando):
     return None
 
 
+_EDITORES = {"vi", "vim", "nvim", "view", "vimdiff", "nvi", "ex", "gvim", "rvim", "rview", "evim"}
+_PAGINADORES = {"less", "more", "most"}
+# «:!orden», «:r !orden», «:w !orden», «:%!filtro», «:sh», «:terminal», «:py …», «:lua …», «system(…)». «:w!» y «:wq!» (forzar) no son la shell.
+_ORDEN_DE_EDITOR = re.compile(r"(?:^|\|)\s*:*\s*[\d.,$%'<>]*\s*(?:(?:r(?:ead)?|w(?:rite)?)\s+)?!|"
+                              r"(?:^|\|)\s*:*\s*(?:sh(?:ell)?|ter(?:minal)?|py(?:thon)?3?|pyx?|lua|perl|ruby|luafile|pyfile|rubyfile)\b|\bsystem\s*\(")
+
+
+def _escape_a_la_shell(base, args):
+    """S6: «vim -c ':!orden'», «nvim +'!orden'», «less +'!orden'»: el editor o el paginador ejecutarían la orden sin que se vea cuál."""
+    if base in _EDITORES:
+        ordenes = [args[i + 1] for i, a in enumerate(args[:-1]) if a in ("-c", "--cmd")] + [a[1:] for a in args if a.startswith("+")]
+        if any(_ORDEN_DE_EDITOR.search(o) for o in ordenes):
+            return "ejecutaría órdenes desde dentro del editor, sin que se vea cuáles"
+    if base in _PAGINADORES and any(a.startswith("+") and "!" in a for a in args):
+        return "ejecutaría órdenes desde dentro del paginador, sin que se vea cuáles"
+    return None
+
+
 def _critico_extra(comando):
     """Cosas que pasan por el filtro anterior pero piden el atajo: código libre que puede borrar, contenedores con acceso total, software de fuera."""
     for seg in _segmentos(comando):
@@ -353,6 +398,16 @@ def _critico_extra(comando):
         codigo = _codigo_en_linea(base, args)
         if codigo and _CODIGO_DESTRUCTIVO.search(codigo):
             return "ejecuta código libre que puede borrar archivos"
+        if codigo and _CODIGO_LANZA_ORDENES.search(codigo):
+            return "ejecuta código libre que lanza otras órdenes, y no se puede revisar cuáles"
+        prefijos = [os.path.basename(x) for x in t[:len(t) - len(resto)]]
+        if "systemd-run" in prefijos and any(a.startswith("--on-") for a in t[:len(t) - len(resto)]):
+            return "crea una tarea automática que se repite (un temporizador de systemd-run)"
+        if re.match(r"[$`]", resto[0]) or base == "eval":
+            return "ejecutaría un programa que sale de una variable o de otra orden: no se sabe cuál hasta ejecutarlo"
+        motivo = _escape_a_la_shell(base, args)
+        if motivo:
+            return motivo
         if base in {"docker", "podman", "nerdctl"} and ("--privileged" in args or any(re.match(r"(?:-v|--volume)(?:=|\s*)/(?::|\s|$)", a) or a in ("/:/host",) or a.startswith("/:") for a in args)
                                                       or re.search(r"(?:-v|--volume)[= ]+/:", " ".join(args))):
             return "da a un contenedor acceso total al equipo (equivale a ser administrador)"
@@ -778,6 +833,10 @@ def _es_lectura(comando):
         t = _tokens(seg)
         if not t or t[0] == "doas" or re.match(r"^[A-Za-z_]\w*=", t[0]):
             return False
+        if t[0] in ("busybox", "toybox"):          # S6: «busybox ls /» se mira como «ls /»
+            t = t[1:]
+            if not t:
+                return False
         if t[0] == "sudo":
             t = [x for x in t[1:] if x != "-n"]
             if not t or os.path.basename(t[0]) not in _SUDO_LECTURA:

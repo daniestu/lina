@@ -144,7 +144,7 @@ def _politica():
 
 
 def _con_sudo(segmento):
-    return re.match(r"^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:sudo|doas|pkexec)\b", segmento) is not None
+    return re.match(r"^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:sudo|doas|pkexec|run0)\b", segmento) is not None
 
 
 def _ruta_coincide(ruta, patron):
@@ -205,6 +205,65 @@ def _papelera_masiva(base, args, datos):
     return False
 
 
+def _git_clean_de_verdad(base, args):
+    """S6: «git clean -f» (y -fd, -fdx, --force…) borra para siempre lo que git no sigue; con -n / --dry-run solo lo enseña."""
+    if base != "git":
+        return False
+    i = 0
+    while i < len(args) and args[i].startswith("-"):           # opciones de git antes del subcomando: -C carpeta, -c clave=valor…
+        i += 2 if args[i] in ("-C", "-c", "--git-dir", "--work-tree", "--namespace") else 1
+    if args[i:i + 1] != ["clean"]:
+        return False
+    resto = args[i + 1:]
+    cortas = "".join(a[1:] for a in resto if a.startswith("-") and not a.startswith("--"))
+    if "n" in cortas or "--dry-run" in resto:
+        return False
+    return "f" in cortas or "--force" in resto
+
+
+_ESQUEMAS_BLOQUEO = ("org.gnome.desktop.screensaver", "org.gnome.desktop.lockdown", "org.cinnamon.desktop.screensaver", "org.mate.screensaver")
+_RUTAS_DCONF_BLOQUEO = ("/org/gnome/desktop/screensaver/", "/org/gnome/desktop/lockdown/", "/org/gnome/desktop/session/idle-delay",
+                        "/org/cinnamon/desktop/screensaver/", "/org/mate/screensaver/")
+
+
+def _toca_bloqueo_de_pantalla(base, args):
+    """S6: cambiar el bloqueo de pantalla (gsettings o dconf de GNOME/Cinnamon/MATE, kscreenlockerrc de KDE) va con las cuentas y credenciales:
+    quitarlo deja el equipo abierto a quien se siente delante. Leerlo no."""
+    sueltos = [a for a in args if not a.startswith("-")]
+    if base == "gsettings" and sueltos[:1] and sueltos[0] in ("set", "reset", "reset-recursively"):
+        esquema, clave = (sueltos[1:2] or [""])[0], (sueltos[2:3] or [""])[0]
+        return esquema.startswith(_ESQUEMAS_BLOQUEO) or (esquema == "org.gnome.desktop.session" and clave in ("idle-delay", ""))
+    if base == "dconf" and sueltos[:1] and sueltos[0] in ("write", "reset", "load"):          # la ruta, o una carpeta que la contenga («dconf load /»)
+        return any(r.startswith(s) or s.startswith(r) for s in sueltos[1:2] for r in _RUTAS_DCONF_BLOQUEO)
+    if re.fullmatch(r"kwriteconfig\d*", base):
+        return any(os.path.basename(a.split("=", 1)[-1]) == "kscreenlockerrc" for a in args)
+    return any(os.path.basename(_normalizar_ruta(r)) == "kscreenlockerrc" for r in _rutas_afectadas(base, args))
+
+
+_SIN_SCRIPT = {"-c", "-e", "-E", "-m", "--eval", "--command", "-V", "--version", "-h", "--help"}
+
+
+def _script_tuyo(resto):
+    """S6: ¿ejecuta un programa o script de tu carpeta personal (por ruta, o como primer argumento de un intérprete; relativo cuenta, porque las órdenes
+    se ejecutan desde tu carpeta)? Lo de tu carpeta no viene de las fuentes de confianza: puede haberlo escrito cualquiera, también la IA."""
+    base = os.path.basename(resto[0])
+    candidatos = [resto[0]] if "/" in resto[0] else []
+    if _es_interprete(base):
+        for a in resto[1:]:
+            if a in _SIN_SCRIPT or (base in ("perl", "ruby") and re.fullmatch(r"-\w*[eE]\w*", a)):
+                break                                       # código en línea o un módulo (-m): no es un archivo
+            if a.startswith("-"):
+                continue
+            if a != "-":
+                candidatos.append(a)
+            break
+    for c in candidatos:
+        ruta = _normalizar_ruta(c) if c.startswith(("/", "~", "$HOME", "${HOME}")) else _normalizar_ruta(os.path.join(_HOME, c))
+        if ruta.startswith(_HOME + "/"):
+            return True
+    return False
+
+
 def _regla_coincide(sec, base, args, resto, datos):
     for tipo, v in sec["reglas"]:
         if tipo == "programa":
@@ -242,6 +301,13 @@ def _regla_coincide(sec, base, args, resto, datos):
                 return True
     if sec["nombre"] == "borrado" and _papelera_masiva(base, args, datos):
         return True
+    if sec["reglas"] and not sec.get("solo_lo_bajado"):        # S6; con la categoría en «libre» (sin reglas) no se vigilan, como las demás
+        if sec["nombre"] == "borrado" and _git_clean_de_verdad(base, args):
+            return True
+        if sec["nombre"] == "cuentas_y_credenciales" and _toca_bloqueo_de_pantalla(base, args):
+            return True
+        if sec["nombre"] == "software_de_fuera" and _script_tuyo(resto):
+            return True
     return False
 
 
@@ -286,7 +352,7 @@ def _secciones_de(comando, _prof=0):
                 continue
             secciones.add(sec["nombre"])
             de_lo_bajado = [(tipo, v) for tipo, v in sec["reglas"] if tipo == "ejecutar_desde" or (tipo == "programa" and v in ("*.AppImage", "*.run"))]
-            if de_lo_bajado and _regla_coincide({"nombre": sec["nombre"], "reglas": de_lo_bajado}, base, args, resto, datos):
+            if de_lo_bajado and _regla_coincide({"nombre": sec["nombre"], "reglas": de_lo_bajado, "solo_lo_bajado": True}, base, args, resto, datos):
                 secciones.add("")
     return secciones
 
