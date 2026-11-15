@@ -119,6 +119,8 @@ class MixinInterfaz:
             return "No guardo la receta: algún paso no tiene nombre de control."
         if not _A.REC.aprender_interfaz(ajuste, "", "", pasos, "", comprobar, solo_comprobar=True):
             return "No puedo guardar esa receta (el nombre debe tener alguna palabra concreta y los pasos ser de pulsar, escribir, tecla o clic)."
+        if self.modo_privado:
+            return "Modo privado: no guardo recetas nuevas. Contesta al usuario normalmente; si pregunta por la receta, díselo."
         self.receta_interfaz_pendiente = (ajuste, args.get("palabras", ""), self.pregunta_pura, pasos, args.get("valor_usado", ""), comprobar)
         return (f"Receta anotada: «{ajuste}» ({len(pasos)} pasos). Se guardará cuando la respuesta se dé por buena; si resulta que no funcionó, se descarta. "
                 "Contesta al usuario normalmente.")

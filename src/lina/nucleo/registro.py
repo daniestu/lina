@@ -2,6 +2,7 @@
 # Copyright (C) 2026 Lina contributors
 """Registro de acciones (acciones.log) y avisos del escritorio. Todo lo que hace el asistente queda anotado aquí, con las claves tapadas."""
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -10,8 +11,43 @@ from lina.nucleo import rutas as RUT
 
 ARCHIVO_ACCIONES = RUT.REGISTRO_ACCIONES
 
+# S10: en modo privado, lo que va al registro (y el servicio vuelca al journal: journalctl --user -u lina) no lleva lo que dices ni lo que contesto, con
+# independencia de privacidad.registrar_preguntas. Lo pone el asistente al arrancar y al cambiar el modo. Se tapa aquí, por donde pasa todo, y no línea a
+# línea: de cada línea queda solo el principio, hasta los primeros dos puntos, «, una dirección web o un nombre de dominio, y además se tapan en cualquier
+# parte las frases del turno (lo que dijiste, lo que oyó Whisper, la respuesta). Coste aceptado: un fallo en privado es más difícil de diagnosticar.
+PRIVADO = False
+_FRASES: list[str] = []
+MAX_FRASES = 20
+_CORTE = re.compile(r": |«|\bhttps?://|\b(?:[\w-]+\.)+[a-z]{2,}\b", re.I)
+
+
+def tapar(*textos):
+    """Frases de este turno que no pueden salir en el registro mientras dure el modo privado (se guardan solo en memoria, las últimas MAX_FRASES)."""
+    for texto in textos:
+        texto = str(texto or "").strip()
+        if len(texto) >= 3 and texto not in _FRASES:
+            _FRASES.append(texto)
+    del _FRASES[:-MAX_FRASES]
+
+
+def privado(activo):
+    global PRIVADO
+    PRIVADO = bool(activo)
+    if not PRIVADO:
+        _FRASES.clear()
+
+
+def _en_privado(mensaje):
+    for frase in sorted(_FRASES, key=len, reverse=True):
+        mensaje = mensaje.replace(frase, "…")
+    m = _CORTE.search(mensaje)
+    return mensaje[:m.start()].rstrip() + (": …" if m.group(0) == ": " else " …") if m else mensaje
+
 
 def log(mensaje):
+    mensaje = str(mensaje)
+    if PRIVADO:
+        mensaje = _en_privado(mensaje)
     print(f"[{time.strftime('%H:%M:%S')}] {mensaje}", flush=True)
 
 

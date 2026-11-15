@@ -48,13 +48,17 @@ Se activa con «activa el modo privado» y se quita solo con el atajo, diciendo 
 - No atiendo «Oye Lina»: solo te escucho con el atajo.
 - No se conserva lo que acaba de pasar (ver más abajo), y al activarlo se borra lo que hubiera.
 - No puedo probar ajustes de KDE que haya que comprobar mirando el panel.
+- El registro no guarda lo que dices ni lo que contesto, tampoco en lo que el servicio vuelca al registro del sistema (`journalctl --user -u lina`), aunque `privacidad.registrar_preguntas` esté activo. De cada línea queda solo el principio («Pregunta: …», «Respuesta [voz]: …»). Lo que ya estaba en el journal de antes no se borra.
+- No aprendo recetas nuevas. Las que ya tengo las sigo usando.
+- No apunto nada nuevo en la memoria: si me dices «recuerda que…», te digo que no lo apunto. Lo que ya tenía lo sigo usando, y «olvida lo de…» funciona.
 
-**Lo que NO cambia. No es un modo de incógnito:**
+**Lo que el modo privado NO cubre. No es un modo de incógnito:**
 
-- Lo que dices se sigue enviando a la IA en texto, con la conversación en curso, el nombre de la ventana activa y el resultado de las herramientas.
-- Las búsquedas se siguen enviando adonde toque (Google dentro de Gemini, Tavily, DuckDuckGo si lo encendiste, Wikipedia y las wikis de juegos).
+- **El proveedor de la IA sigue recibiendo tus preguntas**: lo que dices se le envía en texto, con la conversación en curso, el nombre de la ventana activa y el resultado de las herramientas. Lo que haga con ello lo deciden sus condiciones (ver más abajo).
+- **Steam y ProtonDB ven tu dirección IP** cuando preguntas si un juego funciona en Linux (y el número del juego; el buscador de la tienda de Steam, también su nombre si no está en tu biblioteca).
+- Las búsquedas se siguen enviando adonde toque (Google dentro de Gemini, Tavily, DuckDuckGo si lo encendiste, Wikipedia y las wikis de juegos), y las webs que leo ven tu dirección IP.
 - Lo que ya estaba en la conversación sigue ahí: activarlo no la borra.
-- Sigue guardándose lo demás: el registro (también tus preguntas, si `privacidad.registrar_preguntas` está activo), el registro de acciones, el diario de cambios, las recetas que aprendo, los tiempos y lo que me pidas recordar, y sigo usando esos recuerdos.
+- Sigue guardándose lo demás: el registro de acciones (las órdenes que se ejecutan), el diario de cambios para deshacer y los tiempos (solo números).
 
 ## Qué dice Google de lo que recibe
 

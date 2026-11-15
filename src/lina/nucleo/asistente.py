@@ -35,6 +35,7 @@ from lina.nucleo import busqueda as BUS
 from lina.nucleo import compatibilidad as COMP
 from lina.nucleo import avisos as AVI
 from lina.nucleo import canal as CANAL
+from lina.nucleo import registro as REG
 from lina.nucleo.registro import log
 from lina.nucleo import claves as CL
 from lina.nucleo import ia_activa as IAC
@@ -537,6 +538,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
     def __init__(self):
         self.whisper = MODELOS.cargar_whisper(log, WhisperModel)
         self.modo_privado = ARCHIVO_PRIVADO.exists()
+        REG.privado(self.modo_privado)                   # S10: en privado, el registro y el journal no llevan lo que dices ni lo que contesto
         if self.modo_privado:
             log("Modo privado ACTIVADO (se recuerda de antes): no envío capturas de tu pantalla hasta que lo quites")
         self._configurar_ia(IAC.actual())
@@ -893,6 +895,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         with self.cerrojo_whisper:
             with (crono.medir("whisper") if crono else nullcontext()):
                 texto = self._whisper_texto(audio, language=IDI.actual(), vad_filter=True, initial_prompt=prompt_whisper())
+        REG.tapar(texto)
         log(f"Pregunta: «{texto if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'}» ({time.time() - inicio:.1f} s)")
         return texto
 
@@ -986,6 +989,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
     def _poner_modo_privado(self, activo):
         """Activa o quita el modo privado y lo recuerda en disco (aunque Lina se reinicie)."""
         self.modo_privado = activo
+        REG.privado(activo)
         if activo:
             self.hechos_recientes = []                     # en privado no se conserva lo que ha pasado, ni lo de antes
         try:
@@ -1077,6 +1081,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self._atender(pregunta, inicio, crono, origen=ORIGEN_ATAJO)
 
     def _atender(self, pregunta, inicio, crono=None, nota_sistema="", profundidad=0, origen=None):
+        REG.tapar(pregunta)
         self._n_peticion = self._n_peticion + 1        # los avisos de espera de esta petición caducan cuando se dice su respuesta
         origen = _origen_valido(origen)                                  # el de ESTA petición; sin origen, el restrictivo
         self.origen_voz_libre = origen == ORIGEN_VOZ_LIBRE
@@ -1254,6 +1259,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             if frase_energia != respuesta:
                 log(f"Confirmación de energía escrita por el código (la IA había dicho: «{str(respuesta)[:100]}»)")
             respuesta = frase_energia
+        REG.tapar(respuesta)
         log(f"Respuesta [{origen}]: {respuesta if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'} ({time.time() - inicio:.1f} s en total)")
         try:
             self._aprender_automatico()
@@ -1462,6 +1468,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
 
     def _cerrar_directa(self, pregunta, frase, ident, inicio, crono):
         log(f"Directa [{ident}]: hecho sin llamar a la IA")
+        REG.tapar(frase)
         log(f"Respuesta [directa]: {frase if AJ.actuales(log=lambda m: None).get('privacidad', 'registrar_preguntas') else '…'} ({time.time() - inicio:.1f} s en total)")
         self.guardar_en_historial(pregunta, frase)
         self._apuntar_hechos(pregunta, frase, [f"orden directa {ident}, hecha y comprobada por el código"])

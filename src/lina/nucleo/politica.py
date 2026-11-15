@@ -10,7 +10,6 @@ una sección, se usa la de fábrica. No depende de audio ni de IA, para poder pr
 """
 import copy
 import re
-import time
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import rutas as RUT
 
@@ -55,7 +54,8 @@ def _aplicar_perfil(datos, de_fabrica, aj):
 
 
 def log(mensaje):
-    print(f"[{time.strftime('%H:%M:%S')}] {mensaje}", flush=True)
+    from lina.nucleo import registro          # S10: todo lo que va al journal pasa por registro.log (el modo privado lo tapa allí)
+    registro.log(mensaje)
 
 
 def _parsear(texto):

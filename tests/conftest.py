@@ -98,3 +98,14 @@ def pytest_configure(config):
 
 def pytest_sessionfinish(session, exitstatus):
     shutil.rmtree(CASA, ignore_errors=True)
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _registro_sin_modo_privado():
+    """S10: el modo privado del registro es del proceso; una prueba que lo activa no lo deja puesto para las siguientes."""
+    yield
+    from lina.nucleo import registro
+    registro.privado(False)

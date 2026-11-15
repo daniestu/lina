@@ -36,7 +36,8 @@ _GEN = {t[:6] for t in _GENERICAS}
 
 
 def log(mensaje):
-    print(f"[{time.strftime('%H:%M:%S')}] {mensaje}", flush=True)
+    from lina.nucleo import registro          # S10: todo lo que va al journal pasa por registro.log (el modo privado lo tapa allí)
+    registro.log(mensaje)
 
 
 # ======================= texto limpio y palabras =======================
@@ -137,6 +138,15 @@ def _poner(recetas, nueva, misma_receta):
 
 
 # ======================= aprender =======================
+def _en_privado():
+    """S10: en modo privado no se aprende ninguna receta nueva (ni se añade una frase o un ejemplo a una que ya hay). Las que hay se siguen usando,
+    y se sigue apuntando si salieron bien o mal."""
+    from lina.nucleo import registro
+    if registro.PRIVADO:
+        log("Modo privado: no aprendo recetas nuevas")
+    return registro.PRIVADO
+
+
 def aprender_kde(ajuste, palabras, pedido, archivo, grupos, clave, valor, panel, control, esperado, recargar="", web=False):
     """Apunta un ajuste de KDE que probar_ajuste_kde dejó COMPROBADO en pantalla."""
     ajuste = _libre(ajuste or control, 60)
@@ -147,6 +157,8 @@ def aprender_kde(ajuste, palabras, pedido, archivo, grupos, clave, valor, panel,
              "clave": _limpio(clave, 60), "panel": _limpio(panel, 60), "control": _limpio(control, 80), "recargar": _limpio(recargar, 160),
              "ejemplos": [{"valor": _limpio(valor, 60), "esperado": _limpio(esperado, 80)}]}
     if not nueva["nucleo"]:
+        return None
+    if _en_privado():
         return None
     with _lock:
         recetas = _cargar()
@@ -174,6 +186,8 @@ def aprender_comando(ajuste, palabras, pedido, cambiar, valor_usado, leer, compr
              "pedido": _limpio(pedido, 120), "web": bool(web), "cambiar": cambiar, "valor_usado": _limpio(valor_usado, 60),
              "leer": _limpio(leer, 300), "comprobar": _libre(comprobar, 160)}
     if not nueva["nucleo"]:
+        return None
+    if _en_privado():
         return None
     with _lock:
         recetas = _cargar()
@@ -223,6 +237,8 @@ def aprender_interfaz(ajuste, palabras, pedido, pasos, valor_usado, comprobar, s
         return None
     if solo_comprobar:
         return True
+    if _en_privado():
+        return None
     with _lock:
         recetas = _cargar()
         resultado = _poner(recetas, nueva, lambda r: r.get("pasos") == nueva["pasos"])
@@ -333,6 +349,8 @@ def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, we
     nueva = {"tipo": "pasos", "ajuste": ajuste, "nucleo": nucleo, "palabras": sorted(set(_tokens(ajuste)) - _GEN), "pedido": _limpio(frase, 120), "web": False,
              "pasos": limpios, "frases": [clave], "comprobar": _limpio(comprobar, 300), "esperado": esperado, "verificada": bool(verificada),
              "valor_usado": numeros[0] if con_valor and numeros else "", "cambiar": ""}
+    if _en_privado():
+        return None
     with _lock:
         recetas = _cargar()
         resultado = _poner(recetas, nueva, lambda r: r.get("pasos") == nueva["pasos"])

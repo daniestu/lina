@@ -48,13 +48,17 @@ Turn it on with «activa el modo privado»; only you can turn it off, with the s
 - I don't answer «Oye Lina»: I only listen with the shortcut.
 - What just happened is not kept (see below), and turning it on deletes whatever there was.
 - I can't try KDE settings that need checking by looking at the panel.
+- The log doesn't keep what you say or what I answer, not even in what the service writes to the system log (`journalctl --user -u lina`), even if `privacidad.registrar_preguntas` is on. Only the start of each line is left («Pregunta: …», «Respuesta [voz]: …»). What was already in the journal before is not deleted.
+- I don't learn new recipes. I keep using the ones I already have.
+- I don't note anything new in my memory: if you say «recuerda que…», I tell you I'm not noting it. I keep using what I already had, and «olvida lo de…» works.
 
-**What does NOT change. It is not an incognito mode:**
+**What private mode does NOT cover. It is not an incognito mode:**
 
-- What you say is still sent to the AI as text, with the current conversation, the name of the active window and the result of the tools.
-- Searches are still sent wherever they go (Google inside Gemini, Tavily, DuckDuckGo if you turned it on, Wikipedia and the game wikis).
+- **The AI provider still receives your questions**: what you say is sent to it as text, with the current conversation, the name of the active window and the result of the tools. What it does with that is up to its terms (see below).
+- **Steam and ProtonDB see your IP address** when you ask whether a game works on Linux (and the game's number; the Steam store search also sees its name if it isn't in your library).
+- Searches are still sent wherever they go (Google inside Gemini, Tavily, DuckDuckGo if you turned it on, Wikipedia and the game wikis), and the web pages I read see your IP address.
 - What was already in the conversation stays there: turning it on doesn't delete it.
-- Everything else is still saved: the log (including your questions, if `privacidad.registrar_preguntas` is on), the action log, the change journal, the recipes I learn, the timings and what you ask me to remember, and I keep using those memories.
+- Everything else is still saved: the action log (the commands that run), the change journal for undoing, and the timings (numbers only).
 
 ## What Google says about what it receives
 

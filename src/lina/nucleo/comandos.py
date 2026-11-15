@@ -9,7 +9,6 @@ sabe leerlas y aplicarlas. El archivo se relee solo cuando lo guardas; si falta 
 de fábrica de abajo. No depende de audio ni de IA, para poder probarlo por separado.
 """
 import re
-import time
 import unicodedata
 from pathlib import Path
 from lina.nucleo import idioma as IDI
@@ -280,7 +279,8 @@ DEFECTOS = {
 
 
 def log(mensaje):
-    print(f"[{time.strftime('%H:%M:%S')}] {mensaje}", flush=True)
+    from lina.nucleo import registro          # S10: todo lo que va al journal pasa por registro.log (el modo privado lo tapa allí)
+    registro.log(mensaje)
 
 
 def normalizar(texto):

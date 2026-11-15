@@ -53,7 +53,8 @@ _precio_desconocido_avisado: set = set()
 
 
 def log(mensaje):
-    print(f"[{time.strftime('%H:%M:%S')}] {mensaje}", flush=True)
+    from lina.nucleo import registro          # S10: todo lo que va al journal pasa por registro.log (el modo privado lo tapa allí)
+    registro.log(mensaje)
 
 
 # ======================= las dos claves =======================

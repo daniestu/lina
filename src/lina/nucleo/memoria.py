@@ -131,6 +131,10 @@ def recordar(texto):
     texto = re.sub(r"\s+", " ", str(texto)).strip()
     if not texto:
         return False, T("¿Qué quieres que recuerde?")
+    from lina.nucleo import registro
+    if registro.PRIVADO:                       # S10: en modo privado se usa lo que ya hay, pero no se apunta nada nuevo
+        return False, T("Estás en modo privado: no apunto nada nuevo en la memoria, aunque sigo usando lo que ya tenía. Si quieres que lo recuerde, "
+                        "quita el modo privado y vuelve a decírmelo.")
     if len(texto) > MAX_CARACTERES:
         return False, T("Es demasiado largo para recordarlo ({n} caracteres; el máximo es {max}). Dímelo más corto.", n=len(texto), max=MAX_CARACTERES)
     motivo = motivo_de_rechazo(texto)
