@@ -1197,3 +1197,4 @@
 "lo que me dices" = "what you tell me"
 "lo que recuerdo, sin comprobarlo" = "what I remember, without checking it"
 "según me dices" = "according to what you tell me"
+"No he mandado nada fuera: la orden enviaba datos de tu equipo a internet y en esta petición se ha leído contenido de fuera, que podría traer instrucciones escondidas. Si lo querías tú, pídemelo en una petición nueva o hazlo en tu terminal." = "I haven't sent anything out: the command was sending data from your computer to the internet, and in this request I read outside content that could carry hidden instructions. If you wanted it, ask me in a new request or do it in your terminal."

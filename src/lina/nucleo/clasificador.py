@@ -973,3 +973,71 @@ def analizar_instalacion(comando):
     if not t or t[0] != "sudo":
         return None
     return PL.paquetes_a_instalar(t[1:])
+
+
+# ======================= S5: mandar datos a otro equipo =======================
+# Lo usa el ejecutor solo en una tarea que ha leído contenido de fuera (`contaminado`): ahí, mandar datos fuera se bloquea. Es un hecho del texto de la orden,
+# no una lectura de la intención: lo que el usuario quiera de verdad lo pide en una petición nueva, que empieza limpia.
+_CURL_ENVIA = {"-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--data-ascii", "-F", "--form", "--form-string", "-T", "--upload-file", "--json"}
+_WGET_ENVIA = ("--post-data", "--post-file", "--body-data", "--body-file")
+_CHARLA = {"nc", "ncat", "netcat", "telnet"}
+_SOCAT_FUERA = re.compile(r"^(?:tcp|tcp4|tcp6|udp|udp4|udp6|openssl|ssl)(?:-connect)?:", re.I)
+_NAVEGADORES = {"xdg-open", "firefox", "chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "brave", "brave-browser", "kde-open",
+                "kde-open5", "vivaldi", "microsoft-edge", "opera"}
+_SALIDA_DE_ORDEN = re.compile(r"\$\(|`")
+_REMOTO = re.compile(r"^(?:[\w.-]+@)?[\w.-]+:(?!//)|^rsync://|^[a-z][\w+.-]*://", re.I)
+_PARECE_URL = re.compile(r"^(?:[a-z][\w+.-]*://|[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:[/:?]|$))", re.I)
+_URL_GIT = re.compile(r"^(?:[a-z][\w+.-]*://|[\w.-]+@[\w.-]+:)", re.I)
+
+
+def _envia_segmento(seg, _prof):
+    t = _tokens(seg)
+    resto = _quitar_prefijos(t) if t else None
+    if not resto:
+        return None
+    base, args = os.path.basename(resto[0]), resto[1:]
+    if base in _SHELLS and "-c" in args:
+        i = args.index("-c")
+        return envia_fuera(args[i + 1], _prof + 1) if _prof < 3 and i + 1 < len(args) else None
+    urls = [a for a in args if _PARECE_URL.match(a)]
+    if base == "curl":
+        if any(a in _CURL_ENVIA or any(a.startswith(o + "=") for o in _CURL_ENVIA if o.startswith("--")) for a in args):
+            return "subiría datos a internet con curl"
+        if any(re.fullmatch(r"-[A-Za-z]*[dFT][A-Za-z]*", a) and not a.startswith("--") for a in args):
+            return "subiría datos a internet con curl"
+        if any(_SALIDA_DE_ORDEN.search(u) for u in urls):
+            return "mandaría a internet, dentro de la dirección, lo que da otra orden"
+    if base == "wget":
+        if any(a.startswith(_WGET_ENVIA) for a in args):
+            return "subiría datos a internet con wget"
+        if any(_SALIDA_DE_ORDEN.search(u) for u in urls):
+            return "mandaría a internet, dentro de la dirección, lo que da otra orden"
+    if base in _CHARLA and not any(a in ("-l", "--listen") or (re.fullmatch(r"-[A-Za-z]+", a) and "l" in a) for a in args):
+        if any(not a.startswith("-") for a in args):
+            return "abriría una conexión de red con otro equipo"
+    if base == "socat" and any(_SOCAT_FUERA.match(a) for a in args):
+        return "abriría una conexión de red con otro equipo"
+    if base in ("scp", "rsync", "sftp"):
+        posicionales = [a for a in args if not a.startswith("-")]
+        if base == "sftp" and posicionales:
+            return "copiaría archivos a otro equipo"
+        if len(posicionales) >= 2 and _REMOTO.match(posicionales[-1]):
+            return "copiaría archivos a otro equipo"
+    if base == "git":
+        sueltos = [a for a in args if not a.startswith("-")]
+        if sueltos[:1] == ["push"] and any(_URL_GIT.match(a) for a in sueltos[1:]):
+            return "subiría el repositorio a una dirección que no es un remoto configurado"
+    if base in _NAVEGADORES or (base == "gio" and args[:1] == ["open"]):
+        if any(re.search(r"\$\(|`|\$\{?(?!HOME\b)[A-Za-z_]", a) for a in args if not a.startswith("-")):          # $HOME es abrir algo tuyo
+            return "abriría el navegador con datos de tu equipo metidos en la dirección"
+    return None
+
+
+def envia_fuera(comando, _prof=0):
+    """S5: el motivo si la orden manda datos a otro equipo (subir con curl o wget, una conexión con nc o socat, copiar a otro equipo, git push a una URL,
+    o el navegador con una sustitución en la dirección); None si no. Traer cosas (descargar, clonar, consultar) no cuenta."""
+    for seg in _segmentos(comando):
+        motivo = _envia_segmento(seg, _prof)
+        if motivo:
+            return motivo
+    return None
