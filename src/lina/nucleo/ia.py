@@ -380,13 +380,13 @@ def resultados_tavily(consulta, dominio=None, maximo=5, reserva=True, comprobar_
             return f"«{str(dominio)[:60]}» no es un nombre de web válido (por ejemplo: movistarplus.es). Vuelve a buscar con un dominio correcto o sin él."
         pedido["include_domains"] = [d]
 
-    def reserva(si_no):
+    def a_la_reserva(si_no):
         if not (reserva_permitida and hay_reserva()):
             return si_no
         r = resultados_reserva(consulta, d, maximo)
         return r if isinstance(r, list) and r else si_no
     if time.time() < _pausa_tavily[0]:
-        return reserva(AVB.PARA_LA_IA_LIMITE)
+        return a_la_reserva(AVB.PARA_LA_IA_LIMITE)
     inicio = time.time()
     try:
         r = requests.post("https://api.tavily.com/search",
@@ -395,15 +395,15 @@ def resultados_tavily(consulta, dominio=None, maximo=5, reserva=True, comprobar_
                           timeout=12)
     except requests.RequestException as e:
         log(f"Tavily: sin conexión ({e})")
-        return reserva("La búsqueda web no está disponible ahora mismo.")
+        return a_la_reserva("La búsqueda web no está disponible ahora mismo.")
     if not r.ok:
         log(f"Tavily: error {r.status_code} ({r.text[:200]})")
         if r.status_code in AVB.POR_CODIGO:                  # 432: el plan llegó a su límite; 433: el tope de gasto que pusiste (el 429 es de ritmo)
             AVB.apuntar(AVB.POR_CODIGO[r.status_code])
             _pausa_tavily[0] = _manana()
             log("Tavily: cupo agotado; hasta mañana busco en la reserva (DuckDuckGo)" if hay_reserva() else "Tavily: cupo agotado; no lo vuelvo a llamar hasta mañana")
-            return reserva(AVB.PARA_LA_IA_LIMITE)
-        return reserva("La búsqueda web no está disponible ahora mismo.")
+            return a_la_reserva(AVB.PARA_LA_IA_LIMITE)
+        return a_la_reserva("La búsqueda web no está disponible ahora mismo.")
     try:
         resultados = r.json().get("results", [])
     except ValueError:
@@ -542,7 +542,7 @@ def _apuntar_llamada(clave, modelo, args, kwargs, r, segundos, resultado):
             antes = _huellas.get(huella)
             _huellas[huella] = ahora
             if len(_huellas) > 200:
-                del _huellas[min(_huellas, key=_huellas.get)]
+                del _huellas[min(_huellas, key=lambda h: _huellas[h])]
         repite = ahora - antes if antes is not None and ahora - antes < TIE.REPITE_SEG else None
         TIE.apuntar_llamada(TIE.registro_llamada(getattr(r, "modelo_real", None) or modelo, resultado, segundos, uso=getattr(r, "uso", None), pref=pref,
                                                  conv=conv, huella=huella, repite=repite, pago=PRES.nombre_de(clave) == "pago", motivo=_motivo_fijo[0] or _motivo_actual.get()))

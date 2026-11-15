@@ -89,5 +89,8 @@ check_untyped_defs = true
 # Los módulos pequeños y limpios se comprueban a fondo desde ya.
 [[tool.mypy.overrides]]
 module = ["lina.nucleo.registro", "lina.nucleo.procesos", "lina.nucleo.ejecucion", "lina.nucleo.texto", "lina.nucleo.constantes",
-          "lina.nucleo.opcionales", "lina.nucleo.declaraciones", "lina.nucleo.rutas", "lina.nucleo.dependencias"]
+          "lina.nucleo.opcionales", "lina.nucleo.declaraciones", "lina.nucleo.rutas", "lina.nucleo.dependencias",
+          # M5 (2026-11-15): los que ya pasaban o tenían 1–4 avisos (uno de ellos un fallo de verdad: «find|xargs» rompía el clasificador)
+          "lina.nucleo.clasificador", "lina.nucleo.papelera", "lina.nucleo.recetas", "lina.nucleo.memoria", "lina.nucleo.compatibilidad",
+          "lina.nucleo.fuentes", "lina.nucleo.grupos", "lina.nucleo.busqueda", "lina.nucleo.ia", "lina.modulos.web"]
 check_untyped_defs = true

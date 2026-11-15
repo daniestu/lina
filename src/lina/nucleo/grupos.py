@@ -256,7 +256,7 @@ def reglas_nucleo(solo_informacion=False):
     if not solo_informacion:
         return REGLAS_NUCLEO
     trozos = re.split(r"(?=(?<!\S)\d{1,2}\) )", REGLAS_NUCLEO)
-    return " ".join(t.strip() for t in trozos if not (re.match(r"(\d{1,2})\) ", t.strip()) and int(re.match(r"(\d{1,2})", t.strip()).group(1)) in REGLAS_SOLO_ACCIONES))
+    return " ".join(t.strip() for t in trozos if not ((m := re.match(r"(\d{1,2})\) ", t.strip())) and int(m.group(1)) in REGLAS_SOLO_ACCIONES))
 
 
 def sistema(instrucciones, hechos, grupos=(), solo_informacion=False):

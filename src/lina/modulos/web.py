@@ -62,7 +62,7 @@ def _comprobar_destino(url):
         raise ErrorWeb(f"No encuentro el servidor {host}.")
     ips = []
     for info in infos:
-        ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        ip = ipaddress.ip_address(str(info[4][0]).split("%")[0])
         if not ip.is_global and not PERMITIR_PRIVADAS:
             raise ErrorWeb("Esa dirección es de la red interna de este equipo o de tu casa: no la leo.")
         ips.append(str(ip))

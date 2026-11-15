@@ -99,7 +99,8 @@ def tratar_borrado(comando):
             return comando, _USO_SENCILLO
         return comando, None                             # solo toca cosas de fuera (/tmp, cachés...): sigue como estaba
     base, args, _ = borrados[0]
-    objetivos, fin_opciones = [], False
+    objetivos: list[str] = []
+    fin_opciones = False
     for a in args:
         if not fin_opciones and a == "--":
             fin_opciones = True

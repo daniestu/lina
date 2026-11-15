@@ -326,7 +326,8 @@ def _que_ejecuta(resto):
 
 def _descarga_y_ejecuta(comando):
     """'descargaría y ejecutaría…' si en el mismo comando algo se descarga y luego se ejecuta lo descargado; si no, None."""
-    descargados, clonados = set(), False
+    descargados: set[str] = set()
+    clonados = False
     for seg in _segmentos(comando):
         t = _tokens(seg)
         resto = _quitar_prefijos(t) if t else None
@@ -486,7 +487,8 @@ def _argumentos_de_lectura(base, args):
 def _lectura_amplia(comando):
     """Si el comando recorre o lee con comodines algo que incluye una ruta protegida, el motivo; si no, None. Listar nombres con find sigue valiendo: lo normal es buscar un archivo."""
     if re.search(r"\bfind\b[^;&]*\|\s*(?:sudo\s+)?xargs\b", comando):
-        trozo = re.search(r"\bfind\s+([^|;&]*)", comando).group(1)
+        m = re.search(r"\bfind\s+([^|;&]*)", comando)
+        trozo = m.group(1) if m else ""                    # «find|xargs …», sin espacio: antes rompía el clasificador
         destinos = [a for a in trozo.split() if not a.startswith("-")][:1] or ["."]
         if _toca_protegida(_expandir(destinos[0].strip("'\""), os.path.expanduser("~")), True):
             return _MOTIVO_AMPLIA
@@ -905,7 +907,8 @@ _NO_ES_UN_PROGRAMA_DE_VENTANA = {"env", "sh", "bash", "zsh", "fish", "dash", "py
 def _apps_instaladas():
     """(ejecutables, ids de flatpak) de los programas con ventana INSTALADOS EN EL SISTEMA (no los de tu carpeta de usuario, que cualquiera podría
     haber escrito): se pueden abrir al instante sin esperar a que terminen."""
-    ejecutables, flatpaks = set(), set()
+    ejecutables: set[str] = set()
+    flatpaks: set[str] = set()
     try:
         apps = comandos.nombres_de_apps()
     except Exception:

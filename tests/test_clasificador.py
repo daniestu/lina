@@ -43,3 +43,9 @@ def test_leer_las_cookies_del_navegador_por_otro_programa_esta_bloqueado(comando
 @pytest.mark.parametrize("comando", ['yt-dlp "ytsearch1:Jaleo La Fuga" --print title', "yt-dlp --cookies ~/Descargas/cookies-youtube.txt https://www.youtube.com/watch?v=x"])
 def test_yt_dlp_sin_cookies_del_navegador_no_se_bloquea(comando):
     assert H.clasificar(comando)[0] != "bloqueado", comando
+
+
+def test_find_pegado_a_xargs_no_rompe_el_clasificador():
+    """M5: mypy lo vio. «find|xargs …», sin espacio tras find, hacía que el clasificador lanzara una excepción en vez de decidir."""
+    clase, _ = H.clasificar("find|xargs grep clave")
+    assert clase in ("lectura", "autonomo", "critico", "bloqueado")

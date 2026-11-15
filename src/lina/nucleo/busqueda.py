@@ -139,7 +139,7 @@ def resultados_de_google(datos, dominio=None):
         for i in s.get("groundingChunkIndices") or []:
             if frase and frase not in apoyos.setdefault(i, []):
                 apoyos[i].append(frase)
-    salida = []
+    salida: list = []
     for i, t in enumerate(trozos):
         web = (t or {}).get("web") or {}
         if not web.get("uri"):
