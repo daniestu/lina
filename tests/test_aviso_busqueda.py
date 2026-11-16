@@ -233,7 +233,7 @@ def test_con_reserva_el_cupo_agotado_se_notifica_pero_no_se_dice(monkeypatch):
     assert a.dicho == [] and len(notas) == 1 and "DuckDuckGo" in notas[0][1]
 
 
-def test_con_ninguna_buscar_web_pide_las_palabras_del_usuario():
+def test_con_ninguna_buscar_web_no_lleva_ninguna_autorizacion_de_la_ia():
     decl = IA.declaraciones_de_busqueda.__globals__["HERRAMIENTA_BUSCAR_APAGADA"]["functionDeclarations"][0]
-    assert decl["parameters"]["required"] == ["consulta", "autorizacion"] and "APAGADA" in decl["description"]
+    assert decl["parameters"]["required"] == ["consulta"] and "APAGADA" in decl["description"]
 

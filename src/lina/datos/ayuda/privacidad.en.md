@@ -23,7 +23,7 @@ With `auto`, the default, Lina tries in this order and keeps the first thing tha
 
 **Whether a game works on Linux.** When you ask whether a Steam game works on Linux or needs Proton, Lina checks the Steam store page and the ProtonDB summary, with any `ia.busqueda`. Both only see the game's Steam number and your IP address; if the game is not in your library, the Steam store search also sees its name. The first time you get a notification.
 
-With `tavily` only Tavily is used (and DuckDuckGo if you turn it on); with `google`, only Gemini's (and DuckDuckGo if you turn it on); with `ninguna`, nothing, unless you say «búscalo igualmente», which searches like `auto` for that request only.
+With `tavily` only Tavily is used (and DuckDuckGo if you turn it on); with `google`, only Gemini's (and DuckDuckGo if you turn it on); with `ninguna`, nothing: your question doesn't go to any search engine. It only searches, like `auto` and for that request only, if you ask for it in your own words («búscalo igualmente», «mira en internet…») or if you say yes when Lina offers to search just this once (that «sí», with the shortcut). The AI can't decide it for you: that you are asking is checked by a separate query that only sees your words. Like everything you say, those words do go to the AI provider.
 
 - If you save **sources** (a website for a topic) and use Gemini, the following:
   - **To Gemini:** the list of your topics in each request that may use them and, when the AI picks one, one more query with only that topic and your question. That query goes through your paid key if you have one and your spending cap has room left; otherwise, through the free key. What the website returns also reaches the AI.

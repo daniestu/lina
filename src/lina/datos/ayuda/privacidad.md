@@ -23,7 +23,7 @@ Con `auto`, lo de fábrica, Lina prueba en este orden y se queda con lo primero 
 
 **Si un juego funciona en Linux.** Cuando preguntas si un juego de Steam funciona en Linux o necesita Proton, Lina mira la ficha de la tienda de Steam y el resumen de ProtonDB, con cualquier `ia.busqueda`. Los dos ven solo el número del juego en Steam y tu dirección IP; si el juego no está en tu biblioteca, el buscador de la tienda de Steam ve además su nombre. La primera vez te llega una notificación.
 
-Con `tavily` solo se usa Tavily (y DuckDuckGo si lo enciendes); con `google`, solo la de Gemini (y DuckDuckGo si lo enciendes); con `ninguna`, nada, salvo que digas «búscalo igualmente», que busca como `auto` solo en esa petición.
+Con `tavily` solo se usa Tavily (y DuckDuckGo si lo enciendes); con `google`, solo la de Gemini (y DuckDuckGo si lo enciendes); con `ninguna`, nada: tu pregunta no sale a ningún buscador. Solo se busca, como `auto` y solo en esa petición, si lo pides tú con tus palabras («búscalo igualmente», «mira en internet…») o si dices que sí cuando Lina te ofrece buscarlo solo esta vez (ese «sí», con el atajo). La IA no puede decidirlo por ti: que lo pides lo comprueba una consulta aparte que solo ve tus palabras. Como todo lo que dices, esas palabras sí van al proveedor de la IA.
 
 - Si guardas **fuentes** (una web para un tema) y usas Gemini, lo siguiente:
   - **A Gemini:** la lista de tus temas en cada petición que pueda usarlas, y cuando la IA elige una, una consulta más con solo ese tema y tu pregunta. Esa consulta va por tu clave de pago si la tienes y queda saldo de tu tope; si no, por la gratuita. Lo que traiga la web también le llega a la IA.

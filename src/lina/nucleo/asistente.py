@@ -198,6 +198,9 @@ def prompt_whisper():
 
 
 TOPE_ATAJO_SEG = 60              # con fin por silencio: si el detector nunca corta (música, ruido), deja de escucharte a los 60 s
+# A14: la búsqueda que queda pendiente de tu «sí» con ia.busqueda = ninguna. La descripción la escribe el código (sin la consulta, que es de la IA)
+DESCRIPCION_BUSCAR_UNA_VEZ = "Buscar en internet, solo esta vez, lo que el usuario acaba de preguntar (la búsqueda en internet está apagada)"
+OFERTA_DE_BUSCAR_SEG = 300          # cuánto vale «se te acaba de avisar de que la búsqueda está apagada» para entender una insistencia
 SOLO_WEB = ("buscar_web", "leer_web", "usar_fuente")      # lo único que queda tras usar una fuente, o al insistir en una pregunta (S12)
 MAX_REPETICIONES = 2             # la misma herramienta, con los mismos datos y el mismo resultado: a la tercera no se ejecuta y se termina el turno
 MAX_HECHOS = 4                   # peticiones de las que se guarda lo que consta que pasó
@@ -467,11 +470,11 @@ def escuchar_mandos(al_pulsar):
 
 
 from lina.nucleo.ia import (  # noqa: F401
-    BucleDeHerramienta, BUSQUEDA_APAGADA, Cancelado, NecesitaReglasCompletas, REGLAS_COMPLETAS, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
+    BucleDeHerramienta, Cancelado, NecesitaReglasCompletas, REGLAS_COMPLETAS, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_reserva, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva, modo_busqueda, reserva_sin_clave,
-    clasificar_confirmacion_ia, clasificar_interrupcion_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
+    clasificar_confirmacion_ia, clasificar_interrupcion_ia, pide_buscar_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
     cabe_modelo_local, dominio_valido, empezar_peticion, fallos_de_la_peticion, horas_hasta_renovar_cupo,
 )
@@ -505,6 +508,7 @@ class TareaActual:
     acciones_turno: Any = ()         # [(herramienta, datos, resultado)]; cada petición pone su lista (aquí, vacía e inmutable a propósito)
     fuente_turno: Any = None
     compatibilidad_turno: Any = None
+    _juicio_buscar: Any = None       # A14: lo que dijo la mini-consulta de «¿pides buscar?» en esta petición (None: aún no se ha preguntado)
     fuente_cerrada = reintento_solo_web = turno_aceptado = insistiendo = False
     max_tiempo, max_tokens, max_busquedas = MAX_TIEMPO_TAREA, MAX_TOKENS_TAREA, MAX_BUSQUEDAS
     obstaculo = pedir_profundo = modo_actual = nota_captura = ""
@@ -538,6 +542,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
     canal_voz = False             # con «lina di --voz»: además lo dice en voz alta
     manos_libres: Any = None      # el oyente de «Oye Lina» (manos_libres.py)
     indicador: Any = None         # el icono de la bandeja (indicador.py), si lo hay
+    _t_busqueda_ofrecida = 0.0    # A14: cuándo se te avisó por última vez de que la búsqueda está apagada (un hecho, para entender «aun así…»)
+    busquedas_confirmadas: list = []   # A14: lo que dio la búsqueda que acabas de confirmar (pasa a la petición que la cuenta; se reasigna)
+    _confirmada_como: dict = {}   # A14: qué herramienta fue de verdad una acción confirmada (la búsqueda consta como buscar_web)
     microfono: Any = None         # la entrada de sonido mientras te escucha
     sustituida = False            # la tarea en curso se abandona porque has pedido otra cosa (no hace falta que diga «lo dejo»)
     _grabacion_n = 0              # qué grabación del atajo está en curso: un corte por silencio que llega tarde no cierra la siguiente
@@ -1722,7 +1729,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
                         "no hagas nada más hasta que la diga.]"), False
             log("Confirmado: ejecuto las acciones pendientes")
             resultado = self.ejecutor.confirmar_pendientes()
-            self.acciones_confirmadas = [("ejecutar_comando", {"comando": c, "motivo": m}, r) for c, m, r in self.ejecutor.ultimas]
+            self.acciones_confirmadas = [(*self._confirmada_como.get(c, ("ejecutar_comando", {"comando": c, "motivo": m})), r) for c, m, r in self.ejecutor.ultimas]
             permiso = (" Ese «sí» vale para TODA la tarea: si algo falla (un 404, un paquete que no se encuentra, otro nombre, falta activar el servicio), "
                        "busca otra forma y sigue hasta que funcione, sin volver a preguntarle; lo poco que aún necesite su confirmación (discos, arranque, "
                        "cuentas, dinero, ejecutar algo descargado) quedará preparado como siempre." if self.ejecutor.permiso else "")
@@ -1767,6 +1774,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self._sincronizar_ia()
         self.t_tarea = time.time()
         _abortar.clear()                                  # una tarea nueva no hereda un «para» de la anterior
+        self._juicio_buscar, self.busquedas_confirmadas, self._confirmada_como = None, [], {}      # A14: cada petición juzga de nuevo si pides buscar
         _gasto_tarea["tokens"] = 0
         self.max_tiempo, self.max_tokens, self.max_busquedas = MAX_TIEMPO_TAREA, MAX_TOKENS_TAREA, MAX_BUSQUEDAS
         self.insistiendo = False
@@ -1847,18 +1855,19 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             return "No hagas más búsquedas: responde con lo que ya tienes o di que no lo has encontrado."
         modo = "auto" if getattr(self, "forzar_busqueda", False) else modo_busqueda()
         if modo == "ninguna":
-            if not self._autoriza_buscar(args.get("autorizacion")):
-                self.busqueda_apagada_turno = True              # un hecho: no se buscó por tu ajuste (sin reintento a fondo por esto)
-                log("buscar_web con la búsqueda apagada y sin que lo pidieras en esta petición: no busco")
-                return BUSQUEDA_APAGADA
-            log(f"Búsqueda apagada, pero insistes en esta petición («{str(args.get('autorizacion'))[:60]}»): busco solo esta vez")
+            if not self._pides_buscar():
+                return self._ofrecer_busqueda(consulta, args.get("dominio") or None)
+            log("Búsqueda apagada, pero lo pides tú en esta petición: busco solo esta vez")
             modo = "auto"
+        return self._buscar_de_verdad(consulta, args.get("dominio") or None, modo)
+
+    def _buscar_de_verdad(self, consulta, dominio, modo):
         self.busquedas_turno += 1
         if modo == "tavily":                          # quien eligió tavily lo conserva tal cual: Tavily y, si la enciende, la reserva
-            resultado = buscar_tavily(consulta, args.get("dominio") or None)
+            resultado = buscar_tavily(consulta, dominio)
             self.ejecutor.contaminar("búsqueda web")  # A2e: lo que trae internet puede traer instrucciones escondidas
             return resultado
-        res = BUS.buscar(consulta, args.get("dominio") or None, modo=modo, peticion=str(getattr(self, "pregunta_pura", "") or ""))
+        res = BUS.buscar(consulta, dominio, modo=modo, peticion=str(getattr(self, "pregunta_pura", "") or ""))
         if not hasattr(self, "busquedas_hechas"):
             self.busquedas_hechas = []
         self.busquedas_hechas.append(res)
@@ -1871,19 +1880,36 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
                 resultado += "\n\n" + pagina
         return resultado
 
-    def _autoriza_buscar(self, autorizacion):
-        """¿Las palabras con las que la IA dice que insistes son de verdad tuyas, de esta petición o de la anterior? Lo leído en una web nunca cuenta: solo se
-        compara con lo que dijiste. Basta que estén casi todas sus palabras (Whisper y la IA pueden cambiar alguna)."""
-        cita = [w for w in C.normalizar(str(autorizacion or "")).split() if len(w) > 1]
-        if not cita:
-            return False
-        tuyas = [str(getattr(self, "pregunta_pura", "") or "")]
-        tuyas += [h["texto"] for h in reversed(getattr(self, "historial", []) or []) if h.get("rol") == "user"][:1]
-        for frase in tuyas:
-            dichas = set(C.normalizar(re.sub(r"\[SISTEMA:.*?\]", "", frase, flags=re.S)).split())
-            if dichas and sum(w in dichas for w in cita) >= max(1, round(0.8 * len(cita))):
-                return True
-        return False
+    def _pides_buscar(self):
+        """A14: con la búsqueda apagada, ¿pides TÚ, con tus palabras de esta petición, que se busque? Lo juzga una mini-consulta aparte que solo ve tu
+        frase, la anterior y si se te acaba de avisar de que está apagada (un hecho que apunta el código): ni la conversación, ni lo que diga la IA, ni
+        nada leído. La IA no puede autorizarse: no hay ningún argumento suyo que cuente. Sin respuesta de la mini-consulta, no. Una vez por petición."""
+        if self._juicio_buscar is None:
+            limpia = lambda x: re.sub(r"\[SISTEMA:.*?\]", "", str(x or ""), flags=re.S).strip()      # noqa: E731
+            anterior = next((limpia(h["texto"]) for h in reversed(getattr(self, "historial", []) or []) if h.get("rol") == "user"), "")
+            avisado = time.time() - self._t_busqueda_ofrecida < OFERTA_DE_BUSCAR_SEG
+            r = self._con_claves("mini", pide_buscar_ia, limpia(getattr(self, "pregunta_pura", "")), anterior, avisado) if getattr(self, "clave", None) else None
+            self._juicio_buscar = bool(r and r["pide"])
+            log("¿Pides buscar con la búsqueda apagada? " + ("sí" if self._juicio_buscar else "no" if r else "no lo he podido comprobar: no busco"))
+        return self._juicio_buscar
+
+    def _ofrecer_busqueda(self, consulta, dominio):
+        """Con la búsqueda apagada y sin que lo pidas: no se busca. Queda pendiente de tu «sí» (como cualquier confirmación: la entiende la mini-consulta
+        de las confirmaciones, que solo ve tus palabras y esta descripción; la descripción la escribe el código y no lleva la consulta de la IA)."""
+        self.busqueda_apagada_turno = True              # un hecho: no se buscó por tu ajuste (sin reintento a fondo por esto)
+        self._t_busqueda_ofrecida = time.time()
+        if any(p.get("comando") == DESCRIPCION_BUSCAR_UNA_VEZ for p in self.ejecutor.pendientes):
+            return "Ya hay una búsqueda preparada y pendiente del «sí» del usuario: no prepares otra. Pregúntale si lo buscas solo esta vez."
+        log("buscar_web con la búsqueda apagada y sin que lo pidieras: no busco; queda pendiente de tu «sí»")
+
+        def buscar():
+            resultado = self._buscar_de_verdad(consulta, dominio, "auto")
+            self.busquedas_confirmadas = self.busquedas_hechas[-1:]           # para que la respuesta pueda citar lo que sí se buscó
+            self._confirmada_como = {DESCRIPCION_BUSCAR_UNA_VEZ: ("buscar_web", {"consulta": consulta})}
+            return resultado
+        r = self.ejecutor.preparar_accion(DESCRIPCION_BUSCAR_UNA_VEZ, buscar, motivo="buscar en internet", avisar_escritorio=False,
+                                          razon="la búsqueda en internet está apagada (ia.busqueda = ninguna) y solo se busca si el usuario lo pide")
+        return r + " No des el dato de memoria como si estuviera comprobado."
 
     def _h_usar_fuente(self, nombre, args):
         return self.usar_fuente(args)
@@ -2366,6 +2392,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             salida = salida[:inicio] + T("lo que recuerdo, sin comprobarlo") + salida[fin:]
         if modo_busqueda() == "ninguna" and not getattr(self, "forzar_busqueda", False):
             salida = salida.rstrip() + " " + T("La búsqueda está apagada; si quieres, lo busco solo esta vez.")
+            self._t_busqueda_ofrecida = time.time()         # un hecho: se te acaba de avisar (para entender un «aun así, quiero saberlo»)
         return salida
 
     def _buscar_igualmente(self, peticion):
@@ -2585,7 +2612,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             self.pedir_profundo, self.obstaculo = "", ""
             self._cerrar_receta_interfaz(False)
             return respuesta, modelo
-        if getattr(self, "busqueda_apagada_turno", False) and not self.ejecutor.pendientes and all(
+        if getattr(self, "busqueda_apagada_turno", False) and all(p.get("comando") == DESCRIPCION_BUSCAR_UNA_VEZ for p in self.ejecutor.pendientes) and all(
                 n in SOLO_WEB or n in HERRAMIENTAS_META for n, _, _ in (self.acciones_turno or [])):
             log("No se pudo buscar porque la búsqueda está apagada (es tu ajuste): no reintento")    # en un caso real, 7 llamadas para nada
             self.pedir_profundo, self.obstaculo = "", ""
@@ -2831,10 +2858,10 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self.modo_actual = modo
         empezar_peticion()                                     # los fallos de Gemini de esta petición, para decir por qué no responde
         self.busquedas_turno = 0
-        self.busquedas_hechas = []                             # lo que dio cada buscar_web de esta petición (para no decir «no tengo acceso a internet»)
+        self.busquedas_hechas = list(self.busquedas_confirmadas)   # lo que dio cada buscar_web de esta petición (y la que acabas de confirmar, A14)
         self.busqueda_apagada_turno = False                    # buscar_web no buscó porque la tienes apagada (un hecho: no se reintenta por eso)
         self.compatibilidad_turno = None                       # (juego, datos) de Steam y ProtonDB en esta petición: la respuesta no puede contradecirlos
-        self.forzar_busqueda = self._buscar_igualmente(str(self.pregunta_pura or pregunta))
+        self.forzar_busqueda = self._buscar_igualmente(str(self.pregunta_pura or pregunta)) or bool(self.busquedas_confirmadas)   # tu «sí» vale para esta petición
         self.fuente_turno, self.fuentes_turno = None, {}       # qué pasó con la fuente en esta petición: lo escribe el código
         self.fuente_cerrada = False                            # tras usar una fuente no se reintenta a fondo ni se pasa de la web
         self.reintento_solo_web = False                        # S12: al insistir en una pregunta solo cabe la web

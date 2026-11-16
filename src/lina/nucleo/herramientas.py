@@ -1895,8 +1895,9 @@ class Ejecutor:
         return titulo + " " + describir_deshacer(e) + ".\n" + "\n".join(lineas)
 
     # --- Confirmaciones ---
-    def preparar_accion(self, descripcion, funcion, motivo="tarea", razon="es una acción interna que no se puede deshacer"):
-        """Deja pendiente de tu «sí» una acción interna (no es un comando de shell)."""
+    def preparar_accion(self, descripcion, funcion, motivo="tarea", razon="es una acción interna que no se puede deshacer", avisar_escritorio=True):
+        """Deja pendiente de tu «sí» una acción interna (no es un comando de shell). `avisar_escritorio=False`: sin notificación (para lo que se ofrece a
+        menudo y no cambia nada en el equipo, como buscar con la búsqueda apagada); la confirmación es la misma."""
         rechazada = self._ya_rechazada(descripcion)
         if rechazada:
             return rechazada
@@ -1907,7 +1908,8 @@ class Ejecutor:
                                     "razon": razon, "categoria": "interna"})
             self.t_pendiente = time.time()
             anotar(f"[confirmar] {descripcion}")
-            notificar(T("Asistente: pendiente de tu confirmación"), descripcion)
+            if avisar_escritorio:
+                notificar(T("Asistente: pendiente de tu confirmación"), descripcion)
         return MENSAJE_PREPARADO + f" Se pide confirmación porque {razon}. Explícaselo al usuario."
 
     def exige_cantidad(self):

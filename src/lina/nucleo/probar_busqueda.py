@@ -155,7 +155,7 @@ def respuesta_sin_ia(origen):
 def reiniciar_pausas():
     """Cada pregunta es la de un usuario nuevo: sin modelos en pausa por la anterior, sin caché de búsquedas y sin la espera de DuckDuckGo."""
     from lina.nucleo import ia as IA
-    for d in (IA._pausa_modelo, IA._fallos_red, IA._clase_pausa, BUS._pausa_google, BUS._cache):
+    for d in (IA._pausa_modelo, IA._pausa_vision, IA._fallos_red, IA._clase_pausa, BUS._pausa_google, BUS._cache):
         d.clear()
     BUS._ultima_duckduckgo[0] = 0.0
 
