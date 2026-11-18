@@ -6,8 +6,27 @@ import re
 import requests
 
 from lina.nucleo import proveedores as P
+from lina.nucleo.registro import log
 
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+# A3: los modelos van fijados (constantes.py). Si Google retira uno (responde 404), se usa su alias de siempre hasta que se fije otro: Lina no se queda
+# muda por una versión retirada. Solo con un 404: un 429 no es motivo (el alias no es cupo extra).
+ALIAS_DE = {"gemini-3.5-flash-lite": "gemini-flash-lite-latest", "gemini-3.8-flash": "gemini-flash-latest"}
+_retirados: set = set()
+
+
+def en_uso(modelo):
+    """El nombre que se pide de verdad: el fijado o, si Google lo ha retirado, su alias."""
+    return ALIAS_DE[modelo] if modelo in _retirados else modelo
+
+
+def retirar(modelo):
+    """Un 404 de un modelo fijado: desde ahora va su alias. Devuelve si hay alias con el que repetir (y solo la primera vez)."""
+    if modelo not in ALIAS_DE or modelo in _retirados:
+        return False
+    _retirados.add(modelo)
+    log(f"{modelo}: Google dice que no existe (404); uso {ALIAS_DE[modelo]} hasta que se fije otro modelo (lina doctor, lina ia modelos)")
+    return True
 
 
 def espera_de_cuota(r):
@@ -99,7 +118,9 @@ class Gemini(P.Proveedor):
         elif herramientas:
             cuerpo["tools"] = [{"functionDeclarations": herramientas}]    # Gemini decide qué herramienta pedirnos
         try:
-            r = (post or requests.post)(URL.format(modelo=modelo), headers={"x-goog-api-key": clave}, json=cuerpo, timeout=timeout)
+            r = (post or requests.post)(URL.format(modelo=en_uso(modelo)), headers={"x-goog-api-key": clave}, json=cuerpo, timeout=timeout)
+            if r.status_code == 404 and retirar(modelo):
+                r = (post or requests.post)(URL.format(modelo=en_uso(modelo)), headers={"x-goog-api-key": clave}, json=cuerpo, timeout=timeout)
         except requests.RequestException as e:
             return P.ErrorIA("red", None, str(e))
         if not r.ok:

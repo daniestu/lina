@@ -36,7 +36,7 @@ from lina.nucleo.idioma import N_, T
 from lina.nucleo.opcionales import PRES
 from lina.nucleo.registro import log
 
-MODELO_GOOGLE = "gemini-flash-lite-latest"          # el medido: 24 de 30 con búsqueda, mediana 1,4 s; con «Busca en internet:», 6 de 6 de las que faltaban
+MODELO_GOOGLE = "gemini-3.5-flash-lite"             # fijado (A3); el medido: 24 de 30 con búsqueda, mediana 1,4 s; con «Busca en internet:», 6 de 6 de las que faltaban
 CACHE_SEG = 12 * 60
 INTERVALO_DUCKDUCKGO_SEG = 30
 PAUSA_GOOGLE_SEG = 600                               # tras un error que no es de cuota: un rato sin probar
@@ -185,7 +185,9 @@ def resultados_google(consulta, dominio=None, post=None, ahora=None):
         cuerpo = {"contents": [{"role": "user", "parts": [{"text": pedido}]}], "tools": [{"google_search": {}}]}
         inicio = time.time()
         try:
-            r = (post or IA._post_cancelable)(PG.URL.format(modelo=MODELO_GOOGLE), headers={"x-goog-api-key": clave}, json=cuerpo, timeout=TIMEOUT_GOOGLE)
+            r = (post or IA._post_cancelable)(PG.URL.format(modelo=PG.en_uso(MODELO_GOOGLE)), headers={"x-goog-api-key": clave}, json=cuerpo, timeout=TIMEOUT_GOOGLE)
+            if r.status_code == 404 and PG.retirar(MODELO_GOOGLE):
+                r = (post or IA._post_cancelable)(PG.URL.format(modelo=PG.en_uso(MODELO_GOOGLE)), headers={"x-goog-api-key": clave}, json=cuerpo, timeout=TIMEOUT_GOOGLE)
         except requests.RequestException as e:
             log(f"Búsqueda de Google ({tipo}): sin conexión ({e})")
             return [], T(M_GOOGLE_FALLO)

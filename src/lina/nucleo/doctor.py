@@ -124,6 +124,20 @@ class Sondas:
         socket.create_connection(self.ia().servidor(), timeout=6).close()
         return True
 
+    def modelos_fijados(self):
+        """A3: (los modelos fijados en uso, los que ya no están en la lista de la API) con Gemini y sus modelos de fábrica; None si no aplica.
+        Mirar la lista no gasta cupo."""
+        from lina.nucleo import claves
+        from lina.nucleo import proveedor_gemini as PG
+        ia = self.ia()
+        fijados = sorted({m for m in ia.rapido + ia.profundo + ia.mini if m in PG.ALIAS_DE})
+        if ia.nombre != "gemini" or not fijados:
+            return None
+        lista, error = ia.proveedor.modelos(claves.obtener("gemini"))
+        if lista is None:
+            raise RuntimeError(error)
+        return fijados, [m for m in fijados if m not in lista]
+
     def probar_clave(self):
         from lina.nucleo import claves
         ia = self.ia()
@@ -322,6 +336,16 @@ def comprobar(s=None, red=False):
             if cl and not isinstance(cl, Exception):
                 ok, det = _seguro(s.probar_clave, (None, T("no he podido probarla")))
                 a(OK if ok else AVISO if ok is None else MAL, T("Clave en uso"), det, "" if ok is not False else f"lina clave {proveedor}")
+                mf = _seguro(s.modelos_fijados)
+                if isinstance(mf, Exception):
+                    a(AVISO, T("Modelos de la IA"), T("no he podido mirar la lista de Google ({e})", e=mf))
+                elif mf:
+                    fijados, retirados = mf
+                    if retirados:
+                        a(AVISO, T("Modelos de la IA"), T("Google ya no ofrece {m}: Lina usa su alias «-latest» mientras tanto", m=", ".join(retirados)),
+                          T("Actualiza Lina (lina update) o fija otro modelo en config.toml (lina ia modelos)"))
+                    else:
+                        a(OK, T("Modelos de la IA"), T("fijados y disponibles: {m}", m=", ".join(fijados)))
     return r
 
 

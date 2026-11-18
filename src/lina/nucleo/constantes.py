@@ -13,8 +13,10 @@ VOZ = VOC.VOZ_POR_DEFECTO                  # voz de Piper; main() la sustituye p
 PROMPT_WHISPER_CARACTERES = 650              # tamaño máximo de la pista que se le da a Whisper (si se pasa, olvida el principio)
 MODELO_WHISPER = MOD.MODELO_WHISPER      # voz a texto, en la CPU (ver modelos.py)
 MODELO_LOCAL = "qwen3-vl:8b-instruct"       # modelo de visión de Ollama
-MODELOS_GEMINI = ["gemini-flash-lite-latest", "gemini-flash-latest"]  # modo rápido, en orden de preferencia (Flash gratis: solo 20 al día)
-MODELOS_PROFUNDO = ["gemini-flash-latest", "gemini-flash-lite-latest"]  # modo "a fondo": primero el más potente
+# Modelos fijados (A3), no los alias «-latest» que Google cambia cuando quiere. Para cambiar de versión: `lina ia modelos`, cambiar estas listas y pasar
+# el banco (`lina probar-ia`) antes. Si Google retira uno, proveedor_gemini.ALIAS_DE lo sustituye por su alias y lo dice en el log.
+MODELOS_GEMINI = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]  # modo rápido, en orden de preferencia (Flash gratis: solo 20 al día)
+MODELOS_PROFUNDO = ["gemini-3.8-flash", "gemini-3.5-flash-lite"]  # modo "a fondo": primero el más potente
 # Las palabras y frases que activan el modo a fondo, reinician la conversación o confirman acciones
 # están todas en comandos.txt (se editan sin reiniciar).
 PRIORIDAD = "nube"                          # "nube": Gemini siempre primero; "local": el modelo local primero si cabe en la VRAM
@@ -31,7 +33,7 @@ ARCHIVO_VOCABULARIO = RUT.editable("vocabulario.txt")          # nombres propios
 REINTENTOS_SERVIDOR = 2                      # si Gemini responde «ocupado» (500, 502, 503, 504), se reintenta tantas veces
 ESPERA_REINTENTO = 1.5                       # segundos antes del primer reintento (el segundo espera el doble)
 CONFIRMACION_IA = True                       # True: si tu respuesta a «¿lo hago?» no es un «sí» o «no» clarísimo, una mini-consulta a Gemini la entiende
-MODELOS_CONFIRMACION = ["gemini-flash-lite-latest", "gemini-flash-latest"]   # los prueba por orden; si ninguno responde, se cancela
+MODELOS_CONFIRMACION = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]   # los prueba por orden; si ninguno responde, se cancela
 INTERRUPCION_IA = True                       # True: lo que dices mientras piensa lo entiende una mini-consulta (solo «para», «cancela»… exactos se atajan sin ella)
 PANTALLA_SESION_SEG = 90                      # si hace menos de esto que se usó la pantalla, se sigue enviando (ayuda paso a paso con lo que ves)
 ARCHIVO_PRIVADO = RUT.DATOS / "modo_privado"

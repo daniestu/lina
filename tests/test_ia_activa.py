@@ -31,8 +31,8 @@ def poner(aj, **valores):
 def test_por_defecto_es_gemini_con_los_modelos_de_siempre(aj):
     a = IAC.actual()
     assert a.nombre == "gemini" and a.proveedor is P.obtener("gemini")
-    assert IAC.modelos("rapido") == ["gemini-flash-lite-latest", "gemini-flash-latest"]
-    assert IAC.modelos("profundo")[0] == "gemini-flash-latest" and IAC.modelos("mini") == IAC.modelos("rapido")
+    assert IAC.modelos("rapido") == ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
+    assert IAC.modelos("profundo")[0] == "gemini-3.8-flash" and IAC.modelos("mini") == IAC.modelos("rapido")
 
 
 def test_gemini_con_modelo_propio(aj):

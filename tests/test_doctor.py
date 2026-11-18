@@ -29,6 +29,7 @@ class Todo(D.Sondas):
         return A()
     def red(self): return True
     def probar_clave(self): return True, "funciona"
+    def modelos_fijados(self): return ["gemini-3.5-flash-lite", "gemini-3.8-flash"], []
 
 
 def estados(res):
