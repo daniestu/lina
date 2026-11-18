@@ -447,6 +447,11 @@ def _destino_args(args):
     return elemento, nombre, ventana
 
 
+def seleccion(ayudante=_ayudante):
+    """A5b: lo seleccionado en el gestor de archivos activo, en bruto ({seleccionados, carpetas, ruta_escrita} o {error}). Lo comprueba contexto.py."""
+    return ayudante("seleccion")
+
+
 def contexto(args, ayudante=_ayudante):
     """Qué ventana y qué textos rodean al control de destino (sin tocar nada). {} si no se pudo saber."""
     elemento, nombre, ventana = _destino_args(args)

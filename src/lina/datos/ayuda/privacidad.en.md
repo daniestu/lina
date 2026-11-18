@@ -12,6 +12,8 @@ Lina has no telemetry: she sends no statistics or usage data to anyone. The only
 - **What you have copied or selected, only when your sentence is about it** («summarise this», «translate what I copied»): up to 4000 characters.
   Never in **private mode**, nor by **hands-free** (only with the shortcut or `lina di`), nor with a **sensitive** window in front, nor if your password manager
   marks it as a **password** (KeePassXC does). The log only records what was looked at and how many characters.
+- **The file you have selected in Dolphin, only when your sentence is about it** («send this file to…»): its name, path, type and size,
+  never its content. Same rules as what you copied, and never if it is in a folder with keys or Lina's data (`~/.ssh`, `~/.gnupg`, browser profiles…).
 - **The result of the commands and tools** the AI uses to help you (for example, the list of installed programs or the text of a page you ask it to read).
 - If you have set a **Tavily** key, the text of each web search, which is sent to Tavily. It may include what you ask or the name of a program or game you have open; Tavily does not receive your voice, screenshots or files.
 

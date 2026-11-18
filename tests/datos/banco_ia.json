@@ -395,6 +395,73 @@
      "texto": "Hola, espero que estés bien."
     }
    ]
+  ],
+  "Manda este archivo a mi correo.": [
+   [
+    "mirar_contexto",
+    {
+     "que": "archivo_seleccionado"
+    }
+   ],
+   [
+    "mas_herramientas",
+    {
+     "grupo": "mcp"
+    }
+   ],
+   [
+    "mcp_servidores",
+    {
+     "accion": "listar"
+    }
+   ],
+   [
+    "buscar_web",
+    {
+     "consulta": "model context protocol email server gmail thunderbird"
+    }
+   ],
+   [
+    "buscar_web",
+    {
+     "consulta": "mcp server email send gmail mailgun smtp"
+    }
+   ]
+  ],
+  "¿Cuánto ocupa el archivo que tengo seleccionado?": [
+   [
+    "mirar_contexto",
+    {
+     "que": "archivo_seleccionado"
+    }
+   ]
+  ],
+  "¿Qué tipo de archivo es este que tengo marcado en Dolphin?": [
+   [
+    "mirar_contexto",
+    {
+     "que": "archivo_seleccionado"
+    }
+   ]
+  ],
+  "¿Qué es un archivo PDF?": [],
+  "Busca el archivo de la factura en Descargas.": [
+   [
+    "ejecutar_comando",
+    {
+     "motivo": "buscar el archivo de la factura en Descargas",
+     "comando": "find ~/Descargas -iname \"*factura*\""
+    }
+   ]
+  ],
+  "Crea un archivo llamado notas.": [
+   [
+    "ejecutar_comando",
+    {
+     "motivo": "crear el archivo notas",
+     "comando": "touch ~/Documentos/notas"
+    }
+   ]
   ]
  }
 }

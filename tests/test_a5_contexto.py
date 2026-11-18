@@ -136,7 +136,7 @@ def test_en_modo_privado_o_por_manos_libres_no_se_lee_ni_se_contamina(lina, camp
 def test_esta_en_el_nucleo_y_no_hace_saltar_al_revisor():
     from lina.nucleo import asistente as A
     decl = next(d for d in D.DECLARACIONES if d["name"] == "mirar_contexto")
-    assert "mirar_contexto" in G.NUCLEO and decl["parameters"]["properties"]["que"]["enum"] == ["portapapeles", "seleccion"]
+    assert "mirar_contexto" in G.NUCLEO and decl["parameters"]["properties"]["que"]["enum"] == ["portapapeles", "seleccion", "archivo_seleccionado"]
     assert "mirar_contexto" in A.Asistente.SOLO_CONSULTA and "mirar_contexto" in A.Asistente._HERRAMIENTAS
 
 

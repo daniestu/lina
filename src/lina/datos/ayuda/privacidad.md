@@ -12,6 +12,8 @@ Lina no tiene telemetría: no envía estadísticas ni datos de uso a nadie. Lo �
 - **Lo que tienes copiado o seleccionado, solo cuando tu frase va de eso** («resume esto», «tradúceme lo que he copiado»): hasta 4000 caracteres.
   Nunca en **modo privado**, ni por **manos libres** (solo con el atajo o `lina di`), ni con una ventana **sensible** delante, ni si tu gestor de contraseñas lo
   marca como **contraseña** (KeePassXC lo hace). En el registro solo consta qué se miró y cuántos caracteres.
+- **El archivo que tienes seleccionado en Dolphin, solo cuando tu frase va de él** («manda este archivo a…»): su nombre, su ruta, su tipo y su tamaño,
+  nunca su contenido. Con las mismas reglas que lo copiado, y nunca si está en una carpeta con claves o datos de Lina (`~/.ssh`, `~/.gnupg`, perfiles de navegador…).
 - **El resultado de las órdenes y herramientas** que la IA usa para ayudarte (por ejemplo, la lista de programas instalados o el texto de una página que le pides leer).
 - Si has puesto una clave de **Tavily**, el texto de cada búsqueda web, que se envía a Tavily. Puede incluir lo que preguntas o el nombre de un programa o juego que tengas abierto; a Tavily no le llegan tu voz, capturas de pantalla ni archivos.
 

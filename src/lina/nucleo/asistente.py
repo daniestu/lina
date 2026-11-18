@@ -2137,16 +2137,22 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         return ("Hecho: he cancelado lo que esperaba tu «sí» y he dejado de hablar." if habia else "Hecho: he dejado de hablar.") + " Contesta solo «Vale.»"
 
     def _h_mirar_contexto(self, nombre, args):
-        """A5: lo que tienes copiado o seleccionado. Lo pide la IA cuando entiende que tu frase va de eso; el código verifica los hechos (modo privado,
+        """A5: lo que tienes copiado o seleccionado (texto, o el archivo seleccionado en Dolphin). Lo pide la IA cuando entiende que tu frase va de eso; el código verifica los hechos (modo privado,
         manos libres, ventana sensible, contraseña copiada) y lo leído es contenido de fuera (S5). En el registro, solo qué y cuántos caracteres."""
         from lina.escritorio import sesion as SES
         que = str(args.get("que", "") or "")
         ses = SES.actual()
         ventana = ses.ventana_activa(vigencia=0) if not (self.modo_privado or self.origen_voz_libre) else {}
-        texto, caracteres, motivo = CTX.mirar(que, self.modo_privado, self.origen_voz_libre, ventana, ses)
+        if que == "archivo_seleccionado":                         # A5b: Dolphin, por accesibilidad; solo nombre, ruta, tipo y tamaño
+            from lina.escritorio import interfaz as IFZ
+            texto, caracteres, motivo = CTX.mirar_archivo(self.modo_privado, self.origen_voz_libre, ventana, IFZ.seleccion)
+            unidad = "archivo" if caracteres == 1 else "archivos"
+        else:
+            texto, caracteres, motivo = CTX.mirar(que, self.modo_privado, self.origen_voz_libre, ventana, ses)
+            unidad = "caracteres"
         if caracteres:
             self.ejecutor.contaminar(CTX.QUE[que])
-        log(f"Contexto: {que or '(nada)'}: " + (f"no lo miro ({motivo})" if motivo else f"{caracteres} caracteres"))
+        log(f"Contexto: {que or '(nada)'}: " + (f"no lo miro ({motivo})" if motivo else f"{caracteres} {unidad}"))
         return texto
 
     def _h_ver_juegos(self, nombre, args):

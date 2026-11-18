@@ -6,6 +6,7 @@ programa que no responda no pueda colgar al asistente: quien lo llama pone un ti
 
     python3 interfaz_atspi.py apps
     python3 interfaz_atspi.py elementos [--ventana TEXTO] [--filtro TEXTO] [--max N]
+    python3 interfaz_atspi.py seleccion   (lo seleccionado en el gestor de archivos activo y su barra de ruta)
 
 Escribe JSON en la salida. Solo LEE: no pulsa nada (eso llega en la fase 2). Los campos de contraseña nunca se leen.
 """
@@ -203,6 +204,51 @@ def recorrer(frame, prefijo, filtro, maximo, crudo=False):
             pila.append((h, f"{ruta}.{k}", prof + 1))
     return elementos, recortado
 
+
+
+# ---- archivo seleccionado (A5b) ----
+VISTAS_DE_ARCHIVOS = {"list-item", "table-cell", "tree-item"}
+MAX_SELECCION = 20
+
+
+def _texto_largo(acc, maximo=500):
+    try:
+        t = acc.get_text_iface()
+        if t:
+            return t.get_text(0, min(t.get_character_count(), maximo))
+    except Exception:
+        pass
+    return ""
+
+
+def seleccion():
+    """Lo seleccionado en la ventana activa de un gestor de archivos (mirado con Dolphin): los nombres de los elementos marcados y las carpetas de la
+    barra de ruta (o lo escrito en ella), tal cual. Aquí no se adivina nada: quien llama comprueba en el disco que cada archivo exista."""
+    elegida, msg = elegir_ventana("")
+    if not elegida:
+        return {"error": msg}
+    _, _, app, frame, _ = elegida
+    nombres, carpetas, escrita = [], [], ""
+    pila, nodos = [(frame, 0)], 0
+    while pila:
+        acc, prof = pila.pop()
+        nodos += 1
+        if nodos > MAX_NODOS or prof > MAX_PROFUNDIDAD:
+            continue
+        if rol(acc) in VISTAS_DE_ARCHIVOS and "seleccionado" in estados(acc):
+            n = nombre(acc).strip()
+            if n and n not in nombres and len(nombres) < MAX_SELECCION:
+                nombres.append(n)
+        hs = hijos(acc)
+        roles = [rol(h) for h in hs]
+        if not carpetas and "combo-box" in roles and "button" in roles[roles.index("combo-box"):]:       # la barra de ruta: el campo y una carpeta por botón
+            caja_ruta = hs[roles.index("combo-box")]
+            escrita = next((_texto_largo(t) for t in hijos(caja_ruta) if rol(t) in ("text", "entry")), "")
+            carpetas = [nombre(h).strip() for h, r in zip(hs[roles.index("combo-box"):], roles[roles.index("combo-box"):])
+                        if r == "button" and "visible" in estados(h) and nombre(h).strip()]
+        for h in reversed(hs):
+            pila.append((h, prof + 1))
+    return {"app": nombre(app), "ventana": nombre(frame), "seleccionados": nombres, "carpetas": carpetas, "ruta_escrita": escrita}
 
 
 # ---- actuar (fase 2) ----
@@ -429,7 +475,7 @@ def _teclear(acc, texto, anadir):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("orden", choices=["apps", "elementos", "pulsar", "escribir", "contexto"])
+    p.add_argument("orden", choices=["apps", "elementos", "pulsar", "escribir", "contexto", "seleccion"])
     p.add_argument("--ventana", default="")
     p.add_argument("--filtro", default="")
     p.add_argument("--max", type=int, default=120)
@@ -443,6 +489,9 @@ def main():
     try:
         if a.orden == "apps":
             print(json.dumps({"apps": listar_apps()}, ensure_ascii=False))
+            return
+        if a.orden == "seleccion":
+            print(json.dumps(seleccion(), ensure_ascii=False))
             return
         if a.orden == "contexto":
             print(json.dumps(accion_contexto(a), ensure_ascii=False))
