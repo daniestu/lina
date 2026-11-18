@@ -1,7 +1,7 @@
 # Tareas largas y tareas programadas (A6): diseño
 
-Diseño escrito el 2026-11-18, **sin código**. Espera a dos cosas: la semana de uso con `ia.aislar = auto` (S9f, ver `docs/aislamiento.md`) y las
-respuestas del mantenedor a las preguntas del final. Fila A6 de `docs/plan-mejoras.md`.
+Diseño escrito el 2026-11-18, **sin código**. Espera a la semana de uso con `ia.aislar = auto` (S9f, ver `docs/aislamiento.md`). Las preguntas
+del final ya tienen respuesta del mantenedor. Fila A6 de `docs/plan-mejoras.md`.
 
 ## Qué se quiere
 
@@ -41,8 +41,8 @@ respuestas del mantenedor a las preguntas del final. Fila A6 de `docs/plan-mejor
 - **El plan lo escribe la IA** con una herramienta (`plan_de_tarea`: pasos en frases cortas). El código lo guarda en `~/.local/state/lina/tareas/`
   (archivo 600), con el estado de cada paso (pendiente, hecho, falló) **según los hechos**: un paso solo pasa a hecho si su orden acabó bien
   (`ejecucion.salio_bien`) y, si había comprobación, si salió bien.
-- **Al reiniciar**, Lina no sigue sola: dice «me quedé en el paso 3 de 5 de …; ¿sigo?», y solo con tu «sí» retoma. El contexto de la conversación no
-  se guarda; solo el plan, los pasos y su estado.
+- **Al reiniciar**, Lina no sigue sola ni habla al arrancar: deja una notificación de escritorio, sin voz («Me quedé en el paso 3 de 5 de …»), y
+  la próxima vez que le hables pregunta «¿sigo?»; solo con tu «sí» retoma. El contexto de la conversación no se guarda; solo el plan, los pasos y su estado.
 - **Contenido de fuera:** si un paso leyó contenido de fuera, al retomar la tarea se marca contaminada otra vez (la marca se guarda con el plan).
 - **En el registro y el diario**, lo de siempre: qué orden, cuándo y cómo acabó. El plan guardado no lleva textos leídos de fuera, solo los pasos.
 
@@ -56,17 +56,16 @@ respuestas del mantenedor a las preguntas del final. Fila A6 de `docs/plan-mejor
 | A6d | (Segunda versión) tareas programadas que solo informan, con IA y sin herramientas que cambien nada | M |
 
 **Criterio para darlo por bueno**, escrito antes del código: (1) pruebas con el reloj simulado: una tarea corre a su hora, no corre sin tu «sí», no
-corre si `bwrap` no funciona, se pausa tras 3 fallos y tras un cambio de política que la haría confirmar; (2) prueba de que, al ejecutarse, no se llama
+corre si `bwrap` no funciona, se pausa tras 3 fallos y tras un cambio de política que la haría confirmar; tras un reinicio, una tarea larga a medias deja una notificación y no dice nada hasta que le hablas; (2) prueba de que, al ejecutarse, no se llama
 a la IA; (3) prueba de paráfrasis (≥3 formas, incluidas «Cada lunes vacía Descargas», «Todos los lunes por la mañana borra lo que haya en Descargas» y
 «Programa que se vacíe la carpeta de descargas cada semana»): la IA propone `programar_tarea` con la orden y la repetición correctas, y con «¿Qué tareas
 tengo programadas?» no programa nada; (4) banco gratis 2+2 sin regresiones; (5) una semana de uso del mantenedor con al menos una tarea programada.
 
 **Coste:** sin clave de pago. Unas cuatro piezas (M+S+M, y M para la segunda versión) y un día de cupo gratuito para el banco.
 
-## Preguntas para el mantenedor
+## Respuestas del mantenedor (2026-11-18)
 
-1. ¿Vale que las tareas programadas corran **siempre aisladas**, aunque `ia.aislar` esté en `no`, y que no se ofrezcan si `bwrap` no funciona?
-2. ¿Vale que en la primera versión no haya IA al ejecutarse (solo órdenes fijas confirmadas), y que lo que necesite IA quede para A6d, solo para
-   informar?
-3. ¿Repetición mínima de 1 hora, o prefieres otra?
-4. Tras un reinicio, ¿basta con que Lina pregunte «¿sigo?» al arrancar, o prefieres que solo lo diga cuando le hables?
+1. **Siempre aisladas**, aunque `ia.aislar` esté en `no`; si `bwrap` no funciona en el equipo, las tareas programadas no se ofrecen.
+2. **Primera versión sin IA al ejecutarse**: solo órdenes fijas, confirmadas al programarlas. Lo que necesite IA queda para A6d, solo para informar.
+3. **Repetición mínima de 1 hora.**
+4. **Tras un reinicio**, una notificación de escritorio sin voz, y el «¿sigo?» cuando le hables. Lina nunca habla sola al arrancar.
