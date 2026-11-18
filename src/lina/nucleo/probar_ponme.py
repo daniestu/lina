@@ -150,13 +150,13 @@ def _asistente():
     return A, a, abiertas
 
 
-def pasar(frase, A, a, abiertas, tope=TOPE_SEG):
-    """(abiertas, dicho, segundos) de una petición, cortándola si pasa de `tope`."""
+def pasar(frase, A, a, abiertas, tope=TOPE_SEG, antes=()):
+    """(abiertas, dicho, segundos) de una petición, cortándola si pasa de `tope`. `antes`: [(pregunta, respuesta)] de la conversación previa."""
     abiertas.clear()
     dicho = []
     a.decir = dicho.append
     a._hablar = lambda texto, *x, **k: None
-    a.historial = []
+    a.historial = [m for pregunta, respuesta in antes for m in ({"rol": "user", "texto": pregunta}, {"rol": "model", "texto": respuesta})]
     corte = threading.Timer(tope, A._abortar.set)
     corte.start()
     t0 = time.time()

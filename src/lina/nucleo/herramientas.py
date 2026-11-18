@@ -2397,10 +2397,25 @@ def buscar_youtube(consulta, cantidad=5):
         f"{i}. {l}" for i, l in enumerate(lineas, 1))
 
 
+def rechazo_de_copia(texto, ya_copiado=""):
+    """Por qué NO se copia ese texto (o «» si se copia). Hechos, no intención; caso real (banco, 2026-11-18): «copia esto» sin nada que copiar acabó
+    copiando el contexto de la petición, o mirando el portapapeles para volver a copiar lo mismo."""
+    if not texto.strip():
+        return "No hay nada que copiar: pregúntale al usuario qué quiere copiar."
+    if "[SISTEMA" in texto:
+        return ("No lo he copiado: ese texto es el contexto interno que te da Lina ([SISTEMA: …]), no algo del usuario. Si «esto» es lo último que le "
+                "dijiste, copia eso; si no, pregúntale qué quiere copiar.")
+    if ya_copiado and texto.strip() == ya_copiado.strip():
+        return "No lo he copiado: eso ya es lo que tiene en el portapapeles. Si «esto» era otra cosa, pregúntale qué quiere copiar."
+    return ""
+
+
 def copiar_portapapeles(texto):
     texto = str(texto or "")
-    if not texto:
-        return "No hay nada que copiar."
+    rechazo = rechazo_de_copia(texto, SES.actual().pegar() if texto.strip() and "[SISTEMA" not in texto else "")
+    if rechazo:
+        anotar(f"[portapapeles] no copio ({len(texto)} caracteres): {rechazo.split(':')[0]}")
+        return rechazo
     listo, motivo = DEP.asegurar("portapapeles")
     if not listo:
         return motivo

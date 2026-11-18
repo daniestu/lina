@@ -1059,6 +1059,8 @@
 "no hacía falta ninguna herramienta y ha usado {nombres}" = "no tool was needed and it used {nombres}"
 "no ha usado {nombres}" = "it didn't use {nombres}"
 "ha usado {nombres}, que aquí no toca" = "it used {nombres}, which doesn't belong here"
+"ha metido el contexto interno de la petición ([SISTEMA…]) en una herramienta" = "it put the request's internal context ([SISTEMA…]) into a tool"
+"ninguna llamada lleva «{texto}»" = "no call carries «{texto}»"
 "no ha abierto ninguna dirección" = "it didn't open any address"
 "ha elegido lo esperado" = "it picked what was expected"
 "Paso {n} frases por tu Lina, sin ejecutar nada (unos segundos cada una)…" = "Running {n} phrases through your Lina, executing nothing (a few seconds each)…"

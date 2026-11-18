@@ -33,7 +33,7 @@ def test_la_grabacion_pasa_el_juez(frase):
 
 def test_las_grabaciones_solo_usan_herramientas_que_existen():
     existen = {d["name"] for d in DEC.DECLARACIONES} | {G.META, "buscar_web"}
-    assert {n for ll in GRABADAS.values() for n, _ in ll} <= existen
+    assert {n.removesuffix(B.RECHAZADA) for ll in GRABADAS.values() for n, _ in ll} <= existen
 
 
 @pytest.mark.parametrize("caso, llamadas, motivo", [

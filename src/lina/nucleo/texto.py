@@ -181,14 +181,16 @@ _AFIRMA_HECHO_ES = re.compile(
     r"\b(ya\s+)?(he|hemos|ha|han)\s+(creado|hecho|instalado|configurado|cambiado|borrado|movido|eliminado|desinstalado|abierto|"
     r"activado|desactivado|actualizado|puesto|dejado|quitado|renombrado|copiado|escrito|reiniciado|aplicado|guardado|ajustado)\b"
     r"|\b(esta|queda|ya esta)\s+(hech[oa]|cread[oa]|instalad[oa]|configurad[oa]|list[oa])\b|\b(listo|hecho)\b"
-    r"|\b(desactivad|activad|cambiad|puest|quitad|instalad|configurad|ajustad|aplicad|guardad|cread|borrad|abiert|reiniciad|apagad|encendid)[oa]s?\b")
+    r"|\b(desactivad|activad|cambiad|puest|quitad|instalad|configurad|ajustad|aplicad|guardad|cread|borrad|abiert|reiniciad|apagad|encendid)[oa]s?\b"
+    # «Copiado.» o «ya lo tienes copiado», solo así: «en lo que tienes copiado pone…» no da nada por hecho (caso real del banco, 2026-11-18)
+    r"|^\W*copiad[oa]s?\b|^\W*(ya\s+)?(lo|la|los|las)\s+tienes\s+copiad[oa]s?\b|\bya\s+(lo|la|los|las)\s+tienes\s+copiad[oa]s?\b")
 
 
 _AFIRMA_HECHO_EN = re.compile(
     r"\b(i\s+have|i\s?ve|we\s+have|we\s?ve|i\s+just|i\s+already)\s+(created|made|installed|configured|changed|deleted|removed|moved|uninstalled|opened|"
     r"enabled|disabled|turned|updated|set|put|renamed|copied|written|restarted|applied|saved|adjusted|switched|fixed)\b"
     r"|\b(it\s+is|it\s?s|that\s+is|that\s?s|is\s+now|has\s+been|have\s+been)\s+(done|created|installed|configured|set|ready|enabled|disabled|"
-    r"changed|deleted|removed|moved|updated|applied|saved)\b|\b(all\s+set|done|finished)\b")
+    r"changed|deleted|removed|moved|updated|applied|saved)\b|\b(all\s+set|done|finished)\b|^\W*copied\b")
 AFIRMA_HECHO = IDI.PorIdioma({"es": _AFIRMA_HECHO_ES, "en": _AFIRMA_HECHO_EN})
 
 _ADMITE_DUDA_ES = re.compile(r"no (he|has|pude|puedo|hemos|se ha|ha) (podido|logrado|conseguido|funcionado|comprobado)|no puedo (garantizar|asegurar|confirmar)|"

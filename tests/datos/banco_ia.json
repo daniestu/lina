@@ -312,14 +312,6 @@
     }
    ]
   ],
-  "Copia esto al portapapeles.": [
-   [
-    "copiar_portapapeles",
-    {
-     "texto": "(recortado: el modelo copió el bloque [SISTEMA] de la petición)"
-    }
-   ]
-  ],
   "¿Qué es un portapapeles?": [],
   "Resume la página de la Wikipedia sobre la fotosíntesis.": [
    [
@@ -357,6 +349,50 @@
     "buscar_web",
     {
      "consulta": "site:es.wikipedia.org fotosintesis"
+    }
+   ]
+  ],
+  "Copia esto al portapapeles.": [
+   [
+    "copiar_portapapeles (rechazada)",
+    {
+     "texto": "(recortado: el bloque [SISTEMA] de la petición)"
+    }
+   ]
+  ],
+  "Cópiame eso.": [
+   [
+    "copiar_portapapeles (rechazada)",
+    {}
+   ]
+  ],
+  "Ponme esto en el portapapeles.": [
+   [
+    "copiar_portapapeles (rechazada)",
+    {}
+   ]
+  ],
+  "Copia eso al portapapeles.": [
+   [
+    "copiar_portapapeles",
+    {
+     "texto": "uname -r"
+    }
+   ]
+  ],
+  "Cópiamelo.": [
+   [
+    "copiar_portapapeles",
+    {
+     "texto": "df -h"
+    }
+   ]
+  ],
+  "Pásalo al portapapeles, por favor.": [
+   [
+    "copiar_portapapeles",
+    {
+     "texto": "Hola, espero que estés bien."
     }
    ]
   ]
