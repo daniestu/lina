@@ -62,7 +62,7 @@ def test_amd_lee_sysfs(tmp_path, sin_nvidia):
     (g,) = G.detectar(tmp_path)
     assert g["fabricante"] == "amd"
     m = G.leer(g)
-    assert m["uso_pct"] == 97 and m["temp_c"] == 70 and round(m["vram_usada_mb"]) == 8590 and m["potencia_w"] == 180 and m["limite_w"] == 200
+    assert m["uso_pct"] == 97 and m["temp_c"] == 70 and m["vram_usada_mb"] == 8192 and m["vram_total_mb"] == 16384 and m["potencia_w"] == 180 and m["limite_w"] == 200
     assert m["frec_gpu_mhz"] == 2450 and m["frec_mem_mhz"] == 1249 and m["limitacion"].startswith("ninguna")
     assert "Uso: 97 %" in G.describir(g, m)
 

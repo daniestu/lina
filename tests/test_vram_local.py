@@ -44,8 +44,8 @@ def _sysfs(tmp_path, vendor, usada=None, total=None):
     d.mkdir(parents=True)
     (d / "vendor").write_text(vendor)
     if usada is not None:
-        (d / "mem_info_vram_used").write_text(str(int(usada * 1e6)))
-        (d / "mem_info_vram_total").write_text(str(int(total * 1e6)))
+        (d / "mem_info_vram_used").write_text(str(int(usada * 1048576)))
+        (d / "mem_info_vram_total").write_text(str(int(total * 1048576)))
     return tmp_path
 
 

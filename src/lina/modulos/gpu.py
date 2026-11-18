@@ -130,7 +130,7 @@ def _leer_amd(gpu):
     d = Path(gpu["ruta"]) / "device"
     h = _hwmon(d)
     r = {"uso_pct": _num(d / "gpu_busy_percent")}
-    usada, total = _num(d / "mem_info_vram_used", 1e6), _num(d / "mem_info_vram_total", 1e6)
+    usada, total = _num(d / "mem_info_vram_used", 1048576), _num(d / "mem_info_vram_total", 1048576)    # en MiB, como nvidia-smi
     r["vram_usada_mb"], r["vram_total_mb"] = usada, total
     temp = potencia = limite = critica = None
     r["frec_gpu_mhz"] = r["frec_mem_mhz"] = None
@@ -203,6 +203,51 @@ def describir(gpu, m):
     return (f"{gpu['nombre']}\n  Uso: {_fmt(m.get('uso_pct'), '%')} · Temperatura: {_fmt(m.get('temp_c'), '°C')} · Memoria de vídeo: {vram}\n"
             f"  Frecuencia: {_fmt(m.get('frec_gpu_mhz'), 'MHz')} (memoria {_fmt(m.get('frec_mem_mhz'), 'MHz')}) · "
             f"Consumo: {_fmt(m.get('potencia_w'), 'W', 0)} de un límite de {_fmt(m.get('limite_w'), 'W', 0)}\n  Limitación: {m.get('limitacion', '?')}")
+
+
+# V15: lo que se dice en voz alta. Lo hace el código con los mismos datos, sin IA; las frecuencias y el consumo quedan para quien los pida.
+_SIN_LIMITACION = {"ninguna", "ninguna detectada", "no se puede saber en esta GPU", "?"}
+
+
+def _coma(x, decimales=0):
+    return f"{x:.{decimales}f}".replace(".", ",")
+
+
+def frase_hablada(gpu, m, con_nombre=False):
+    """Una frase corta para decir por voz: si va bien, temperatura, uso y memoria de vídeo (lo que haya); si algo la limita, solo eso y su dato.
+    None si no se ha podido leer."""
+    if m.get("error"):
+        return None
+    sujeto = f"La {gpu['nombre']}" if con_nombre else "La gráfica"
+    limitacion = str(m.get("limitacion") or "?")
+    if limitacion not in _SIN_LIMITACION:
+        motivos = []
+        for parte in limitacion.split(", "):                         # «límite de potencia (software)», o las de Intel: «pl1», «thermal»…
+            parte = parte.strip()
+            dicho = ("límite de potencia" if re.fullmatch(r"pl\d", parte) else "temperatura" if parte in ("thermal", "prochot")
+                     else parte.split(" (")[0])
+            if dicho not in motivos:
+                motivos.append(dicho)
+        motivo = " y ".join(motivos)
+        if "temperatura" in motivo and m.get("temp_c") is not None:
+            dato = f": está a {_coma(m['temp_c'])} grados"
+        elif "potencia" in motivo and m.get("potencia_w") is not None:
+            dato = f": consume {_coma(m['potencia_w'])}" + (f" de {_coma(m['limite_w'])} vatios" if m.get("limite_w") else " vatios")
+        else:
+            dato = ""
+        return f"{sujeto} está frenando su rendimiento por {motivo}{dato}."
+    partes = []
+    if m.get("temp_c") is not None:
+        partes.append(f"{_coma(m['temp_c'])} grados")
+    if m.get("uso_pct") is not None:
+        partes.append(f"{_coma(m['uso_pct'])} % de uso")
+    if m.get("vram_usada_mb") is not None:
+        usada = m["vram_usada_mb"] / 1024
+        partes.append(f"{_coma(usada, 1)} de {_coma(m['vram_total_mb'] / 1024, 1)} GB de memoria" if m.get("vram_total_mb") else f"{_coma(usada, 1)} GB de memoria en uso")
+    if not partes:
+        return f"{sujeto} no informa de su temperatura, su uso ni su memoria en este equipo."
+    lista = partes[0] if len(partes) == 1 else ", ".join(partes[:-1]) + " y " + partes[-1]
+    return f"{sujeto} va bien: {lista}."
 
 
 # ======================= LACT =======================
@@ -319,7 +364,13 @@ def planificar(args):
         return {"error": "No detecto ninguna tarjeta gráfica que sepa leer (NVIDIA con nvidia-smi, AMD o Intel)."}
     if accion == "estado":
         elegidas = [g for g in gpus if objetivo and objetivo.lower() in (g["nombre"] + g["id"]).lower()] or gpus
-        return {"texto": "\n".join(describir(g, leer(g)) for g in elegidas)}
+        lecturas = [(g, leer(g)) for g in elegidas]
+        frases = [f for f in (frase_hablada(g, m, con_nombre=len(lecturas) > 1) for g, m in lecturas) if f]
+        detalle = "\n".join(describir(g, m) for g, m in lecturas)
+        if not frases:
+            return {"texto": detalle}
+        return {"texto": "PARA DECIR EN VOZ ALTA (dilo así, sin añadir frecuencias ni vatios): " + " ".join(frases)
+                + "\n\nDetalle, solo si pregunta por algo de aquí (frecuencias, consumo, límite de potencia):\n" + detalle}
     if accion == "registro_iniciar":
         try:
             return iniciar_registro(args.get("intervalo_s") or 2, args.get("minutos") or 15)
