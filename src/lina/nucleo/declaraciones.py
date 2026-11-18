@@ -202,6 +202,10 @@ DECLARACIONES: list[dict] = [
      "description": ("El usuario quiere que pares (con las palabras que sean: «cállate», «ya está bien», «déjalo», «para de hablar», «no sigas con eso»). "
                      "Cancela lo que esperaba su «sí» y corta lo que estabas diciendo. No borra ni deshace nada."),
      "parameters": {"type": "object", "properties": {}}},
+    {"name": "mirar_contexto",
+     "description": ("Lee lo que el usuario tiene copiado (portapapeles) o seleccionado con el ratón (seleccion), cuando su frase se refiere a eso "
+                     "(«resume esto», «¿qué pone en lo que he copiado?», «tradúceme lo que tengo seleccionado»). No copia nada ni sirve para páginas web."),
+     "parameters": {"type": "object", "properties": {"que": {"type": "string", "enum": ["portapapeles", "seleccion"]}}, "required": ["que"]}},
     {"name": "compatibilidad_linux",
      "description": ("Dice si un juego de Steam tiene versión para Linux y cómo funciona con Proton según ProtonDB, consultando la tienda de Steam y ProtonDB "
                      "(ven solo el número del juego y la dirección IP). Úsala SIEMPRE antes de afirmar si un juego funciona en Linux, si es nativo o si "

@@ -243,6 +243,122 @@
      "texto": "/tmp"
     }
    ]
+  ],
+  "Resume esto.": [
+   [
+    "mirar_contexto",
+    {
+     "que": "portapapeles"
+    }
+   ]
+  ],
+  "¿Qué pone en lo que he copiado?": [
+   [
+    "mirar_contexto",
+    {
+     "que": "portapapeles"
+    }
+   ]
+  ],
+  "Léeme lo que hay en el portapapeles.": [
+   [
+    "mirar_contexto",
+    {
+     "que": "portapapeles"
+    }
+   ]
+  ],
+  "Traduce al inglés lo que acabo de copiar.": [
+   [
+    "mirar_contexto",
+    {
+     "que": "portapapeles"
+    }
+   ],
+   [
+    "copiar_portapapeles",
+    {
+     "texto": "Plants use sunlight to turn water and air into the sugar that feeds them."
+    }
+   ]
+  ],
+  "Tradúceme lo que tengo seleccionado.": [
+   [
+    "mirar_contexto",
+    {
+     "que": "seleccion"
+    }
+   ]
+  ],
+  "¿Qué significa el texto que he marcado con el ratón?": [
+   [
+    "mas_herramientas",
+    {
+     "grupo": "archivos"
+    }
+   ],
+   [
+    "mirar_contexto",
+    {
+     "que": "seleccion"
+    }
+   ]
+  ],
+  "Explícame la frase que tengo subrayada.": [
+   [
+    "mirar_contexto",
+    {
+     "que": "seleccion"
+    }
+   ]
+  ],
+  "Copia esto al portapapeles.": [
+   [
+    "copiar_portapapeles",
+    {
+     "texto": "(recortado: el modelo copió el bloque [SISTEMA] de la petición)"
+    }
+   ]
+  ],
+  "¿Qué es un portapapeles?": [],
+  "Resume la página de la Wikipedia sobre la fotosíntesis.": [
+   [
+    "buscar_web",
+    {
+     "consulta": "fotosintesis wikipedia"
+    }
+   ],
+   [
+    "buscar_web",
+    {
+     "consulta": "fotosintesis site:es.wikipedia.org"
+    }
+   ],
+   [
+    "buscar_web",
+    {
+     "dominio": "es.wikipedia.org",
+     "consulta": "fotosintesis"
+    }
+   ],
+   [
+    "buscar_web",
+    {
+     "consulta": "https://es.wikipedia.org/wiki/Fotos%C3%ADntesis"
+    }
+   ],
+   [
+    "leer_web",
+    {
+     "url": "https://es.wikipedia.org/wiki/Fotos%C3%ADntesis"
+    }
+   ],
+   [
+    "buscar_web",
+    {
+     "consulta": "site:es.wikipedia.org fotosintesis"
+    }
+   ]
   ]
  }
 }

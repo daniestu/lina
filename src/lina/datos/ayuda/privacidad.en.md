@@ -9,6 +9,9 @@ Lina has no telemetry: she sends no statistics or usage data to anyone. The only
 - **The name of the active window and its program**, to know what you are talking about.
 - **Screenshots of your screen, only if you allow it** (`lina privacidad si`) and only when needed: in a game, if you talk about what you see, or if the AI asks for it.
   Never with **private mode** on, nor with **sensitive** windows (banks, billing, password managers…), nor while you haven't decided.
+- **What you have copied or selected, only when your sentence is about it** («summarise this», «translate what I copied»): up to 4000 characters.
+  Never in **private mode**, nor by **hands-free** (only with the shortcut or `lina di`), nor with a **sensitive** window in front, nor if your password manager
+  marks it as a **password** (KeePassXC does). The log only records what was looked at and how many characters.
 - **The result of the commands and tools** the AI uses to help you (for example, the list of installed programs or the text of a page you ask it to read).
 - If you have set a **Tavily** key, the text of each web search, which is sent to Tavily. It may include what you ask or the name of a program or game you have open; Tavily does not receive your voice, screenshots or files.
 
@@ -37,6 +40,7 @@ With `tavily` only Tavily is used (and DuckDuckGo if you turn it on); with `goog
 - Your keys and passwords (the system keyring keeps them; the AI can't read them and they are not printed in the log).
 - Your files, unless you ask for something that requires reading one (then only what is read for that task).
 - Screenshots in private mode, with sensitive windows or without your permission.
+- What you have copied or selected in private mode, by hands-free, with a sensitive window in front or if your password manager marks it as a password.
 
 ## What private mode does
 
@@ -45,6 +49,7 @@ Turn it on with «activa el modo privado»; only you can turn it off, with the s
 **While it is on:**
 
 - No screenshot of your screen is taken or sent, and the AI can't ask for one.
+- The AI can't look at what you have copied or selected.
 - I don't answer «Oye Lina»: I only listen with the shortcut.
 - What just happened is not kept (see below), and turning it on deletes whatever there was.
 - I can't try KDE settings that need checking by looking at the panel.

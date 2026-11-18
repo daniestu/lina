@@ -18,7 +18,7 @@ from lina.nucleo import plataforma as PL
 
 # ---- herramientas de cada grupo (el orden final lo manda el orden de herramientas.DECLARACIONES) ----
 NUCLEO = ["ejecutar_comando", "abrir_app", "ver_pantalla", "mirar_pantalla", "pensar_a_fondo", "empezar_de_cero",
-          "deshacer_cambio", "usar_receta", "modo_privado", "gestionar_fuentes", "parar"]
+          "deshacer_cambio", "usar_receta", "modo_privado", "gestionar_fuentes", "parar", "mirar_contexto"]
 META = "mas_herramientas"
 
 GRUPOS = {

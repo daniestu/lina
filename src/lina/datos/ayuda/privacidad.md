@@ -9,6 +9,9 @@ Lina no tiene telemetría: no envía estadísticas ni datos de uso a nadie. Lo �
 - **El nombre de la ventana activa y su programa**, para saber de qué hablas.
 - **Capturas de tu pantalla, solo si lo permites** (`lina privacidad si`) y solo cuando hacen falta: en un juego, si hablas de lo que ves, o si la IA lo pide.
   Nunca con el **modo privado** activado, ni con ventanas **sensibles** (bancos, facturación, gestores de contraseñas…), ni mientras no hayas decidido.
+- **Lo que tienes copiado o seleccionado, solo cuando tu frase va de eso** («resume esto», «tradúceme lo que he copiado»): hasta 4000 caracteres.
+  Nunca en **modo privado**, ni por **manos libres** (solo con el atajo o `lina di`), ni con una ventana **sensible** delante, ni si tu gestor de contraseñas lo
+  marca como **contraseña** (KeePassXC lo hace). En el registro solo consta qué se miró y cuántos caracteres.
 - **El resultado de las órdenes y herramientas** que la IA usa para ayudarte (por ejemplo, la lista de programas instalados o el texto de una página que le pides leer).
 - Si has puesto una clave de **Tavily**, el texto de cada búsqueda web, que se envía a Tavily. Puede incluir lo que preguntas o el nombre de un programa o juego que tengas abierto; a Tavily no le llegan tu voz, capturas de pantalla ni archivos.
 
@@ -37,6 +40,7 @@ Con `tavily` solo se usa Tavily (y DuckDuckGo si lo enciendes); con `google`, so
 - Tus claves y contraseñas (las guarda el llavero del sistema; la IA no puede leerlas ni se imprimen en el registro).
 - Tus archivos, a no ser que me pidas algo que exija leer uno (entonces solo lo que se lee para esa tarea).
 - Capturas de pantalla en modo privado, con ventanas sensibles o sin tu permiso.
+- Lo que tienes copiado o seleccionado en modo privado, por manos libres, con una ventana sensible delante o si tu gestor de contraseñas lo marca como contraseña.
 
 ## Qué hace el modo privado
 
@@ -45,6 +49,7 @@ Se activa con «activa el modo privado» y se quita solo con el atajo, diciendo 
 **Mientras está activo:**
 
 - No se hace ni se envía ninguna captura de tu pantalla, y la IA no puede pedirla.
+- La IA no puede mirar lo que tienes copiado ni seleccionado.
 - No atiendo «Oye Lina»: solo te escucho con el atajo.
 - No se conserva lo que acaba de pasar (ver más abajo), y al activarlo se borra lo que hubiera.
 - No puedo probar ajustes de KDE que haya que comprobar mirando el panel.

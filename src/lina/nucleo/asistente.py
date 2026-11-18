@@ -34,6 +34,7 @@ from lina.nucleo import autoconocimiento as AUTO
 from lina.nucleo import aviso_busqueda as AVB
 from lina.nucleo import busqueda as BUS
 from lina.nucleo import compatibilidad as COMP
+from lina.nucleo import contexto as CTX
 from lina.nucleo import avisos as AVI
 from lina.nucleo import canal as CANAL
 from lina.nucleo import registro as REG
@@ -2135,6 +2136,19 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self.callar()
         return ("Hecho: he cancelado lo que esperaba tu «sí» y he dejado de hablar." if habia else "Hecho: he dejado de hablar.") + " Contesta solo «Vale.»"
 
+    def _h_mirar_contexto(self, nombre, args):
+        """A5: lo que tienes copiado o seleccionado. Lo pide la IA cuando entiende que tu frase va de eso; el código verifica los hechos (modo privado,
+        manos libres, ventana sensible, contraseña copiada) y lo leído es contenido de fuera (S5). En el registro, solo qué y cuántos caracteres."""
+        from lina.escritorio import sesion as SES
+        que = str(args.get("que", "") or "")
+        ses = SES.actual()
+        ventana = ses.ventana_activa(vigencia=0) if not (self.modo_privado or self.origen_voz_libre) else {}
+        texto, caracteres, motivo = CTX.mirar(que, self.modo_privado, self.origen_voz_libre, ventana, ses)
+        if caracteres:
+            self.ejecutor.contaminar(CTX.QUE[que])
+        log(f"Contexto: {que or '(nada)'}: " + (f"no lo miro ({motivo})" if motivo else f"{caracteres} caracteres"))
+        return texto
+
     def _h_ver_juegos(self, nombre, args):
         return self.ejecutor.ver_juegos(args.get("buscar"), bool(args.get("diagnostico")))
 
@@ -2180,7 +2194,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
 
     _HERRAMIENTAS = {
         "buscar_web": _h_buscar_web, "usar_fuente": _h_usar_fuente, "necesito_datos_actuales": _h_necesito_datos_actuales,
-        "compatibilidad_linux": _h_compatibilidad_linux, "gestionar_fuentes": _h_gestionar_fuentes, "parar": _h_parar,
+        "compatibilidad_linux": _h_compatibilidad_linux, "gestionar_fuentes": _h_gestionar_fuentes, "parar": _h_parar, "mirar_contexto": _h_mirar_contexto,
         "ejecutar_comando": _h_ejecutar_comando, "disenar_documento": _h_disenar_documento, "crear_documento": _h_crear_documento,
         "buscar_youtube": _h_buscar_youtube, "ver_papelera": _h_ver_papelera, "vaciar_papelera": _h_vaciar_papelera,
         "restaurar_de_papelera": _h_restaurar_de_papelera, "copiar_portapapeles": _h_copiar_portapapeles, "buscar_ajuste_kde": _h_buscar_ajuste_kde,
@@ -2946,7 +2960,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
 
     # E1c: las herramientas que no cambian nada; con las reglas solo de información, cualquier otra corta el turno y se repite con todas las reglas
     SOLO_CONSULTA = {"buscar_web", "leer_web", "usar_fuente", "necesito_datos_actuales", "mas_herramientas", "pensar_a_fondo", "ver_pantalla", "mirar_pantalla",
-                     "compatibilidad_linux", "parar",
+                     "compatibilidad_linux", "parar", "mirar_contexto",
                      "ver_juegos", "ver_gasto", "ver_diario", "procesos", "observar_config", "buscar_archivos"}
 
     # E1c: preguntas sobre el estado del propio equipo, que se contestan con un comando: van con todas las reglas desde el principio. En la medida, «¿cuánta

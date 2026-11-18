@@ -254,9 +254,13 @@ class Sesion:
 
     # ------------------------------------------------------------------ portapapeles
     def _ordenes_portapapeles(self):
-        wl = {"copiar": ["wl-copy"], "pegar": ["wl-paste", "-n"], "programa": "wl-copy", "pegar_programa": "wl-paste"}
-        xc = {"copiar": ["xclip", "-selection", "clipboard"], "pegar": ["xclip", "-selection", "clipboard", "-o"], "programa": "xclip", "pegar_programa": "xclip"}
-        xs = {"copiar": ["xsel", "-b", "-i"], "pegar": ["xsel", "-b", "-o"], "programa": "xsel", "pegar_programa": "xsel"}
+        # «primaria»: el texto seleccionado con el ratón (A5). «tipos»: qué formatos ofrece lo copiado; xsel no sabe decirlo.
+        wl = {"copiar": ["wl-copy"], "pegar": ["wl-paste", "-n"], "programa": "wl-copy", "pegar_programa": "wl-paste",
+              "pegar_primaria": ["wl-paste", "-n", "--primary"], "tipos": ["wl-paste", "--list-types"], "tipos_primaria": ["wl-paste", "--list-types", "--primary"]}
+        xc = {"copiar": ["xclip", "-selection", "clipboard"], "pegar": ["xclip", "-selection", "clipboard", "-o"], "programa": "xclip", "pegar_programa": "xclip",
+              "pegar_primaria": ["xclip", "-selection", "primary", "-o"], "tipos": ["xclip", "-selection", "clipboard", "-t", "TARGETS", "-o"],
+              "tipos_primaria": ["xclip", "-selection", "primary", "-t", "TARGETS", "-o"]}
+        xs = {"copiar": ["xsel", "-b", "-i"], "pegar": ["xsel", "-b", "-o"], "programa": "xsel", "pegar_programa": "xsel", "pegar_primaria": ["xsel", "-p", "-o"]}
         return [wl, xc, xs] if self.tipo == "wayland" else [xc, xs, wl]
 
     def copiar(self, texto):
@@ -268,14 +272,24 @@ class Sesion:
                     return True
         return False
 
-    def pegar(self):
-        """Contenido del portapapeles, o '' si no hay o no se puede leer."""
+    def pegar(self, primaria=False):
+        """Contenido del portapapeles (o, con `primaria`, del texto seleccionado), o '' si no hay o no se puede leer."""
         for m in self._ordenes_portapapeles():
             if self._tiene(m["pegar_programa"]):
-                rc, out = self._ej(m["pegar"], tiempo=3)
+                rc, out = self._ej(m["pegar_primaria" if primaria else "pegar"], tiempo=3)
                 if rc == 0:
                     return out
         return ""
+
+    def tipos_portapapeles(self, primaria=False):
+        """Los formatos que ofrece lo copiado (o lo seleccionado), con el primer programa que sabe decirlo; None si ninguno sabe."""
+        for m in self._ordenes_portapapeles():
+            orden = m.get("tipos_primaria" if primaria else "tipos")
+            if orden and self._tiene(m["pegar_programa"]):
+                rc, out = self._ej(orden, tiempo=3)
+                if rc == 0:
+                    return [t.strip() for t in out.splitlines() if t.strip()]
+        return None
 
     def programa_portapapeles(self):
         """Primer programa instalado que sirve para copiar, o None."""
