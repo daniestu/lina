@@ -476,7 +476,7 @@ from lina.nucleo.ia import (  # noqa: F401
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, comprobar_tema, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_reserva, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva, modo_busqueda, reserva_sin_clave,
     clasificar_confirmacion_ia, clasificar_interrupcion_ia, pide_buscar_ia, fracaso_en_respuesta, modelo_local_cargado, nivel_razonamiento,
     parece_promesa, preguntar_gemini, preguntar_ia, preguntar_local, puede_usar_local, resumen_error_gemini, verificar_cumplimiento,
-    cabe_modelo_local, dominio_valido, empezar_peticion, fallos_de_la_peticion, horas_hasta_renovar_cupo,
+    cabe_modelo_local, dominio_valido, empezar_peticion, en_medida, fallos_de_la_peticion, horas_hasta_renovar_cupo,
 )
 
 
@@ -1572,9 +1572,11 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         try:
             if not AJ.actuales(log=lambda m: None).get("privacidad", "registrar_tiempos"):
                 return
-            reg = crono.registro(origen, modo)
+            via = "texto" if self.origen_texto else "manos_libres" if self.origen_voz_libre else "atajo"
+            reg = crono.registro(origen, modo, via)
             log(TIE.linea_de_registro(reg))
-            TIE.guardar(reg)
+            if not en_medida():                                    # V13: una pasada del banco no es uso real y no va a tiempos.jsonl
+                TIE.guardar(reg)
         except Exception as e:
             log(f"Tiempos: fallo {e!r}")
 

@@ -22,9 +22,17 @@ ARCHIVO = RUT.ESTADO / "tiempos.jsonl"
 MAX_BYTES = 200_000          # al pasarse, se queda con las últimas MAX_LINEAS_TRAS_ROTAR líneas
 MAX_LINEAS_TRAS_ROTAR = 500
 FASES = ("whisper", "previas", "ia", "herramientas", "sintesis", "voz")
-NOMBRES = {"whisper": N_("Whisper (voz a texto)"), "previas": N_("decisiones previas del código"), "ia": N_("IA (sin herramientas)"),
+NOMBRES = {"whisper": N_("Whisper (voz a texto)"), "previas": N_("decisiones previas del código"), "ia": N_("IA"),
            "herramientas": N_("herramientas"), "sintesis": N_("síntesis de la voz"), "voz": N_("reproducción")}
 HASTA_OIRTE = ("whisper", "previas", "ia", "herramientas", "sintesis")      # lo que pasa desde que terminas de hablar hasta que suena la primera palabra
+# V13: cómo llegó la petición. Los registros de antes de V13 no lo llevan: con Whisper eran por voz (atajo o manos libres, sin distinguir); sin él pueden
+# ser `lina di` o una pasada de `lina probar-ia` (que entonces también se guardaba aquí), y no cuentan.
+VIAS = {"atajo": N_("Con el atajo"), "manos_libres": N_("Por manos libres"), "texto": N_("Con «lina di» (texto)"),
+        "voz": N_("Por voz (registros antiguos: atajo y manos libres juntos)")}
+MODOS = {"directa": N_("directas"), "rapido": N_("rápido"), "profundo": N_("a fondo")}
+DIAS_TIEMPOS = 14
+LENTA_SEG = 10.0                     # cuántas pasan de esto: la media sola engaña cuando unas pocas tardan muchísimo
+ANCHO_ETIQUETA = 30
 
 ARCHIVO_ESCUCHAS = RUT.ESTADO / "escuchas.jsonl"
 MAX_LINEAS_ESCUCHAS = 5000           # ~450 KB: meses de uso
@@ -82,10 +90,12 @@ class Cronometro:
     def hasta_oirte(self):
         return sum(self.fases.get(f, 0.0) for f in HASTA_OIRTE)
 
-    def registro(self, ruta, modo=""):
-        """La línea que se guarda: solo números y la ruta que se siguió. Sin texto del usuario."""
+    def registro(self, ruta, modo="", via=None):
+        """La línea que se guarda: solo números, la ruta que se siguió y cómo llegó la petición (`via`, de VIAS). Sin texto del usuario."""
         reg = {"t": int(time.time()), "ruta": str(ruta)[:60], "modo": str(modo)[:12], "herramientas": self.herramientas,
                "fases": {k: round(v, 3) for k, v in self.fases.items()}, "hasta_oirte": round(self.hasta_oirte(), 3)}
+        if via in VIAS and via != "voz":
+            reg["via"] = via
         if self.llamadas:
             reg["llamadas"] = [[round(float(s), 3), str(r)[:12]] for s, r in self.llamadas[:30]]
         return reg
@@ -121,21 +131,30 @@ def guardar(reg, archivo=None):
         return False
 
 
-def leer(archivo=None, ultimas=50):
+def leer(archivo=None, ultimas=None, dias=None, ahora=None):
+    """Los registros del archivo: los de los últimos `dias` días, o las últimas `ultimas` líneas, o todos."""
     archivo = archivo or ARCHIVO
     try:
         lineas = archivo.read_text(encoding="utf-8").splitlines()
     except OSError:
         return []
+    desde = (ahora or time.time()) - dias * 86400 if dias else None
     out = []
-    for linea in lineas[-ultimas:]:
+    for linea in (lineas[-ultimas:] if ultimas else lineas):
         try:
             d = json.loads(linea)
         except ValueError:
             continue
-        if isinstance(d, dict) and isinstance(d.get("fases"), dict):
+        if isinstance(d, dict) and isinstance(d.get("fases"), dict) and (desde is None or float(d.get("t") or 0) >= desde):
             out.append(d)
     return out
+
+
+def via_de(reg):
+    """Cómo llegó la petición, o None si es un registro antiguo que no se puede saber (sin `via` y sin Whisper)."""
+    if reg.get("via") in VIAS:
+        return reg["via"]
+    return "voz" if "whisper" in reg.get("fases", {}) else None
 
 
 def resumir(registros):
@@ -166,23 +185,49 @@ def resumir_llamadas(registros):
             "mediana": statistics.median(duraciones), "maxima": max(duraciones), "fallidas": fallidas}
 
 
-def _bloque(titulo, registros, salida):
+def _mediana_y_lentas(valores):
+    return statistics.median(valores), sum(1 for v in valores if v > LENTA_SEG)
+
+
+def _linea_fase(etiqueta, valores, salida):
+    mediana, lentas = _mediana_y_lentas(valores)
+    extra = " · " + T("{n} de {total} pasan de 10 s", n=lentas, total=len(valores)) if lentas else ""
+    salida(f"  {etiqueta:{ANCHO_ETIQUETA}} " + T("mediana {mediana}", mediana=_s(mediana)) + extra)
+
+
+def _bloque(via, registros, salida):
+    """Una forma de llegar (atajo, manos libres, texto): cuántas por modo, la mediana de cada fase y cuántas pasan de 10 s, y lo que más hace esperar."""
     if not registros:
         return
-    r = resumir(registros)
-    salida(T("{titulo}: {n} peticiones", titulo=T(titulo), n=r["n"]))
-    for fase, (media, mediana, _) in r["fases"].items():
-        salida(f"  {T(NOMBRES[fase]):34} " + T("media {media} · mediana {mediana}", media=_s(media), mediana=_s(mediana)))
-    salida(f"  {T('desde que acabas de hablar hasta que suena'):34} " + T("media {media} · mediana {mediana}", media=_s(r["hasta_oirte"][0]),
-                                                                              mediana=_s(r["hasta_oirte"][1])))
-    if r["mas_lenta"]:
-        salida("  " + T("La fase más lenta: {fase}.", fase=T(NOMBRES[r["mas_lenta"]])))
+    modos = " · ".join(f"{T(MODOS[m])} {sum(1 for r in registros if r.get('modo') == m)}" for m in MODOS if any(r.get("modo") == m for r in registros))
+    salida(T("{titulo}: {n} peticiones", titulo=T(VIAS[via]), n=len(registros)) + (f" ({modos})" if modos else ""))
+    for fase in FASES:
+        valores = [r["fases"][fase] for r in registros if fase in r["fases"]]
+        if valores and (fase != "herramientas" or any(valores)):
+            _linea_fase(T(NOMBRES[fase]), valores, salida)
+    _linea_fase(T("hasta que empieza a hablar"), [float(r.get("hasta_oirte", 0.0)) for r in registros], salida)
+    por_modo = [(m, [float(r.get("hasta_oirte", 0.0)) for r in registros if r.get("modo") == m]) for m in MODOS]
+    por_modo = [(m, v) for m, v in por_modo if v]
+    if len(por_modo) > 1:
+        salida("  " + T("hasta que habla, por modo: {detalle}", detalle=" · ".join(f"{T(MODOS[m])} {_s(statistics.median(v))}" for m, v in por_modo)))
+    medianas = {f: statistics.median([r["fases"][f] for r in registros if f in r["fases"]]) for f in HASTA_OIRTE
+                if any(f in r["fases"] for r in registros)}
+    total = sum(float(r.get("hasta_oirte", 0.0)) for r in registros)
+    if medianas and total > 0:
+        fase = max(medianas, key=lambda f: medianas[f])
+        parte = sum(r["fases"].get(fase, 0.0) for r in registros) / total
+        salida("  " + T("Lo que más te hace esperar: {fase} (mediana {mediana}, el {pc} de la espera)", fase=T(NOMBRES[fase]),
+                        mediana=_s(medianas[fase]), pc=f"{round(parte * 100)} %"))
+
+
+def _linea_llamadas(registros, salida):
     ll = resumir_llamadas(registros)
-    if ll:
-        salida("  " + T("Llamadas a la IA: {n} en {p} peticiones · media {media} · mediana {mediana} · la más lenta {maxima}", n=ll["n"], p=ll["peticiones"],
-                        media=_s(ll["media"]), mediana=_s(ll["mediana"]), maxima=_s(ll["maxima"])))
-        if ll["fallidas"]:
-            salida("  " + T("   no llegaron bien: {detalle}", detalle=", ".join(f"{k} ×{v}" for k, v in sorted(ll["fallidas"].items()))))
+    if not ll:
+        return
+    salida(T("Llamadas a la IA: {n} en {p} peticiones · mediana {mediana} · la más lenta {maxima}", n=ll["n"], p=ll["peticiones"],
+             mediana=_s(ll["mediana"]), maxima=_s(ll["maxima"])))
+    if ll["fallidas"]:
+        salida("  " + T("no llegaron bien: {detalle}", detalle=", ".join(f"{k} ×{v}" for k, v in sorted(ll["fallidas"].items()))))
 
 
 # ======================= escuchas del atajo (V3c) =======================
@@ -549,33 +594,38 @@ def principal_ia(argv, salida=print, archivo=None, hoy=None, precio=None):
     return 0
 
 
-def principal(argv, salida=print, archivo=None, archivo_escuchas=None):
+def principal(argv, salida=print, archivo=None, archivo_escuchas=None, ahora=None):
     if argv[:1] == ["escucha"]:
         return principal_escucha(argv[1:], salida, archivo_escuchas)
     if argv[:1] == ["ia"]:
         return principal_ia(argv[1:], salida)
-    ultimas = 50
+    dias = DIAS_TIEMPOS
     if argv:
         try:
-            ultimas = int(argv[0])
-            if not 1 <= ultimas <= 5000:
+            dias = int(argv[0])
+            if not 1 <= dias <= 365:
                 raise ValueError
         except ValueError:
-            salida(T("Uso:  lina tiempos [N]   (resume las últimas N peticiones; por defecto 50)   |   lina tiempos escucha [días]   |   lina tiempos ia [días]"))
+            salida(T("Uso:  lina tiempos [días]   (resume las peticiones de los últimos días; por defecto 14)   |   lina tiempos escucha [días]   |   "
+                     "lina tiempos ia [días]"))
             return 2
-    registros = leer(archivo, ultimas)
+    todos = leer(archivo, dias=dias, ahora=ahora)
+    registros = [r for r in todos if via_de(r)]
     if not registros:
         salida(T("Todavía no hay tiempos medidos. Habla con Lina un rato y vuelve a probar. (Se guardan solo números, nunca lo que dices; "
                  "se desactiva con:  lina config poner privacidad.registrar_tiempos no)"))
         return 0
-    directas = [r for r in registros if str(r.get("ruta", "")).startswith("directa")]
-    resto = [r for r in registros if r not in directas]
-    _bloque(N_("Órdenes directas (sin IA)"), directas, salida)
-    _bloque(N_("Con la IA, sin herramientas"), [r for r in resto if not r.get("herramientas")], salida)
-    _bloque(N_("Con la IA y herramientas"), [r for r in resto if r.get("herramientas")], salida)
+    primero, ultimo = (time.strftime("%Y-%m-%d", time.localtime(float(r.get("t") or 0))) for r in (registros[0], registros[-1]))
+    salida(T("Tiempos de los últimos {d} días (del {desde} al {hasta}): {n} peticiones.", d=dias, desde=primero, hasta=ultimo, n=len(registros)))
+    for via in VIAS:
+        _bloque(via, [r for r in registros if via_de(r) == via], salida)
+    _linea_llamadas(registros, salida)
+    if len(todos) > len(registros):
+        salida(T("Sin contar: {n} registros antiguos sin origen ni voz (pueden ser del banco, lina probar-ia).", n=len(todos) - len(registros)))
     escuchas = leer_escuchas(archivo_escuchas)
     if escuchas:
-        salida(T("Escuchas con el atajo en los últimos {d} días: {n}. El detalle (cuántas cortó solo al callarte):  lina tiempos escucha", d=DIAS_ESCUCHA,
+        salida(T("Escuchas con el atajo en los últimos {d} días: {n} (el detalle:  lina tiempos escucha)", d=DIAS_ESCUCHA,
                  n=sum(1 for e in escuchas if e["fin"] != "pulsacion_ignorada")))
-    salida(T("Se guardan solo números en {archivo}; lo borras con:  lina olvidar tiempos", archivo=archivo or ARCHIVO))
+    salida(T("Solo se guardan números, en {archivo}", archivo=archivo or ARCHIVO))
+    salida(T("Se borran con:  lina olvidar tiempos"))
     return 0

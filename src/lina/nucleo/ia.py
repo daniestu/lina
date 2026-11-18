@@ -544,6 +544,11 @@ def solo_medida():
             en_medida[0] = False
 
 
+def en_medida():
+    """¿Estamos dentro de solo_medida() (`lina probar-ia`, `probar-ponme`, `probar-busqueda`)? Entonces nada de esto es uso real."""
+    return _motivo_fijo[0] == "medida"
+
+
 _huellas: dict = {}                    # huella del principio → cuándo se usó por última vez (para saber si se repite; no sale de la memoria)
 _cerrojo_huellas = threading.Lock()
 

@@ -95,16 +95,15 @@ def test_lina_tiempos_sin_datos_y_con_datos(tmp_path):
     archivo = tmp_path / "t.jsonl"
     salida = []
     assert TIE.principal([], salida.append, archivo) == 0 and "Todavía no hay tiempos" in salida[0]
-    for ia, herr, ruta in ((1.0, 0, "g"), (5.0, 2, "g"), (0.0, 0, "directa:abrir_app")):
+    for ia, herr, ruta, modo in ((1.0, 0, "g", "rapido"), (5.0, 2, "g", "rapido"), (0.0, 0, "directa:abrir_app", "directa")):
         c = TIE.Cronometro(Reloj())
         c.sumar("ia", ia)
         c.herramientas = herr
-        TIE.guardar(c.registro(ruta), archivo)
+        TIE.guardar(c.registro(ruta, modo, "atajo"), archivo)
     salida.clear()
     assert TIE.principal([], salida.append, archivo) == 0
     texto = "\n".join(salida)
-    assert "Con la IA, sin herramientas: 1 peticiones" in texto and "Con la IA y herramientas: 1 peticiones" in texto and "La fase más lenta" in texto
-    assert "Órdenes directas (sin IA): 1 peticiones" in texto
+    assert "Con el atajo: 3 peticiones (directas 1 · rápido 2)" in texto and "Lo que más te hace esperar: IA" in texto
 
 
 def test_lina_tiempos_rechaza_un_numero_raro(tmp_path):
@@ -136,7 +135,7 @@ def test_lina_tiempos_cuenta_las_llamadas(tmp_path):
     c = TIE.Cronometro(Reloj())
     c.sumar("ia", 3.0)
     c.llamadas = [(2.5, "ok"), (9.0, "503")]
-    TIE.guardar(c.registro("ia", "rapido"), archivo)
+    TIE.guardar(c.registro("ia", "rapido", "atajo"), archivo)
     salida = []
     assert TIE.principal([], salida.append, archivo) == 0
     texto = "\n".join(salida)
@@ -232,7 +231,7 @@ def test_lina_tiempos_escucha_rechaza_dias_raros_y_remite_desde_lina_tiempos(tmp
     archivo, escuchas = tmp_path / "t.jsonl", tmp_path / "e.jsonl"
     c = TIE.Cronometro(Reloj())
     c.sumar("ia", 1.0)
-    TIE.guardar(c.registro("g"), archivo)
+    TIE.guardar(c.registro("g", "rapido", "atajo"), archivo)
     _apuntar(escuchas, datetime.date.today(), "silencio", ajuste=True, silencio=1.0)
     salida = []
     TIE.principal([], salida.append, archivo, escuchas)
