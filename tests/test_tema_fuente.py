@@ -141,7 +141,7 @@ def test_lina_olvidar_tiempos_lo_borra():
 
 # ---------------------------------------------------------------- la regla del 8 %
 def _regs(*tandas):
-    return [{"origen": o, "res": "sin_veredicto" if mal else "encaja"} for o, mal, n in tandas for _ in range(n)]
+    return [{"dia": TIE.INICIO_REGLA_FUENTES, "origen": o, "res": "sin_veredicto" if mal else "encaja"} for o, mal, n in tandas for _ in range(n)]
 
 
 @pytest.mark.parametrize("fallos, aviso", [(8, False), (9, True)])
@@ -170,7 +170,7 @@ def _informe(registros):
 def test_con_menos_de_cien_y_sin_aviso_no_dice_que_vaya_bien():
     texto = _informe(_regs(("real", True, 5), ("real", False, 15), ("prueba", True, 2)))
     assert "llevas 20 de 100" in texto and "no significa que vaya bien" in texto and "dentro del límite" not in texto
-    assert "uso real: 20 comprobaciones, 5 sin veredicto" in texto and "probar: 2, 2 sin veredicto" in texto
+    assert "uso real: 20 comprobaciones, 5 sin veredicto" in texto and "medidas): 2, 2 sin veredicto" in texto
 
 
 def test_con_nueve_fallos_avisa_aunque_no_lleguen_a_cien():
@@ -248,3 +248,27 @@ def test_probar_sin_fuentes_no_llama_a_la_ia(probar):
 def test_probar_prueba_la_otra_clave_si_la_primera_falla(probar):
     _, _, _, turnos = probar([PROV.ErrorIA("cuota", 429, "sin cupo"), USA])
     assert turnos == ["gratis", "de-pago"]
+
+
+def test_dentro_de_una_medida_la_comprobacion_es_prueba(monkeypatch):
+    """Auditoría del 2026-11-18: una pasada del banco que dispara una fuente no puede contar como uso real."""
+    _proveedor(monkeypatch, ["encaja", "encaja"])
+    with IA.solo_medida():
+        IA.comprobar_tema(["clave"], "t", "p")
+    IA.comprobar_tema(["clave"], "t", "p")
+    assert [r["origen"] for r in TIE.leer_comprobaciones()] == ["prueba", "real"]
+
+
+def test_la_regla_del_8_cuenta_desde_su_fecha_y_dice_cuantas_deja_fuera():
+    viejas = [{"dia": "2026-11-11", "origen": "real", "res": "sin_veredicto"}] * 20
+    nuevas = [{"dia": TIE.INICIO_REGLA_FUENTES, "origen": "real", "res": "encaja"}] * 12
+    r = TIE.resumir_comprobaciones(viejas + nuevas)
+    assert (r["primeras"], r["en_primeras"], r["antes"], r["aviso"]) == (12, 0, 20, False)
+    for linea in nuevas[:1]:
+        TIE.apuntar_comprobacion({**linea, "intentos": 1, "seg": 0.5, "pago": False})
+    for linea in viejas[:3]:
+        TIE.apuntar_comprobacion({**linea, "intentos": 1, "seg": 0.5, "pago": False})
+    salida = []
+    TIE.informe_comprobaciones(salida.append)
+    assert any("cuenta desde el 2026-11-13: 3 de uso real de antes no entran" in s for s in salida)
+    assert any("llevas 1 de 100" in s for s in salida)

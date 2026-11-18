@@ -58,6 +58,9 @@ MAX_LINEAS_COMPROBACIONES = 5000
 CAMPOS_COMPROBACION = ("dia", "origen", "res", "intentos", "seg", "pago")
 PRIMERAS_COMPROBACIONES = 100
 MAX_SIN_VEREDICTO = 8
+# La regla cuenta desde aquí: antes, una pasada del banco que disparase una fuente se apuntaba como uso real, y llamadas_ia.jsonl, que lo
+# desmentiría, ya no llega tan atrás. Desde este día cada comprobación real cuadra con su llamada fuera de las medidas (auditoría del 2026-11-18).
+INICIO_REGLA_FUENTES = "2026-11-13"
 UMBRAL_PRINCIPIO_TOKENS = 6000
 UMBRAL_DIFERENCIA_SEG = 0.5
 UMBRAL_PARTE_ENTRADA = 0.70
@@ -490,9 +493,11 @@ def resumir_comprobaciones(registros):
     """Por origen, cuántas y cuántas sin veredicto; y la regla del 8 % sobre las primeras comprobaciones de uso real, en orden."""
     por = {o: [r for r in registros if r["origen"] == o] for o in ("real", "prueba")}
     fallos = {o: sum(r["res"] == "sin_veredicto" for r in rs) for o, rs in por.items()}
-    primeras = por["real"][:PRIMERAS_COMPROBACIONES]
+    validas = [r for r in por["real"] if str(r.get("dia", "")) >= INICIO_REGLA_FUENTES]
+    primeras = validas[:PRIMERAS_COMPROBACIONES]
     en_primeras = sum(r["res"] == "sin_veredicto" for r in primeras)
-    return {"n": {o: len(rs) for o, rs in por.items()}, "fallos": fallos, "primeras": len(primeras), "en_primeras": en_primeras, "aviso": en_primeras > MAX_SIN_VEREDICTO}
+    return {"n": {o: len(rs) for o, rs in por.items()}, "fallos": fallos, "primeras": len(primeras), "en_primeras": en_primeras, "aviso": en_primeras > MAX_SIN_VEREDICTO,
+            "antes": len(por["real"]) - len(validas)}
 
 
 def informe_comprobaciones(salida, archivo=None, apuntando=True):
@@ -503,8 +508,10 @@ def informe_comprobaciones(salida, archivo=None, apuntando=True):
         return
     r = resumir_comprobaciones(registros)
     salida(T("Fuentes, uso real: {n} comprobaciones, {f} sin veredicto ({pc}).", n=r["n"]["real"], f=r["fallos"]["real"], pc=_pc(r["fallos"]["real"], r["n"]["real"])))
-    salida(T("Fuentes, pruebas con lina fuentes probar: {n}, {f} sin veredicto ({pc}); no cuentan para la regla.", n=r["n"]["prueba"], f=r["fallos"]["prueba"],
-             pc=_pc(r["fallos"]["prueba"], r["n"]["prueba"])))
+    salida(T("Fuentes, pruebas (lina fuentes probar y las medidas): {n}, {f} sin veredicto ({pc}); no cuentan para la regla.", n=r["n"]["prueba"],
+             f=r["fallos"]["prueba"], pc=_pc(r["fallos"]["prueba"], r["n"]["prueba"])))
+    if r["antes"]:
+        salida(T("La regla del 8 % cuenta desde el {dia}: {n} de uso real de antes no entran.", dia=INICIO_REGLA_FUENTES, n=r["antes"]))
     if r["aviso"]:
         salida("→ " + T("Regla del 8 %: {f} sin veredicto en las primeras {n} de uso real: supera el 8 %, para y revisa.", f=r["en_primeras"], n=r["primeras"]))
     elif r["primeras"] < PRIMERAS_COMPROBACIONES:

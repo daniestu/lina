@@ -729,8 +729,9 @@ def _mini_consulta_ia(clave, prompt, esquema, contenido, validas, etiqueta, **ex
 
 def comprobar_tema(claves, tema, pregunta, origen="real"):
     """R3: ¿esta pregunta es exactamente de ese tema? «encaja», «no_encaja» o None si no hubo veredicto, que para quien llama es un no. Solo prueba la primera clave y el modelo
-    medido. Cada comprobación se apunta con su origen («real» o «prueba»), solo con números."""
+    medido. Cada comprobación se apunta con su origen («real», o «prueba» si es de `lina fuentes probar` o corre dentro de una medida), solo con números."""
     from lina.nucleo import fuentes as FUE
+    origen = "prueba" if en_medida() else origen        # una pasada del banco que dispara una fuente no es uso real
     t0, decision, intentos = time.monotonic(), None, 0
     clave = claves[0] if claves else None
     while clave and decision is None and intentos < INTENTOS_TEMA:
