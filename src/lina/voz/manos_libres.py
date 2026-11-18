@@ -564,6 +564,7 @@ class ManosLibres:
         self.parado = threading.Event()
         self.reabrir = threading.Event()        # hay que reabrir el micrófono (cambió el audio del sistema)
         self.ultimo_motivo_pausa = None
+        self.oye = None                   # V14a: la activación de ahora con algo sonando ({t, bajado, voz}), hasta saber cómo acabó
 
     # --- hilo ---
     def iniciar(self):
@@ -682,6 +683,7 @@ class ManosLibres:
         if self.modo == "orden" and ahora > self.limite_orden and not self.seg.en_voz:
             self.modo = None
             self.log("Manos libres: no he oído la orden; vuelvo a esperar")
+            self._anotar_oye("sin_orden")
             self.pitido(400)
             self.silencio_hasta = self.reloj() + 0.35
 
@@ -711,11 +713,40 @@ class ManosLibres:
         self._sonido_bajado = espera
         try:
             if espera:                                   # el pitido de «te he oído» dura 0,12 s: se espera a que acabe para que no se baje con lo demás
-                threading.Timer(0.4, lambda: self.a._bajar_sonido("manos libres") if self.modo == "orden" else None).start()
+                threading.Timer(0.4, self._bajar_tras_pitido).start()
             else:
                 self.a._subir_sonido("manos libres")
         except AttributeError:
             pass
+
+    def _bajar_tras_pitido(self):
+        if self.modo != "orden":
+            return
+        self.a._bajar_sonido("manos libres")
+        oye = getattr(self, "oye", None)
+        if oye is not None and oye["bajado"] is None:
+            oye["bajado"] = self.reloj()
+
+    def _suena_algo(self):
+        try:
+            return pc_suena(self.pactl)
+        except Exception:
+            return False
+
+    def _anotar_oye(self, forma):
+        """V14a: cómo fue una activación con algo sonando, en escuchas.jsonl (solo números): de una frase (todo se oye con el sonido alto), en dos tiempos
+        (cuánto tardó en bajar tras el pitido y si empezaste a hablar antes) o sin orden. Decide si hace falta V6 (bajar al oír el nombre)."""
+        oye, self.oye = self.oye, None
+        if oye is None:
+            return
+        datos = {"forma": forma}
+        if oye["bajado"] is not None:
+            datos["bajado_ms"] = (oye["bajado"] - oye["t"]) * 1000
+        if forma == "dos_tiempos":
+            datos["voz_antes"] = oye["voz"] is not None and (oye["bajado"] is None or oye["voz"] < oye["bajado"])
+        anotar = getattr(self.a, "_anotar_escucha", None)
+        if anotar:
+            anotar("oye_lina", **datos)
 
     def procesar_bloque(self, bloque):
         """Un bloque de audio (30 ms). Si completa una frase, la trata. Devuelve el texto tratado (solo para pruebas)."""
@@ -731,6 +762,8 @@ class ManosLibres:
             return None
         self.ultimo_motivo_pausa = None
         frase = self.seg.alimentar(bloque)
+        if self.oye is not None and self.oye["voz"] is None and self.modo == "orden" and self.seg.en_voz:
+            self.oye["voz"] = self.reloj()            # el detector la nota un poco después de que empieces: si acaso, cuenta de menos
         if frase is None:
             return None
         return self.tratar_frase(frase)
@@ -751,10 +784,12 @@ class ManosLibres:
             self.modo = None
             self.seguimiento_hasta = 0.0
             self._nueva_peticion()
+            self.oye = {"t": self.reloj(), "bajado": None, "voz": None} if self._suena_algo() else None
             if orden:
                 self.log(f"Manos libres: me has llamado y has dicho «{orden}» (oído: «{texto}»)")
                 self.pitido(1000)
                 self.silencio_hasta = self.reloj() + 0.35
+                self._anotar_oye("una_frase")
                 self.a.atender_manos_libres(orden)
             else:
                 self.log(f"Manos libres: me has llamado (oído: «{texto}»); espero tu orden")
@@ -766,6 +801,7 @@ class ManosLibres:
         if self.modo == "orden":
             self.modo = None
             orden = limpiar_orden(texto)
+            self._anotar_oye("dos_tiempos" if orden else "sin_orden")
             if orden:
                 self.log(f"Manos libres: orden «{orden}»")
                 self.a.atender_manos_libres(orden)

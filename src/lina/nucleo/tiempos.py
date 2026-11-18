@@ -36,8 +36,10 @@ ANCHO_ETIQUETA = 30
 
 ARCHIVO_ESCUCHAS = RUT.ESTADO / "escuchas.jsonl"
 MAX_LINEAS_ESCUCHAS = 5000           # ~450 KB: meses de uso
-FINES = ("silencio", "pulsacion", "nada", "tope", "pulsacion_ignorada")
-CAMPOS_ESCUCHA = ("dia", "fin", "ajuste", "silencio", "dur", "espera", "tras_corte")   # lo ÚNICO que se guarda de una escucha
+FINES = ("silencio", "pulsacion", "nada", "tope", "pulsacion_ignorada", "oye_lina")
+# lo ÚNICO que se guarda de una escucha; «oye_lina» (V14a) es una activación por manos libres con algo sonando: su forma y números
+CAMPOS_ESCUCHA = ("dia", "fin", "ajuste", "silencio", "dur", "espera", "tras_corte", "forma", "bajado_ms", "voz_antes")
+FORMAS_OYE = ("una_frase", "dos_tiempos", "sin_orden")
 TRAS_CORTE_MAX = 10.0                # volver a pulsar antes de esto tras un corte por silencio cuenta como «posible corte a destiempo»
 DIAS_ESCUCHA = 14
 
@@ -234,11 +236,17 @@ def _linea_llamadas(registros, salida):
 
 
 # ======================= escuchas del atajo (V3c) =======================
-def registro_escucha(fin, ajuste=None, silencio=None, dur=None, espera=None, tras_corte=None, hoy=None):
+def registro_escucha(fin, ajuste=None, silencio=None, dur=None, espera=None, tras_corte=None, hoy=None, forma=None, bajado_ms=None, voz_antes=None):
     """La línea de una escucha: el modo de terminar, el día (sin hora) y números. Nada más, por construcción."""
-    if fin not in FINES:
+    if fin not in FINES or (fin == "oye_lina") != (forma is not None) or (forma is not None and forma not in FORMAS_OYE):
         raise ValueError(fin)
     reg = {"dia": (hoy or datetime.date.today()).isoformat(), "fin": fin}
+    if forma is not None:
+        reg["forma"] = forma
+    if bajado_ms is not None:
+        reg["bajado_ms"] = int(round(float(bajado_ms)))
+    if voz_antes is not None:
+        reg["voz_antes"] = bool(voz_antes)
     if ajuste is not None:
         reg["ajuste"] = bool(ajuste)
     for clave, valor in (("silencio", silencio), ("dur", dur), ("espera", espera), ("tras_corte", tras_corte)):
@@ -294,6 +302,8 @@ def _mediana(xs):
 def resumir_escuchas(registros):
     """Por cada valor de silencio con el ajuste activo: cuántas cortó solo, cuántas acabaste pulsando, «No te he oído», tope, posibles cortes a destiempo y
     pulsaciones ignoradas; y las de doble pulsación (ajuste apagado)."""
+    oye = resumir_oye([r for r in registros if r["fin"] == "oye_lina"])
+    registros = [r for r in registros if r["fin"] != "oye_lina"]
     con, sin = {}, []
     ignoradas = sum(1 for r in registros if r["fin"] == "pulsacion_ignorada")
     for r in registros:
@@ -311,8 +321,34 @@ def resumir_escuchas(registros):
                         "espera_corte": (statistics.mean(esperas) if esperas else None, _mediana(esperas)),
                         "espera_pulsando": _mediana([r["espera"] for r in por["pulsacion"] if "espera" in r]),
                         "a_destiempo": sum(1 for r in rs if "tras_corte" in r)})
-    return {"n": len(registros) - ignoradas, "ignoradas": ignoradas, "con": bloques,
+    return {"n": len(registros) - ignoradas, "ignoradas": ignoradas, "con": bloques, "oye": oye,
             "sin": {"n": len(sin), "dur": statistics.mean([r["dur"] for r in sin if "dur" in r]) if any("dur" in r for r in sin) else None}}
+
+
+def resumir_oye(registros):
+    """V14a: las activaciones de «Oye Lina» con algo sonando. «Con el sonido alto»: las de una frase (no se baja nunca) y las de dos tiempos en que
+    empezaste a hablar antes de que bajara, sobre las que llevaban orden. Más de 1 de cada 5 es la mitad del criterio para V6."""
+    por = {f: [r for r in registros if r.get("forma") == f] for f in FORMAS_OYE}
+    antes = sum(1 for r in por["dos_tiempos"] if r.get("voz_antes"))
+    con_orden = len(por["una_frase"]) + len(por["dos_tiempos"])
+    alto = len(por["una_frase"]) + antes
+    return {"n": len(registros), "por": {f: len(v) for f, v in por.items()}, "voz_antes": antes, "con_orden": con_orden, "alto": alto,
+            "bajado_ms": _mediana([r["bajado_ms"] for r in por["dos_tiempos"] if isinstance(r.get("bajado_ms"), (int, float))]),
+            "supera": con_orden > 0 and alto * 5 > con_orden}
+
+
+def _informe_oye(o, salida):
+    if not o["n"]:
+        return
+    salida(T("«Oye Lina» con algo sonando: {n}", n=o["n"]))
+    salida("  " + T("de una frase (todo con el sonido alto)   {n}  ({pc})", n=o["por"]["una_frase"], pc=_pc(o["por"]["una_frase"], o["n"])))
+    ms = "-" if o["bajado_ms"] is None else f"{round(o['bajado_ms'])} ms"
+    salida("  " + T("en dos tiempos                          {n}  ({pc})   bajó {ms} tras el pitido (mediana)", n=o["por"]["dos_tiempos"],
+                    pc=_pc(o["por"]["dos_tiempos"], o["n"]), ms=ms))
+    salida("    " + T("empezaste a hablar antes de que bajara {n}", n=o["voz_antes"]))
+    salida("  " + T("sin orden                               {n}", n=o["por"]["sin_orden"]))
+    salida("  → " + T("Con el sonido alto: {a} de {m} con orden ({pc}); V6 haría falta por encima de 1 de cada 5.", a=o["alto"], m=o["con_orden"],
+                      pc=_pc(o["alto"], o["con_orden"])))
 
 
 def _pc(n, total):
@@ -335,7 +371,7 @@ def principal_escucha(argv, salida=print, archivo=None, hoy=None):
             return 2
     archivo = archivo or ARCHIVO_ESCUCHAS
     r = resumir_escuchas(leer_escuchas(archivo, dias, hoy))
-    if not r["n"] and not r["ignoradas"]:
+    if not r["n"] and not r["ignoradas"] and not r["oye"]["n"]:
         salida(T("Todavía no hay escuchas del atajo apuntadas en los últimos {d} días.", d=dias))
         return 0
     salida(T("Escuchas con el atajo, últimos {d} días: {n}", d=dias, n=r["n"]))
@@ -353,6 +389,7 @@ def principal_escucha(argv, salida=print, archivo=None, hoy=None):
         salida("  " + T("Pulsaciones justo después de un corte (ignoradas): {n}", n=r["ignoradas"]))
     if r["sin"]["n"]:
         salida("  " + T("Con doble pulsación: {n}   duración media {dur}", n=r["sin"]["n"], dur=_seg(r["sin"]["dur"])))
+    _informe_oye(r["oye"], salida)
     salida(T("Se guardan solo el modo de terminar, el día y tiempos en {archivo}; lo borras con:  lina olvidar tiempos", archivo=archivo))
     return 0
 

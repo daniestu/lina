@@ -31,7 +31,7 @@ class Fa:
 cfgp=casa/"activacion.txt"; cfg=M.Config(cfgp)
 t=[0.0]; textos=[]; pit=[]; logs=[]
 fa=Fa()
-ml=M.ManosLibres(fa,lambda a:textos.pop(0),log=logs.append,pitido=pit.append,reloj=lambda:t[0],cfg=cfg)
+ml=M.ManosLibres(fa,lambda a:textos.pop(0),log=logs.append,pitido=pit.append,reloj=lambda:t[0],cfg=cfg,pactl=lambda *x:"")
 def alim(x):
     for b in bloques(x):
         t[0]+=0.03; ml.procesar_bloque(b)
