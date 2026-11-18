@@ -1809,7 +1809,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if (self.fuente_cerrada or self.reintento_solo_web) and nombre not in SOLO_WEB:
             log(f"{nombre} rechazada: en esta parte de la petición solo cabe la web")
             return "Aquí no hace falta nada más: responde ya con lo que tienes, sin más herramientas."
-        log(f"Herramienta: {nombre}")                          # solo el nombre, nunca los datos: para saber qué se usó (caso del Atlético con la búsqueda apagada)
+        log(f"Herramienta: {nombre}")                          # solo el nombre, nunca los datos: para saber qué se usó (caso real de la búsqueda apagada)
         if getattr(self, "reglas_reducidas", False) and self._es_accion(nombre, args):
             log(f"{nombre}: es una acción y van las reglas solo de información; no la ejecuto")
             raise NecesitaReglasCompletas()
