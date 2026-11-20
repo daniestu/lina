@@ -28,6 +28,8 @@ With `auto`, the default, Lina tries in this order and keeps the first thing tha
 
 **Whether a game works on Linux.** When you ask whether a Steam game works on Linux or needs Proton, Lina checks the Steam store page and the ProtonDB summary, with any `ia.busqueda`. Both only see the game's Steam number and your IP address; if the game is not in your library, the Steam store search also sees its name. The first time you get a notification.
 
+**When installing something from the AUR.** Before asking for your «yes», Lina checks in the public AUR API (`aur.archlinux.org`, the same one paru uses) what else the package brings. It only receives the package names and your IP address; the same paru will see when installing it.
+
 With `tavily` only Tavily is used (and DuckDuckGo if you turn it on); with `google`, only Gemini's (and DuckDuckGo if you turn it on); with `ninguna`, nothing: your question doesn't go to any search engine. It only searches, like `auto` and for that request only, if you ask for it in your own words («búscalo igualmente», «mira en internet…») or if you say yes when Lina offers to search just this once (that «sí», with the shortcut). The AI can't decide it for you: that you are asking is checked by a separate query that only sees your words. Like everything you say, those words do go to the AI provider.
 
 - If you save **sources** (a website for a topic) and use Gemini, the following:
@@ -57,6 +59,7 @@ Turn it on with «activa el modo privado»; only you can turn it off, with the s
 - I can't try KDE settings that need checking by looking at the panel.
 - The log doesn't keep what you say or what I answer, not even in what the service writes to the system log (`journalctl --user -u lina`), even if `privacidad.registrar_preguntas` is on. Only the start of each line is left («Pregunta: …», «Respuesta [voz]: …»). What was already in the journal before is not deleted.
 - I don't learn new recipes. I keep using the ones I already have.
+- If an installation fails, the action log keeps only the notice, not the last part of its output.
 - I don't note anything new in my memory: if you say «recuerda que…», I tell you I'm not noting it. I keep using what I already had, and «olvida lo de…» works.
 
 **What private mode does NOT cover. It is not an incognito mode:**
@@ -76,7 +79,7 @@ With the **free** key, according to Google's current terms, what is sent may be 
 | What | Where | How to delete it |
 |---|---|---|
 | Change journal and copies for undoing | `~/.local/share/lina/diario` | `lina olvidar diario` |
-| Action log (commands run) | `~/.local/state/lina/acciones.log` (rotates itself at ~1 MB) | `lina olvidar acciones` |
+| Action log (commands run, and for a failed installation the last 40 lines of its output, except in private mode) | `~/.local/state/lina/acciones.log` (rotates itself at ~1 MB) | `lina olvidar acciones` |
 | What you ask me to remember («remember that…»; only you write it, with the hotkey, never the AI nor Lina on its own, and never passwords or keys; the AI only receives what is relevant to each request) | `~/.local/share/lina/memoria.json` | `lina memoria` (view and delete one), `lina olvidar memoria` |
 | The websites you choose for each topic (`lina fuentes`; only you write them, never the AI; they are used when answering, as explained above) | `~/.local/share/lina/fuentes.json` (only you can read it) | `lina fuentes quitar`, `lina olvidar fuentes` |
 | Learned recipes (what you already asked me that went well: the phrase, the steps and how it was checked; never passwords) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` or `lina recetas borrar todas` |

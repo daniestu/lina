@@ -28,6 +28,8 @@ Con `auto`, lo de fábrica, Lina prueba en este orden y se queda con lo primero 
 
 **Si un juego funciona en Linux.** Cuando preguntas si un juego de Steam funciona en Linux o necesita Proton, Lina mira la ficha de la tienda de Steam y el resumen de ProtonDB, con cualquier `ia.busqueda`. Los dos ven solo el número del juego en Steam y tu dirección IP; si el juego no está en tu biblioteca, el buscador de la tienda de Steam ve además su nombre. La primera vez te llega una notificación.
 
+**Al instalar algo del AUR.** Antes de pedirte el «sí», Lina mira en la API pública del AUR (`aur.archlinux.org`, la misma que usa paru) qué más trae el paquete. Le llegan solo los nombres de los paquetes y tu dirección IP; lo mismo que verá paru al instalarlo.
+
 Con `tavily` solo se usa Tavily (y DuckDuckGo si lo enciendes); con `google`, solo la de Gemini (y DuckDuckGo si lo enciendes); con `ninguna`, nada: tu pregunta no sale a ningún buscador. Solo se busca, como `auto` y solo en esa petición, si lo pides tú con tus palabras («búscalo igualmente», «mira en internet…») o si dices que sí cuando Lina te ofrece buscarlo solo esta vez (ese «sí», con el atajo). La IA no puede decidirlo por ti: que lo pides lo comprueba una consulta aparte que solo ve tus palabras. Como todo lo que dices, esas palabras sí van al proveedor de la IA.
 
 - Si guardas **fuentes** (una web para un tema) y usas Gemini, lo siguiente:
@@ -57,6 +59,7 @@ Se activa con «activa el modo privado» y se quita solo con el atajo, diciendo 
 - No puedo probar ajustes de KDE que haya que comprobar mirando el panel.
 - El registro no guarda lo que dices ni lo que contesto, tampoco en lo que el servicio vuelca al registro del sistema (`journalctl --user -u lina`), aunque `privacidad.registrar_preguntas` esté activo. De cada línea queda solo el principio («Pregunta: …», «Respuesta [voz]: …»). Lo que ya estaba en el journal de antes no se borra.
 - No aprendo recetas nuevas. Las que ya tengo las sigo usando.
+- Si falla una instalación, en el registro de acciones queda solo el aviso, no la última parte de su salida.
 - No apunto nada nuevo en la memoria: si me dices «recuerda que…», te digo que no lo apunto. Lo que ya tenía lo sigo usando, y «olvida lo de…» funciona.
 
 **Lo que el modo privado NO cubre. No es un modo de incógnito:**
@@ -76,7 +79,7 @@ Con la clave **gratuita**, según las condiciones de Google vigentes, lo que se 
 | Qué | Dónde | Cómo borrarlo |
 |---|---|---|
 | Diario de cambios y copias para deshacer | `~/.local/share/lina/diario` | `lina olvidar diario` |
-| Registro de acciones (órdenes ejecutadas) | `~/.local/state/lina/acciones.log` (rota solo al llegar a ~1 MB) | `lina olvidar acciones` |
+| Registro de acciones (órdenes ejecutadas, y de una instalación que falla, las últimas 40 líneas de su salida, salvo en modo privado) | `~/.local/state/lina/acciones.log` (rota solo al llegar a ~1 MB) | `lina olvidar acciones` |
 | Lo que me pides recordar («recuerda que…»; solo lo escribes tú, con el atajo, nunca la IA ni Lina por su cuenta, y nunca contraseñas ni claves; a la IA solo le llega lo que viene al caso de cada petición) | `~/.local/share/lina/memoria.json` | `lina memoria` (verlo y borrar uno), `lina olvidar memoria` |
 | Las webs que eliges para cada tema (`lina fuentes`; solo las escribes tú, nunca la IA; se usan al responder, como se explica arriba) | `~/.local/share/lina/fuentes.json` (solo lo puedes leer tú) | `lina fuentes quitar`, `lina olvidar fuentes` |
 | Recetas aprendidas (lo que ya me pediste y salió bien: la frase, los pasos y cómo se comprobó; nunca contraseñas) | `~/.local/share/lina/recetas.json` | `lina olvidar recetas` o `lina recetas borrar todas` |

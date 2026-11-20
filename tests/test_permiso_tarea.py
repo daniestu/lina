@@ -46,8 +46,10 @@ def test_un_si_cubre_los_reintentos_y_el_servicio_de_lo_instalado(ej):
     for comando in ("sudo paru -S --noconfirm cloudflare-warp-bin", "sudo paru -Syu --noconfirm", "sudo systemctl enable --now warp-svc",
                     "sudo paru -S spotify"):                         # sin haber leído nada de fuera, otro paquete de fuera es la misma clase de paso
         assert not _pide_confirmacion(ej, comando), comando
-    assert [c for c, _ in ej.ejecutados][1:] == ["sudo paru -S --noconfirm cloudflare-warp-bin", "sudo paru -Syu --noconfirm",
-                                                 "sudo systemctl enable --now warp-svc", "sudo paru -S spotify"]
+    # A15 (e): paru va siempre sin preguntas por la terminal (--needed --noconfirm --skipreview)
+    assert [c for c, _ in ej.ejecutados][1:] == ["sudo paru -S --needed --skipreview --noconfirm cloudflare-warp-bin",
+                                                 "sudo paru -Syu --needed --skipreview --noconfirm",
+                                                 "sudo systemctl enable --now warp-svc", "sudo paru -S --needed --noconfirm --skipreview spotify"]
     assert not ej.pendientes
     assert any("actualizar todo el sistema" in d for d in ej.dicho)
 

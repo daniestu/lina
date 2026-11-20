@@ -486,6 +486,33 @@
      "texto": "uname -r"
     }
    ]
+  ],
+  "Instálalo.": [
+   [
+    "ejecutar_comando",
+    {
+     "comando": "paru -S --noconfirm caffeine-ng",
+     "motivo": "instalar caffeine-ng"
+    }
+   ]
+  ],
+  "Pónmelo en el equipo.": [
+   [
+    "ejecutar_comando",
+    {
+     "comando": "paru -S --noconfirm caffeine-ng",
+     "motivo": "instalar Caffeine"
+    }
+   ]
+  ],
+  "¿Me lo puedes instalar?": [
+   [
+    "ejecutar_comando",
+    {
+     "motivo": "instalar caffeine-ng",
+     "comando": "paru -S --noconfirm caffeine-ng"
+    }
+   ]
   ]
  }
 }

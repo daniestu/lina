@@ -82,6 +82,10 @@ CASOS = [
     Caso("¿Elden Ring funciona en Linux o hace falta Proton?", debe=("compatibilidad_linux",), nunca=("ejecutar_comando",)),
     Caso("Aunque tengas la búsqueda apagada, mira en internet quién ganó el último Gran Premio de Fórmula 1.", debe=("buscar_web",), nunca=("ejecutar_comando",)),
     Caso("Cuéntame un chiste corto.", sin_herramientas=True),
+    # A15: instalar algo que solo está en el AUR, después de preguntar si existe (paráfrasis; la confirmación con lo que trae la pone el código)
+    Caso("Instálalo.", debe=("ejecutar_comando",), en_argumentos="caffeine", antes=(("¿Existe Caffeine en Linux?", "Sí: en Arch no está en los repositorios oficiales, pero sí en el AUR, como caffeine-ng."),)),
+    Caso("Pónmelo en el equipo.", debe=("ejecutar_comando",), en_argumentos="caffeine", antes=(("¿Existe Caffeine en Linux?", "Sí: en Arch no está en los repositorios oficiales, pero sí en el AUR, como caffeine-ng."),)),
+    Caso("¿Me lo puedes instalar?", debe=("ejecutar_comando",), en_argumentos="caffeine", antes=(("¿Existe Caffeine en Linux?", "Sí: en Arch no está en los repositorios oficiales, pero sí en el AUR, como caffeine-ng."),)),
     # A5: lo copiado o seleccionado lo pide la IA con mirar_contexto (paráfrasis, con las frases del mantenedor); y negativos que no deben pedirlo
     Caso("Resume esto.", debe=("mirar_contexto",), nunca=("ejecutar_comando",)),
     Caso("¿Qué pone en lo que he copiado?", debe=("mirar_contexto",), nunca=("ejecutar_comando",)),

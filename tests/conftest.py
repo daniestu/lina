@@ -109,3 +109,13 @@ def _registro_sin_modo_privado():
     yield
     from lina.nucleo import registro
     registro.privado(False)
+
+
+@pytest.fixture(autouse=True)
+def _sin_aur_de_verdad(monkeypatch):
+    """A15: ninguna prueba consulta el AUR de verdad (las que lo prueban le pasan su propio `http`)."""
+    from lina.nucleo import aur
+
+    def sin_red():
+        raise RuntimeError("sin red en las pruebas")
+    monkeypatch.setattr(aur, "_http", sin_red)

@@ -39,6 +39,8 @@ from lina.nucleo.idioma import T
 from lina.nucleo.ejecucion import _abs, _codigo_de_salida, _privilegios  # noqa: F401
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
+from lina.nucleo import aur as AUR
+from lina.nucleo import fallos_instalacion as FI
 from lina.nucleo.clasificador import (  # noqa: F401
     APPS_PERMITIDAS, AVISO_DESTRUCCION_TOTAL, FLAGS_SEGUROS, PROTEGER_DATOS, RAIZ_AYUDANTE, RUTA_DATOS, _AYUDANTE_ROOT,
     _A_UN_INTERPRETE, _A_UN_SHELL, _CLONAN, _CODIGO_CON_RED, _CODIGO_DESTRUCTIVO, _CODIGO_QUE_EJECUTA, _DESCARGAN,
@@ -1430,6 +1432,8 @@ def modo_aislar():
 class Ejecutor:
     def __init__(self, avisar=None, confirmar=True):
         self.avisar = avisar or (lambda texto: None)
+        self.en_privado = lambda: False          # A15: lo pone el asistente; en modo privado la salida de un fallo no se guarda
+        self.explicar_fallo = None               # A15: una frase sobre una salida de fallo que el código no reconoce (la pone el asistente)
         self.confirmar = confirmar
         self.pendientes = []
         self.t_pendiente = 0.0
@@ -1564,6 +1568,8 @@ class Ejecutor:
                 return f"BLOQUEADO: {rechazo}"
             if comando != original:
                 anotar(f"[papelera] {original}  ->  {comando}")
+        if AUR.objetivos(comando):                       # A15 (e): paru o yay sin preguntas por la terminal, que en segundo plano nadie contesta
+            comando = AUR.sin_preguntas(comando)
         clase, razon = clasificar(comando)
         if self.solo_preparar and clase in {"instalar", "lanzar", "inocuo", "autonomo"}:
             clase, razon = "critico", "ya le has preguntado al usuario y falta su «sí»"
@@ -1625,18 +1631,29 @@ class Ejecutor:
             else:
                 self.avisar(T("Sigo sin preguntarte: {motivo}.", motivo=motivo))
             return self._con_red(comando, motivo, "confirmado")       # (no se apunta como paquete de confianza: eso solo con tu «sí» a ese paquete)
+        aviso_aur = ""
+        objetivos_aur = AUR.objetivos(comando)
+        if objetivos_aur and not any(x["comando"] == comando for x in self.pendientes):      # A15 (d): qué más trae del AUR, antes de tu «sí»
+            trae = AUR.que_trae(objetivos_aur[1])
+            comando, aviso_aur = AUR.sin_preguntas(comando, trae), AUR.frase(trae)
         rechazada = self._ya_rechazada(comando)
         if rechazada:
             return rechazada
+        return self._dejar_pendiente(comando, motivo, razon, aviso_aur)
+
+    def _dejar_pendiente(self, comando, motivo, razon, aviso_aur=""):
+        """Deja la orden pendiente de tu «sí» (también la que propone el código tras un fallo, A15). `aviso_aur`: lo que trae del AUR, que se dice."""
         if any(x["comando"] == comando for x in self.pendientes):
             return MENSAJE_PREPARADO
         if len(self.pendientes) >= MAX_PENDIENTES:
             return "Hay demasiadas acciones pendientes. Pide confirmación de las que hay antes de preparar más."
-        self.pendientes.append({"comando": comando, "motivo": motivo, "razon": razon, "categoria": categoria_de_motivo(razon), "web": bool(self.contaminado)})
+        self.pendientes.append({"comando": comando, "motivo": motivo, "razon": razon, "categoria": categoria_de_motivo(razon), "web": bool(self.contaminado),
+                                **({"aviso_aur": aviso_aur} if aviso_aur else {})})
         self.t_pendiente = time.time()
         con_sudo = T(" (con permisos de administrador)") if re.search(r"\bsudo\b", comando) else ""
-        notificar(T("Asistente: pendiente de tu confirmación") + con_sudo, f"{comando}\n" + T("(Motivo: {razon})", razon=razon))
-        return MENSAJE_PREPARADO + f" Se pide confirmación porque {razon}. Explícaselo al usuario."
+        notificar(T("Asistente: pendiente de tu confirmación") + con_sudo, f"{comando}\n" + T("(Motivo: {razon})", razon=razon) + (f"\n{aviso_aur}" if aviso_aur else ""))
+        return (MENSAJE_PREPARADO + f" Se pide confirmación porque {razon}. Explícaselo al usuario."
+                + (f" Antes de pedirle el «sí», dile también esto, tal cual: «{aviso_aur}»" if aviso_aur else ""))
 
     # --- Red de seguridad (A2) ---
     def _con_red(self, comando, motivo, clase):
@@ -2010,10 +2027,12 @@ class Ejecutor:
         return PL.orden_canonica_instalar(analizar_instalacion(comando))
 
     @staticmethod
-    def _entorno():
-        """El entorno de las órdenes de la IA: sin variables que parezcan claves, tokens o contraseñas (así `printenv` no puede filtrarlas)."""
-        limpio = {k: v for k, v in os.environ.items() if not _VARIABLE_SECRETA.search(k) or k in _VARIABLES_UTILES}
-        return dict(limpio, LC_ALL="C.UTF-8", TERM="dumb", PAGER="cat", SYSTEMD_PAGER="", GIT_PAGER="cat")
+    def _entorno(instalacion=False):
+        """El entorno de las órdenes de la IA: sin variables que parezcan claves, tokens o contraseñas (así `printenv` no puede filtrarlas). Una
+        instalación va con el idioma en inglés (LC_ALL=C, sin LANGUAGE, que lo cambiaría): su salida es la misma en cualquier sistema y así se
+        reconoce por qué ha fallado (A15)."""
+        limpio = {k: v for k, v in os.environ.items() if (not _VARIABLE_SECRETA.search(k) or k in _VARIABLES_UTILES) and not (instalacion and k == "LANGUAGE")}
+        return dict(limpio, LC_ALL="C" if instalacion else "C.UTF-8", TERM="dumb", PAGER="cat", SYSTEMD_PAGER="", GIT_PAGER="cat")
 
     def lanzar(self, comando):
         """Abre un programa o enlace sin esperar a que termine. Va en su propio «scope» de systemd: si el asistente se reinicia, no se cierra lo que abrió."""
@@ -2255,7 +2274,7 @@ class Ejecutor:
         try:
             proc = subprocess.Popen(orden, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, text=True, errors="replace", cwd=_HOME,
-                                    env=self._entorno(), start_new_session=True)
+                                    env=self._entorno(instalacion=bool(FI.gestor(comando))), start_new_session=True)
         except OSError as e:
             return f"No se pudo lanzar el comando: {e}"
         try:
@@ -2280,6 +2299,12 @@ class Ejecutor:
             resultado += ("\n[Puede que esto lo haya impedido el AISLAMIENTO de las órdenes (ia.aislar): las claves, los datos de Lina y lo que arranca solo "
                           "están protegidos" + ("" if jaula.red else ", y en esta petición, tras leer contenido de fuera, no hay red") + ". No lo intentes de otra "
                           "forma: si de verdad hace falta, díselo al usuario; puede pedírtelo de nuevo para confirmarlo o hacerlo en su terminal.]")
+        if proc.returncode != 0:
+            frase, preparada = self._tras_fallo_de_instalacion(comando, salida, motivo)
+            if frase:
+                resultado += (f"\nPOR QUÉ HA FALLADO (lo ha visto el código en la salida; díselo así): {frase}" +
+                              (" He dejado PREPARADO actualizar el sistema y volver a intentarlo: pregúntale si quiere; solo se hace con su «sí»."
+                               if preparada else ""))
         if kernel_antes and not modulos_del_kernel_presentes():
             anotar(f"[kernel-cambiado] {comando}")
             resultado += ("\nAVISO: con esto se ha actualizado el kernel. Hasta reiniciar no se pueden cargar módulos nuevos (modprobe fallará): díselo al "
@@ -2372,7 +2397,40 @@ class Ejecutor:
                                                                               if kernel else T(" Como se ha actualizado todo el sistema, conviene reiniciar el equipo cuando puedas.")
                                                                               if reiniciar else ""))
         else:
-            self.avisar(T("Ha fallado una tarea: {motivo}. Está el detalle en el registro de acciones.", motivo=motivo))
+            frase, preparada = self._tras_fallo_de_instalacion(comando, salida, motivo)
+            if frase:
+                self.avisar(frase + (T(" ¿Actualizo el sistema y lo vuelvo a intentar? Dímelo con el atajo.") if preparada else ""))
+            else:
+                self.avisar(T("Ha fallado una tarea: {motivo}. Está el detalle en el registro de acciones.", motivo=motivo))
+
+    def _tras_fallo_de_instalacion(self, comando, salida, motivo):
+        """A15: si lo que ha fallado es una instalación, (la frase con el motivo, escrita por el código, o None; si ha dejado preparada la propuesta
+        de actualizar). La última parte de la salida queda en el registro, salvo en modo privado. Si el motivo es una lista de paquetes desactualizada,
+        el código prepara «actualizar el sistema y volver a intentarlo», que solo se hace con tu «sí» por el atajo (nunca por manos libres ni sola)."""
+        gestor = FI.gestor(comando)
+        if not gestor:
+            return None, False
+        if not self.en_privado():
+            anotar("[salida-del-fallo] " + FI.cola(salida).replace("\n", "\n    "))
+        hallado = FI.motivo(salida)
+        clave, porque = "", None
+        if hallado:
+            clave, frase, paquete = hallado
+            porque = T(frase, paquete=paquete or T("un paquete que necesita"))
+        elif self.explicar_fallo:
+            try:
+                porque = self.explicar_fallo(FI.cola(salida, 15, 1500))
+            except Exception as e:
+                log(f"No he podido resumir por qué ha fallado «{motivo}»: {e!r}")
+        if not porque:
+            return None, False
+        preparada = False
+        orden = FI.orden_de_actualizar(gestor) if clave == "desactualizada" else None
+        if orden:
+            r = self._dejar_pendiente(f"{orden} && {comando}", T("actualizar el sistema y volver a intentar: {motivo}", motivo=motivo),
+                                      T("actualiza todo el sistema antes de volver a instalar"))
+            preparada = r.startswith(MENSAJE_PREPARADO)
+        return T("Ha fallado {motivo}: {porque}.", motivo=motivo, porque=porque), preparada
 
 
 
