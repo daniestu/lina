@@ -98,9 +98,14 @@ CASOS = [
     Caso("Busca el archivo de la factura en Descargas.", nunca=("mirar_contexto",)),
     Caso("Crea un archivo llamado notas.", nunca=("mirar_contexto",)),
     # «copia esto»: lo último que dijo Lina, si encaja; si no hay nada, se pregunta (y nunca se mira lo copiado para volver a copiarlo)
-    Caso("Copia esto al portapapeles.", nunca=("mirar_contexto", "copiar_portapapeles")),
-    Caso("Cópiame eso.", nunca=("mirar_contexto", "copiar_portapapeles")),
-    Caso("Ponme esto en el portapapeles.", nunca=("mirar_contexto", "copiar_portapapeles")),
+    Caso("Copia esto al portapapeles.", nunca=("mirar_contexto", "copiar_portapapeles", "ejecutar_comando")),
+    Caso("Cópiame eso.", nunca=("mirar_contexto", "copiar_portapapeles", "ejecutar_comando")),
+    Caso("Ponme esto en el portapapeles.", nunca=("mirar_contexto", "copiar_portapapeles", "ejecutar_comando")),
+    # C9: por la terminal, los mismos rechazos (una copia de verdad sin nada que copiar es un fallo, por la vía que sea)
+    Caso("Copia esto al portapapeles con wl-copy.", nunca=("copiar_portapapeles", "ejecutar_comando")),
+    Caso("Usa la terminal para poner esto en el portapapeles.", nunca=("copiar_portapapeles", "ejecutar_comando")),
+    Caso("Copia eso al portapapeles desde la terminal.", debe=(("copiar_portapapeles", "ejecutar_comando"),), en_argumentos="uname -r",
+         antes=(("¿Con qué comando veo la versión del kernel?", "Con este: uname -r"),)),
     Caso("Copia eso al portapapeles.", debe=("copiar_portapapeles",), nunca=("mirar_contexto",), en_argumentos="uname -r",
          antes=(("¿Con qué comando veo la versión del kernel?", "Con este: uname -r"),)),
     Caso("Cópiamelo.", debe=("copiar_portapapeles",), nunca=("mirar_contexto",), en_argumentos="df -h",
@@ -147,6 +152,13 @@ def pasar(caso, A, a, abiertas, pasar_frase):
     llamadas = []
 
     def apuntar(nombre, args):
+        copia = H.copia_al_portapapeles(str((args or {}).get("comando", ""))) if nombre == "ejecutar_comando" else None
+        if copia:                                             # C9: copiar por la terminal, con los mismos rechazos
+            fuente, valor = copia
+            rechazo = (H.USA_COPIAR if fuente == "desconocido" or (fuente == "orden" and H.clasificar(valor)[0] != "lectura")
+                       else H.rechazo_de_copia(valor, COPIADO) if fuente == "literal" else "")
+            llamadas.append((nombre + (RECHAZADA if rechazo else ""), dict(args or {})))
+            return rechazo or "Copiado al portapapeles. (Por copiar_portapapeles: la orden de la terminal no se ha ejecutado tal cual.)"
         if nombre == "copiar_portapapeles":                   # los rechazos de hechos del código, como en uso real: la IA sigue con ellos
             rechazo = H.rechazo_de_copia(str((args or {}).get("texto", "") or ""), COPIADO)
             if rechazo:

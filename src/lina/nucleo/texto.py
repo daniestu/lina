@@ -183,7 +183,7 @@ _AFIRMA_HECHO_ES = re.compile(
     r"|\b(esta|queda|ya esta)\s+(hech[oa]|cread[oa]|instalad[oa]|configurad[oa]|list[oa])\b|\b(listo|hecho)\b"
     r"|\b(desactivad|activad|cambiad|puest|quitad|instalad|configurad|ajustad|aplicad|guardad|cread|borrad|abiert|reiniciad|apagad|encendid)[oa]s?\b"
     # «Copiado.» o «ya lo tienes copiado», solo así: «en lo que tienes copiado pone…» no da nada por hecho (caso real del banco, 2026-11-18)
-    r"|^\W*copiad[oa]s?\b|^\W*(ya\s+)?(lo|la|los|las)\s+tienes\s+copiad[oa]s?\b|\bya\s+(lo|la|los|las)\s+tienes\s+copiad[oa]s?\b")
+    r"|^\W*(?:el\s+)?(?:texto\s+)?copiad[oa]s?\b|^\W*(ya\s+)?(lo|la|los|las)\s+tienes\s+copiad[oa]s?\b|\bya\s+(lo|la|los|las)\s+tienes\s+copiad[oa]s?\b")
 
 
 _AFIRMA_HECHO_EN = re.compile(

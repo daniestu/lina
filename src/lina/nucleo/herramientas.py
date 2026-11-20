@@ -47,7 +47,7 @@ from lina.nucleo.clasificador import (  # noqa: F401
     _SECRETOS, _SHELLS, _SUDOERS, _SUDO_LECTURA, _SUSTITUCION_A_SHELL, _apps_instaladas, _bloqueado, _bloqueado_hostil,
     _codigo_en_linea, _critico_extra, _descarga_y_ejecuta, _disco_de_datos, envia_fuera, _es_inocuo, _es_interprete, _es_lanzamiento,
     _es_lectura, _es_objetivo_peligroso, _limpiar_escapes, _nombres_descargados, _normalizar_ruta, _que_ejecuta, _quitar_prefijos,
-    _ruta_abrible, _segmento_lectura, _segmentos, _sin_acentos, _tokens, analizar_instalacion, destruccion_total, lectura_sensible,
+    _ruta_abrible, _segmento_lectura, _segmentos, _sin_acentos, _tokens, analizar_instalacion, copia_al_portapapeles, destruccion_total, lectura_sensible,
 )
 from lina.nucleo.procesos import _fuera_del_servicio  # noqa: F401
 from lina.nucleo.registro import ARCHIVO_ACCIONES, MAX_REGISTRO_ACCIONES, anotar, log, notificar  # noqa: F401
@@ -2239,6 +2239,9 @@ class Ejecutor:
         return AIS.Jaula(casa=_HOME, red=limpia, bus=limpia, confirmada=confirmada, escribibles=[RUTA_DATOS])
 
     def ejecutar(self, comando, motivo="tarea", clase=""):
+        copia = copiar_por_terminal(comando)                # C9: copiar por la terminal pasa por los mismos rechazos que copiar_portapapeles
+        if copia is not None:
+            return copia
         fuente = _fuente_externa(comando)
         if fuente:
             self.contaminar(fuente)                  # lo que devuelva puede traer instrucciones: ver A2e
@@ -2408,6 +2411,38 @@ def rechazo_de_copia(texto, ya_copiado=""):
     if ya_copiado and texto.strip() == ya_copiado.strip():
         return "No lo he copiado: eso ya es lo que tiene en el portapapeles. Si «esto» era otra cosa, pregúntale qué quiere copiar."
     return ""
+
+
+USA_COPIAR = ("No lo he copiado: por la terminal solo copio un texto escrito tal cual o la salida de una orden que solo lee. Si sabes qué copiar, usa "
+              "copiar_portapapeles con el texto; si no, pregúntale al usuario qué quiere copiar.")
+
+
+def _salida_de_lectura(orden):
+    """(código, salida) de una orden que el clasificador da por lectura: lo mismo que ejecutar_comando dejaría correr sin preguntar."""
+    try:
+        r = subprocess.run(["bash", "-c", orden], stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace", timeout=15, cwd=_HOME)
+    except (OSError, subprocess.SubprocessError):
+        return 1, ""
+    return r.returncode, r.stdout
+
+
+def copiar_por_terminal(comando, leer=_salida_de_lectura):
+    """C9: una orden que escribe en el portapapeles (wl-copy, xclip, xsel) no se ejecuta tal cual: se saca el texto que copiaría y va por
+    copiar_portapapeles, con sus mismos rechazos (vacío, [SISTEMA], lo ya copiado). None si la orden no copia nada."""
+    copia = copia_al_portapapeles(comando)
+    if copia is None:
+        return None
+    fuente, valor = copia
+    if fuente == "desconocido" or (fuente == "orden" and clasificar(valor)[0] != "lectura"):
+        anotar("[portapapeles] no copio por la terminal: no se sabe qué texto copiaría sin ejecutar algo que no es de lectura")
+        return USA_COPIAR
+    texto = valor
+    if fuente == "orden":
+        codigo, texto = leer(valor)
+        if codigo != 0:
+            return "No lo he copiado: la orden que daba el texto ha fallado. Dile al usuario qué ha pasado."
+    r = copiar_portapapeles(texto)
+    return r + " (Por copiar_portapapeles: la orden de la terminal no se ha ejecutado tal cual.)" if r.startswith("Copiado") else r
 
 
 def copiar_portapapeles(texto):

@@ -462,6 +462,30 @@
      "comando": "touch ~/Documentos/notas"
     }
    ]
+  ],
+  "Copia esto al portapapeles con wl-copy.": [
+   [
+    "copiar_portapapeles (rechazada)",
+    {
+     "texto": "(recortado: el bloque [SISTEMA] de la petición)"
+    }
+   ]
+  ],
+  "Usa la terminal para poner esto en el portapapeles.": [
+   [
+    "copiar_portapapeles (rechazada)",
+    {
+     "texto": "(recortado: el bloque [SISTEMA] de la petición)"
+    }
+   ]
+  ],
+  "Copia eso al portapapeles desde la terminal.": [
+   [
+    "copiar_portapapeles",
+    {
+     "texto": "uname -r"
+    }
+   ]
   ]
  }
 }

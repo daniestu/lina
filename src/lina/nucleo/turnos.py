@@ -45,11 +45,12 @@ _ACCION_EN = re.compile(r"^(?:(?:hey|ok|please|can you|could you)\s+)*(?:put on|
 # Herramientas que solo informan (buscan, leen, miran): no hacen nada en el equipo.
 HERRAMIENTAS_DE_INFORMAR = HERRAMIENTAS_META | {"buscar_web", "leer_web", "buscar_youtube", "mirar_pantalla", "ver_pantalla", "buscar_ajuste_kde",
                                                 "buscar_clave_en_binarios", "observar_config", "ver_diario", "ver_recetas", "ver_juegos", "ver_gasto",
-                                                "mis_ajustes", "ver_papelera", "usar_receta", "necesito_datos_actuales", "usar_fuente"}
+                                                "mis_ajustes", "ver_papelera", "usar_receta", "necesito_datos_actuales", "usar_fuente",
+                                                "mirar_contexto"}     # mirar lo copiado no es hacer nada (banco, 2026-11-19: «copiado» sin copiar pasaba)
 
 
 # Para la última red de honestidad vale cualquier orden de hacer algo, no solo las que tienen reintento: «sube», «borra», «cambia», «crea», «reinicia»…
-_HACER_ES = re.compile(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:sube|baja|borra|elimina|mueve|copia|crea|cambia|pausa|quita|silencia|reinicia|actualiza|"
+_HACER_ES = re.compile(r"^(?:(?:oye|vale|venga|por favor|puedes|me puedes|podrias)\s+)*(?:sube|baja|borra|elimina|mueve|copia|crea|cambia|pausa|quita|silencia|reinicia|actualiza|pon|usa|"
                        r"desinstala|guarda|renombra|escribe|envia|manda|configura|ajusta|ejecuta|limpia|vacia|minimiza|maximiza|suspende)(?:me|lo|la|los|las|le|melo|mela)?\b")
 _HACER_EN = re.compile(r"^(?:(?:hey|ok|please|can you|could you)\s+)*(?:raise|lower|delete|remove|move|copy|create|change|pause|mute|restart|update|uninstall|save|rename|write|send|"
                        r"configure|adjust|run|clean|empty|minimize|maximize|close|stop)\b")
