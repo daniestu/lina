@@ -420,7 +420,7 @@ def _escalon(escalon, consulta, dominio, res, ahora, peticion=""):
     if escalon == "google":
         return resultados_google(consulta, dominio, ahora=ahora)
     if escalon == "tavily":
-        if not CL.obtener("tavily"):
+        if not CL.obtener("tavily") or not IA.tavily_permitido():     # E2: dentro de una medida, como sin clave: no gasta tu cupo de Tavily
             res.sin_tavily = True
             return [], T(M_SIN_TAVILY)
         r = IA.resultados_tavily(consulta, dominio, reserva=False, comprobar_modo=False)

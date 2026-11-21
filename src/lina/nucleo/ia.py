@@ -16,6 +16,7 @@ import requests
 from lina import __version__
 from lina.nucleo import ajustes as AJ
 from lina.nucleo import aviso_busqueda as AVB
+from lina.nucleo import cupo_tavily as CUP
 from lina.nucleo import claves as CL
 from lina.nucleo import herramientas as H
 from lina.nucleo import ia_activa as IAC
@@ -295,7 +296,7 @@ def hay_busqueda_tavily():
     return modo_busqueda() in ("auto", "tavily") and bool(CL.obtener("tavily"))
 
 
-_pausa_tavily = [0.0]     # hasta cuándo no se llama a Tavily (agotó su cupo: hasta mañana)
+_pausa_tavily = [0.0]     # hasta cuándo no se llama a Tavily en este proceso (agotó su cupo: hasta el día 1; lo que vale entre procesos está en cupo_tavily)
 _pausa_reserva = [0.0]    # hasta cuándo no se pregunta a DuckDuckGo (nos ha tomado por un robot)
 RESERVA = "https://lite.duckduckgo.com/lite/"
 PAUSA_RESERVA_SEG = 1800
@@ -396,7 +397,7 @@ def resultados_tavily(consulta, dominio=None, maximo=5, reserva=True, comprobar_
     Si Tavily no responde o ha agotado su cupo, se busca en la reserva (DuckDuckGo, sin clave) salvo que ia.busqueda_reserva esté apagado. Tras un cupo
     agotado (432/433) no se vuelve a llamar a Tavily hasta mañana: va directamente a la reserva. `reserva=False`: sin DuckDuckGo (la escalera de «auto»
     lo prueba ella misma); `comprobar_modo=False`: basta la clave (para «búscalo igualmente» con ia.busqueda = ninguna)."""
-    if not (hay_busqueda_tavily() if comprobar_modo else CL.obtener("tavily")):
+    if not (hay_busqueda_tavily() if comprobar_modo else CL.obtener("tavily")) or not tavily_permitido():
         return "La búsqueda web no está configurada."
     reserva_permitida = reserva
     maximo = max(1, min(int(maximo), 20))
@@ -413,7 +414,11 @@ def resultados_tavily(consulta, dominio=None, maximo=5, reserva=True, comprobar_
             return si_no
         r = resultados_reserva(consulta, d, maximo)
         return r if isinstance(r, list) and r else si_no
-    if time.time() < _pausa_tavily[0]:
+    medida = en_medida()
+    no_llamar = CUP.motivo_para_no_llamar(medida)
+    if time.time() < _pausa_tavily[0] or no_llamar:
+        if no_llamar == "tope_real":
+            AVB.apuntar(AVB.TOPE_PROPIO)
         return a_la_reserva(AVB.PARA_LA_IA_LIMITE)
     inicio = time.time()
     try:
@@ -428,8 +433,9 @@ def resultados_tavily(consulta, dominio=None, maximo=5, reserva=True, comprobar_
         log(f"Tavily: error {r.status_code} ({r.text[:200]})")
         if r.status_code in AVB.POR_CODIGO:                  # 432: el plan llegó a su límite; 433: el tope de gasto que pusiste (el 429 es de ritmo)
             AVB.apuntar(AVB.POR_CODIGO[r.status_code])
-            _pausa_tavily[0] = _manana()
-            log("Tavily: cupo agotado; hasta mañana busco en la reserva (DuckDuckGo)" if hay_reserva() else "Tavily: cupo agotado; no lo vuelvo a llamar hasta mañana")
+            hasta = CUP.agotado()
+            _pausa_tavily[0] = time.mktime(hasta.timetuple())
+            log(f"Tavily: cupo agotado; no lo vuelvo a llamar hasta el {hasta.isoformat()}" + (" (mientras, la reserva: DuckDuckGo)" if hay_reserva() else ""))
             return a_la_reserva(AVB.PARA_LA_IA_LIMITE)
         return a_la_reserva("La búsqueda web no está disponible ahora mismo.")
     try:
@@ -437,6 +443,8 @@ def resultados_tavily(consulta, dominio=None, maximo=5, reserva=True, comprobar_
     except ValueError:
         resultados = []
     log(f"Búsqueda «{consulta}»{' en ' + pedido['include_domains'][0] if 'include_domains' in pedido else ''}: {len(resultados)} resultados ({time.time() - inicio:.1f} s)")
+    if CUP.apuntar(medida):
+        AVB.apuntar(AVB.AVISO_80)
     return [x for x in resultados if isinstance(x, dict)]
 
 
@@ -547,6 +555,24 @@ def solo_medida():
 def en_medida():
     """¿Estamos dentro de solo_medida() (`lina probar-ia`, `probar-ponme`, `probar-busqueda`)? Entonces nada de esto es uso real."""
     return _motivo_fijo[0] == "medida"
+
+
+_tavily_en_medida = [False]
+
+
+@contextmanager
+def tavily_en_medida():
+    """E2: solo lo que mide justo Tavily (`lina probar-busqueda tavily`) lo usa dentro de una medida, y con su tope (cupo_tavily.TOPE_MEDIDAS)."""
+    _tavily_en_medida[0] = True
+    try:
+        yield
+    finally:
+        _tavily_en_medida[0] = False
+
+
+def tavily_permitido():
+    """E2: dentro de una medida no se llama a Tavily (el banco gastó 228 búsquedas en una semana sin medir el buscador), salvo con tavily_en_medida()."""
+    return not en_medida() or _tavily_en_medida[0]
 
 
 _huellas: dict = {}                    # huella del principio → cuándo se usó por última vez (para saber si se repite; no sale de la memoria)

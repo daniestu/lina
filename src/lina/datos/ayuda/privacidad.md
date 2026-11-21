@@ -87,6 +87,7 @@ Con la clave **gratuita**, según las condiciones de Google vigentes, lo que se 
 | Cómo termina cada escucha del atajo (por silencio, por tu pulsación…) y, si sonaba algo, cómo fue cada «Oye Lina» (de una frase o en dos tiempos, cuánto tardó en bajar el sonido y si hablaste antes), con el día sin hora y tiempos; nunca audio ni texto (`lina tiempos escucha`) | `~/.local/state/lina/escuchas.jsonl` (últimas 5000) | `lina olvidar tiempos` |
 | Tokens y duración de cada llamada a la IA, con el modelo, su motivo (normal, reintento…), el día sin hora y una huella del principio fijo (para saber si la caché se aprovecha); nunca lo que preguntas ni lo que contesta (`lina tiempos ia`) | `~/.local/state/lina/llamadas_ia.jsonl` (últimas 5000) | `lina olvidar tiempos` |
 | Cómo acabó cada comprobación de que una pregunta es del tema de una fuente: si es uso real o `lina fuentes probar`, encaja o no, intentos, segundos, el día sin hora y si usó la clave de pago; nunca el tema ni la pregunta (`lina tiempos ia`) | `~/.local/state/lina/comprobaciones_fuente.jsonl` | `lina olvidar tiempos` |
+| Cuántas búsquedas de Tavily van este mes (de uso real y de medidas) y hasta qué día está agotado; solo números, nunca la consulta ni la clave (`lina doctor`) | `~/.local/share/lina/tavily.json` | `lina olvidar tiempos` |
 | Registro del sistema (lo que dices y contesto, si no lo desactivas) | `journalctl --user -u lina` | `lina olvidar registro` |
 
 Para que lo que dices y contesto no quede en el registro: `lina config poner privacidad.registrar_preguntas false`.

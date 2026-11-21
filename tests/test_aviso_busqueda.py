@@ -180,6 +180,7 @@ def test_guardar_otra_clave_no_olvida_los_avisos(claves_en_tmp, estado):
 def _tavily_responde(con, monkeypatch, codigo):
     con("tavily", "tvly-de-prueba")
     IA._pausa_tavily[0] = 0.0                                       # aquí se mide el aviso (una vez al mes), no la pausa tras un 432
+    IA.CUP.quitar_pausa()                                           # (E2: la pausa también se guarda, hasta el día 1)
     monkeypatch.setattr(requests, "post", MagicMock(return_value=MagicMock(ok=False, status_code=codigo, text="limit")))
     return IA.resultados_tavily("partido de hoy")
 

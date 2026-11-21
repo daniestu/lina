@@ -17,6 +17,7 @@ Cada pregunta, y cada repetición, empieza sin pausas de modelos ni caché, como
 Criterio, escrito antes de repetir las pasadas (2026-11-04): con Tavily o con la clave de pago, al menos el 90 % de las preguntas válidas (las que no son
 «api») con respuesta y fuente, y al menos 15 válidas; con menos de 15, «inconclusivo». Solo con la clave gratuita se informa de lo que haya, sin criterio.
 """
+import contextlib
 import re
 import shutil
 import tempfile
@@ -58,6 +59,7 @@ REINTENTOS = (20, 40, 60)
 PAUSA_SEG = 8                                        # entre pregunta y pregunta: la clave gratuita admite 15 llamadas por minuto
 TOPE_SEG = 90
 TOKENS: list = []                        # tokens de cada llamada a la IA de la pregunta en curso (E1: el criterio es la media de tokens por pregunta)
+BUSQUEDAS_POR_PREGUNTA_MAX = 2      # E2: el tope de búsquedas de una petición (max_busquedas)
 LLAMADAS_POR_PREGUNTA_MAX = 5            # para el gasto máximo con la clave de pago (medido: 2 a 3 por pregunta, más la búsqueda de Google), por cada intento posible
 _NO_RESPONDE = re.compile(r"\b(?:no tengo acceso|no puedo (?:buscar|acceder|navegar|consultar)|no he podido (?:buscar|encontrar|leer)|no lo se\b|"
                           r"no lo he encontrado|no he encontrado|no dispongo)")
@@ -246,8 +248,18 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
     preguntas = PREGUNTAS[:int(numeros[0])] if numeros else PREGUNTAS
     from lina.nucleo import claves as CL
     from lina.nucleo import ia as IA
+    from lina.nucleo import cupo_tavily as CUP
     from lina.nucleo import medida_gasto as MG
     con_pago = "gemini_pago" in NIVELES[nivel]
+    con_tavily = "tavily" in NIVELES[nivel]
+    if con_tavily and CL.obtener("tavily"):                  # E2: Tavily en las medidas, solo aquí y con su tope del mes (sin clave, lo dice más abajo)
+        quedan, maximo_tavily = CUP.restante_medidas(), len(preguntas) * BUSQUEDAS_POR_PREGUNTA_MAX
+        if quedan <= 0:
+            salida(T("Este mes las medidas ya han hecho {t} búsquedas de Tavily, su tope: no lanzo más hasta el día 1 (o mide con «gratis» o «pago»).",
+                     t=CUP.TOPE_MEDIDAS))
+            return 5
+        salida(T("Gastará como mucho {n} búsquedas de Tavily; a las medidas les quedan {q} de {t} este mes, y al llegar me paro.", n=maximo_tavily,
+                 q=quedan, t=CUP.TOPE_MEDIDAS))
     maximo = MG.maximo_estimado(len(preguntas) * (1 + len(REINTENTOS)), LLAMADAS_POR_PREGUNTA_MAX) if con_pago else 0.0
     if con_pago and MG.restante_del_mes() <= 0:
         salida(MG.frase_sin_tope_del_mes())
@@ -266,10 +278,13 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
         salida(T("Nivel «{nivel}»: paso {n} preguntas por una Lina de usuario nuevo (unos segundos cada una, con pausas)…", nivel=nivel, n=len(preguntas)))
         A, a, llamadas = (preparar or _asistente)()
         filas, notas, antiguas, gastadas, tokens = [], [], [], [], []
-        with IA.solo_medida():
+        with IA.solo_medida(), (IA.tavily_en_medida() if con_tavily else contextlib.nullcontext()):
             for i, frase in enumerate(preguntas):
                 if tope and tope.superado():
                     salida(MG.frase_parada(tope))
+                    return 4
+                if con_tavily and CL.obtener("tavily") and CUP.restante_medidas() <= 0:
+                    salida(T("Las medidas han llegado a su tope de {t} búsquedas de Tavily este mes: me paro.", t=CUP.TOPE_MEDIDAS))
                     return 4
                 if i:
                     dormir(PAUSA_SEG)

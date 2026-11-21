@@ -119,3 +119,10 @@ def _sin_aur_de_verdad(monkeypatch):
     def sin_red():
         raise RuntimeError("sin red en las pruebas")
     monkeypatch.setattr(aur, "_http", sin_red)
+
+
+@pytest.fixture(autouse=True)
+def _cupo_de_tavily_aparte(monkeypatch, tmp_path):
+    """E2: cada prueba empieza con el cupo de Tavily a cero (su archivo, en la carpeta de la prueba): un 432 de una no deja agotada a la siguiente."""
+    from lina.nucleo import cupo_tavily
+    monkeypatch.setattr(cupo_tavily, "ARCHIVO", tmp_path / "tavily.json")

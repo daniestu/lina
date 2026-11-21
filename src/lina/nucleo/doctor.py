@@ -90,6 +90,11 @@ class Sondas:
         from lina.nucleo import aislamiento as AIS
         return (AJ.actuales(log=lambda m: None).get("ia", "aislar"),) + tuple(AIS.disponible())
 
+    def tavily(self):
+        """E2: el cupo de Tavily de este mes (búsquedas de uso real y de medidas, topes, agotado hasta). Solo lee su archivo: no llama a Tavily."""
+        from lina.nucleo import cupo_tavily as CUP
+        return CUP.resumen()
+
     def busqueda_detalle(self):
         """(¿DuckDuckGo encendido?, cuándo nos tomó por un robot la última vez o None, [(«pago»|«gratis», desde, hasta)] de las claves de Gemini que no se
         prueban con la búsqueda de Google). Solo lee archivos de estado: no busca nada."""
@@ -277,6 +282,16 @@ def comprobar(s=None, red=False):
               "" if pago else T("lina clave gemini_pago   (o «auto»:  lina config poner ia.busqueda auto)"))
         else:
             a(OK, T("Búsqueda en internet"), T("desactivada en ia.busqueda (ni Wikipedia); «búscalo igualmente» busca en esa petición"))
+        cupo = _seguro(getattr(s, "tavily", lambda: None), None) if tavily and modo in ("auto", "tavily") else None
+        if isinstance(cupo, dict):
+            tope = T("de {t}", t=cupo["tope_real"]) if cupo["tope_real"] else T("sin tope")
+            if cupo["agotado_hasta"]:
+                a(AVISO, T("Tavily"), T("agotado hasta el día {dia} ({fecha}): hasta entonces no lo llamo{resto}", dia=cupo["agotado_hasta"].day,
+                                        fecha=cupo["agotado_hasta"].strftime("%d/%m"), resto=T(" y busco en Wikipedia y en las wikis") if modo == "auto" else ""),
+                  T("Si has ampliado el plan, vuelve a guardar la clave:  lina clave tavily"))
+            else:
+                a(OK, T("Tavily"), T("este mes, {n} búsquedas {tope} (ia.tavily_mes) y {m} de medidas, de {tm}", n=cupo["real"], tope=tope, m=cupo["medida"],
+                                     tm=cupo["tope_medidas"]))
         reserva, robot, bloqueos = _seguro(getattr(s, "busqueda_detalle", lambda: (False, None, [])), (False, None, []))
         if modo in ("auto", "google"):
             for tipo, desde, _hasta in bloqueos:

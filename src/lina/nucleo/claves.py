@@ -195,10 +195,13 @@ def reiniciar_servicio(ejecutar=subprocess.run):
 
 
 def _olvidar_avisos(nombre):
-    """Con la clave de Tavily nueva (o sin ella), lo que se avisó de la búsqueda deja de valer."""
+    """Con la clave de Tavily nueva (o sin ella), lo que se avisó de la búsqueda deja de valer, y también la pausa por cupo agotado (E2: quizá has
+    ampliado el plan o cambiado de cuenta)."""
     if nombre == "tavily":
         from lina.nucleo import aviso_busqueda
+        from lina.nucleo import cupo_tavily
         aviso_busqueda.olvidar()
+        cupo_tavily.quitar_pausa()
 
 
 def borrar(nombre, ejecutar=subprocess.run):

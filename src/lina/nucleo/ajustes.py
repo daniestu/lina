@@ -107,6 +107,9 @@ ESQUEMA: dict = {
         "aislar": ("no", "opcion", ("no", "auto", "si"), N_("no (de fábrica): las órdenes de la IA se ejecutan como siempre. auto: se aíslan con bwrap si el sistema lo permite (sin tocar tus claves ni los datos de Lina, sin dejar nada que arranque solo y, tras leer contenido de fuera, sin red); si no, como siempre, y lina doctor dice por qué. si: sin aislamiento solo se ejecuta lo que solo lee y lo inocuo. Solo lo cambias tú.")),
         "busqueda_reserva": (False, "bool", None, N_("true: también busca en DuckDuckGo, sin clave, si lo demás no responde. Poco fiable: suele tomar a los programas por robots, "
                              "y DuckDuckGo ve tu consulta y tu dirección IP. false (de fábrica): no se usa.")),
+        "tavily_mes": (1000, "int", (0, 1000000), N_("Cuántas búsquedas de Tavily puede hacer Lina al mes (1000 de fábrica: el plan gratuito de Tavily). Al 80 % te avisa con "
+                       "una notificación; al llegar, deja de llamar a Tavily hasta el día 1 y busca en Wikipedia. 0: sin tope. Sin clave de pago de Gemini, Tavily es la "
+                       "única vía de datos de hoy.")),
         "tope_vram_mb": (4096, "int", (512, 65536), N_("Lo máximo de memoria de vídeo (MB) que Lina ocupa a la vez, contando Whisper. El modelo local de reserva (Ollama) solo "
                          "se carga si cabe dentro de este tope.")),
     },
