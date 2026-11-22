@@ -318,7 +318,7 @@ def _parametrizar(pasos, numero):
     return (nuevos, True) if usado[0] else (pasos, False)
 
 
-def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, web=False):
+def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, web=False, nombre="", valor=""):
     """Apunta la secuencia que cumplió `frase`. `pasos`: [{"herr", "args"}] ya filtrados por quien llama (solo lo que cambió algo y funcionó).
     `comprobar` y `esperado`: el comando de solo lectura que lo confirmó y lo que dio. `verificada`: lo comprobó el código (no solo el revisor)."""
     f = _fragmentos(frase)
@@ -338,7 +338,12 @@ def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, we
     if _SECRETO.search(json.dumps(limpios, ensure_ascii=False)) or "toggle" in json.dumps(limpios).lower():
         return None                                                       # nada con contraseñas, y nada que alterne (repetirlo daría otro resultado)
     limpios, con_valor = _parametrizar(limpios, numeros[0] if numeros else None)
-    ajuste = _libre(frase, 60)
+    valor_texto = ""
+    if valor and len(valor) >= 3 and not con_valor:              # S9g: la palabra que cambia de una vez a otra (el programa), que señala la IA
+        con_hueco = json.loads(json.dumps(limpios, ensure_ascii=False).replace(valor, "{valor}"))
+        if "{valor}" in json.dumps(con_hueco, ensure_ascii=False) and json.dumps(con_hueco, ensure_ascii=False).replace("{valor}", valor) == json.dumps(limpios, ensure_ascii=False):
+            limpios, valor_texto = con_hueco, valor
+    ajuste = _libre(nombre or frase, 60)                         # S9g: el nombre general de R2 si lo hay; si no, tu frase, como siempre
     clave = _clave_frase(palabras, numeros[0] if con_valor and numeros else None)
     nucleo = _nucleo(ajuste)
     if not ajuste or not nucleo:
@@ -348,7 +353,7 @@ def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, we
         comprobar, esperado = "", ""
     nueva = {"tipo": "pasos", "ajuste": ajuste, "nucleo": nucleo, "palabras": sorted(set(_tokens(ajuste)) - _GEN), "pedido": _limpio(frase, 120), "web": False,
              "pasos": limpios, "frases": [clave], "comprobar": _limpio(comprobar, 300), "esperado": esperado, "verificada": bool(verificada),
-             "valor_usado": numeros[0] if con_valor and numeros else "", "cambiar": ""}
+             "valor_usado": numeros[0] if con_valor and numeros else _limpio(valor_texto, 60), "cambiar": ""}
     if _en_privado():
         return None
     with _lock:

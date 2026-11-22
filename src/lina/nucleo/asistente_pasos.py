@@ -6,6 +6,7 @@ Aprender: al terminar una petición que se dio por cumplida, se guardan SOLO los
 fallidos), más la lectura que lo comprobó. Repetir: si lo que pides es, palabra por palabra, algo que ya se cumplió así, el código repite esos pasos con las
 mismas herramientas y las mismas reglas de seguridad (un paso crítico sigue pidiendo tu atajo; una receta no da permisos nuevos), repite la comprobación y
 lo dice. Si algo no sale como la vez anterior, la IA toma el relevo contándole lo que pasó."""
+import json
 import os
 import re
 import shlex
@@ -168,8 +169,10 @@ class MixinPasos:
     def _aprender_pasos(self):
         """Al terminar una petición dada por buena: si hizo algo que se puede repetir, apunta los pasos. Nunca estropea la respuesta."""
         REC, ej = self._REC(), self.ejecutor
-        if (REC is None or not self._recetas_de_pasos_activas() or not self.turno_aceptado or ej.receta_turno or ej.duda or ej.pendientes
-                or ej.contaminado or self.insistiendo):
+        if REC is None or not self._recetas_de_pasos_activas() or ej.receta_turno or ej.duda or ej.contaminado:
+            return
+        por_hechos = self._cumplida_por_hechos()                 # S9g: dada por cumplida por los hechos del cambio, no por si Gemini contestó
+        if not por_hechos and (not self.turno_aceptado or ej.pendientes or self.insistiendo):
             return
         frase = self._frase_para_receta()
         if not frase:
@@ -230,7 +233,14 @@ class MixinPasos:
                 if salida.strip():
                     verificada, comprobar, esperado = True, lectura[0], salida
         pasos = [{"herr": e[1], "args": e[2], **({"comprobado": True} if e[1] != "ejecutar_comando" and "COMPROBADO AHORA" in e[3] else {})} for e in efectos]
-        receta = REC.aprender_pasos(frase, pasos, comprobar, esperado, verificada)
+        nombre, valor = "", ""
+        try:                                                     # S9g: el nombre general de R2 (y la palabra que cambia); si no contesta, tu frase
+            general = self._generalizar_receta(frase, "\n".join(e[4] or json.dumps(e[2], ensure_ascii=False) for e in efectos))
+            if general:
+                nombre, valor = general
+        except Exception as e:
+            log(f"Receta de pasos: sin nombre general ({e!r})")
+        receta = REC.aprender_pasos(frase, pasos, comprobar, esperado, verificada, nombre=nombre, valor=valor)
         if receta:
             ej.receta_turno = True
 

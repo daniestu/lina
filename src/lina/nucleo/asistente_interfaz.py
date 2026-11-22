@@ -138,7 +138,7 @@ class MixinInterfaz:
         if aceptada and diferidas:
             self.ejecutor.guardar_diferidas(self._peticion_de_receta())
         elif diferidas:
-            log(f"Receta descartada ({len(diferidas)}): la petición no se dio por cumplida")
+            guardar_por_hechos(self, diferidas)
         self.ejecutor.recetas_diferidas = []
         pendiente, self.receta_interfaz_pendiente = self.receta_interfaz_pendiente, None
         if not pendiente or not aceptada:
@@ -148,6 +148,12 @@ class MixinInterfaz:
         receta = _A.REC.aprender_interfaz(*pendiente)
         if receta:
             self.ejecutor.receta_turno = True
+
+    def _cumplida_por_hechos(self):
+        return cumplida_por_hechos(self)
+
+    def _guardar_por_hechos(self, diferidas):
+        guardar_por_hechos(self, diferidas)
 
     def _peticion_de_receta(self):
         return peticion_de_receta(self.historial, self.pregunta_pura)
@@ -216,3 +222,23 @@ class MixinInterfaz:
 
 # Al final a propósito: asistente.py importa este módulo y este importa a asistente.py; así vale importar cualquiera de los dos primero.
 from lina.nucleo import asistente as _A  # se usa al llamar (no al importar): así valen los parches de pruebas
+
+
+def cumplida_por_hechos(asistente):
+    """S9g: ¿hay en esta petición un cambio comprobado por hechos y ninguna duda abierta? Entonces la tarea cuenta como cumplida para guardar la
+    receta, aunque Gemini no conteste al final o la IA prepare otra cosa después. Nunca tras leer contenido de fuera ni en modo privado."""
+    ej = asistente.ejecutor
+    return (getattr(ej, "cambio_comprobado", False) is True and not getattr(ej, "duda", "") and not getattr(ej, "contaminado", "")
+            and not getattr(asistente, "modo_privado", False))
+
+
+def guardar_por_hechos(asistente, diferidas):
+    """Las recetas que apunta el código (R1) se guardan por los hechos del cambio; las demás, solo con el visto bueno de la respuesta."""
+    por_hechos = [d for d in diferidas if d.get("generalizar")]
+    if por_hechos and cumplida_por_hechos(asistente):
+        asistente.ejecutor.recetas_diferidas = por_hechos
+        if asistente.ejecutor.guardar_diferidas(asistente._peticion_de_receta()):
+            log("Receta guardada por los hechos del cambio, aunque la respuesta no se diera por buena")
+    elif diferidas:
+        log(f"Receta descartada ({len(diferidas)}): la petición no se dio por cumplida")
+    asistente.ejecutor.recetas_diferidas = []

@@ -173,7 +173,9 @@ def usuario_nuevo(nivel, obtener_real=None):
     obtener_real = obtener_real or CL.obtener
     claves = {n: obtener_real(n) for n in NIVELES[nivel]}
     carpeta = tempfile.mkdtemp(prefix="lina-probar-busqueda-")
+    from lina.nucleo import registro as REG
     cambios = [(RUT, "CONFIG", RUT.CONFIG.__class__(carpeta) / "config"), (RUT, "ESTADO", RUT.ESTADO.__class__(carpeta) / "estado"),
+               (REG, "ARCHIVO_ACCIONES", RUT.ESTADO.__class__(carpeta) / "estado" / "acciones.log"),      # S9g: lo de la medida, no en tu registro
                (CL, "obtener", lambda nombre, *a, **k: claves.get(nombre, "")), (FUE, "listar", lambda *a, **k: []),
                (MEM, "relevantes", lambda *a, **k: []), (MEM, "nota_para_la_ia", lambda *a, **k: "")]
     antes = [(o, n, getattr(o, n)) for o, n, _ in cambios]
@@ -239,7 +241,7 @@ def es_de_servicio(nota, llamadas, origen=""):
     return respuesta_sin_ia(origen) or (nota != "bien" and any(r in TRANSITORIOS for r in llamadas))
 
 
-def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=time.sleep, reiniciar=reiniciar_pausas):
+def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=time.sleep, reiniciar=reiniciar_pausas, vigia=None):
     if argv[:1] in (["-h"], ["--help"], ["ayuda"]):
         salida(T(AYUDA))
         return 0
@@ -276,10 +278,15 @@ def principal(argv, salida=print, preparar=None, pasar_pregunta=None, dormir=tim
             salida(T("Para el nivel «{nivel}» falta la clave: {faltan}. Guárdala con  lina clave {primera}", nivel=nivel, faltan=", ".join(faltan), primera=faltan[0]))
             return 2
         salida(T("Nivel «{nivel}»: paso {n} preguntas por una Lina de usuario nuevo (unos segundos cada una, con pausas)…", nivel=nivel, n=len(preguntas)))
+        from lina.nucleo import vigia_medida as VIG
+        vigia = vigia or VIG.Vigia()                    # S9g: las órdenes de la Lina de usuario nuevo son de verdad: si cambian tu sistema, se para
+        vigia.empezar(salida)
         A, a, llamadas = (preparar or _asistente)()
         filas, notas, antiguas, gastadas, tokens = [], [], [], [], []
         with IA.solo_medida(), (IA.tavily_en_medida() if con_tavily else contextlib.nullcontext()):
             for i, frase in enumerate(preguntas):
+                if i and vigia.parar_si_cambio(salida):
+                    return 6
                 if tope and tope.superado():
                     salida(MG.frase_parada(tope))
                     return 4

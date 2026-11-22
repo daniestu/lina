@@ -172,7 +172,7 @@ def pasar(frase, A, a, abiertas, tope=TOPE_SEG, antes=()):
     return list(abiertas), dicho, time.time() - t0
 
 
-def principal(argv, salida=print):
+def principal(argv, salida=print, vigia=None):
     if argv[:1] in (["-h"], ["--help"], ["ayuda"]):
         salida(T(AYUDA))
         return 0
@@ -181,11 +181,16 @@ def principal(argv, salida=print):
     from lina.nucleo import ia as IA
     CL.proteger_salida()
     salida(T("Paso {n} peticiones por tu Lina, sin abrir nada (unos segundos cada una)…", n=len(casos)))
+    from lina.nucleo import vigia_medida as VIG
+    vigia = vigia or VIG.Vigia()                        # S9g: aquí las órdenes son de verdad: si cambian tu sistema, la medida se para
+    vigia.empezar(salida)
     A, a, abiertas = _asistente()
     cuenta, filas = {}, []
     with IA.solo_medida():
         for frase, juez in casos:
             abiertas_caso, dicho, seg = pasar(frase, A, a, abiertas)
+            if vigia.parar_si_cambio(salida):
+                return 6
             nota, motivo = juez(abiertas_caso, dicho)
             cuenta[nota] = cuenta.get(nota, 0) + 1
             filas.append((frase, nota, motivo, seg, abiertas_caso, dicho))

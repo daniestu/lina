@@ -73,8 +73,13 @@ def orden(argv, jaula, existe=os.path.lexists):
     for ruta in jaula.tapadas():
         o += _tapar(ruta, existe)
     if not jaula.bus:
-        for ruta in ([os.path.join(runtime, "bus")] if runtime else []) + [BUS_DEL_SISTEMA]:
-            o += _tapar(ruta, existe)
+        # S9g: sin bus se tapa ENTERA la carpeta de la sesión, no solo el socket del bus: ahí están también el gestor de servicios de tu usuario
+        # (systemd/private: «systemctl --user mask» llegaba a tu sistema), los agentes de claves de SSH y GPG, PipeWire y Wayland
+        sesion = [r for r in dict.fromkeys([runtime, f"/run/user/{os.getuid()}"]) if r]      # también si XDG_RUNTIME_DIR no estuviera puesta
+        for ruta in sesion:
+            if existe(ruta):
+                o += ["--tmpfs", ruta]                   # es una carpeta: encima, una vacía
+        o += _tapar(BUS_DEL_SISTEMA, existe)
     if not jaula.red:
         o.append("--unshare-net")
         for ruta in SIN_RED_TAMBIEN:

@@ -1504,6 +1504,7 @@ class Ejecutor:
         self.snapshot_aviso = None           # número de la snapshot recién creada, pendiente de contárselo a la IA
         self.duda = ""                       # si el último cambio no se pudo comprobar (⚠/✘/error): para que el asistente insista
         self.efecto_sin_comprobar = False    # se editó un archivo de configuración y nadie ha mirado si tiene efecto
+        self.cambio_comprobado = False       # S9g: en esta petición hay un cambio comprobado por hechos (para dar la tarea por cumplida)
         self.cambio_sin_comprobar = False    # S13: se cambió algo y el código no tiene ningún hecho que diga que hizo lo pedido
         self.duda_revertida = False          # el último intento se revirtió bien: el estado es el de antes, pero el objetivo sigue sin cumplirse
         self.rechazadas = set()              # lo que el usuario acaba de decir que NO (solo vale durante esa respuesta)
@@ -1798,6 +1799,7 @@ class Ejecutor:
             if v:
                 extra.append(v)
         if rc == 0 and v and "✘" not in v and "⚠" not in v:
+            self.cambio_comprobado = True
             self._receta_por_hechos(comando, clase, v)
         if rc == 0 and not v and clase in {"autonomo", "confirmado", "libre"} and not _parece_lectura(comando) and not FI.gestor(comando):
             self.cambio_sin_comprobar = True             # S13: salió bien (código 0), pero nada dice que el efecto sea el pedido

@@ -33,7 +33,7 @@ def test_sin_red_tambien_sin_dns_y_sin_bus(tmp_path, monkeypatch):
     o = AIS.orden(["true"], _jaula(tmp_path, red=False, bus=False), existe=lambda r: r in existentes)
     assert "--unshare-net" in o
     texto = " ".join(o)
-    assert f"/dev/null {tmp_path / 'run' / 'bus'}" in texto and f"/dev/null {AIS.BUS_DEL_SISTEMA}" in texto
+    assert f"--tmpfs {tmp_path / 'run'}" in texto and f"/dev/null {AIS.BUS_DEL_SISTEMA}" in texto      # S9g: toda la sesión, no solo el bus
     assert "/run/systemd/resolve" in o
     assert ["--bind", str(tmp_path / "run"), str(tmp_path / "run")] != o[1:4] and f"--bind {tmp_path / 'run'} " not in texto
 

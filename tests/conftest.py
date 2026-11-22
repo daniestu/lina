@@ -126,3 +126,10 @@ def _cupo_de_tavily_aparte(monkeypatch, tmp_path):
     """E2: cada prueba empieza con el cupo de Tavily a cero (su archivo, en la carpeta de la prueba): un 432 de una no deja agotada a la siguiente."""
     from lina.nucleo import cupo_tavily
     monkeypatch.setattr(cupo_tavily, "ARCHIVO", tmp_path / "tavily.json")
+
+
+@pytest.fixture(autouse=True)
+def _sin_vigia_de_verdad(monkeypatch):
+    """S9g: el vigía de las medidas mira tu sistema real (systemd de tu usuario, ~/.config): en las pruebas, nunca."""
+    from lina.nucleo import vigia_medida
+    monkeypatch.setattr(vigia_medida, "Vigia", lambda *a, **k: vigia_medida.SinVigia())
