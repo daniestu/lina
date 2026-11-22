@@ -1975,6 +1975,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             resultado = mirar_pantalla(self._claves("mini"), args.get("pregunta", ""), args.get("espera", 2))
         if resultado.startswith("Lo que se ve"):
             self.ejecutor.efecto_sin_comprobar = False          # alguien ha mirado de verdad
+            self.ejecutor.cambio_sin_comprobar = False
         return resultado
 
     def _h_probar_ajuste_kde(self, nombre, args):
@@ -2550,6 +2551,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if self.ejecutor.efecto_sin_comprobar:
             log("La respuesta daba por hecho un cambio de configuración sin comprobar su efecto: se corrige")
             return texto.rstrip() + " " + T("Ojo: he cambiado un archivo de configuración, pero no he comprobado en pantalla que el cambio tenga efecto; dímelo si no lo ves.")
+        if getattr(self.ejecutor, "cambio_sin_comprobar", False) is True:     # S13: la orden salió bien, pero nada comprueba que haga lo que pediste
+            log("La respuesta daba por hecho un cambio que nada ha comprobado: se corrige")
+            return texto.rstrip() + " " + T("Ojo: la orden ha salido bien, pero no he podido comprobar que haga lo que pedías; dímelo si no lo ves.")
         return texto
 
     def _avisar_voz(self, texto):

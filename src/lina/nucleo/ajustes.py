@@ -39,7 +39,7 @@ IDIOMAS = ("es", "en")          # los que se pueden elegir (fase 8); «en» se a
 CATEGORIAS = ("borrado", "software_de_fuera", "red_expuesta", "sesion", "persistencia", "archivos_de_paquetes")
 MODOS_CATEGORIA = ("perfil", "confirmar", "libre")
 # Estas categorías se confirman siempre con el atajo, en todos los perfiles y sin interruptor: tocar discos, arranque, cuentas, dinero y gasto.
-SIEMPRE_CONFIRMAN = ("discos_y_particiones", "arranque", "cuentas_y_credenciales", "dinero", "gasto_del_asistente")
+SIEMPRE_CONFIRMAN = ("discos_y_particiones", "arranque", "cuentas_y_credenciales", "dinero", "gasto_del_asistente", "permisos_de_apps")
 
 ESQUEMA: dict = {
     "asistente": {

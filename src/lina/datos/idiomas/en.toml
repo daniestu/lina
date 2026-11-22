@@ -1266,3 +1266,4 @@
 "este mes, {n} búsquedas {tope} (ia.tavily_mes) y {m} de medidas, de {tm}" = "this month, {n} searches {tope} (ia.tavily_mes) and {m} from measurements, of {tm}"
 "sin tope" = "no cap"
 "Asistente" = "Assistant"
+"Ojo: la orden ha salido bien, pero no he podido comprobar que haga lo que pedías; dímelo si no lo ves." = "Note: the command went fine, but I couldn't check that it does what you asked; tell me if you don't see it."

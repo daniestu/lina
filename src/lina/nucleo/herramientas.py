@@ -1504,6 +1504,7 @@ class Ejecutor:
         self.snapshot_aviso = None           # número de la snapshot recién creada, pendiente de contárselo a la IA
         self.duda = ""                       # si el último cambio no se pudo comprobar (⚠/✘/error): para que el asistente insista
         self.efecto_sin_comprobar = False    # se editó un archivo de configuración y nadie ha mirado si tiene efecto
+        self.cambio_sin_comprobar = False    # S13: se cambió algo y el código no tiene ningún hecho que diga que hizo lo pedido
         self.duda_revertida = False          # el último intento se revirtió bien: el estado es el de antes, pero el objetivo sigue sin cumplirse
         self.rechazadas = set()              # lo que el usuario acaba de decir que NO (solo vale durante esa respuesta)
         self.profundo = False                # True cuando el asistente INSISTE: topes más amplios
@@ -1629,6 +1630,10 @@ class Ejecutor:
             ok, info = self._snapshot_si_hace_falta(motivo)                  # A2a: sin red de seguridad, no se cambia el sistema solo
             if not ok:
                 clase, razon = "critico", f"no he podido crear la snapshot de seguridad antes de cambiar el sistema ({info})"
+        if (clase == "critico" and self.confirmar and not self.contaminado and _politica()["modo"] != "prudente"
+                and _secciones_de(comando) == {"permisos_de_apps"} and EF.solo_quita_permisos(comando)):
+            anotar(f"[quita-permisos] {comando}  # sin «sí»: solo quita acceso a un programa (o lo vuelve a lo de fábrica); queda en el diario")
+            clase, razon = "autonomo", ""                # S13: quitar acceso no pide «sí»; darlo, siempre (SIEMPRE_CONFIRMAN)
         if (clase == "critico" and self.confirmar and not self.contaminado and _politica()["modo"] != "prudente"
                 and _secciones_de(comando) == {"persistencia"}):
             escritas = {os.path.normpath(_abs(i[1])) for i in _intenciones_de_cambio(comando) if i[0] == "escribe"} if diario else set()
@@ -1794,6 +1799,8 @@ class Ejecutor:
                 extra.append(v)
         if rc == 0 and v and "✘" not in v and "⚠" not in v:
             self._receta_por_hechos(comando, clase, v)
+        if rc == 0 and not v and clase in {"autonomo", "confirmado", "libre"} and not _parece_lectura(comando) and not FI.gestor(comando):
+            self.cambio_sin_comprobar = True             # S13: salió bien (código 0), pero nada dice que el efecto sea el pedido
         if rc == 0 and re.search(r"\b(toggle|invokeShortcut)\b", comando, re.I):
             extra.append("AVISO: este comando ALTERNA un estado sin decir cuál era ni cuál es ahora: puede haber dejado justo lo contrario de lo pedido. "
                          "Compruébalo (leyendo el estado o mirando la pantalla) antes de decir que está hecho, y si no puedes, dilo.")

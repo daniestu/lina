@@ -441,6 +441,15 @@ ruta /lib
 ruta /lib64
 
 
+# 12) Dar a un programa en caja (Flatpak, Snap) más acceso a tu equipo: tus archivos, dispositivos u otros programas.
+#     Dar acceso se confirma SIEMPRE. Quitarlo (o volver a lo de fábrica) no se pregunta: va sin «sí» y queda en el diario.
+#     Lo decide el código por el efecto de la orden, no por el programa. Si no la quieres, borra la sección entera.
+[permisos_de_apps]
+motivo da a un programa más acceso a tu equipo (tus archivos, dispositivos u otros programas)
+subcomando flatpak override permission-set permission-reset
+subcomando snap connect disconnect
+
+
 # ============================================================================================
 #  ZONAS DESECHABLES
 #  Aquí SÍ puede borrar de verdad (rm) sin preguntar: son cachés y temporales que se regeneran.

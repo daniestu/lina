@@ -253,3 +253,35 @@ def comodines_sin_nada(comando, casa=None):
                 return []
         nombres += rutas
     return nombres
+
+
+# S13: dar o quitar permisos a un programa. La sección de politica.txt dice qué órdenes cambian permisos; aquí solo se mira si lo que hacen QUITA acceso
+# (sus opciones o su subcomando dicen no, quitar, deshacer…) o lo DA (cualquier otra cosa). Nada de un programa concreto: es la forma de las palabras.
+_QUITA = re.compile(r"^(?:no|un|dis|reset|revoke|remove|deny|drop|del|clear)", re.I)
+_SOLO_AMBITO = {"user", "system", "installation", "show", "verbose", "help", "assumeyes", "noninteractive"}
+
+
+def solo_quita_permisos(comando):
+    """¿La orden solo QUITA acceso (o lo vuelve a lo de fábrica)? Mira, en cada tramo que no sea de lectura, el subcomando y las opciones: si alguna
+    parte no dice quitar, da acceso y se confirma. Lo que no se pueda leer, también."""
+    from lina.nucleo.clasificador import _es_lectura, _segmentos
+    tramos = [t for t in _segmentos(str(comando)) if t.strip() and not _es_lectura(t)]
+    if not tramos:
+        return False
+    for tramo in tramos:
+        palabras = _sin_prefijos(_palabras(tramo))
+        if not palabras:
+            return False
+        args = palabras[1:]
+        sub = next((a for a in args if not a.startswith("-")), "")
+        opciones = [a.lstrip("-").split("=", 1)[0] for a in args if a.startswith("-")]
+        opciones = [o for o in opciones if o and o not in _SOLO_AMBITO]
+        sub_quita = any(_QUITA.match(p) for p in re.split(r"[-_]", sub) if p)
+        if opciones:
+            if not all(_QUITA.match(o) for o in opciones):
+                return False
+        elif not sub_quita and sub and not args[args.index(sub) + 1:]:
+            return False                                   # un subcomando sin nada más que no dice quitar: se confirma
+        elif not sub_quita and len([a for a in args if not a.startswith("-")]) > 1:
+            return False                                   # «permission-set TABLA ID APP DATOS», «connect app:cámara»: da acceso
+    return True
