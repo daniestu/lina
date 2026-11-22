@@ -455,6 +455,8 @@ def _como_se_hace(r):
         return (f"{cabecera}: pasos con la interfaz{valor}: {pasos}. Se comprobó así: {r.get('comprobar') or '?'}. Los nombres de los controles pueden haber cambiado: si alguno "
                 "no aparece, lista los controles y adapta. Cada paso pasa por las mismas protecciones de siempre.")
     texto = f"{cabecera}: cambiar con `{r['cambiar']}`"
+    if "⏎" in r["cambiar"]:
+        texto += " (cada ⏎ es un salto de línea de la orden)"
     if "{valor}" in r["cambiar"]:
         texto += f" (en {{valor}} va el valor que pida el usuario; la última vez {r.get('valor_usado') or '?'})"
     if r.get("leer"):

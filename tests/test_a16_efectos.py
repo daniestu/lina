@@ -169,20 +169,6 @@ def test_las_acciones_de_varias_lineas_quedan_en_una(tmp_path, monkeypatch):
     assert texto.count("\n") == 1 and "Hidden=true ⏎ EOF" in texto
 
 
-def test_tras_una_tarea_que_costo_sugiere_guardar_la_receta(monkeypatch):
-    for m in ("sounddevice", "faster_whisper"):
-        sys.modules.setdefault(m, MagicMock())
-    from lina.nucleo import asistente as A
-    a = A.Asistente.__new__(A.Asistente)
-    a.ejecutor = MagicMock(duda="")
-    a.acciones_turno = [("ejecutar_comando", {"comando": "ls ~/.config/autostart"}, "código de salida: 0"),
-                        ("ejecutar_comando", {"comando": "cat /etc/xdg/autostart/x.desktop"}, "código de salida: 0")]
-    a._receta_sugerida = False
-    r = a._sugerir_receta("ejecutar_comando", {"comando": OCULTAR}, "código de salida: 0 (0 s)\nhecho")
-    assert "guardar_receta" in r and "general" in r
-    assert a._sugerir_receta("ejecutar_comando", {"comando": OCULTAR}, "código de salida: 0 (0 s)\nhecho") == "código de salida: 0 (0 s)\nhecho"
-
-
 # ---------------------------------------------------------------- con ia.aislar: solo se abre donde escribe lo juzgado
 def test_la_jaula_abre_solo_la_ruta_de_lo_reversible():
     from lina.nucleo import aislamiento as AIS

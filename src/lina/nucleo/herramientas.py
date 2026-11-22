@@ -1263,6 +1263,24 @@ def deshacer_entrada(entrada):
     return (True if "ok" in estados else False), lineas
 
 
+MAX_ORDEN_RECETA = 280           # A16b: una orden más larga no cabe en una receta de comando (se guardan en una línea de 300)
+
+
+def sin_carpeta_personal(comando, casa):
+    """La orden con tu carpeta personal como ~ (o $HOME dentro de comillas dobles, donde ~ no se expande): una receta no lleva tu usuario."""
+    casa = str(casa).rstrip("/")
+    salida, i = [], 0
+    while True:
+        j = comando.find(casa + "/", i)
+        if j < 0 or not casa:
+            return "".join(salida) + comando[i:]
+        antes = comando[:j]
+        dentro_simples = antes.count("'") % 2 == 1
+        dentro_dobles = antes.count('"') % 2 == 1 and not dentro_simples
+        salida.append(comando[i:j] + ("$HOME/" if dentro_dobles else casa + "/" if dentro_simples else "~/"))
+        i = j + len(casa) + 1
+
+
 def _ultimo_tramo_mira(comando):
     """¿La última orden (tras ; && o |) solo lee? (grep, ls, systemctl status…)."""
     tramos = [t for t in _segmentos(str(comando)) if t.strip()]
@@ -1476,6 +1494,9 @@ class Ejecutor:
         self.contaminado = ""                # de dónde viene el contenido de fuera leído en esta tarea (A2e), o vacío
         self.receta_turno = False            # ¿ya se apuntó alguna receta en esta tarea? (para no duplicar el apunte automático)
         self.recetas_diferidas = []          # recetas por guardar: solo se guardan si al final se da por cumplido lo pedido (ver Asistente._cerrar_receta_interfaz)
+        self.recetas_de_lo_confirmado = []   # A16b: las que salen de una orden confirmada con tu «sí»; pasan a la petición de ese «sí»
+        self.ordenes_peticion = 0            # A16b: cuántas órdenes ha pedido la IA en esta petición (para saber si la tarea ha costado)
+        self.generalizar = None              # A16b: (petición, orden) → (nombre general, palabra variable) o None; lo pone el asistente
         self.n_comandos = 0
         self.n_cambios = 0
         self.snapshot_tarea = None
@@ -1545,6 +1566,7 @@ class Ejecutor:
 
     # --- Lo que llama la IA ---
     def herramienta(self, args):
+        self.ordenes_peticion += 1
         comando = str((args or {}).get("comando", "")).strip()
         motivo = str((args or {}).get("motivo", "")).strip() or "tarea"
         if not comando:
@@ -1770,6 +1792,8 @@ class Ejecutor:
             v = _verificar(intenciones, payloads)
             if v:
                 extra.append(v)
+        if rc == 0 and v and "✘" not in v and "⚠" not in v:
+            self._receta_por_hechos(comando, clase, v)
         if rc == 0 and re.search(r"\b(toggle|invokeShortcut)\b", comando, re.I):
             extra.append("AVISO: este comando ALTERNA un estado sin decir cuál era ni cuál es ahora: puede haber dejado justo lo contrario de lo pedido. "
                          "Compruébalo (leyendo el estado o mirando la pantalla) antes de decir que está hecho, y si no puedes, dilo.")
@@ -2383,16 +2407,64 @@ class Ejecutor:
                       "Díselo al usuario.]")
         return texto
 
+    def _receta_por_hechos(self, comando, clase, comprobado):
+        """A16b: un cambio que ha salido bien y está comprobado por hechos, en una tarea que ha costado (3 órdenes o más, tu «sí» o insistir a fondo), queda
+        como receta pendiente, sin depender de que la IA se acuerde. Se guarda solo si la petición se da por cumplida, nunca tras leer contenido de fuera
+        ni en modo privado, y sin tu carpeta personal en la orden (va como ~)."""
+        if REC is None or self.contaminado or self.en_privado():
+            return
+        if not (clase == "confirmado" or self.ordenes_peticion >= 3 or getattr(self, "profundidad", 0)):
+            return
+        orden = sin_carpeta_personal(comando, _HOME)
+        if _HOME.rstrip("/") + "/" in orden:
+            return                                       # tu carpeta dentro de comillas simples: no se puede quitar tu usuario, no se guarda
+        if len(orden) > MAX_ORDEN_RECETA or REC.para_comando(" ⏎ ".join(orden.split("\n"))):
+            return
+        destino = self.recetas_de_lo_confirmado if clase == "confirmado" else self.recetas_diferidas
+        if any(d.get("cambiar") == orden for d in destino):
+            return
+        destino.append({"ajuste": "", "palabras": "", "cambiar": orden, "valor_usado": "", "leer": "", "comprobar": comprobado[:160], "web": False,
+                        "generalizar": True})
+        anotar(f"[receta-por-hechos] pendiente de que se dé por cumplido: {orden}")
+
     def guardar_diferidas(self, peticion):
         """Guarda de verdad las recetas que estaban por confirmar. Devuelve las que se guardaron. Solo se llama cuando la petición se dio por cumplida."""
         guardadas = []
         diferidas, self.recetas_diferidas = list(getattr(self, "recetas_diferidas", None) or []), []
         for d in diferidas:
+            if d.get("generalizar"):
+                receta = self._guardar_general(peticion, d)
+                if receta:
+                    self.receta_turno = True
+                    guardadas.append(receta)
+                continue
             receta = REC.aprender_comando(d["ajuste"], d["palabras"], peticion, d["cambiar"], d["valor_usado"], d["leer"], d["comprobar"], web=d["web"])
             if receta:
                 self.receta_turno = True
                 guardadas.append(receta)
         return guardadas
+
+    def _guardar_general(self, peticion, d):
+        """A16b: el nombre general y la palabra que cambia los da la IA (una mini-consulta); el código cambia esa palabra por {valor} solo si, puesta de
+        nuevo, sale la orden exacta que se ejecutó. Sin nombre, no se guarda."""
+        if self.contaminado or self.en_privado() or not self.generalizar:
+            return None
+        try:
+            general = self.generalizar(peticion, d["cambiar"])
+        except Exception as e:
+            log(f"Receta por hechos: no he podido darle un nombre general ({e!r})")
+            return None
+        if not general or not general[0]:
+            return None
+        ajuste, valor = general
+        orden = d["cambiar"]
+        if valor and len(valor) >= 3 and valor in orden and "{valor}" not in orden:
+            con_hueco = orden.replace(valor, "{valor}")
+            if con_hueco.replace("{valor}", valor) == orden:
+                orden = con_hueco
+        if "{valor}" not in orden:
+            valor = ""
+        return REC.aprender_comando(ajuste, "", peticion, " ⏎ ".join(orden.split("\n")), valor, "", d["comprobar"], web=False)
 
     @staticmethod
     def _esperar_sin_avisar(proc, comando):
