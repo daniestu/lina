@@ -84,7 +84,7 @@ def test_la_de_pasos_se_aprende_por_hechos_aunque_gemini_no_contestara_y_quede_a
     monkeypatch.setattr(A.Asistente, "_REC", lambda self: REC)
     a._aprender_pasos()
     assert aprender.called
-    assert aprender.call_args.kwargs == {"nombre": "quitar una app del inicio automático", "valor": "org.kde.kdeconnect.daemon"}
+    assert aprender.call_args.kwargs == {"nombre": "quitar una app del inicio automático", "valor": "org.kde.kdeconnect.daemon", "atajo": True}
     a.ejecutor.cambio_comprobado = False                         # sin el hecho, como antes: hace falta el visto bueno y nada pendiente
     aprender.reset_mock()
     a._aprender_pasos()

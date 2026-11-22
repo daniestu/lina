@@ -174,12 +174,16 @@ class MixinPasos:
         por_hechos = self._cumplida_por_hechos()                 # S9g: dada por cumplida por los hechos del cambio, no por si Gemini contestó
         if not por_hechos and (not self.turno_aceptado or ej.pendientes or self.insistiendo):
             return
-        frase = self._frase_para_receta()
-        if not frase:
-            return
+        frase, previa = self._frase_para_receta(), False
+        if not frase:                                            # S9h: parece reaccionar a lo anterior («No quiero que…», «ahora…»)
+            frase = str(self.pregunta_pura or "").strip()
+            previa = any(h.get("rol") == "user" for h in (self.historial or []))   # el hecho: ¿hay algo antes a lo que pueda referirse?
+            if not frase:
+                return
         palabras = set(C.normalizar(frase).split())
-        if palabras & _DEPENDE_DEL_CONTEXTO or any(len(w) >= 6 and re.search(r"[aei](?:lo|la|los|las)$", w) for w in palabras):
-            return                                               # «ciérralo», «desactívala»: dependen de a qué se refiera en ese momento
+        # «ciérralo», «desactívala», o un «no…» con algo dicho antes: dependen de a qué se refiera en ese momento. No impide aprender (lo deciden los
+        # hechos): impide el atajo sin IA, y la receta solo se apunta si la IA le da un nombre general a partir de lo que se hizo
+        atajo = not previa and not (palabras & _DEPENDE_DEL_CONTEXTO or any(len(w) >= 6 and re.search(r"[aei](?:lo|la|los|las)$", w) for w in palabras))
         efectos, lecturas = [], []                               # (posición, herramienta, datos, resultado, comando)
         for i, (n, a, r) in enumerate(self.acciones_turno):
             a, r = a or {}, str(r)
@@ -240,7 +244,7 @@ class MixinPasos:
                 nombre, valor = general
         except Exception as e:
             log(f"Receta de pasos: sin nombre general ({e!r})")
-        receta = REC.aprender_pasos(frase, pasos, comprobar, esperado, verificada, nombre=nombre, valor=valor)
+        receta = REC.aprender_pasos(frase, pasos, comprobar, esperado, verificada, nombre=nombre, valor=valor, atajo=atajo)
         if receta:
             ej.receta_turno = True
 

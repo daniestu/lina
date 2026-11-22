@@ -107,10 +107,19 @@ for nombre, acciones in (("notas", [cmd(CAMBIAR), ("notas", {"accion": "añadir"
     limpiar(); a = asistente(Ejec())
     ok(terminar(a, "desactiva la cámara", acciones) == [], f"no se aprende ({nombre})")
 
-# ---- frases que dependen del contexto, seguimientos o preguntas no se aprenden
-for frase in ("ciérralo", "desactiva esto", "abre el último", "¿está desactivada la cámara?", "ahora desactívala", "desactiva la cámara y sube el volumen"):
+# ---- S9h: la forma de la frase no decide si se aprende, solo si queda el atajo sin IA
+for frase in ("ciérralo", "desactiva esto", "abre el último", "ahora desactívala"):       # dependen del momento: sin nombre general, nada
     limpiar(); a = asistente(Ejec())
-    ok(terminar(a, frase, [cmd(CAMBIAR), cmd(LEER, "true")]) == [], f"no se aprende de «{frase}»")
+    ok(terminar(a, frase, [cmd(CAMBIAR), cmd(LEER, "true")]) == [], f"no se aprende de «{frase}» sin nombre general")
+limpiar(); a = asistente(Ejec())
+a._generalizar_receta = lambda frase, ordenes: ("desactivar la cámara", "")
+rs = terminar(a, "desactiva esto", [cmd(CAMBIAR), cmd(LEER, "true")])
+ok(len(rs) == 1 and rs[0]["ajuste"] == "desactivar la cámara" and rs[0]["frases"] == [] and R.para_frase("desactiva esto") is None,
+   f"con nombre general se aprende, sin atajo: {rs}")
+for frase in ("¿puedes desactivar la cámara?", "desactiva la cámara y sube el volumen", "Que la cámara no se encienda"):
+    limpiar(); a = asistente(Ejec())
+    rs = terminar(a, frase, [cmd(CAMBIAR), cmd(LEER, "true")])
+    ok(len(rs) == 1 and rs[0]["frases"] == [] and R.para_frase(frase) is None, f"«{frase}»: se aprende por los hechos, sin atajo sin IA: {rs}")
 
 # ---- un paso crítico solo se aprende si es el último, y la petición es la de antes del «sí»
 limpiar(); a = asistente(Ejec())

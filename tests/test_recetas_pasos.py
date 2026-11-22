@@ -94,8 +94,16 @@ def test_lo_que_no_se_debe_repetir_no_se_aprende(pasos):
     assert R.aprender_pasos("haz la cosa rara", pasos) is None and R._cargar() == []
 
 
-@pytest.mark.parametrize("frase", ["¿qué hora es?", "cierra esto y abre eso otro", "", "haz lo de siempre y luego lo otro", "y"])
-def test_frases_que_no_son_una_orden_sencilla_no_se_aprenden(frase):
+@pytest.mark.parametrize("frase", ["¿qué hora es?", "cierra esto y abre eso otro", "haz lo de siempre y luego lo otro",
+                                   "Que Caffeine no se abra solo al encender el ordenador"])
+def test_la_forma_de_la_frase_no_impide_aprender_solo_quita_el_atajo_sin_ia(frase):
+    """S9h: si se aprende lo deciden los hechos; una frase que no es una orden sencilla queda sin atajo y se le ofrece a la IA."""
+    r = R.aprender_pasos(frase, CAMARA_OFF)
+    assert r and r["frases"] == [] and R.para_frase(frase) is None
+
+
+@pytest.mark.parametrize("frase", ["", "y"])
+def test_sin_nada_con_que_nombrarla_no_se_aprende(frase):
     assert R.aprender_pasos(frase, CAMARA_OFF) is None
 
 

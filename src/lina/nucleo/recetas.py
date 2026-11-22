@@ -318,13 +318,19 @@ def _parametrizar(pasos, numero):
     return (nuevos, True) if usado[0] else (pasos, False)
 
 
-def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, web=False, nombre="", valor=""):
+def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, web=False, nombre="", valor="", atajo=True):
     """Apunta la secuencia que cumplió `frase`. `pasos`: [{"herr", "args"}] ya filtrados por quien llama (solo lo que cambió algo y funcionó).
-    `comprobar` y `esperado`: el comando de solo lectura que lo confirmó y lo que dio. `verificada`: lo comprobó el código (no solo el revisor)."""
-    f = _fragmentos(frase)
-    if not f or web or not pasos or len(pasos) > MAX_PASOS:
+    `comprobar` y `esperado`: el comando de solo lectura que lo confirmó y lo que dio. `verificada`: lo comprobó el código (no solo el revisor).
+    Si se aprende lo deciden los hechos (lo que cambió y funcionó), no la forma de la frase. La forma solo decide si queda además el atajo de repetirla
+    sin IA cuando vuelvas a decir lo mismo (`frases`): ese atajo es conservador porque solo acelera; sin él, la receta se le ofrece a la IA, que decide
+    por significado (S9h: «Que Caffeine no se abra solo…» se quedaba sin receta por empezar por «que»). `atajo=False`: quien llama sabe que la frase
+    depende del momento («ciérralo»); entonces solo se apunta con un nombre general."""
+    if web or not pasos or len(pasos) > MAX_PASOS:
         return None
-    palabras, numeros = f
+    f = _fragmentos(frase) if atajo else None
+    if not f and not (atajo or nombre):
+        return None
+    palabras, numeros = f or ([], [])
     limpios = []
     for p in pasos:
         if p.get("herr") not in HERRAMIENTAS_REPETIBLES or not isinstance(p.get("args"), dict):
@@ -344,7 +350,7 @@ def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, we
         if "{valor}" in json.dumps(con_hueco, ensure_ascii=False) and json.dumps(con_hueco, ensure_ascii=False).replace("{valor}", valor) == json.dumps(limpios, ensure_ascii=False):
             limpios, valor_texto = con_hueco, valor
     ajuste = _libre(nombre or frase, 60)                         # S9g: el nombre general de R2 si lo hay; si no, tu frase, como siempre
-    clave = _clave_frase(palabras, numeros[0] if con_valor and numeros else None)
+    frases = [_clave_frase(palabras, numeros[0] if con_valor and numeros else None)] if f else []
     nucleo = _nucleo(ajuste)
     if not ajuste or not nucleo:
         return None
@@ -352,7 +358,7 @@ def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, we
     if _SECRETO.search(esperado) or not comprobar:
         comprobar, esperado = "", ""
     nueva = {"tipo": "pasos", "ajuste": ajuste, "nucleo": nucleo, "palabras": sorted(set(_tokens(ajuste)) - _GEN), "pedido": _limpio(frase, 120), "web": False,
-             "pasos": limpios, "frases": [clave], "comprobar": _limpio(comprobar, 300), "esperado": esperado, "verificada": bool(verificada),
+             "pasos": limpios, "frases": frases, "comprobar": _limpio(comprobar, 300), "esperado": esperado, "verificada": bool(verificada),
              "valor_usado": numeros[0] if con_valor and numeros else _limpio(valor_texto, 60), "cambiar": ""}
     if _en_privado():
         return None
