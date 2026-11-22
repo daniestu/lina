@@ -38,6 +38,7 @@ class Jaula:
     bus: bool = True
     confirmada: bool = False
     escribibles: list[str] = field(default_factory=list)        # otras carpetas escribibles (el disco de datos con su papelera, /tmp va siempre)
+    abiertas: list[str] = field(default_factory=list)           # A16: rutas de SOLO_LECTURA que esta orden puede escribir (lo reversible e inocuo)
 
     def tapadas(self):
         return [os.path.join(self.casa, r) for r in (DE_LINA if self.confirmada else _RUTAS_PROTEGIDAS)]
@@ -67,7 +68,7 @@ def orden(argv, jaula, existe=os.path.lexists):
     if jaula.bus and runtime and existe(runtime):
         o += ["--bind", runtime, runtime]                        # como hoy: PipeWire, Wayland y los programas que dejan ahí sus sockets
     for ruta in jaula.de_solo_lectura():
-        if existe(ruta):
+        if existe(ruta) and ruta not in jaula.abiertas:
             o += ["--ro-bind", ruta, ruta]
     for ruta in jaula.tapadas():
         o += _tapar(ruta, existe)

@@ -1265,3 +1265,4 @@
 "de {t}" = "of {t}"
 "este mes, {n} búsquedas {tope} (ia.tavily_mes) y {m} de medidas, de {tm}" = "this month, {n} searches {tope} (ia.tavily_mes) and {m} from measurements, of {tm}"
 "sin tope" = "no cap"
+"Asistente" = "Assistant"

@@ -1838,6 +1838,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             resultado = CL.limpiar_para_ia(resultado)               # punto único: ninguna herramienta (comandos, documentos, KDE, interfaz, web, MCP) le pasa claves a la IA
         if crono:
             crono.herramientas += 1
+        resultado = self._sugerir_receta(nombre, args, resultado)
         self.acciones_turno.append((nombre, args, resultado))
         self.guion_herramientas.append((clave, resultado))
         self.paso_guion += 1
@@ -2465,6 +2466,19 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         return texto.rstrip() + " " + {"no_sale": T("Ojo: esto no sale de tu web {web}.", web=web), "sino_general": T("Ojo: esto no sale de tu web {web}, sino de una búsqueda general.", web=web),
                                        "no_estaba": T("Ojo: en tu web {web} no lo he encontrado; lo que te digo no sale de ahí.", web=web)}[falta]
 
+    def _sugerir_receta(self, nombre, args, resultado):
+        """A16: tras un cambio que ha salido bien en una tarea que ha costado (3 órdenes o más), se le recuerda a la IA que lo guarde como receta, con
+        sus pasos reales y en general, para ir directa la próxima vez. Una vez por petición; guardar_receta ya exige que se ejecutara y comprobara."""
+        if (nombre != "ejecutar_comando" or getattr(self, "_receta_sugerida", False) or not isinstance(resultado, str) or not EJ.salio_bien(resultado)
+                or H.clasificar(str((args or {}).get("comando", "")))[0] in ("lectura", "inocuo") or getattr(self.ejecutor, "duda", "")):
+            return resultado
+        if sum(1 for n, _, _ in getattr(self, "acciones_turno", []) if n == "ejecutar_comando") < 2:
+            return resultado
+        self._receta_sugerida = True
+        return (resultado + "\n[Si con esto queda hecho lo que pidió, guárdalo con guardar_receta (pide el grupo ajustes_kde con mas_herramientas si no "
+                "la tienes): un nombre general del ajuste (sin el nombre de este programa si sirve para otros), los comandos que has ejecutado de verdad "
+                "y cómo lo has comprobado. Así, la próxima vez irás directo.]")
+
     def _con_lo_que_trae_el_aur(self, texto):
         """A15 (d): si se pide el «sí» para instalar del AUR algo que trae más paquetes de él, la respuesta lo dice; si la IA no lo ha dicho, lo añade
         el código con su frase. Se comprueba por los nombres de los paquetes, no por cómo lo diga la IA."""
@@ -2920,6 +2934,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self.reintento_solo_web = False                        # S12: al insistir en una pregunta solo cabe la web
         self.guion_herramientas = []
         self.acciones_turno = list(self.acciones_confirmadas)
+        self._receta_sugerida = False                          # A16: el recordatorio de guardar la receta, una vez por petición
         self.turno_aceptado = False
         self.ejecutor.recetas_diferidas = []
         self.acciones_confirmadas = []

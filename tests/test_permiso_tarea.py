@@ -40,18 +40,21 @@ def test_sin_permiso_cada_intento_pregunta(ej):
     assert ej.permiso is None
 
 
-def test_un_si_cubre_los_reintentos_y_el_servicio_de_lo_instalado(ej):
+def test_un_si_cubre_los_reintentos_de_lo_mismo_y_no_otra_accion(ej, monkeypatch):
+    """A16 (2026-11-21): un «sí» solo cubre lo que se describió. Los reintentos de la misma instalación y actualizar el sistema para poder hacerla, sí;
+    activar su servicio (otro efecto) u otro paquete (otra cosa), no: piden su «sí» (antes los cubría)."""
+    avisos = []
+    monkeypatch.setattr(H, "notificar", lambda titulo, texto="": avisos.append(texto))
     _confirmar(ej)
-    assert ej.permiso and ej.permiso["secciones"] == {"software_de_fuera"}
-    for comando in ("sudo paru -S --noconfirm cloudflare-warp-bin", "sudo paru -Syu --noconfirm", "sudo systemctl enable --now warp-svc",
-                    "sudo paru -S spotify"):                         # sin haber leído nada de fuera, otro paquete de fuera es la misma clase de paso
+    assert ej.permiso and ej.permiso["secciones"] == {"software_de_fuera"} and ej.permiso["efectos"] == {"instalar"}
+    for comando in ("sudo paru -S --noconfirm cloudflare-warp-bin", "sudo paru -Syu --noconfirm"):
         assert not _pide_confirmacion(ej, comando), comando
     # A15 (e): paru va siempre sin preguntas por la terminal (--needed --noconfirm --skipreview)
     assert [c for c, _ in ej.ejecutados][1:] == ["sudo paru -S --needed --skipreview --noconfirm cloudflare-warp-bin",
-                                                 "sudo paru -Syu --needed --skipreview --noconfirm",
-                                                 "sudo systemctl enable --now warp-svc", "sudo paru -S --needed --noconfirm --skipreview spotify"]
-    assert not ej.pendientes
-    assert any("actualizar todo el sistema" in d for d in ej.dicho)
+                                                 "sudo paru -Syu --needed --skipreview --noconfirm"]
+    assert any("actualizar todo el sistema" in a for a in avisos) and ej.dicho == []    # el aviso no espera a que Lina quede libre: va como notificación
+    assert _pide_confirmacion(ej, "sudo systemctl enable --now warp-svc")
+    assert _pide_confirmacion(ej, "sudo paru -S spotify")
 
 
 def test_el_servicio_de_otra_cosa_sigue_preguntando(ej):

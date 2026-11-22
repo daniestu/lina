@@ -40,6 +40,7 @@ from lina.nucleo.ejecucion import _abs, _codigo_de_salida, _privilegios  # noqa:
 from lina.nucleo import plataforma as PL
 from lina.nucleo import privilegios as PRIV
 from lina.nucleo import aur as AUR
+from lina.nucleo import efectos as EF
 from lina.nucleo import fallos_instalacion as FI
 from lina.nucleo.clasificador import (  # noqa: F401
     APPS_PERMITIDAS, AVISO_DESTRUCCION_TOTAL, FLAGS_SEGUROS, PROTEGER_DATOS, RAIZ_AYUDANTE, RUTA_DATOS, _AYUDANTE_ROOT,
@@ -106,6 +107,7 @@ except ImportError:          # si falta diario.py el asistente funciona igual, p
 
 # ======================= CONFIGURACIÓN =======================
 ARCHIVO_DIARIO_VISIBLE = RUT.DATOS / "diario_visible.txt"
+LINEAS_DE_RESULTADO = 12       # A16: líneas del resultado de cada orden en el registro de Lina (en modo privado, una)
 TIMEOUT_ESPERA = 10            # segundos que espera a que acabe un comando antes de seguir en segundo plano (y avisarte al terminar)
 TIMEOUT_MAXIMO = 10800         # un comando en segundo plano se corta a las 3 horas (una copia grande puede tardar)
 MAX_SALIDA = 3000              # caracteres de salida que se devuelven a la IA
@@ -1261,6 +1263,19 @@ def deshacer_entrada(entrada):
     return (True if "ok" in estados else False), lineas
 
 
+def _ultimo_tramo_mira(comando):
+    """¿La última orden (tras ; && o |) solo lee? (grep, ls, systemctl status…)."""
+    tramos = [t for t in _segmentos(str(comando)) if t.strip()]
+    return bool(tramos) and _es_lectura(tramos[-1])
+
+
+def _no_existia_nada(resultado):
+    """¿Todos los errores de la salida dicen que no existía lo que se nombraba? Entonces la orden no cambió nada."""
+    lineas = [x for x in str(resultado).splitlines()[1:] if x.strip() and not x.startswith("[")]
+    return bool(lineas) and all(re.search(r"no such file|no existe|cannot (?:stat|access|remove)|not found|no se puede (?:acceder|efectuar)", x, re.I)
+                                for x in lineas)
+
+
 def _verificar(intenciones, payloads=None):
     """Comprueba de verdad que lo que el comando dice haber hecho está hecho. Devuelve una línea o None.
     Cada comprobación sale bien (True), mal (False) o dudosa (None: escrito, pero sin garantía de que tenga efecto)."""
@@ -1568,6 +1583,12 @@ class Ejecutor:
                 return f"BLOQUEADO: {rechazo}"
             if comando != original:
                 anotar(f"[papelera] {original}  ->  {comando}")
+        vacios = EF.comodines_sin_nada(comando, _HOME)
+        if vacios:                                       # A16: no se pide un «sí» para borrar o mover nada
+            anotar(f"[nada-que-borrar] {comando}")
+            log(f"Acción [no ejecutada: no existe nada de lo que nombra]: {comando}")
+            return ("No existe nada que coincida con " + ", ".join(vacios[:5]) + ", así que no se ha hecho nada. No pidas confirmación por nada: mira "
+                    "primero qué hay (por ejemplo, con ls) y actúa sobre lo que exista.")
         if AUR.objetivos(comando):                       # A15 (e): paru o yay sin preguntas por la terminal, que en segundo plano nadie contesta
             comando = AUR.sin_preguntas(comando)
         clase, razon = clasificar(comando)
@@ -1586,6 +1607,18 @@ class Ejecutor:
             ok, info = self._snapshot_si_hace_falta(motivo)                  # A2a: sin red de seguridad, no se cambia el sistema solo
             if not ok:
                 clase, razon = "critico", f"no he podido crear la snapshot de seguridad antes de cambiar el sistema ({info})"
+        if (clase == "critico" and self.confirmar and not self.contaminado and _politica()["modo"] != "prudente"
+                and _secciones_de(comando) == {"persistencia"}):
+            escritas = {os.path.normpath(_abs(i[1])) for i in _intenciones_de_cambio(comando) if i[0] == "escribe"} if diario else set()
+            inocuo, por_que = EF.reversible_e_inocuo(comando, _HOME, se_puede_deshacer=lambda r: os.path.normpath(r) in escritas)
+            if inocuo:                                   # A16: solo escribe archivos de claves de tu carpeta que no hacen ejecutar nada, y se puede deshacer
+                anotar(f"[reversible] {comando}  # sin «sí»: solo escribe en tu carpeta, se puede deshacer y no hace ejecutar nada")
+                clase, razon = "autonomo", ""
+                destinos = [r for r, _, _ in (EF.escrituras(comando, _HOME) or ([], []))[0]]
+                self._abiertas = (comando, [os.path.join(_HOME, r) for r in AIS.SOLO_LECTURA
+                                            if any(d.startswith(os.path.join(_HOME, r) + os.sep) for d in destinos)])
+            else:
+                log(f"Acción crítica por persistencia, con confirmación: {por_que}")
         anotar(f"[{clase}] {comando}  # {motivo}")
         log(f"Acción [{clase}]: {comando}")
         if clase in {"lanzar", "autonomo", "lectura"}:
@@ -1626,10 +1659,11 @@ class Ejecutor:
                 return tope
             anotar(f"[permiso-de-tarea] {comando}  # {motivo} (lo cubre tu «sí» de antes)")
             log(f"Acción cubierta por tu «sí» de antes: {comando}")
+            # A16: dentro de la misma petición, avisar por voz esperaría a que Lina quede libre (hasta 120 s esperándose a sí misma): va como notificación
             if _es_actualizacion_completa(comando):
-                self.avisar(T("Voy a actualizar todo el sistema para poder seguir; cuando acabe, conviene reiniciar."))
+                notificar(T("Asistente"), T("Voy a actualizar todo el sistema para poder seguir; cuando acabe, conviene reiniciar."))
             else:
-                self.avisar(T("Sigo sin preguntarte: {motivo}.", motivo=motivo))
+                notificar(T("Asistente"), T("Sigo sin preguntarte: {motivo}.", motivo=motivo))
             return self._con_red(comando, motivo, "confirmado")       # (no se apunta como paquete de confianza: eso solo con tu «sí» a ese paquete)
         aviso_aur = ""
         objetivos_aur = AUR.objetivos(comando)
@@ -1742,7 +1776,14 @@ class Ejecutor:
             self.efecto_sin_comprobar = True
         if rc == 0 and any(i[0] == "ajuste_kde" or (i[0] == "escribe" and _es_configuracion(i[1])) for i in intenciones):
             self.efecto_sin_comprobar = True                                 # ver probar_ajuste_kde / mirar_pantalla
-        if rc not in (0, None):                                              # lo último que se hizo, ¿está comprobado?
+        if rc not in (0, None) and intenciones and _ultimo_tramo_mira(comando):     # A16: falló solo la orden de mirar del final; lo escrito se comprueba por hechos
+            v2 = _verificar(intenciones, payloads)
+            if v2 and "✘" not in v2 and "⚠" not in v2:
+                extra.append(v2 + " (el código distinto de 0 es de la última orden, que solo miraba)")
+                rc = 0
+        if rc not in (0, None) and _no_existia_nada(resultado):
+            pass                                                             # A16: no ha cambiado nada (no existía lo que nombraba): no hay nada que comprobar
+        elif rc not in (0, None):                                            # lo último que se hizo, ¿está comprobado?
             self.duda = f"el comando «{comando[:80]}» terminó con error (código {rc})"
         elif v:
             self.duda = v[:400] if ("✘" in v or "⚠" in v) else ""
@@ -1966,7 +2007,8 @@ class Ejecutor:
             self.permiso = None
             return
         objetivo = set().union(*(objetivo_de(c) for c in comandos_))
-        self.permiso = {"secciones": secciones, "objetivo": objetivo, "hasta": time.time() + PERMISO_TAREA_SEG,
+        efectos = set().union(*(EF.efectos(c) for c in comandos_))
+        self.permiso = {"secciones": secciones, "objetivo": objetivo, "efectos": efectos, "hasta": time.time() + PERMISO_TAREA_SEG,
                         "web": bool(self.contaminado) or any(p.get("web") for p in pendientes)}
         anotar(f"[permiso-de-tarea] tu «sí» cubre el resto de la tarea: {', '.join(sorted(secciones))}")
 
@@ -1990,6 +2032,11 @@ class Ejecutor:
         secciones = _secciones_de(comando)
         if "" in secciones or secciones & set(AJ.SIEMPRE_CONFIRMAN):
             return False
+        if not EF.efectos(comando) <= p.get("efectos", set()):
+            return False                                 # A16: un «sí» para borrar no cubre escribir, ni uno para instalar cubre activar un servicio
+        nombra = objetivo_de(comando)
+        if nombra and not nombra <= p["objetivo"]:
+            return False                                 # A16: ni lo mismo sobre otra cosa (otro paquete, otro archivo)
         otras = secciones - p["secciones"]               # activar el servicio de lo que instalaste (warp-svc tras cloudflare-warp) también es la tarea
         if otras and not (otras == {"persistencia"} and objetivo_de(comando) & p["objetivo"]):
             return False
@@ -2255,7 +2302,9 @@ class Ejecutor:
             return None
         confirmada = clase == "confirmado"
         limpia = confirmada or not self.contaminado
-        return AIS.Jaula(casa=_HOME, red=limpia, bus=limpia, confirmada=confirmada, escribibles=[RUTA_DATOS])
+        abierta = getattr(self, "_abiertas", None)
+        abiertas = abierta[1] if abierta and abierta[0] == comando else []      # A16: solo la orden que se juzgó reversible e inocua, y solo donde escribe
+        return AIS.Jaula(casa=_HOME, red=limpia, bus=limpia, confirmada=confirmada, escribibles=[RUTA_DATOS], abiertas=abiertas)
 
     def ejecutar(self, comando, motivo="tarea", clase=""):
         copia = copiar_por_terminal(comando)                # C9: copiar por la terminal pasa por los mismos rechazos que copiar_portapapeles
@@ -2313,8 +2362,9 @@ class Ejecutor:
 
     def _resultado(self, rc, salida, segundos, comando):
         anotar(f"[fin rc={rc}] {comando}")
-        primera = next((l.strip() for l in salida.splitlines() if l.strip()), "(sin salida)")
-        log(f"   resultado (código {rc}): {primera[:140]}")
+        lineas = [l.strip()[:140] for l in salida.splitlines() if l.strip()] or ["(sin salida)"]
+        cuantas = 1 if self.en_privado() else LINEAS_DE_RESULTADO     # A16: hasta 12 líneas; en modo privado, solo la primera, como antes
+        log(f"   resultado (código {rc}): " + "\n      ".join(lineas[:cuantas]) + (f"\n      (… {len(lineas) - cuantas} líneas más)" if len(lineas) > cuantas else ""))
         texto = f"código de salida: {rc} ({segundos:.0f} s)\n{_recortar(CL.limpiar_para_ia(salida))}"      # ninguna clave que imprima un comando llega a la IA
         if rc == 0 and re.match(r"\s*(?:sudo\s+(?:-n\s+)?)?(?:gio\s+trash|trash-put)\b", comando):
             texto += ("\n[Esto ha MOVIDO a la papelera: NO se ha borrado de forma definitiva y se puede recuperar. Cuéntaselo así al "

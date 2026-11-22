@@ -69,6 +69,8 @@ def anotar(linea):
         linea = _claves.limpiar(str(linea))
     except Exception:
         pass
+    if not str(linea).startswith("[salida-del-fallo]"):
+        linea = str(linea).replace("\n", " ⏎ ")       # A16: una orden de varias líneas, entera en su línea del registro
     try:
         _rotar(ARCHIVO_ACCIONES, MAX_REGISTRO_ACCIONES)
         fd = os.open(ARCHIVO_ACCIONES, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
