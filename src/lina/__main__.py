@@ -45,6 +45,7 @@ AYUDA = N_("""Lina {version}: asistente de voz para el escritorio Linux.
   lina bienvenida            te guía para dejar a Lina lista: clave de Gemini, micrófono, nombre, autonomía, privacidad y búsqueda
   lina modelos [estado|gpu]  descarga (o dice si están) el modelo de voz a texto y la voz de Lina; «gpu» deja lista tu tarjeta NVIDIA
   lina atajo [TECLA]         crea el atajo de teclado global para hablar con Lina (KDE y GNOME)
+  lina boton [aprender|quitar]   un botón o una combinación de un mando (o de cualquier dispositivo que no sea un teclado) que hace lo mismo que el atajo
   lina uninstall [--todo]    quita lo que instaló Lina; --todo también tus ajustes, claves y datos
   lina mcp [--config]        servidor MCP de Lina para otras IAs
   lina --version
@@ -82,6 +83,9 @@ def main(argv=None):
         return 0
     if orden == "pulsar":
         return _pulsar()
+    if orden == "boton":
+        from lina.nucleo import boton
+        return boton.principal(resto)
     if orden == "di":
         from lina.nucleo import canal
         return canal.principal(resto)

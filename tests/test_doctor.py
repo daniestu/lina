@@ -9,6 +9,7 @@ class Todo(D.Sondas):
     """Un equipo en perfecto estado."""
     def sistema(self): return {"distro": "Arch Linux", "familia": "arch", "gestor": "pacman", "escritorio": "kde", "sesion": "wayland"}
     def python(self): return (3, 12, 1)
+    def boton(self): return ("apagado", None)
     def python_origen(self): return "uv", True
     def base_que_falta(self): return []
     def audio(self): return "pipewire"

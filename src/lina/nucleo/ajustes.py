@@ -77,6 +77,10 @@ ESQUEMA: dict = {
                                                      "terminando antes). false: pulsa otra vez para terminar.")),
         "silencio_atajo": (1.0, "float", (0.5, 3.0), N_("Con fin_por_silencio: segundos callado que dan la frase por terminada. Mídelo con:  lina probar-voz silencio")),
         "espera_atajo": (6, "int", (2, 20), N_("Con fin_por_silencio: segundos que espera a que empieces a hablar antes de decir «No te he oído».")),
+        "boton": ("", "texto", None, N_("Un botón o una combinación de un dispositivo que no sea un teclado (un mando, un pedal…) que hace lo mismo que el atajo. "
+                                        "Vacío (de fábrica) = ninguno. Se elige con:  lina boton aprender   (no se escribe a mano)")),
+        "boton_home": (True, "bool", None, N_("true: una pulsación corta del botón central (Home) de un mando, sin tocar otro, hace lo mismo que el atajo. "
+                                              "false: ese botón no hace nada en Lina.")),
     },
     "autonomia": {
         "perfil": ("autonomo", "opcion", PERFILES, N_("autonomo: actúa solo salvo lo crítico · equilibrado: además frena los cambios tras leer contenido "

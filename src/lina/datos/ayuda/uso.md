@@ -8,6 +8,7 @@
   segundo más que pulsar, y con música alta puede no oír que has callado (entonces pulsas, o para sola a los 60 s).
   `lina tiempos escucha` te dice, con tu uso real, cuántas veces cortó solo, cuántas acabaste pulsando y si te cortó a destiempo (guarda solo el modo de
   terminar, el día y tiempos; nunca audio ni texto).
+- **Con un mando**: una pulsación corta del botón central (Home), sin tocar otro, hace lo mismo que el atajo (`activacion.boton_home`). Y si quieres otro botón o una combinación (de un mando, un pedal… nunca de un teclado), `lina boton aprender`: lo mantienes pulsado, lo sueltas y se apunta. Lina lo lee sin quedárselo, así que el botón llega también al juego y el mando conserva la vibración: elige uno que no uses al jugar. `lina boton` dice cuál tienes y si está conectado; `lina boton quitar` lo quita.
 - **Sin manos**: «Oye Lina, …» (el nombre lo eliges tú). No escucha mientras juegas, salvo que se lo pidas. Se prueba con `lina manos-libres probar "oye lina abre firefox"`.
 - Si le dices algo mientras trabaja, te escucha igualmente: «para» o «cancela eso» lo dejan; otra cosa distinta, la atiende en lugar de lo anterior.
 

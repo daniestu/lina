@@ -3280,10 +3280,14 @@ def main():
     signal.signal(signal.SIGUSR1, lambda *_: evento.set())
     ARCHIVO_PID.write_text(str(os.getpid()))
     canal = CANAL.servir(RUT.SOCKET, asistente, log=log)            # lina di "frase"
-    if evdev:
+    if not AJ.actuales(log=lambda m: None).get("activacion", "boton_home"):
+        log("Botón Home de los mandos: apagado (activacion.boton_home = false)")
+    elif evdev:
         threading.Thread(target=escuchar_mandos, args=(evento.set,), daemon=True).start()
     else:
         log("Sin la librería evdev: el mando no activará el asistente")
+    from lina.nucleo import boton as BOT                         # A17: un botón de cualquier dispositivo que no sea un teclado (apagado de fábrica)
+    threading.Thread(target=BOT.vigilar, args=(evento.set,), kwargs={"log": log}, daemon=True).start()
     threading.Thread(target=asistente.vigilar_recordatorios, daemon=True).start()
     threading.Thread(target=AVI.vigilar, daemon=True).start()
     if asistente.mcp:

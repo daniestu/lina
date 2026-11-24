@@ -90,6 +90,11 @@ class Sondas:
         from lina.nucleo import aislamiento as AIS
         return (AJ.actuales(log=lambda m: None).get("ia", "aislar"),) + tuple(AIS.disponible())
 
+    def boton(self):
+        """A17: (motivo, ajuste leído) del botón que activa a Lina. Solo lee /sys y el ajuste: no abre ningún dispositivo."""
+        from lina.nucleo import boton as BOT
+        return BOT.estado(AJ.actuales(log=lambda m: None).get("activacion", "boton"))
+
     def tavily(self):
         """E2: el cupo de Tavily de este mes (búsquedas de uso real y de medidas, topes, agotado hasta). Solo lee su archivo: no llama a Tavily."""
         from lina.nucleo import cupo_tavily as CUP
@@ -319,6 +324,11 @@ def comprobar(s=None, red=False):
         else:
             a(MAL, titulo, T("si, pero no se puede: {motivo}. Solo se ejecuta lo que solo lee y lo inocuo", motivo=motivo),
               T("lina config poner ia.aislar auto   (o instala bubblewrap)"))
+    bot = _seguro(getattr(s, "boton", lambda: None))
+    if isinstance(bot, tuple) and bot[0] != "apagado":
+        from lina.nucleo import boton as BOT
+        a(OK if bot[0] in ("listo", "no_conectado") else AVISO, T("Botón para activar a Lina"), BOT.texto_estado(*bot),
+          "" if bot[0] in ("listo", "no_conectado", "sin_permiso") else "lina boton aprender")
     if not _seguro(s.llavero, False):
         a(AVISO, T("Llavero del sistema"), T("no disponible: las claves van a un archivo solo tuyo (600)"), T("Opcional: instala libsecret (secret-tool) y un llavero (GNOME Keyring o KWallet)"))
     serv = _seguro(s.servicio)
