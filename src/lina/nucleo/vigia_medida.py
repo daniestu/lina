@@ -6,7 +6,8 @@ cambiado, la medida se para y dice qué.
 Caso real (medida de A16b, 2026-11-22): dentro de una jaula «sin bus», `systemctl --user mask …` enmascaró el arranque de KDE Connect y otra orden paró
 un temporizador, sin que la medida lo viera. La foto: el estado de las unidades de systemd de tu usuario y de sus temporizadores, lo que hay en
 ~/.config/autostart y ~/.config/systemd/user, los archivos de configuración de primer nivel de ~/.config y los nombres de lo que hay hasta dos niveles.
-Solo mira (lee archivos y pregunta a systemd); no cambia nada. Lo que el escritorio cambia solo se descubre con dos fotos antes de empezar: lo que
+Solo mira (lee archivos y pregunta a systemd); no cambia nada. Las unidades transitorias (los programas que abre tu escritorio) no la paran: salen en
+el informe (S9i). Lo que el escritorio cambia solo se descubre con dos fotos antes de empezar: lo que
 difiere entre ellas cuenta como volátil, se enseña y no para la medida."""
 import hashlib
 import os
@@ -52,7 +53,9 @@ def foto(casa=None, ejecutar=subprocess.run):
     for linea in (unidades or "").splitlines():
         partes = linea.split()
         if len(partes) >= 2:
-            datos[f"unidad:{partes[0]}"] = partes[1]
+            # S9i: una unidad «transient» solo existe mientras corre (así abre tu escritorio cada programa que lanzas) y desaparece sola; no es un
+            # cambio que dure, y se cuenta aparte. Lo que dura (enabled, disabled, masked, linked, static…) sigue en «unidad:»
+            datos[f"{'transitoria' if partes[1] == 'transient' else 'unidad'}:{partes[0]}"] = partes[1]
     for linea in (_systemctl(["list-units", "--type=timer", "--all"], ejecutar) or "").splitlines():
         partes = linea.split()
         if len(partes) >= 4:
@@ -110,7 +113,7 @@ class Vigia:
 
     def __init__(self, casa=None, ejecutar=subprocess.run, espera=ESPERA_VOLATILES, dormir=time.sleep):
         self.casa, self.ejecutar, self.espera, self.dormir = casa, ejecutar, espera, dormir
-        self.base, self.volatiles = {}, set()
+        self.base, self.volatiles, self.vistas_transitorias = {}, set(), {}
 
     def empezar(self, salida=print):
         salida(T("Miro tu sistema real antes de empezar ({s} s), para parar si la medida lo cambia…", s=self.espera))
@@ -122,11 +125,19 @@ class Vigia:
             salida(T("Cambia solo, sin la medida (no la para): {lista}", lista=", ".join(sorted(k.split(":", 1)[1] for k in self.volatiles))[:300]))
 
     def cambios(self):
-        """Lo que ha cambiado desde que empezó, sin lo volátil."""
-        return [c for c in diferencias(self.base, foto(self.casa, self.ejecutar)) if c[0] not in self.volatiles]
+        """Lo que ha cambiado desde que empezó y dura: sin lo volátil ni las unidades transitorias (S9i), que se guardan para el informe."""
+        todos = [c for c in diferencias(self.base, foto(self.casa, self.ejecutar)) if c[0] not in self.volatiles]
+        for c in todos:
+            if c[0].startswith("transitoria:") and c[0] not in self.vistas_transitorias:
+                self.vistas_transitorias[c[0]] = c
+        return [c for c in todos if not c[0].startswith("transitoria:")]
+
+    def informe(self):
+        """Las unidades transitorias que aparecieron o desaparecieron durante la medida (no la paran; se dicen al final)."""
+        return explicar(list(self.vistas_transitorias.values()), maximo=20)
 
     def parar_si_cambio(self, salida=print):
-        """True (y lo dice) si la medida ha cambiado tu sistema real: quien llama se para."""
+        """True (y lo dice) si la medida ha cambiado tu sistema real de forma que dura: quien llama se para."""
         cambios = self.cambios()
         if not cambios:
             return False
@@ -146,3 +157,6 @@ class SinVigia:
 
     def parar_si_cambio(self, salida=print):
         return False
+
+    def informe(self):
+        return []

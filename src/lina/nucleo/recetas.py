@@ -118,8 +118,13 @@ def _poner(recetas, nueva, misma_receta):
         # Se conserva el nombre con el que se apuntó (así lo llama el usuario) y se SUMAN las palabras nuevas: «luz nocturna» no se pierde porque la
         # segunda vez la IA llamara al ajuste por el nombre de un control del panel.
         nueva["palabras"] = sorted((set(previa.get("palabras", [])) | set(previa.get("nucleo", [])) | set(nueva["palabras"]) | set(nueva["nucleo"])) - _GEN)[:12]
-        if previa.get("nucleo"):
+        if previa.get("nucleo") and not (previa.get("por_nombrar") and not nueva.get("por_nombrar")):   # S9i: un nombre general gana al provisional
             nueva["ajuste"], nueva["nucleo"] = previa["ajuste"], previa["nucleo"]
+            if previa.get("por_nombrar"):
+                nueva["intentos_nombre"] = int(previa.get("intentos_nombre", 0))
+            else:
+                nueva.pop("por_nombrar", None)
+                nueva.pop("intentos_nombre", None)
         nueva.update(id=previa["id"], creada=previa.get("creada", ahora), exitos=int(previa.get("exitos", 0)) + 1, fallos=0, ultima=ahora)
         if nueva["tipo"] == "pasos":
             nueva["frases"] = list(dict.fromkeys(list(nueva.get("frases", [])) + list(previa.get("frases", []))))[:MAX_FRASES]
@@ -176,15 +181,16 @@ def plantilla(cambiar, valor_usado):
     return cambiar
 
 
-def aprender_comando(ajuste, palabras, pedido, cambiar, valor_usado, leer, comprobar, web=False):
-    """Apunta un ajuste que se cambió con un comando (ya validado por quien llama: se ejecutó bien y se comprobó)."""
+def aprender_comando(ajuste, palabras, pedido, cambiar, valor_usado, leer, comprobar, web=False, por_nombrar=False):
+    """Apunta un ajuste que se cambió con un comando (ya validado por quien llama: se ejecutó bien y se comprobó). `por_nombrar`: falló la consulta que
+    pone el nombre general; `ajuste` es provisional y se vuelve a pedir más tarde (S9i)."""
     ajuste = _libre(ajuste, 60)
     cambiar = plantilla(cambiar, valor_usado)
     if not ajuste or not cambiar:
         return None
     nueva = {"tipo": "comando", "ajuste": ajuste, "nucleo": _nucleo(ajuste), "palabras": sorted(set(_tokens(ajuste) + _tokens(palabras) + _tokens(pedido)[:6]) - _GEN),
              "pedido": _limpio(pedido, 120), "web": bool(web), "cambiar": cambiar, "valor_usado": _limpio(valor_usado, 60),
-             "leer": _limpio(leer, 300), "comprobar": _libre(comprobar, 160)}
+             "leer": _limpio(leer, 300), "comprobar": _libre(comprobar, 160), **_marca_por_nombrar(por_nombrar)}
     if not nueva["nucleo"]:
         return None
     if _en_privado():
@@ -318,17 +324,18 @@ def _parametrizar(pasos, numero):
     return (nuevos, True) if usado[0] else (pasos, False)
 
 
-def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, web=False, nombre="", valor="", atajo=True):
+def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, web=False, nombre="", valor="", atajo=True, por_nombrar=False):
     """Apunta la secuencia que cumplió `frase`. `pasos`: [{"herr", "args"}] ya filtrados por quien llama (solo lo que cambió algo y funcionó).
     `comprobar` y `esperado`: el comando de solo lectura que lo confirmó y lo que dio. `verificada`: lo comprobó el código (no solo el revisor).
     Si se aprende lo deciden los hechos (lo que cambió y funcionó), no la forma de la frase. La forma solo decide si queda además el atajo de repetirla
     sin IA cuando vuelvas a decir lo mismo (`frases`): ese atajo es conservador porque solo acelera; sin él, la receta se le ofrece a la IA, que decide
     por significado (S9h: «Que Caffeine no se abra solo…» se quedaba sin receta por empezar por «que»). `atajo=False`: quien llama sabe que la frase
-    depende del momento («ciérralo»); entonces solo se apunta con un nombre general."""
+    depende del momento («ciérralo»); entonces solo se apunta con un nombre general. `por_nombrar`: falló la consulta que lo pone; se apunta con un
+    nombre provisional y se vuelve a pedir más tarde (S9i)."""
     if web or not pasos or len(pasos) > MAX_PASOS:
         return None
     f = _fragmentos(frase) if atajo else None
-    if not f and not (atajo or nombre):
+    if not f and not (atajo or nombre or por_nombrar):
         return None
     palabras, numeros = f or ([], [])
     limpios = []
@@ -345,10 +352,8 @@ def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, we
         return None                                                       # nada con contraseñas, y nada que alterne (repetirlo daría otro resultado)
     limpios, con_valor = _parametrizar(limpios, numeros[0] if numeros else None)
     valor_texto = ""
-    if valor and len(valor) >= 3 and not con_valor:              # S9g: la palabra que cambia de una vez a otra (el programa), que señala la IA
-        con_hueco = json.loads(json.dumps(limpios, ensure_ascii=False).replace(valor, "{valor}"))
-        if "{valor}" in json.dumps(con_hueco, ensure_ascii=False) and json.dumps(con_hueco, ensure_ascii=False).replace("{valor}", valor) == json.dumps(limpios, ensure_ascii=False):
-            limpios, valor_texto = con_hueco, valor
+    if not con_valor:                                            # S9g: la palabra que cambia de una vez a otra (el programa), que señala la IA
+        limpios, valor_texto = _hueco_en_pasos(limpios, valor)
     ajuste = _libre(nombre or frase, 60)                         # S9g: el nombre general de R2 si lo hay; si no, tu frase, como siempre
     frases = [_clave_frase(palabras, numeros[0] if con_valor and numeros else None)] if f else []
     nucleo = _nucleo(ajuste)
@@ -359,7 +364,7 @@ def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, we
         comprobar, esperado = "", ""
     nueva = {"tipo": "pasos", "ajuste": ajuste, "nucleo": nucleo, "palabras": sorted(set(_tokens(ajuste)) - _GEN), "pedido": _limpio(frase, 120), "web": False,
              "pasos": limpios, "frases": frases, "comprobar": _limpio(comprobar, 300), "esperado": esperado, "verificada": bool(verificada),
-             "valor_usado": numeros[0] if con_valor and numeros else _limpio(valor_texto, 60), "cambiar": ""}
+             "valor_usado": numeros[0] if con_valor and numeros else _limpio(valor_texto, 60), "cambiar": "", **_marca_por_nombrar(por_nombrar)}
     if _en_privado():
         return None
     with _lock:
@@ -368,6 +373,83 @@ def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, we
         _guardar(recetas)
     log(f"Receta aprendida (pasos): «{ajuste}» en {len(limpios)} paso(s){' (comprobada por el código)' if nueva['verificada'] else ''}")
     return resultado
+
+
+def _hueco_en_pasos(pasos, valor):
+    """(pasos, valor) con `valor` cambiado por {valor} si, puesto de nuevo, salen exactamente los mismos pasos (un hecho); si no, (pasos, "")."""
+    if not valor or len(valor) < 3:
+        return pasos, ""
+    texto = json.dumps(pasos, ensure_ascii=False)
+    con_hueco = texto.replace(valor, "{valor}")
+    if "{valor}" in con_hueco and "{valor}" not in texto and con_hueco.replace("{valor}", valor) == texto:
+        return json.loads(con_hueco), valor
+    return pasos, ""
+
+
+# ======================= el nombre general, si la consulta falló (S9i) =======================
+# Si la consulta que pone el nombre general falla (Gemini saturado, sin cupo, sin red), la receta se apunta igual, con un nombre provisional, y el
+# nombre general se vuelve a pedir al final de otra petición (una vez por petición). Al conseguirlo, el programa pasa a ser el hueco {valor}.
+MAX_INTENTOS_NOMBRE = 10
+
+
+def _marca_por_nombrar(por_nombrar):
+    return {"por_nombrar": True, "intentos_nombre": 0} if por_nombrar else {}
+
+
+def por_nombrar():
+    """La receta que espera su nombre general (la más antigua), o None."""
+    with _lock:
+        recetas = _cargar()
+    return next((r for r in recetas if r.get("por_nombrar") and int(r.get("intentos_nombre", 0)) < MAX_INTENTOS_NOMBRE), None)
+
+
+def ordenes_de(r):
+    """Lo que hizo la receta, para la consulta del nombre: la orden (con sus saltos de línea) o los pasos."""
+    if r.get("tipo") == "comando":
+        return str(r.get("cambiar", "")).replace(" ⏎ ", "\n")
+    return "\n".join(str(p["args"].get("comando") or json.dumps(p["args"], ensure_ascii=False)) for p in r.get("pasos", []) if isinstance(p.get("args"), dict))
+
+
+def poner_nombre(ident, nombre, valor=""):
+    """Le pone a la receta `ident` su nombre general y, si aparece tal cual y sale la misma orden al ponerlo de nuevo, el hueco {valor}."""
+    ajuste = _libre(nombre, 60)
+    if not ajuste or not _nucleo(ajuste):
+        return fallo_nombre(ident)
+    with _lock:
+        recetas = _cargar()
+        r = next((x for x in recetas if x.get("id") == ident), None)
+        if r is None:
+            return None
+        if r["tipo"] == "pasos" and "{valor}" not in json.dumps(r.get("pasos", [])):
+            r["pasos"], usado = _hueco_en_pasos(r["pasos"], valor)
+            r["valor_usado"] = _limpio(usado, 60) or r.get("valor_usado", "")
+        elif r["tipo"] == "comando" and valor and len(valor) >= 3 and "{valor}" not in r["cambiar"]:
+            con_hueco = r["cambiar"].replace(valor, "{valor}")
+            if "{valor}" in con_hueco and con_hueco.replace("{valor}", valor) == r["cambiar"]:
+                r["cambiar"], r["valor_usado"] = con_hueco, _limpio(valor, 60)
+        provisional = r["ajuste"]
+        r["ajuste"], r["nucleo"] = ajuste, _nucleo(ajuste)
+        r["palabras"] = sorted((set(r.get("palabras", [])) | set(_tokens(ajuste))) - _GEN)[:12]
+        r.pop("por_nombrar", None)
+        r.pop("intentos_nombre", None)
+        _guardar(recetas)
+    log(f"Receta {ident}: ya tiene nombre general, «{ajuste}» (antes, provisional: «{provisional}»)")
+    return r
+
+
+def fallo_nombre(ident):
+    """Otro intento fallido. Tras MAX_INTENTOS_NOMBRE se deja de intentar y se dice en el registro (el nombre provisional se queda)."""
+    with _lock:
+        recetas = _cargar()
+        r = next((x for x in recetas if x.get("id") == ident), None)
+        if r is None:
+            return None
+        r["intentos_nombre"] = int(r.get("intentos_nombre", 0)) + 1
+        agotado = r["intentos_nombre"] >= MAX_INTENTOS_NOMBRE
+        _guardar(recetas)
+    if agotado:
+        log(f"Receta {ident}: sin nombre general tras {MAX_INTENTOS_NOMBRE} intentos; se queda con el provisional, «{r['ajuste']}»")
+    return None
 
 
 def para_frase(texto):

@@ -85,12 +85,14 @@ def test_los_saltos_de_linea_van_como_simbolo_y_se_explican(ej, monkeypatch):
 
 
 @pytest.mark.parametrize("general", [None, ("", ""), Exception("la IA no responde")])
-def test_sin_nombre_general_no_se_guarda(ej, monkeypatch, general):
-    aprender = MagicMock()
+def test_sin_nombre_general_se_guarda_con_nombre_provisional_por_nombrar(ej, monkeypatch, general):
+    """S9i: si la consulta del nombre falla, no se pierde: se guarda por nombrar y el nombre general se pide más tarde."""
+    aprender = MagicMock(return_value={"id": "r0003"})
     monkeypatch.setattr(H.REC, "aprender_comando", aprender)
     ej.generalizar = MagicMock(side_effect=general) if isinstance(general, Exception) else MagicMock(return_value=general)
     ej.recetas_diferidas = [{"cambiar": ORDEN, "comprobar": "✔", "generalizar": True}]
-    assert ej.guardar_diferidas("x") == [] and not aprender.called
+    assert ej.guardar_diferidas("Que KDE Connect no se inicie solo") == [{"id": "r0003"}]
+    assert aprender.call_args.kwargs["por_nombrar"] is True and aprender.call_args[0][3] == ORDEN
 
 
 def test_tras_leer_de_fuera_tampoco_se_guarda_al_final(ej, monkeypatch):

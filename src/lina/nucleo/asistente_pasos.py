@@ -238,15 +238,37 @@ class MixinPasos:
                     verificada, comprobar, esperado = True, lectura[0], salida
         pasos = [{"herr": e[1], "args": e[2], **({"comprobado": True} if e[1] != "ejecutar_comando" and "COMPROBADO AHORA" in e[3] else {})} for e in efectos]
         nombre, valor = "", ""
-        try:                                                     # S9g: el nombre general de R2 (y la palabra que cambia); si no contesta, tu frase
+        try:                                                     # S9g: el nombre general de R2 (y la palabra que cambia)
             general = self._generalizar_receta(frase, "\n".join(e[4] or json.dumps(e[2], ensure_ascii=False) for e in efectos))
-            if general:
+            if general and general[0]:
                 nombre, valor = general
         except Exception as e:
             log(f"Receta de pasos: sin nombre general ({e!r})")
-        receta = REC.aprender_pasos(frase, pasos, comprobar, esperado, verificada, nombre=nombre, valor=valor, atajo=atajo)
+        # S9i: si la consulta falló, se apunta con un nombre provisional y el general se vuelve a pedir al final de otra petición
+        receta = REC.aprender_pasos(frase, pasos, comprobar, esperado, verificada, nombre=nombre, valor=valor, atajo=atajo,
+                                    por_nombrar=atajo and not nombre)      # lo que depende del momento, solo con nombre general (S9h)
         if receta:
             ej.receta_turno = True
+
+
+    def _nombrar_pendiente(self):
+        """S9i: una receta que se apuntó sin nombre general (falló la consulta) lo vuelve a pedir: una vez por petición, nunca en la misma petición
+        en que se aprendió otra, ni en modo privado, ni tras leer contenido de fuera."""
+        REC, ej = self._REC(), self.ejecutor
+        if REC is None or getattr(ej, "receta_turno", False) or getattr(ej, "contaminado", "") or getattr(self, "modo_privado", False) or REC._en_privado():
+            return
+        r = REC.por_nombrar()
+        if not r:
+            return
+        try:
+            general = self._generalizar_receta(r.get("pedido", ""), REC.ordenes_de(r))
+        except Exception as e:
+            log(f"Receta {r['id']}: el nombre general sigue sin llegar ({e!r})")
+            general = None
+        if general and general[0]:
+            REC.poner_nombre(r["id"], *general)
+        else:
+            REC.fallo_nombre(r["id"])
 
 
 def _limpio_corto(texto):

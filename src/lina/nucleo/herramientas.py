@@ -2455,16 +2455,17 @@ class Ejecutor:
 
     def _guardar_general(self, peticion, d):
         """A16b: el nombre general y la palabra que cambia los da la IA (una mini-consulta); el código cambia esa palabra por {valor} solo si, puesta de
-        nuevo, sale la orden exacta que se ejecutó. Sin nombre, no se guarda."""
+        nuevo, sale la orden exacta que se ejecutó. S9i: si la consulta falla, se guarda con tu petición como nombre provisional y el nombre general se
+        vuelve a pedir más tarde."""
         if self.contaminado or self.en_privado() or not self.generalizar:
             return None
         try:
             general = self.generalizar(peticion, d["cambiar"])
         except Exception as e:
             log(f"Receta por hechos: no he podido darle un nombre general ({e!r})")
-            return None
+            general = None
         if not general or not general[0]:
-            return None
+            return REC.aprender_comando(peticion, "", peticion, " ⏎ ".join(d["cambiar"].split("\n")), "", "", d["comprobar"], web=False, por_nombrar=True)
         ajuste, valor = general
         orden = d["cambiar"]
         if valor and len(valor) >= 3 and valor in orden and "{valor}" not in orden:

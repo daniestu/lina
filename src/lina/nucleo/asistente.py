@@ -1293,6 +1293,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             if getattr(self.ejecutor, "recetas_diferidas", None):     # S9g: si no se cerraron (Gemini se cortó tras actuar), por los hechos
                 self._guardar_por_hechos(list(self.ejecutor.recetas_diferidas))
             self._aprender_pasos()
+            self._nombrar_pendiente()                              # S9i: la que quedó sin nombre general, otra vez
         except Exception as e:                                     # aprender es un extra: nunca debe estropear la respuesta
             log(f"Receta automática: fallo {e!r}")
         self.guardar_en_historial(pregunta_sin_receta, respuesta)
