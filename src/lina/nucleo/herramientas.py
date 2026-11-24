@@ -804,6 +804,40 @@ def _destino_final(fuente, destino):
     return os.path.join(d, os.path.basename(_normalizar_ruta(str(fuente)))) if os.path.isdir(d) else d
 
 
+def _bases_xdg(casa):
+    """[(tu carpeta, [carpetas del sistema que tapa])] según el estándar XDG: la configuración y los datos de tu usuario tapan a los del sistema con
+    el mismo nombre."""
+    def lista(variable, defecto):
+        return [d for d in (os.environ.get(variable) or defecto).split(":") if d.startswith("/")]
+    config = os.environ.get("XDG_CONFIG_HOME") if casa == os.path.expanduser("~") and os.environ.get("XDG_CONFIG_HOME") else os.path.join(casa, ".config")
+    datos = os.environ.get("XDG_DATA_HOME") if casa == os.path.expanduser("~") and os.environ.get("XDG_DATA_HOME") else os.path.join(casa, ".local/share")
+    return [(config, lista("XDG_CONFIG_DIRS", "/etc/xdg")), (datos, lista("XDG_DATA_DIRS", "/usr/local/share:/usr/share"))]
+
+
+def sombras_sin_original(comando, casa=None, existe=os.path.exists):
+    """S9j: los archivos que la orden escribe en tu carpeta para TAPAR uno del sistema que no existe. Por hechos: si la orden tapa al menos un archivo
+    del sistema que existe (así se sabe que lo que hace es tapar), cualquier otro que escriba en la misma carpeta y no tape nada es un error (un nombre
+    mal puesto). Si no tapa nada que exista, no se juzga: puede ser un archivo nuevo tuyo. Sin nombres de programas: lo dice el sistema de archivos."""
+    casa = (casa or _HOME).rstrip("/")
+    escritos = []
+    for c in _intenciones_de_cambio(comando):
+        if c[0] in ("escribe", "crear_archivo") and isinstance(c[1], str):
+            ruta = c[1]
+            ruta = casa + ruta[1:] if ruta.startswith("~/") else ruta.replace("$HOME", casa, 1) if ruta.startswith("$HOME") else ruta
+            escritos.append(os.path.normpath(ruta if ruta.startswith("/") else os.path.join(casa, ruta)))
+    tapan, sin_original = {}, {}
+    for ruta in dict.fromkeys(escritos):
+        for tuya, sistema in _bases_xdg(casa):
+            if not ruta.startswith(tuya.rstrip("/") + "/"):
+                continue
+            rel = os.path.relpath(ruta, tuya)
+            if not any(os.path.isdir(os.path.join(s, os.path.dirname(rel))) for s in sistema):
+                continue                                  # esa carpeta no existe en el sistema: no tapa nada, es tuya
+            destino = tapan if any(existe(os.path.join(s, rel)) for s in sistema) else sin_original
+            destino.setdefault(os.path.dirname(ruta), []).append(ruta)
+    return [r for carpeta, rutas in sin_original.items() if carpeta in tapan for r in rutas]
+
+
 def _intenciones_de_cambio(comando, _prof=0):
     """[(tipo, datos...)] de lo que va a cambiar un comando, para anotarlo, deshacerlo y comprobarlo."""
     out = []
@@ -2427,9 +2461,18 @@ class Ejecutor:
         orden = sin_carpeta_personal(comando, _HOME)
         if _HOME.rstrip("/") + "/" in orden:
             return                                       # tu carpeta dentro de comillas simples: no se puede quitar tu usuario, no se guarda
-        if len(orden) > MAX_ORDEN_RECETA or REC.para_comando(" ⏎ ".join(orden.split("\n"))):
+        if len(orden) > MAX_ORDEN_RECETA:
             return
         destino = self.recetas_de_lo_confirmado if clase == "confirmado" else self.recetas_diferidas
+        sin_original = sombras_sin_original(comando)
+        if sin_original:                                 # S9j: tapa algo que no existe (un nombre mal puesto): no se guarda como receta
+            anotar(f"[receta-descartada] tapa lo que no existe en el sistema: {', '.join(sin_carpeta_personal(r, _HOME) for r in sin_original)}")
+            return
+        hecha = REC.para_comando(" ⏎ ".join(orden.split("\n"))) or (REC.ya_hecha([{"herr": "ejecutar_comando", "args": {"comando": orden}}]) or (None,))[0]
+        if hecha:                                        # S9j: ya es una receta guardada: se refuerza (si la petición se da por cumplida), no se duplica
+            if not any(d.get("reforzar") == hecha["id"] for d in destino):
+                destino.append({"reforzar": hecha["id"], "cambiar": orden, "generalizar": True})
+            return
         if any(d.get("cambiar") == orden for d in destino):
             return
         destino.append({"ajuste": "", "palabras": "", "cambiar": orden, "valor_usado": "", "leer": "", "comprobar": comprobado[:160], "web": False,
@@ -2441,6 +2484,10 @@ class Ejecutor:
         guardadas = []
         diferidas, self.recetas_diferidas = list(getattr(self, "recetas_diferidas", None) or []), []
         for d in diferidas:
+            if d.get("reforzar"):                        # S9j: lo hecho ya era esta receta
+                REC.reforzar(d["reforzar"], "la petición la siguió y se dio por cumplida")
+                self.receta_turno = True
+                continue
             if d.get("generalizar"):
                 receta = self._guardar_general(peticion, d)
                 if receta:

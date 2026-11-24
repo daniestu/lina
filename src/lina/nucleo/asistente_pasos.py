@@ -206,6 +206,9 @@ class MixinPasos:
                     shlex.split(cmd)
                 except ValueError:
                     return
+                cmd = H.sin_carpeta_personal(cmd, H._HOME)       # S9j: con ~, nunca tu usuario (como las que apunta el código)
+                if H._HOME.rstrip("/") + "/" in cmd:
+                    return                                       # tu carpeta dentro de comillas simples: no se puede quitar, no se apunta
                 efectos.append((i, n, {"comando": cmd, "motivo": a.get("motivo", "")}, r, cmd, clase))
             else:
                 if not _ok(n, r):
@@ -237,6 +240,18 @@ class MixinPasos:
                 if salida.strip():
                     verificada, comprobar, esperado = True, lectura[0], salida
         pasos = [{"herr": e[1], "args": e[2], **({"comprobado": True} if e[1] != "ejecutar_comando" and "COMPROBADO AHORA" in e[3] else {})} for e in efectos]
+        sin_original = [r for e in efectos if e[4] for r in H.sombras_sin_original(e[4])]
+        if sin_original:                                         # S9j: tapa en tu carpeta algo que no existe en el sistema (un nombre mal puesto)
+            log(f"Receta de pasos descartada: tapa lo que no existe en el sistema ({', '.join(H.sin_carpeta_personal(r, H._HOME) for r in sin_original)})")
+            return
+        hecha = REC.ya_hecha(pasos)
+        if not hecha and len(pasos) == 1 and pasos[0]["herr"] == "ejecutar_comando":
+            comando = REC.para_comando(" ⏎ ".join(H.sin_carpeta_personal(pasos[0]["args"]["comando"], H._HOME).split("\n")))
+            hecha = (comando, None) if comando else None
+        if hecha:                                                # S9j: lo hecho ya era una receta guardada: se refuerza, no se apunta otra igual
+            REC.reforzar(hecha[0]["id"], "la petición hizo lo mismo y salió bien")
+            ej.receta_turno = True
+            return
         nombre, valor = "", ""
         try:                                                     # S9g: el nombre general de R2 (y la palabra que cambia)
             general = self._generalizar_receta(frase, "\n".join(e[4] or json.dumps(e[2], ensure_ascii=False) for e in efectos))

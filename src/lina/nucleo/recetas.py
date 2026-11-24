@@ -247,7 +247,7 @@ def aprender_interfaz(ajuste, palabras, pedido, pasos, valor_usado, comprobar, s
         return None
     with _lock:
         recetas = _cargar()
-        resultado = _poner(recetas, nueva, lambda r: r.get("pasos") == nueva["pasos"])
+        resultado = _poner(recetas, nueva, lambda r: misma_por_pasos(r.get("pasos"), nueva["pasos"]))       # S9j: sin contar el motivo
         _guardar(recetas)
     log(f"Receta aprendida (interfaz): «{ajuste}» en {len(limpios)} pasos")
     return resultado
@@ -369,7 +369,7 @@ def aprender_pasos(frase, pasos, comprobar="", esperado="", verificada=False, we
         return None
     with _lock:
         recetas = _cargar()
-        resultado = _poner(recetas, nueva, lambda r: r.get("pasos") == nueva["pasos"])
+        resultado = _poner(recetas, nueva, lambda r: misma_por_pasos(r.get("pasos"), nueva["pasos"]))       # S9j: sin contar el motivo
         _guardar(recetas)
     log(f"Receta aprendida (pasos): «{ajuste}» en {len(limpios)} paso(s){' (comprobada por el código)' if nueva['verificada'] else ''}")
     return resultado
@@ -450,6 +450,50 @@ def fallo_nombre(ident):
     if agotado:
         log(f"Receta {ident}: sin nombre general tras {MAX_INTENTOS_NOMBRE} intentos; se queda con el provisional, «{r['ajuste']}»")
     return None
+
+
+# ======================= la misma receta, aunque cambie el motivo o el programa (S9j) =======================
+def _sin_motivo(pasos):
+    """Los pasos sin el «motivo», que la IA escribe distinto cada vez y no cambia lo que se hace."""
+    return [{"herr": p.get("herr"), "args": {k: v for k, v in (p.get("args") or {}).items() if k != "motivo"}} for p in pasos or [] if isinstance(p, dict)]
+
+
+def encaja(plantilla, pasos):
+    """(True, valor) si `pasos` son los de `plantilla`, sin contar el motivo, con el hueco {valor} relleno con el mismo texto en todas partes (valor
+    None si no hay hueco); (False, None) si no."""
+    a = json.dumps(_sin_motivo(plantilla), ensure_ascii=False, sort_keys=True)
+    b = json.dumps(_sin_motivo(pasos), ensure_ascii=False, sort_keys=True)
+    if a == b:
+        return True, None
+    if "{valor}" not in a:
+        return False, None
+    trozos = a.split("{valor}")
+    patron = re.escape(trozos[0]) + "".join(("(?P<v>[^\"\\\\]+?)" if i == 0 else "(?P=v)") + re.escape(x) for i, x in enumerate(trozos[1:]))
+    m = re.fullmatch(patron, b)
+    return (True, m.group("v")) if m else (False, None)
+
+
+def misma_por_pasos(a, b):
+    """¿Son la misma receta? Iguales sin contar el motivo, o una es la otra con el hueco relleno."""
+    return bool(a) and bool(b) and (encaja(a, b)[0] or encaja(b, a)[0])
+
+
+def ya_hecha(pasos):
+    """(receta, valor) de una receta de pasos guardada que encaja con lo que se acaba de hacer, o None."""
+    with _lock:
+        recetas = _cargar()
+    for r in recetas:
+        if r.get("tipo") == "pasos" and int(r.get("fallos", 0)) == 0:
+            si, valor = encaja(r.get("pasos"), pasos)
+            if si:
+                return r, valor
+    return None
+
+
+def reforzar(ident, motivo=""):
+    """Una petición que siguió la receta `ident` y salió bien: suma un acierto (en vez de apuntar otra igual)."""
+    resultado_pasos(ident, True)
+    log(f"Receta {ident} reforzada: {motivo or 'se volvió a usar y funcionó'}")
 
 
 def para_frase(texto):
