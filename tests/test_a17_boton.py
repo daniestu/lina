@@ -89,10 +89,11 @@ def test_la_combinacion_se_dispara_una_vez_y_solo_mira_sus_botones():
 
 
 # ---------------------------------------------------------------- Lina en marcha
-def _vigilar(sistema, ajuste, al_pulsar, log):
+def _vigilar(sistema, ajuste, al_pulsar, log, mantener=0):
     parar = threading.Event()
     hilo = threading.Thread(target=BOT.vigilar, args=(al_pulsar,), kwargs={"ajuste": ajuste, "log": log.append, "sysfs": sistema.sysfs,
-                                                                           "dev": sistema.dev, "parar": parar, "vuelta": 0.05}, daemon=True)
+                                                                           "dev": sistema.dev, "parar": parar, "vuelta": 0.05,
+                                                                           "mantener": lambda: mantener}, daemon=True)
     hilo.start()
     return parar, hilo
 
@@ -164,10 +165,11 @@ def test_aprender_apunta_la_combinacion_sin_abrir_el_teclado(sistema, monkeypatc
     fd = [None]
     hilo = threading.Thread(target=lambda: fd.__setitem__(0, _pulsar(sistema.mando, [(L3, 1), (R3, 1), (R3, 0), (L3, 0)], antes=0.3)))
     hilo.start()
-    nuevo = BOT.aprender(salida.append, lambda pregunta: "s", sistema.sysfs, sistema.dev, espera=5)
+    respuestas = iter(["1,5", "s"])
+    nuevo = BOT.aprender(salida.append, lambda pregunta: next(respuestas), sistema.sysfs, sistema.dev, espera=5)
     hilo.join()
     os.close(fd[0])
-    assert nuevo == "1234:abcd Mando de prueba: 317+318"
+    assert nuevo == ("1234:abcd Mando de prueba: 317+318", 1.5)
     assert abiertos == [sistema.mando]
     assert any("BTN_THUMBL (L3) + BTN_THUMBR (R3)" in s for s in salida) and any("llegará también" in s for s in salida)
 
@@ -176,7 +178,8 @@ def test_aprender_sin_tu_si_no_cambia_nada(sistema):
     fd = [None]
     hilo = threading.Thread(target=lambda: fd.__setitem__(0, _pulsar(sistema.mando, [(A, 1), (A, 0)], antes=0.3)))
     hilo.start()
-    assert BOT.aprender(lambda s: None, lambda pregunta: "n", sistema.sysfs, sistema.dev, espera=5) is None
+    respuestas = iter(["", "n"])
+    assert BOT.aprender(lambda s: None, lambda pregunta: next(respuestas), sistema.sysfs, sistema.dev, espera=5) is None
     hilo.join()
     os.close(fd[0])
 
@@ -189,7 +192,7 @@ def test_aprender_sin_pulsar_nada(sistema):
 
 class Ajustes:
     def __init__(self):
-        self.valores = {("activacion", "boton"): ""}
+        self.valores = {("activacion", "boton"): "", ("activacion", "boton_mantener"): 1.0}
 
     def get(self, s, k):
         return self.valores[(s, k)]
@@ -200,11 +203,11 @@ class Ajustes:
 
 def test_lina_boton_aprender_y_quitar(sistema, monkeypatch):
     aj = Ajustes()
-    monkeypatch.setattr(BOT, "aprender", lambda *a, **k: "1234:abcd Mando de prueba: 317+318")
+    monkeypatch.setattr(BOT, "aprender", lambda *a, **k: ("1234:abcd Mando de prueba: 317+318", 2.0))
     assert BOT.principal(["aprender"], lambda s: None, ajustes=aj, sysfs=sistema.sysfs, dev=sistema.dev) == 0
     salida = []
     BOT.principal([], salida.append, ajustes=aj, sysfs=sistema.sysfs, dev=sistema.dev)
-    assert "Conectado y se puede leer" in salida[0]
+    assert "Conectado y se puede leer" in salida[0] and "mantenerlo 2 s" in salida[1] and aj.get("activacion", "boton_mantener") == 2.0
     BOT.principal(["quitar"], lambda s: None, ajustes=aj)
     assert aj.get("activacion", "boton") == ""
 

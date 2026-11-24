@@ -1298,3 +1298,9 @@
 "«{nombre}»: {botones}. Está conectado, pero tu usuario no puede leerlo; Lina no pide permisos nuevos." = "«{nombre}»: {botones}. It is connected, but your user can't read it; Lina doesn't ask for new permissions."
 "«{nombre}» es un teclado: Lina no lee teclados. Elige otro dispositivo:  lina boton aprender" = "«{nombre}» is a keyboard: Lina doesn't read keyboards. Pick another device:  lina boton aprender"
 "«{nombre}» no tiene esos botones. Vuelve a elegirlos:  lina boton aprender" = "«{nombre}» doesn't have those buttons. Pick them again:  lina boton aprender"
+# A17b: mantener pulsado
+"¿Cuántos segundos hay que mantenerlo para activar a Lina? (0 = basta pulsar) [{s}] " = "How many seconds must it be held to activate Lina? (0 = a press is enough) [{s}] "
+"Eso no es un número de segundos entre 0 y 5. No cambio nada." = "That is not a number of seconds between 0 and 5. I'm not changing anything."
+"Basta con pulsarlo (activacion.boton_mantener = 0)." = "A press is enough (activacion.boton_mantener = 0)."
+"Hay que mantenerlo {s} s (también el botón Home de los mandos). Se cambia con:  lina boton aprender" = "It must be held {s} s (also the Home button on controllers). Change it with:  lina boton aprender"
+"Segundos que hay que mantener el botón elegido (y el botón Home de los mandos) para activar a Lina; así una pulsación normal en un juego no la activa. 0 = basta pulsar. Se elige también con:  lina boton aprender" = "Seconds the chosen button (and the Home button on controllers) must be held to activate Lina; that way a normal press in a game doesn't activate her. 0 = a press is enough. Also picked with:  lina boton aprender"

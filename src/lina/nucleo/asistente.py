@@ -413,42 +413,60 @@ def mirar_pantalla(clave, pregunta, espera=2.0):
     return f"Lo que se ve en la pantalla, respondiendo a «{str(pregunta).strip()[:400]}»: {texto}"
 
 
-# ======================= MANDO: PULSACIÓN CORTA DE HOME =======================
-def escuchar_mandos(al_pulsar):
-    """Vigila los mandos conectados (y los que se conecten después).
-    Una pulsación corta de Home, sin tocar otro botón, equivale al atajo del teclado.
-    Los juegos no usan Home, así que no reciben nada que les afecte."""
+# ======================= MANDO: EL BOTÓN HOME (mantenido, o pulsación corta con 0 s) =======================
+def escuchar_mandos(al_pulsar, mantener=None):
+    """Vigila los mandos conectados (y los que se conecten después). El botón Home, sin tocar otro botón, equivale al atajo del teclado: mantenido
+    `activacion.boton_mantener` segundos (A17b, 1 s de fábrica), o con 0 una pulsación corta, como antes. Mantenerlo evita que una pulsación normal
+    (Steam abre su menú con ella) active a Lina; el botón llega igual a lo demás, porque no se queda el mando."""
+    if mantener is None:
+        def mantener():
+            return AJ.actuales(log=lambda m: None).get("activacion", "boton_mantener")
     vigilados: dict = {}
     descartados: set = set()
     ultima_vez = [0.0]
 
+    def disparar(mando):
+        # Si Steam está abierto, el mismo mando aparece dos veces (el real y el virtual de Steam): se ignora la segunda señal si llega casi a la vez.
+        if time.time() - ultima_vez[0] > 0.6:
+            ultima_vez[0] = time.time()
+            log(f"Botón Home del mando ({mando.name})")
+            al_pulsar()
+
     def vigilar(mando):
-        pulsado_en = None    # momento en que se pulsó Home (None = no está pulsado)
-        otro_boton = False   # ¿se ha tocado otro botón mientras Home estaba pulsado?
+        estado = {"desde": None, "otro": False, "segundos": 0.0, "temporizador": None}
+
+        def vencido(inicio):
+            if estado["desde"] == inicio and not estado["otro"]:
+                disparar(mando)
+
         try:
             for ev in mando.read_loop():
                 if ev.type == ecodes.EV_KEY and ev.code == ecodes.BTN_MODE:
                     if ev.value == 1:
-                        pulsado_en, otro_boton = time.time(), False
-                    elif ev.value == 0 and pulsado_en is not None:
-                        corta = time.time() - pulsado_en < 0.8
-                        pulsado_en = None
-                        # Si Steam está abierto, el mismo mando aparece dos veces (el real y
-                        # el virtual de Steam): ignoramos la segunda señal si llega casi a la vez.
-                        if corta and not otro_boton and time.time() - ultima_vez[0] > 0.6:
-                            ultima_vez[0] = time.time()
-                            log(f"Botón Home del mando ({mando.name})")
-                            al_pulsar()
-                elif pulsado_en is not None:
+                        estado.update(desde=time.time(), otro=False, segundos=float(mantener() or 0))
+                        if estado["segundos"] > 0:
+                            estado["temporizador"] = threading.Timer(estado["segundos"], vencido, args=(estado["desde"],))
+                            estado["temporizador"].daemon = True
+                            estado["temporizador"].start()
+                    elif ev.value == 0 and estado["desde"] is not None:
+                        corta = time.time() - estado["desde"] < 0.8
+                        if estado["temporizador"]:
+                            estado["temporizador"].cancel()
+                        if estado["segundos"] <= 0 and corta and not estado["otro"]:
+                            disparar(mando)
+                        estado.update(desde=None, temporizador=None)
+                elif estado["desde"] is not None:
                     # Otro botón o la cruceta mientras Home está pulsado: es un atajo de Steam,
                     # no para el asistente. (Los joysticks se ignoran: se mueven solos un poco.)
                     if ev.type == ecodes.EV_KEY and ev.value == 1:
-                        otro_boton = True
+                        estado["otro"] = True
                     elif ev.type == ecodes.EV_ABS and ev.code in (ecodes.ABS_HAT0X, ecodes.ABS_HAT0Y) and ev.value != 0:
-                        otro_boton = True
+                        estado["otro"] = True
         except OSError:
             log(f"Mando desconectado: {mando.name}")
         finally:
+            if estado["temporizador"]:
+                estado["temporizador"].cancel()
             vigilados.pop(mando.path, None)
 
     while True:

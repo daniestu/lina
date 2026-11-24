@@ -16,7 +16,7 @@ CARPETA = RUT.PAQUETE / "datos" / "ayuda"
 # Lo que la IA nunca cambia por su cuenta: dinero y claves (los cambia el usuario con su voz o en la terminal)
 INTOCABLES = {("gasto", "tope_mensual_eur"), ("gasto", "eur_por_usd"), ("gasto", "avisos_porcentaje"), ("privacidad", "almacen_claves"), ("privacidad", "capturas"),
               ("ia", "aislar"),                        # S9: el aislamiento de sus propias órdenes, tampoco
-              ("activacion", "boton"), ("activacion", "boton_home")}   # A17: qué dispositivo lee Lina, tampoco
+              ("activacion", "boton"), ("activacion", "boton_home"), ("activacion", "boton_mantener")}   # A17: qué dispositivo lee Lina, tampoco
 
 
 # Lo que NO se puede sacar de las herramientas. Una prueba comprueba que lo que se nombra aquí existe y que cada límite sigue siendo verdad en el código.

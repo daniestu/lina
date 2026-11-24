@@ -79,6 +79,8 @@ ESQUEMA: dict = {
         "espera_atajo": (6, "int", (2, 20), N_("Con fin_por_silencio: segundos que espera a que empieces a hablar antes de decir «No te he oído».")),
         "boton": ("", "texto", None, N_("Un botón o una combinación de un dispositivo que no sea un teclado (un mando, un pedal…) que hace lo mismo que el atajo. "
                                         "Vacío (de fábrica) = ninguno. Se elige con:  lina boton aprender   (no se escribe a mano)")),
+        "boton_mantener": (1.0, "float", (0.0, 5.0), N_("Segundos que hay que mantener el botón elegido (y el botón Home de los mandos) para activar a Lina; así una pulsación normal "
+                                                        "en un juego no la activa. 0 = basta pulsar. Se elige también con:  lina boton aprender")),
         "boton_home": (True, "bool", None, N_("true: una pulsación corta del botón central (Home) de un mando, sin tocar otro, hace lo mismo que el atajo. "
                                               "false: ese botón no hace nada en Lina.")),
     },

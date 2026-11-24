@@ -32,6 +32,7 @@ BITS = struct.calcsize("l") * 8                                  # los mapas de 
 LETRAS = set(range(16, 26)) | set(range(30, 39)) | set(range(44, 51))
 MIN_LETRAS = 10
 VUELTA = 3                                                       # segundos entre miradas al ajuste y a los dispositivos
+MAX_MANTENER = 5.0
 _AJUSTE = re.compile(r"^([0-9a-f]{4}):([0-9a-f]{4}) (.+): (\d{1,4}(?:\+\d{1,4}){0,3})$")
 # Nombres legibles de los botones más comunes (input-event-codes.h); el resto se dice por su número
 NOMBRES = {272: "BTN_LEFT", 273: "BTN_RIGHT", 274: "BTN_MIDDLE", 275: "BTN_SIDE", 276: "BTN_EXTRA", 304: "BTN_SOUTH (A)", 305: "BTN_EAST (B)",
@@ -123,38 +124,72 @@ def botones(bloque):
 
 
 class Combinacion:
-    """Se dispara una vez cuando están pulsados a la vez todos los botones elegidos; vuelve a valer cuando se sueltan todos."""
+    """Se dispara una vez cuando todos los botones elegidos llevan `mantener` segundos pulsados a la vez (0 = en cuanto están todos); soltar uno antes
+    lo cancela, y vuelve a valer cuando se sueltan todos. `exclusivo`: si se toca cualquier otro botón mientras tanto, esa vez no cuenta (lo usa el
+    botón Home). Sin nada de ningún dispositivo: solo códigos y tiempos."""
 
-    def __init__(self, codigos):
-        self.codigos, self.pulsados, self.disparada = set(codigos), set(), False
+    def __init__(self, codigos, mantener=0.0, exclusivo=False, ahora=time.monotonic):
+        self.codigos, self.mantener, self.exclusivo, self.ahora = set(codigos), float(mantener or 0), exclusivo, ahora
+        self.pulsados, self.disparada, self.desde, self.estropeada = set(), False, None, False
 
     def ver(self, codigo, valor):
-        if codigo not in self.codigos or valor == 2:             # otro botón (no se mira) o la repetición de uno mantenido
+        """True si con este evento hay que activar a Lina (solo cuando no hay que mantener)."""
+        if valor == 2:                                           # la repetición de uno mantenido
+            return False
+        if codigo not in self.codigos:
+            if valor and self.pulsados and self.exclusivo:
+                self.estropeada, self.desde = True, None         # otro botón a la vez: es otra cosa, no para Lina
             return False
         (self.pulsados.add if valor else self.pulsados.discard)(codigo)
         if not self.pulsados:
-            self.disparada = False
-        if self.pulsados == self.codigos and not self.disparada:
+            self.disparada, self.desde, self.estropeada = False, None, False
+            return False
+        if self.pulsados != self.codigos:
+            self.desde = None
+            return False
+        if self.disparada or self.estropeada:
+            return False
+        if self.mantener <= 0:
             self.disparada = True
+            return True
+        if self.desde is None:
+            self.desde = self.ahora()
+        return False
+
+    def falta(self):
+        """Segundos que faltan para activar si se sigue manteniendo, o None si no se está manteniendo la combinación."""
+        if self.desde is None or self.disparada or self.estropeada:
+            return None
+        return max(0.0, self.mantener - (self.ahora() - self.desde))
+
+    def vencida(self):
+        """True (una vez) si ya se ha mantenido el tiempo pedido."""
+        if self.falta() == 0.0:
+            self.disparada, self.desde = True, None
             return True
         return False
 
 
-def vigilar(al_pulsar, ajuste=None, log=print, sysfs=SYSFS, dev=DEV, dormir=time.sleep, parar=None, vuelta=VUELTA):
+def vigilar(al_pulsar, ajuste=None, log=print, sysfs=SYSFS, dev=DEV, dormir=time.sleep, parar=None, vuelta=VUELTA, mantener=None):
     """El hilo de Lina: mira el ajuste cada pocos segundos (no hace falta reiniciar al cambiarlo), abre el dispositivo elegido cuando está y llama a
     `al_pulsar` cuando se pulsa la combinación. Con el ajuste vacío no abre nada. `parar`: un threading.Event para terminar (las pruebas)."""
-    if ajuste is None:
+    if ajuste is None or mantener is None:
         from lina.nucleo import ajustes as AJ
-
+    if ajuste is None:
         def ajuste():
             return AJ.actuales(log=lambda m: None).get("activacion", "boton")
+    if mantener is None:
+        def mantener():
+            return AJ.actuales(log=lambda m: None).get("activacion", "boton_mantener")
     fd, actual, combinacion, avisado = None, None, None, ""
     while not (parar and parar.is_set()):
-        elegido = leer_ajuste(ajuste())
-        if elegido != actual:
-            if fd is not None:
+        elegido, segundos = leer_ajuste(ajuste()), mantener()
+        if elegido != actual or (combinacion and combinacion.mantener != float(segundos or 0)):
+            if fd is not None and elegido != actual:
                 os.close(fd)
-            fd, actual, combinacion, avisado = None, elegido, (Combinacion(elegido[3]) if elegido else None), ""
+                fd = None
+            actual, avisado = elegido, ("" if elegido != actual else avisado)
+            combinacion = Combinacion(elegido[3], segundos) if elegido else None
         if actual and fd is None:
             disp, motivo = buscar(actual, sysfs, dev)
             if motivo == "listo":
@@ -170,7 +205,8 @@ def vigilar(al_pulsar, ajuste=None, log=print, sysfs=SYSFS, dev=DEV, dormir=time
             dormir(vuelta)
             continue
         try:
-            listo = select.select([fd], [], [], vuelta)[0]
+            falta = combinacion.falta()
+            listo = select.select([fd], [], [], vuelta if falta is None else min(vuelta, falta))[0]
             if listo:
                 bloque = os.read(fd, EVENTO.size * 64)
                 if not bloque:
@@ -179,21 +215,24 @@ def vigilar(al_pulsar, ajuste=None, log=print, sysfs=SYSFS, dev=DEV, dormir=time
                     if combinacion.ver(codigo, valor):
                         log("Botón de activación pulsado")
                         al_pulsar()
+            if combinacion.vencida():                            # mantenida el tiempo pedido
+                log("Botón de activación pulsado")
+                al_pulsar()
         except BlockingIOError:
             continue
         except OSError:
             log("Botón de activación: el dispositivo se ha desconectado; lo espero")
             os.close(fd)
             fd, avisado = None, "desconectado"
-            combinacion = Combinacion(actual[3])
+            combinacion = Combinacion(actual[3], combinacion.mantener)
     if fd is not None:
         os.close(fd)
 
 
 # ======================= el asistente: pulsas y se apunta =======================
-def aprender(salida=print, entrada=input, sysfs=SYSFS, dev=DEV, espera=15, ahora=time.monotonic):
+def aprender(salida=print, entrada=input, sysfs=SYSFS, dev=DEV, espera=15, ahora=time.monotonic, mantener=1.0):
     """Abre (solo para leer) los dispositivos que no son teclado y que tu usuario puede leer, espera a que mantengas un botón o una combinación y la
-    sueltes, y devuelve el ajuste (o None). Solo se miran los botones; nada se guarda salvo lo que elijas."""
+    sueltes, pregunta cuánto hay que mantenerlo y devuelve (ajuste, segundos), o None. Solo se miran los botones; nada se guarda salvo lo que elijas."""
     candidatos = [d for d in dispositivos(sysfs, dev) if not d["teclado"] and d["legible"]]
     sin_permiso = [d for d in dispositivos(sysfs, dev) if not d["teclado"] and not d["legible"]]
     if not candidatos:
@@ -248,10 +287,30 @@ def aprender(salida=print, entrada=input, sysfs=SYSFS, dev=DEV, espera=15, ahora
         return None
     salida(T("He visto en «{nombre}»: {botones}.", nombre=d["nombre"], botones=" + ".join(nombre_codigo(c) for c in codigos)))
     salida(T("Ese botón llegará también a lo que estés usando (Lina no se queda el dispositivo): mejor uno o una combinación que no uses en tus juegos."))
+    segundos = _segundos(entrada(T("¿Cuántos segundos hay que mantenerlo para activar a Lina? (0 = basta pulsar) [{s}] ", s=_num(mantener))), mantener)
+    if segundos is None:
+        salida(T("Eso no es un número de segundos entre 0 y 5. No cambio nada."))
+        return None
     if str(entrada(T("¿Lo guardo? [s/N] "))).strip().lower() not in ("s", "si", "sí", "y", "yes"):
         salida(T("No cambio nada."))
         return None
-    return escribir_ajuste(d["fabricante"], d["modelo"], d["nombre"], codigos)
+    return escribir_ajuste(d["fabricante"], d["modelo"], d["nombre"], codigos), segundos
+
+
+def _num(s):
+    return f"{float(s):g}"
+
+
+def _segundos(texto, defecto):
+    """Los segundos que se contestan (vacío = los de ahora), entre 0 y MAX_MANTENER; None si no vale."""
+    texto = str(texto or "").strip().replace(",", ".").rstrip("s").strip()
+    if not texto:
+        return float(defecto)
+    try:
+        s = float(texto)
+    except ValueError:
+        return None
+    return s if 0 <= s <= MAX_MANTENER else None
 
 
 # ======================= lina boton =======================
@@ -276,9 +335,10 @@ def principal(argv, salida=print, entrada=input, ajustes=None, sysfs=SYSFS, dev=
         ajustes = AJ.actuales(log=lambda m: None)
     orden = argv[0] if argv else ""
     if orden == "aprender":
-        nuevo = aprender(salida, entrada, sysfs, dev)
+        nuevo = aprender(salida, entrada, sysfs, dev, mantener=ajustes.get("activacion", "boton_mantener"))
         if nuevo:
-            ajustes.establecer("activacion", "boton", nuevo)
+            ajustes.establecer("activacion", "boton", nuevo[0])
+            ajustes.establecer("activacion", "boton_mantener", nuevo[1])
             salida(T("Guardado. Lina lo usa en unos segundos, sin reiniciar. Para quitarlo:  lina boton quitar"))
             return 0
         return 1
@@ -294,7 +354,14 @@ def principal(argv, salida=print, entrada=input, ajustes=None, sysfs=SYSFS, dev=
         return 2
     motivo, elegido = estado(ajustes.get("activacion", "boton"), sysfs, dev)
     salida(texto_estado(motivo, elegido))
+    if motivo != "apagado":
+        salida(texto_mantener(ajustes.get("activacion", "boton_mantener")))
     return 0
+
+
+def texto_mantener(segundos):
+    return (T("Basta con pulsarlo (activacion.boton_mantener = 0).") if not float(segundos or 0)
+            else T("Hay que mantenerlo {s} s (también el botón Home de los mandos). Se cambia con:  lina boton aprender", s=_num(segundos)))
 
 
 def texto_estado(motivo, elegido):
