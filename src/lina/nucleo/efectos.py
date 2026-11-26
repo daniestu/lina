@@ -10,6 +10,7 @@
 Ninguna acción concreta tiene aquí su caso: solo formatos (claves y valores, heredoc, redirecciones) y programas por lo que hacen. Caso real que lo
 motivó (2026-11-21): quitar un programa del inicio automático pidió un «sí» para borrar archivos que no existían y luego escribió otra cosa con él."""
 import glob
+import hashlib
 import os
 import re
 import shlex
@@ -21,6 +22,10 @@ _CLAVE_QUE_EJECUTA = re.compile(r"^\s*(?:(?:Try)?Exec\w*|Environment\w*)\s*=", r
 _SUDO = {"sudo", "doas", "pkexec", "run0", "su"}
 BORRAN = {"rm", "unlink", "shred", "rmdir", "trash-put", "trash-rm", "srm", "wipe"}
 ESCRIBEN = {"tee", "cp", "mv", "install", "ln", "mkdir", "touch", "truncate", "rsync", "dd"}
+# S9k: un cp de archivos normales que se pueden leer se juzga por lo que escribiría de verdad (el contenido del origen). Solo opciones que no cambian
+# QUÉ se escribe; con cualquier otra (-r, -n, -l, -s, -u, --backup…), como siempre: no se puede saber antes.
+_CP_SIN_EFECTO = {"-f", "--force", "-v", "--verbose", "-p", "--preserve", "-T", "--no-target-directory"}
+MAX_COPIA = 200_000
 
 
 def _expandir(ruta, casa):
@@ -77,10 +82,66 @@ def _sin_prefijos(palabras):
     return _quitar_prefijos(palabras or [])
 
 
-def escrituras(comando, casa=None):
+def _huella(datos):
+    return hashlib.sha256(datos).hexdigest()
+
+
+def _copia(args, casa):
+    """[(destino, contenido, origen, huella)] de un `cp` cuyos orígenes son archivos normales, de texto, que se pueden leer ahora; None si no (otras
+    opciones, carpetas, comodines, binarios, demasiado grandes, varios orígenes a algo que no es una carpeta…)."""
+    posicionales, fin = [], False
+    for a in args:
+        if not fin and a == "--":
+            fin = True
+        elif not fin and a.startswith("-") and len(a) > 1:
+            if a not in _CP_SIN_EFECTO and not re.fullmatch(r"-[fvpT]+", a):
+                return None
+        else:
+            posicionales.append(a)
+    if len(posicionales) < 2 or any(re.search(r"[*?\[]", a) for a in posicionales):
+        return None
+    *origenes, destino = posicionales
+    destino_abs = _expandir(destino, casa)
+    a_carpeta = destino.endswith("/") or os.path.isdir(destino_abs)
+    if len(origenes) > 1 and not a_carpeta:
+        return None
+    hechas = []
+    for o in origenes:
+        origen = _expandir(o, casa)
+        try:
+            if not os.path.isfile(origen) or os.path.getsize(origen) > MAX_COPIA:
+                return None
+            with open(origen, "rb") as f:
+                datos = f.read(MAX_COPIA + 1)
+            contenido = datos.decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            return None
+        final = os.path.join(destino_abs, os.path.basename(origen)) if a_carpeta else destino_abs
+        if os.path.normpath(final) == os.path.normpath(origen):
+            return None
+        hechas.append((os.path.normpath(final), contenido, origen, _huella(datos)))
+    return hechas
+
+
+def origenes_cambiados(origenes):
+    """Los orígenes de una copia que ya no son lo que se comprobó (otro contenido, o no están). Se mira justo antes de ejecutar la orden (S9k)."""
+    cambiados = []
+    for ruta, huella in origenes or ():
+        try:
+            with open(ruta, "rb") as f:
+                ahora = _huella(f.read(MAX_COPIA + 1))
+        except OSError:
+            ahora = None
+        if ahora != huella:
+            cambiados.append(ruta)
+    return cambiados
+
+
+def escrituras(comando, casa=None, origenes=None):
     """(escrituras, resto) de la orden: escrituras = [(ruta absoluta, contenido, «>» o «>>»)] de lo que escribe con contenido que se sabe antes de ejecutarla
-    (heredoc, echo o printf literales, kwriteconfig); resto = los tramos que no escriben nada. None si escribe algo cuyo contenido no se puede saber,
-    o si no se puede leer la orden."""
+    (heredoc, echo o printf literales, kwriteconfig, y S9k: un cp de archivos que se pueden leer, con su contenido); resto = los tramos que no escriben
+    nada. None si escribe algo cuyo contenido no se puede saber, o si no se puede leer la orden. `origenes`: una lista donde se apunta (origen, huella)
+    de cada copia, para comprobar justo antes de ejecutar que no ha cambiado."""
     casa = casa or os.path.expanduser("~")
     trozos = _trozos_con_heredoc(comando)
     if trozos is None:
@@ -120,8 +181,17 @@ def escrituras(comando, casa=None):
                     return None
                 hechas.append((ruta, literal, op))
                 continue
+            if prog == "cp" and cuerpo is None:
+                copia = _copia(palabras[1:], casa)
+                if copia is None:
+                    return None                             # un cp que no se puede juzgar por su contenido: como siempre
+                for final, contenido, origen, huella in copia:
+                    hechas.append((final, contenido, ">"))
+                    if origenes is not None:
+                        origenes.append((origen, huella))
+                continue
             if prog in ESCRIBEN - {"mkdir"} or (prog == "sed" and any(p.startswith("-i") for p in palabras[1:])):
-                return None                                 # copia, mueve, enlaza o edita: el contenido no se sabe antes
+                return None                                 # mueve, enlaza o edita: el contenido no se sabe antes
             resto.append(tramo)
     return hechas, resto
 
@@ -165,14 +235,14 @@ def _lo_que_queda(contenido, op, antes):
     return contenido
 
 
-def reversible_e_inocuo(comando, casa=None, existe=os.path.exists, se_puede_deshacer=lambda ruta: False, leer=_leer):
+def reversible_e_inocuo(comando, casa=None, existe=os.path.exists, se_puede_deshacer=lambda ruta: False, leer=_leer, origenes=None):
     """(True, «») si la orden solo escribe, dentro de tu carpeta y sin sudo, archivos de claves y valores sin ninguna clave Exec/TryExec, cada uno nuevo
     o que el diario puede deshacer, y lo demás que hace no cambia nada (lectura, o crear la carpeta donde escribe). Si no, (False, por qué)."""
     casa = os.path.normpath(casa or os.path.expanduser("~"))
     trozos = _trozos_con_heredoc(comando) or []
     if any(re.search(r"(?:^|[;&|(]\s*)(?:sudo|doas|pkexec|run0|su)\b", linea.strip()) for linea, _ in trozos):     # solo en las órdenes, no en lo escrito
         return False, "lleva permisos de administrador"
-    partes = escrituras(comando, casa)
+    partes = escrituras(comando, casa, origenes)
     if partes is None:
         return False, "escribe algo cuyo contenido no se puede saber antes"
     hechas, resto = partes
@@ -201,6 +271,25 @@ def reversible_e_inocuo(comando, casa=None, existe=os.path.exists, se_puede_desh
             continue                                       # recargar o mirar los servicios de tu usuario no cambia lo que arranca
         return False, f"hace algo más que escribir ({tramo[:60]})"
     return True, ""
+
+
+def nota_para_la_ia(comando, por_que, casa=None):
+    """S9k: el motivo exacto por el que esta orden pide «sí» y la alternativa general, como hechos, para la IA (decide ella; el código solo explica).
+    Sin nombres de programas ni de acciones: solo lo que hace la orden. "" si no hay nada que añadir."""
+    casa = os.path.normpath(casa or os.path.expanduser("~"))
+    if "puede hacer que se ejecute" in por_que:
+        origenes = []
+        escrituras(comando, casa, origenes)                 # solo para saber qué copia (y de dónde)
+        copiados = sorted({os.path.basename(o) for o, _ in origenes})
+        de_donde = (f" (copia entero {', '.join(copiados)}, con sus claves Exec…)" if copiados else "")
+        return (f"Hecho comprobado: {por_que}{de_donde}. Una orden que solo escribe en tu carpeta archivos de claves sin claves que lancen programas "
+                "(Exec…, TryExec, Environment…) y que se puede deshacer no necesita «sí». Si para lo que pide el usuario basta con cambiar algunas "
+                "claves, puedes escribir solo esas (sin copiar el archivo entero); si de verdad hace falta esta orden tal cual, pídele el «sí».")
+    if "no se puede saber antes" in por_que:
+        return ("Hecho comprobado: no se puede saber antes qué escribirá esta orden (mueve, enlaza, edita o copia algo que no se puede leer ahora). "
+                "Si basta con escribir unas claves, escríbelas tú (printf o un heredoc) y se podrá comprobar; una orden así, en tu carpeta, sin claves "
+                "que lancen programas y que se puede deshacer, no necesita «sí». Si de verdad hace falta esta orden tal cual, pídele el «sí».")
+    return ""
 
 
 def efectos(comando):

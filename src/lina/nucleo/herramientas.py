@@ -1672,15 +1672,19 @@ class Ejecutor:
         if (clase == "critico" and self.confirmar and not self.contaminado and _politica()["modo"] != "prudente"
                 and _secciones_de(comando) == {"persistencia"}):
             escritas = {os.path.normpath(_abs(i[1])) for i in _intenciones_de_cambio(comando) if i[0] == "escribe"} if diario else set()
-            inocuo, por_que = EF.reversible_e_inocuo(comando, _HOME, se_puede_deshacer=lambda r: os.path.normpath(r) in escritas)
+            origenes = []                                # S9k: lo que copia un cp, con su huella, para comprobarlo justo antes de ejecutar
+            inocuo, por_que = EF.reversible_e_inocuo(comando, _HOME, se_puede_deshacer=lambda r: os.path.normpath(r) in escritas, origenes=origenes)
             if inocuo:                                   # A16: solo escribe archivos de claves de tu carpeta que no hacen ejecutar nada, y se puede deshacer
                 anotar(f"[reversible] {comando}  # sin «sí»: solo escribe en tu carpeta, se puede deshacer y no hace ejecutar nada")
                 clase, razon = "autonomo", ""
                 destinos = [r for r, _, _ in (EF.escrituras(comando, _HOME) or ([], []))[0]]
                 self._abiertas = (comando, [os.path.join(_HOME, r) for r in AIS.SOLO_LECTURA
-                                            if any(d.startswith(os.path.join(_HOME, r) + os.sep) for d in destinos)])
+                                            if any(d.startswith(os.path.join(_HOME, r) + os.sep) for d in destinos)], origenes, destinos)
             else:
                 log(f"Acción crítica por persistencia, con confirmación: {por_que}")
+                # S9k: el motivo exacto y la alternativa general van a la IA con el «PREPARADO», y lo que escribiría, por si la IA lo resuelve de otra forma
+                self._nota_pendiente = (comando, EF.nota_para_la_ia(comando, por_que, _HOME),
+                                        sorted({os.path.normpath(_abs(i[1])) for i in _intenciones_de_cambio(comando) if i[0] == "escribe"}))
         anotar(f"[{clase}] {comando}  # {motivo}")
         log(f"Acción [{clase}]: {comando}")
         if clase in {"lanzar", "autonomo", "lectura"}:
@@ -1707,7 +1711,8 @@ class Ejecutor:
         if clase == "lanzar":
             return self.lanzar(comando)
         if clase == "autonomo":
-            return self._con_red(comando, motivo, "autonomo")
+            resultado = self._con_red(comando, motivo, "autonomo")
+            return resultado + self._sustituir_pendientes(comando, resultado)
         if clase == "instalar":
             return self._con_red(self._canonico_instalar(comando), motivo, "instalar")
         if not self.confirmar:
@@ -1743,13 +1748,33 @@ class Ejecutor:
             return MENSAJE_PREPARADO
         if len(self.pendientes) >= MAX_PENDIENTES:
             return "Hay demasiadas acciones pendientes. Pide confirmación de las que hay antes de preparar más."
+        nota = getattr(self, "_nota_pendiente", None)
+        nota = nota if nota and nota[0] == comando else None
         self.pendientes.append({"comando": comando, "motivo": motivo, "razon": razon, "categoria": categoria_de_motivo(razon), "web": bool(self.contaminado),
-                                **({"aviso_aur": aviso_aur} if aviso_aur else {})})
+                                **({"aviso_aur": aviso_aur} if aviso_aur else {}), **({"sustituible": nota[2]} if nota and nota[2] else {})})
         self.t_pendiente = time.time()
         con_sudo = T(" (con permisos de administrador)") if re.search(r"\bsudo\b", comando) else ""
         notificar(T("Asistente: pendiente de tu confirmación") + con_sudo, f"{comando}\n" + T("(Motivo: {razon})", razon=razon) + (f"\n{aviso_aur}" if aviso_aur else ""))
         return (MENSAJE_PREPARADO + f" Se pide confirmación porque {razon}. Explícaselo al usuario."
-                + (f" Antes de pedirle el «sí», dile también esto, tal cual: «{aviso_aur}»" if aviso_aur else ""))
+                + (f" Antes de pedirle el «sí», dile también esto, tal cual: «{aviso_aur}»" if aviso_aur else "")
+                + (f" {nota[1]}" if nota and nota[1] else ""))
+
+    def _sustituir_pendientes(self, comando, resultado):
+        """S9k: si una orden sin «sí» (reversible e inocua) acaba de escribir bien los mismos archivos que una pendiente de persistencia, la pendiente ya
+        no hace falta: se descarta (no se había ejecutado nada) y se dice. Decidido por los hechos: los archivos que escribe cada una."""
+        abierta = getattr(self, "_abiertas", None)
+        if not (abierta and abierta[0] == comando and len(abierta) > 3 and EJ.salio_bien(resultado)):
+            return ""
+        hechos = {os.path.normpath(d) for d in abierta[3]}
+        quitadas = [p for p in self.pendientes if p.get("sustituible") and set(p["sustituible"]) <= hechos]
+        for p in quitadas:
+            self.pendientes.remove(p)
+            anotar(f"[pendiente-sustituida] {p['comando']}  # la ha resuelto sin «sí»: {comando}")
+            log(f"Pendiente descartada: «{p['comando'][:80]}» (la ha resuelto otra orden reversible e inocua sobre los mismos archivos)")
+        if not quitadas:
+            return ""
+        return ("\n\nQueda descartada la orden pendiente que escribía en los mismos archivos ("
+                + "; ".join(p["comando"][:100] for p in quitadas) + "): no se ejecutó y ya no hace falta pedir «sí» por ella.")
 
     # --- Red de seguridad (A2) ---
     def _con_red(self, comando, motivo, clase):
@@ -2380,6 +2405,14 @@ class Ejecutor:
         fuente = _fuente_externa(comando)
         if fuente:
             self.contaminar(fuente)                  # lo que devuelva puede traer instrucciones: ver A2e
+        abierta = getattr(self, "_abiertas", None)
+        if abierta and abierta[0] == comando and len(abierta) > 2 and abierta[2]:
+            cambiados = EF.origenes_cambiados(abierta[2])          # S9k: lo que copia, leído justo antes de ejecutar: ¿sigue siendo lo que se juzgó?
+            if cambiados:
+                anotar(f"[origen-cambiado] {comando}  # {', '.join(cambiados)}")
+                self._abiertas = None
+                return (f"NO EJECUTADO: lo que copia esta orden ({', '.join(os.path.basename(c) for c in cambiados)}) ha cambiado desde que se "
+                        "comprobó. Vuelve a pedir la orden y se juzgará otra vez.")
         cmd = PRIV.adaptar(self.normalizar_sudo(comando), analizar_instalacion(comando))      # según el permiso que haya: ayudante de root, pkexec o tal cual
         jaula = self._jaula(comando, cmd, clase)
         if isinstance(jaula, str):
