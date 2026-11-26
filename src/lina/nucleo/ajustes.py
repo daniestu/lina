@@ -81,8 +81,8 @@ ESQUEMA: dict = {
                                         "Vacío (de fábrica) = ninguno. Se elige con:  lina boton aprender   (no se escribe a mano)")),
         "boton_mantener": (1.0, "float", (0.0, 5.0), N_("Segundos que hay que mantener el botón elegido (y el botón Home de los mandos) para activar a Lina; así una pulsación normal "
                                                         "en un juego no la activa. 0 = basta pulsar. Se elige también con:  lina boton aprender")),
-        "boton_home": (True, "bool", None, N_("true: una pulsación corta del botón central (Home) de un mando, sin tocar otro, hace lo mismo que el atajo. "
-                                              "false: ese botón no hace nada en Lina.")),
+        "boton_home": (False, "bool", None, N_("true: el botón central (Home) de un mando, mantenido boton_mantener segundos sin tocar otro, hace lo mismo que el atajo. "
+                                               "false (de fábrica): ese botón no hace nada en Lina; Steam lo usa para abrir su menú.")),
     },
     "autonomia": {
         "perfil": ("autonomo", "opcion", PERFILES, N_("autonomo: actúa solo salvo lo crítico · equilibrado: además frena los cambios tras leer contenido "
