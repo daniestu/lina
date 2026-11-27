@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shlex
+import threading
 
 from lina.nucleo import comandos as C
 from lina.nucleo import herramientas as H
@@ -100,6 +101,8 @@ class MixinPasos:
                 self._nota_pasos = nota
                 log(f"Receta {receta['id']} («{receta['ajuste']}»): {nota or 'no ha salido como la vez anterior'}; se lo dejo a la IA")
                 return None
+            if receta.get("por_nombrar"):                         # S9l: la receta que se acaba de usar pide su nombre general, sin retrasar la respuesta
+                threading.Thread(target=self._nombrar_pendiente, kwargs={"receta": receta}, daemon=True).start()
             return frase, "receta"
         except Exception as e:
             if type(e).__name__ == "Cancelado":
@@ -153,7 +156,7 @@ class MixinPasos:
                 return None, (f"se repitió la receta «{receta['ajuste']}» (r. {receta['id']}) pero la comprobación no dio lo de la vez anterior "
                               f"(esperaba «{esperado[:80]}», dio «{' '.join(r.splitlines()[1:])[:80]}»); los pasos ya están hechos. Mira el estado y arréglalo si hace falta")
         REC.resultado_pasos(receta["id"], True)
-        return T("Hecho."), ""
+        return (self._frase_sin_comprobar() or T("Hecho.")), ""       # S9l: «hecho» solo si el efecto se ha comprobado
 
     # ======================= aprender =======================
     def _frase_para_receta(self):
@@ -251,6 +254,8 @@ class MixinPasos:
         if hecha:                                                # S9j: lo hecho ya era una receta guardada: se refuerza, no se apunta otra igual
             REC.reforzar(hecha[0]["id"], "la petición hizo lo mismo y salió bien")
             ej.receta_turno = True
+            if hecha[0].get("por_nombrar"):                      # S9l: y si aún no tenía nombre general, lo pide ahora
+                self._nombrar_pendiente(receta=hecha[0])
             return
         nombre, valor = "", ""
         try:                                                     # S9g: el nombre general de R2 (y la palabra que cambia)
@@ -266,13 +271,19 @@ class MixinPasos:
             ej.receta_turno = True
 
 
-    def _nombrar_pendiente(self):
+    def _nombrar_pendiente(self, receta=None):
         """S9i: una receta que se apuntó sin nombre general (falló la consulta) lo vuelve a pedir: una vez por petición, nunca en la misma petición
-        en que se aprendió otra, ni en modo privado, ni tras leer contenido de fuera."""
+        en que se aprendió otra, ni en modo privado, ni tras leer contenido de fuera. S9l: `receta` = la que se acaba de usar (con la IA o sin ella),
+        que lo pide aunque en esta petición no se haya aprendido nada."""
         REC, ej = self._REC(), self.ejecutor
-        if REC is None or getattr(ej, "receta_turno", False) or getattr(ej, "contaminado", "") or getattr(self, "modo_privado", False) or REC._en_privado():
+        if REC is None or getattr(ej, "contaminado", "") or getattr(self, "modo_privado", False) or REC._en_privado():
             return
-        r = REC.por_nombrar()
+        if receta is None and getattr(ej, "receta_turno", False):
+            return
+        r = receta if receta is not None and receta.get("por_nombrar") else (REC.por_nombrar() if receta is None else None)
+        if r and receta is not None:
+            r = next((x for x in REC._cargar() if x.get("id") == r["id"] and x.get("por_nombrar")
+                      and int(x.get("intentos_nombre", 0)) < REC.MAX_INTENTOS_NOMBRE), None)   # puede haberlo recibido ya, o haberse rendido
         if not r:
             return
         try:

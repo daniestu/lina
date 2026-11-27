@@ -814,10 +814,9 @@ def _bases_xdg(casa):
     return [(config, lista("XDG_CONFIG_DIRS", "/etc/xdg")), (datos, lista("XDG_DATA_DIRS", "/usr/local/share:/usr/share"))]
 
 
-def sombras_sin_original(comando, casa=None, existe=os.path.exists):
-    """S9j: los archivos que la orden escribe en tu carpeta para TAPAR uno del sistema que no existe. Por hechos: si la orden tapa al menos un archivo
-    del sistema que existe (así se sabe que lo que hace es tapar), cualquier otro que escriba en la misma carpeta y no tape nada es un error (un nombre
-    mal puesto). Si no tapa nada que exista, no se juzga: puede ser un archivo nuevo tuyo. Sin nombres de programas: lo dice el sistema de archivos."""
+def escritos_que_tapan(comando, casa=None, existe=os.path.exists):
+    """S9l: [(ruta en tu carpeta, [rutas del sistema que tapa], [carpetas del sistema con su mismo sitio])] de lo que la orden escribe en tu carpeta de
+    configuración o de datos (estándar XDG), solo si esa carpeta existe también en el sistema. La lista del medio vacía = no tapa nada que exista."""
     casa = (casa or _HOME).rstrip("/")
     escritos = []
     for c in _intenciones_de_cambio(comando):
@@ -825,16 +824,25 @@ def sombras_sin_original(comando, casa=None, existe=os.path.exists):
             ruta = c[1]
             ruta = casa + ruta[1:] if ruta.startswith("~/") else ruta.replace("$HOME", casa, 1) if ruta.startswith("$HOME") else ruta
             escritos.append(os.path.normpath(ruta if ruta.startswith("/") else os.path.join(casa, ruta)))
-    tapan, sin_original = {}, {}
+    salida = []
     for ruta in dict.fromkeys(escritos):
         for tuya, sistema in _bases_xdg(casa):
             if not ruta.startswith(tuya.rstrip("/") + "/"):
                 continue
             rel = os.path.relpath(ruta, tuya)
-            if not any(os.path.isdir(os.path.join(s, os.path.dirname(rel))) for s in sistema):
-                continue                                  # esa carpeta no existe en el sistema: no tapa nada, es tuya
-            destino = tapan if any(existe(os.path.join(s, rel)) for s in sistema) else sin_original
-            destino.setdefault(os.path.dirname(ruta), []).append(ruta)
+            carpetas = [os.path.join(s, os.path.dirname(rel)) for s in sistema if os.path.isdir(os.path.join(s, os.path.dirname(rel)))]
+            if carpetas:                                  # si esa carpeta no existe en el sistema, no tapa nada: es tuya
+                salida.append((ruta, [os.path.join(s, rel) for s in sistema if existe(os.path.join(s, rel))], carpetas))
+    return salida
+
+
+def sombras_sin_original(comando, casa=None, existe=os.path.exists):
+    """S9j: los archivos que la orden escribe en tu carpeta para TAPAR uno del sistema que no existe. Por hechos: si la orden tapa al menos un archivo
+    del sistema que existe (así se sabe que lo que hace es tapar), cualquier otro que escriba en la misma carpeta y no tape nada es un error (un nombre
+    mal puesto). Si no tapa nada que exista, no se juzga: puede ser un archivo nuevo tuyo. Sin nombres de programas: lo dice el sistema de archivos."""
+    tapan, sin_original = {}, {}
+    for ruta, tapados, _ in escritos_que_tapan(comando, casa, existe):
+        (tapan if tapados else sin_original).setdefault(os.path.dirname(ruta), []).append(ruta)
     return [r for carpeta, rutas in sin_original.items() if carpeta in tapan for r in rutas]
 
 
@@ -1540,6 +1548,7 @@ class Ejecutor:
         self.efecto_sin_comprobar = False    # se editó un archivo de configuración y nadie ha mirado si tiene efecto
         self.cambio_comprobado = False       # S9g: en esta petición hay un cambio comprobado por hechos (para dar la tarea por cumplida)
         self.cambio_sin_comprobar = False    # S13: se cambió algo y el código no tiene ningún hecho que diga que hizo lo pedido
+        self.tapados = []                    # S9l: (ruta en tu carpeta, la del sistema a la que sustituye) de lo escrito en esta petición
         self.duda_revertida = False          # el último intento se revirtió bien: el estado es el de antes, pero el objetivo sigue sin cumplirse
         self.rechazadas = set()              # lo que el usuario acaba de decir que NO (solo vale durante esa respuesta)
         self.profundo = False                # True cuando el asistente INSISTE: topes más amplios
@@ -1548,6 +1557,8 @@ class Ejecutor:
         """Una frase corta de por qué el último cambio no se pudo comprobar (para la voz); vacío si no hay duda."""
         if not self.duda:
             return ""
+        if "no sustituye a ningún archivo del sistema" in self.duda:            # S9l
+            return "lo que he escrito no sustituye a ningún archivo del sistema: ese nombre no es el bueno"
         if "⚠" in self.duda:
             return "lo escribí, pero no puedo confirmar que el programa use ese ajuste"
         if "✘" in self.duda:
@@ -1855,8 +1866,13 @@ class Ejecutor:
         v = None
         if VERIFICAR_RESULTADOS and rc == 0 and intenciones:
             v = _verificar(intenciones, payloads)
-            if v:
-                extra.append(v)
+        if rc == 0:
+            aviso = self._hueco_de_receta(comando)               # S9l: una receta usada con un valor que no tapa nada de lo que tapaba
+            if aviso:
+                v = aviso + ("\n" + v if v else "")
+            self.tapados = getattr(self, "tapados", []) + [(r, s[0]) for r, s, _ in escritos_que_tapan(comando) if s]
+        if v:
+            extra.append(v)
         if rc == 0 and v and "✘" not in v and "⚠" not in v:
             self.cambio_comprobado = True
             self._receta_por_hechos(comando, clase, v)
@@ -2482,6 +2498,35 @@ class Ejecutor:
             texto += ("\n[sudo pide contraseña: falta configurar sudo sin contraseña para el usuario. "
                       "Díselo al usuario.]")
         return texto
+
+    def _hueco_de_receta(self, comando):
+        """S9l: si la orden es una receta guardada con su hueco relleno, y esa receta, con el valor con el que se aprendió, tapaba en tu carpeta archivos
+        del sistema que existen (estándar XDG), comprueba que con este valor también: si no tapa nada, el valor del hueco no es el bueno. Devuelve el
+        aviso (⚠, para la IA y para la duda) o "". Lo decide el sistema de archivos, sin nombres de programas: la IA busca el nombre correcto."""
+        if REC is None:
+            return ""
+        orden = sin_carpeta_personal(comando, _HOME)
+        hallada = REC.ya_hecha([{"herr": "ejecutar_comando", "args": {"comando": orden}}])
+        if not hallada and REC.para_comando(" ⏎ ".join(orden.split("\n"))):
+            r = REC.para_comando(" ⏎ ".join(orden.split("\n")))
+            m = re.fullmatch(re.escape(r["cambiar"]).replace(re.escape("{valor}"), "(.+?)"), " ⏎ ".join(orden.split("\n")))
+            hallada = (r, m.group(1) if m and m.groups() else None)
+        if not hallada or not hallada[1] or not hallada[0].get("valor_usado"):
+            return ""
+        receta, valor = hallada
+        plantilla = (receta["pasos"][0]["args"].get("comando", "") if receta.get("tipo") == "pasos" else receta.get("cambiar", "").replace(" ⏎ ", "\n"))
+        original = plantilla.replace("{valor}", receta["valor_usado"])
+        if not any(s for _, s, _ in escritos_que_tapan(original)):
+            return ""                                            # la receta no tapaba nada del sistema: no hay nada que comparar
+        ahora = escritos_que_tapan(comando)
+        if any(s for _, s, _ in ahora):
+            return ""
+        rutas = ", ".join(sin_carpeta_personal(r, _HOME) for r, _, _ in ahora) or "lo que escribe"
+        carpetas = sorted({c for _, _, cs in ahora for c in cs})
+        log(f"Receta {receta['id']}: el valor «{valor}» no tapa nada que exista en el sistema (con «{receta['valor_usado']}» sí): no se da por hecho")
+        return (f"⚠ COMPROBADO AHORA: {rutas} no sustituye a ningún archivo del sistema (no hay ninguno con ese nombre en {', '.join(carpetas)}), y la "
+                f"receta «{receta['ajuste']}» sí lo hacía con «{receta['valor_usado']}». El valor del hueco («{valor}») no es el bueno: no lo des por "
+                f"hecho; mira qué nombres hay (por ejemplo, ls {carpetas[0] if carpetas else 'esa carpeta del sistema'}) y vuelve a usar la receta con el que exista.")
 
     def _receta_por_hechos(self, comando, clase, comprobado):
         """A16b: un cambio que ha salido bien y está comprobado por hechos, en una tarea que ha costado (3 órdenes o más, tu «sí» o insistir a fondo), queda

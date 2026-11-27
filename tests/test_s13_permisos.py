@@ -106,4 +106,4 @@ def test_la_respuesta_lo_dice(monkeypatch):
     monkeypatch.setattr(A.FUE, "firma", lambda: None)
     monkeypatch.setattr(a, "_enlace_sin_comprobar", lambda: None)
     r = a._honestidad_de_lo_hecho("He configurado Telegram para que no arranque.")
-    assert r.endswith("no he podido comprobar que haga lo que pedías; dímelo si no lo ves.")
+    assert "He configurado" not in r and r.startswith("La orden ha salido bien, pero no he podido comprobar")     # S9l: se sustituye, no se añade

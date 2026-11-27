@@ -2544,8 +2544,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         return str(hecho[0]["motivo"]).strip().rstrip(".")[:200] if hecho else None
 
     def _honestidad_de_lo_hecho(self, texto):
-        """Si el último cambio sigue SIN comprobarse (⚠, ✘ o error) y la respuesta lo da por hecho sin reconocer la duda,
-        el código añade la corrección. No se confía en que la IA lo diga."""
+        """Si el efecto de lo cambiado en esta petición no se ha podido comprobar (⚠, ✘, error o nada que lo mire) y la respuesta no lo reconoce, la
+        respuesta es lo que consta, escrito por el código (S9l: se sustituye, no se añade, y no depende de cómo lo diga la IA). No se confía en que la
+        IA lo diga."""
         if self.ejecutor.pendientes or admite_duda(texto):
             return texto
         peticion = str(self.pregunta_pura or "")
@@ -2554,6 +2555,10 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             log(f"La respuesta dice haber cambiado una fuente y no consta: se sustituye («{str(texto)[:80]}»)")
             return (T("No lo he guardado: las fuentes no las guardo así. Dime «para TEMA usa esta página…» con el atajo o con lina di, o usa lina fuentes añadir.") if afirma == "guardar"
                     else T("No lo he quitado: las fuentes no las quito así. Dime «quita la fuente de TEMA» con el atajo o con lina di, o usa lina fuentes quitar."))
+        frase = self._frase_sin_comprobar()
+        if frase:                                                  # S9l: por los hechos, no por cómo lo diga la IA: no se da por hecho lo que no consta
+            log(f"La respuesta no reconoce que el efecto no se ha podido comprobar: se sustituye por lo que consta («{str(texto)[:80]}»)")
+            return frase
         if not afirma_hecho(texto):
             return texto
         if pide_hacer(peticion):
@@ -2566,16 +2571,26 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             log(f"La respuesta da por buena una ficha que no salió de ninguna búsqueda ({inventada[0]}): se corrige")
             return texto.rstrip() + " " + T("Ojo, corrijo: la ficha de {plataforma} que he abierto no ha salido de ninguna búsqueda; puede no ser lo que pediste.",
                                             plataforma=CONT.NOMBRE_VISIBLE.get(inventada[1], inventada[1]))
-        if self.ejecutor.duda:
-            log("La respuesta daba por hecho algo sin comprobar: se corrige")
-            return texto.rstrip() + " " + T("Ojo, corrijo: no he podido comprobar que eso funcione ({duda}); no lo des por hecho.", duda=self.ejecutor.duda_corta())
-        if self.ejecutor.efecto_sin_comprobar:
-            log("La respuesta daba por hecho un cambio de configuración sin comprobar su efecto: se corrige")
-            return texto.rstrip() + " " + T("Ojo: he cambiado un archivo de configuración, pero no he comprobado en pantalla que el cambio tenga efecto; dímelo si no lo ves.")
-        if getattr(self.ejecutor, "cambio_sin_comprobar", False) is True:     # S13: la orden salió bien, pero nada comprueba que haga lo que pediste
-            log("La respuesta daba por hecho un cambio que nada ha comprobado: se corrige")
-            return texto.rstrip() + " " + T("Ojo: la orden ha salido bien, pero no he podido comprobar que haga lo que pedías; dímelo si no lo ves.")
         return texto
+
+    def _frase_sin_comprobar(self):
+        """S9l: lo que consta de verdad cuando el efecto no se ha podido comprobar, sin decir «hecho»; None si está comprobado. La escribe el código
+        a partir de los hechos (la duda abierta, qué archivos del sistema se han sustituido en tu carpeta, qué no ha mirado nadie)."""
+        ej = self.ejecutor
+        if isinstance(getattr(ej, "duda", ""), str) and ej.duda:
+            return T("Todavía no sé si ha funcionado: {duda}. No lo doy por hecho; dime si lo ves o lo intento de otra forma.", duda=ej.duda_corta())
+        efecto = getattr(ej, "efecto_sin_comprobar", False) is True
+        if not (efecto or getattr(ej, "cambio_sin_comprobar", False) is True):
+            return None
+        tapados = getattr(ej, "tapados", None)
+        tapados = tapados if isinstance(tapados, list) else []
+        if tapados:
+            return T("He dejado {archivos} en tu carpeta, en lugar de los del sistema. Desde aquí no puedo comprobar que tenga efecto: se notará la "
+                     "próxima vez que se carguen (por ejemplo, al volver a iniciar sesión).",
+                     archivos=", ".join(sorted({os.path.basename(r) for r, _ in tapados})))
+        if efecto:
+            return T("He cambiado la configuración, pero no he podido comprobar que tenga efecto. No lo doy por hecho: dime si lo ves.")
+        return T("La orden ha salido bien, pero no he podido comprobar que haga lo que pedías. No lo doy por hecho: dime si lo ves.")
 
     def _avisar_voz(self, texto):
         """Un aviso de espera («lo pienso a fondo», «Google está tardando…»), sin bloquear y sin romper nada si el audio falla. Es efímero: si cuando le
