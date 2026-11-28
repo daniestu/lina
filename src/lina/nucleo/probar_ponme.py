@@ -6,7 +6,11 @@ Pasa una tanda fija de peticiones por la Lina real (tus ajustes, tus claves, Gem
 vez de ejecutarse. De cada una dice qué habría abierto, cuánto tardó y cuántas páginas abrió, y lo puntúa: «bien», «a medias» (por ejemplo la ficha de la
 serie en vez del capítulo), «mal», o «revisar» cuando la dirección no basta para saberlo (un identificador sin nombre): entonces la enseña para que la
 mires tú. No cambia ajustes, no escribe en tu memoria y gasta unas pocas llamadas a la IA y a la búsqueda por petición.
+
+A8: de fábrica, SOLO con la clave gratuita (si se queda sin cupo, esa petición sale mal, pero no se pasa sola a la de pago). Con «pago», también la de
+pago, y antes de empezar dice el gasto máximo, que es el tope de la tanda (--tope-eur=N lo cambia): si lo pasa, se para.
 """
+import contextlib
 import re
 import sys
 import threading
@@ -16,10 +20,12 @@ from unittest.mock import MagicMock
 from lina.nucleo import comandos as C
 from lina.nucleo.idioma import N_, T
 
-AYUDA = N_("""lina probar-ponme [N]
-    Pasa una tanda de peticiones «ponme…» por tu Lina (IA y búsqueda de verdad) SIN abrir nada, y dice qué habría abierto, cuánto tardó y si acertó.
-    N: solo las N primeras. Gasta unas pocas llamadas a la IA y a la búsqueda por petición.""")
+AYUDA = N_("""lina probar-ponme [N] [pago] [--tope-eur=N]
+    Pasa una tanda de peticiones «ponme…» por tu Lina (IA y búsqueda de verdad) SIN abrir nada, y dice qué habría abierto, cuánto tardó, cuántas
+    llamadas a la IA hizo y si acertó. N: solo las N primeras. De fábrica usa SOLO la clave gratuita; con «pago», también la de pago, y antes dice
+    el gasto máximo, que es el tope de la tanda (--tope-eur=N lo cambia).""")
 TOPE_SEG = 120                        # una petición que tarde más se corta (cuenta como mal)
+LLAMADAS_POR_PETICION_MAX = 20        # A8: el tope de llamadas de una petición que solo busca y abre webs (para el gasto máximo con la de pago)
 
 
 def _n(texto):
@@ -129,6 +135,23 @@ CASOS = [
 ]
 
 
+@contextlib.contextmanager
+def solo_clave_gratuita(activo=True):
+    """A8: mientras dura, la Lina de la medida solo ve la clave gratuita de Gemini (la de pago queda vacía), así que no puede pasarse a ella sola."""
+    from lina.nucleo import ia_activa as IAC
+    real = IAC.claves_de
+
+    def claves_de(ia):
+        gratis, pago = real(ia)
+        return (gratis, "") if ia.nombre == "gemini" else (gratis, pago)
+    if activo:
+        IAC.claves_de = claves_de
+    try:
+        yield
+    finally:
+        IAC.claves_de = real
+
+
 def _asistente():
     """La Lina de verdad (ajustes, claves, IA y búsqueda), sin Whisper (la frase llega escrita) y sin abrir nada: cada xdg-open se apunta."""
     from lina.nucleo import asistente as A
@@ -176,27 +199,44 @@ def principal(argv, salida=print, vigia=None):
     if argv[:1] in (["-h"], ["--help"], ["ayuda"]):
         salida(T(AYUDA))
         return 0
-    casos = CASOS[:int(argv[0])] if argv[:1] and argv[0].isdigit() else CASOS
+    numeros = [x for x in argv if x.isdigit()]
+    casos = CASOS[:int(numeros[0])] if numeros else CASOS
+    con_pago = "pago" in argv
     from lina.nucleo import claves as CL
     from lina.nucleo import ia as IA
+    from lina.nucleo import medida_gasto as MG
+    tope = None
+    if con_pago:
+        maximo = MG.maximo_estimado(len(casos), LLAMADAS_POR_PETICION_MAX)
+        if MG.restante_del_mes() <= 0:
+            salida(MG.frase_sin_tope_del_mes())
+            return 5
+        tope = MG.Tope(min(MG.tope_de(argv, maximo), MG.restante_del_mes()))
+        salida(MG.frase_estimacion(maximo, tope.eur))
+    else:
+        salida(T("Solo con la clave gratuita: si se queda sin cupo, esa petición sale mal (para medir también con la de pago: lina probar-ponme N pago)."))
     CL.proteger_salida()
     salida(T("Paso {n} peticiones por tu Lina, sin abrir nada (unos segundos cada una)…", n=len(casos)))
     from lina.nucleo import vigia_medida as VIG
     vigia = vigia or VIG.Vigia()                        # S9g: aquí las órdenes son de verdad: si cambian tu sistema, la medida se para
     vigia.empezar(salida)
-    A, a, abiertas = _asistente()
     cuenta, filas = {}, []
-    with IA.solo_medida():
+    with solo_clave_gratuita(not con_pago), IA.solo_medida():
+        A, a, abiertas = _asistente()
         for frase, juez in casos:
+            if tope and tope.superado():
+                salida(MG.frase_parada(tope))
+                return 4
             abiertas_caso, dicho, seg = pasar(frase, A, a, abiertas)
+            llamadas = IA.llamadas_de_la_peticion()
             if vigia.parar_si_cambio(salida):
                 return 6
             nota, motivo = juez(abiertas_caso, dicho)
             cuenta[nota] = cuenta.get(nota, 0) + 1
-            filas.append((frase, nota, motivo, seg, abiertas_caso, dicho))
+            filas.append((frase, nota, motivo, seg, abiertas_caso, dicho, llamadas))
     salida("")
-    for frase, nota, motivo, seg, abiertas_caso, dicho in filas:
-        salida(f"{nota:9} {seg:5.1f} s  {len(abiertas_caso)} pág.  {frase}")
+    for frase, nota, motivo, seg, abiertas_caso, dicho, llamadas in filas:
+        salida(f"{nota:9} {seg:5.1f} s  {len(abiertas_caso)} pág.  {T('{n} llamadas', n=llamadas)}  {frase}")
         salida(f"            {motivo}")
         for u in abiertas_caso:
             salida(f"            → {u}")
@@ -206,6 +246,7 @@ def principal(argv, salida=print, vigia=None):
     salida(T("Bien: {b} · a medias: {m} · mal: {x} · revisar: {r} · media {s:.1f} s · {p} páginas abiertas", b=cuenta.get("bien", 0),
              m=cuenta.get("a medias", 0), x=cuenta.get("mal", 0), r=cuenta.get("revisar", 0), s=sum(f[3] for f in filas) / max(1, len(filas)),
              p=sum(len(f[4]) for f in filas)))
+    salida(T("Llamadas a la IA: {t} en total, {m} como mucho en una petición.", t=sum(f[6] for f in filas), m=max((f[6] for f in filas), default=0)))
     return 0
 
 

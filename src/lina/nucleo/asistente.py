@@ -69,7 +69,7 @@ from PIL import Image
 
 from lina.nucleo import comandos as C
 from lina.nucleo import grupos as G
-from lina.nucleo.turnos import HERRAMIENTAS_META, afirma_fuente, correccion_de_fuente, enlace_sin_comprobar, orden_de_cortesia, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo, es_pregunta, niega_internet
+from lina.nucleo.turnos import HERRAMIENTAS_META, afirma_fuente, correccion_de_fuente, enlace_sin_comprobar, orden_de_cortesia, hechos_de_peticion, motivo_corto, nota_de_hechos, pagina_que_no_es, aperturas_web, direcciones_que_abre, origen_de_direccion, nota_de_direccion_sin_origen, sin_lo_no_abierto, pide_hacer, pregunta_por_lo_anterior, sin_efecto, pide_accion, pide_contenido, solo_herramientas_meta, solo_se_informo, es_pregunta, niega_internet
 try:
     from lina.modulos import web as W
 except ImportError:
@@ -142,7 +142,7 @@ from lina.nucleo.constantes import (  # noqa: F401
     ANCHO_MAX_CAPTURA, ARCHIVO_PID, ARCHIVO_PRIVADO, ARCHIVO_VOCABULARIO, AUDIO_RESPUESTA, AVISO_ESPERA_A_FONDO,
     CAPTURA, CAPTURA_MIRAR, CONFIRMACION_IA, CONFIRMAR_ACCIONES, ESPERA_CUOTA_MAX, ESPERA_PARAR_MAXIMA, ESPERA_PARAR_TAREA,
     ESPERA_REINTENTO, FRECUENCIA, INSTRUCCIONES, INSTRUCCION_LOCAL, instrucciones, INTERRUPCION_IA, MAX_BUSQUEDAS, MAX_BUSQUEDAS_PROFUNDO,
-    MAX_CONTINUACIONES, MAX_ESPERAS_CUOTA, MAX_MIRADAS, MAX_MIRADAS_PROFUNDO, MAX_PASOS, MAX_PASOS_PROFUNDO, MAX_TIEMPO_TAREA,
+    MAX_CONTINUACIONES, MAX_ESPERAS_CUOTA, MAX_LLAMADAS_PETICION_WEB, MAX_SEGUNDOS_PETICION_WEB, MAX_MIRADAS, MAX_MIRADAS_PROFUNDO, MAX_PASOS, MAX_PASOS_PROFUNDO, MAX_TIEMPO_TAREA,
     MAX_TIEMPO_TAREA_PROFUNDO, MAX_TOKENS_TAREA, MAX_TOKENS_TAREA_PROFUNDO, MAX_TURNOS, MODELOS_CONFIRMACION, MODELOS_GEMINI,
     MODELOS_PROFUNDO, MODELO_LOCAL, MODELO_WHISPER, NO_VE_PANTALLA, OLLAMA, PANTALLA_SESION_SEG,
     PAUSA_MODELO_SEG, PLAZO_PENSAR_A_FONDO, PRIORIDAD, PROMPT_WHISPER_CARACTERES, REINTENTOS_SERVIDOR, SESION_MINUTOS,
@@ -489,7 +489,7 @@ def escuchar_mandos(al_pulsar, mantener=None):
 
 
 from lina.nucleo.ia import (  # noqa: F401
-    BucleDeHerramienta, Cancelado, NecesitaReglasCompletas, REGLAS_COMPLETAS, motivo_llamada, recoger_llamadas, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
+    BucleDeHerramienta, Cancelado, NecesitaReglasCompletas, REGLAS_COMPLETAS, motivo_llamada, recoger_llamadas, empezar_cuenta_de_llamadas, llamadas_de_la_peticion, DECISIONES_CONFIRMACION, DECISIONES_CUMPLIMIENTO, DECISIONES_INTERRUPCION, ESQUEMA_CONFIRMACION,
     ESQUEMA_CUMPLIMIENTO, ESQUEMA_INTERRUPCION, HERRAMIENTA_BUSCAR, PROMPT_CONFIRMACION, PROMPT_CUMPLIMIENTO, PROMPT_INTERRUPCION,
     PROMPT_RESUMEN_WEB, _INCAPAZ_DEBIL, _INCAPAZ_FUERTE, _PROMESA, _abortar, _comprobar_cancelacion, _dormir, _espera_de_cuota,
     ver_imagen, _gasto_tarea, _id_pausa, _mini_consulta_ia, _mini_consulta_json, comprobar_tema, _pausa_modelo, _post_cancelable, _resumir_trozo, buscar_reserva, buscar_tavily, declaraciones_de_busqueda, hay_busqueda_tavily, hay_reserva, modo_busqueda, reserva_sin_clave,
@@ -611,6 +611,8 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self.acciones_turno = []       # todo lo que se ha ejecutado de verdad en esta pregunta: (herramienta, datos, resultado)
         self.acciones_confirmadas = []  # lo que se ejecutó al decir «sí», para contarlo aunque Gemini falle
         self.t_tarea = time.time()      # cuándo empezó la petición actual (para el tope de tiempo)
+        self.t_peticion = time.time()   # A8: cuándo empezó la petición (no se reinicia al insistir), para el tope de las que solo buscan y abren webs
+        self.contenido_pedido = None    # A8: lo que la IA entendió que querías ver (contenido.entender), si se le preguntó en esta petición
         self.guion_herramientas = []   # lo que ya se ha ejecutado en esta pregunta (para no repetirlo si cambia de modelo)
         self.paso_guion = 0
         self.ultimo_modo = "rapido"
@@ -1134,6 +1136,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         self.ejecutor.origen = origen                                    # para retomarla con el mismo si pasa a segundo plano
         crono = crono or TIE.Cronometro()
         recoger_llamadas()                                          # cuenta de cero las llamadas a la IA de esta petición (se apuntan en `lina tiempos`)
+        if not profundidad:
+            empezar_cuenta_de_llamadas()                            # A8: y su tope, si solo busca y abre webs
+            self.t_peticion, self.contenido_pedido = time.time(), None
         self.ejecutor.profundidad = profundidad                     # >0: esta vuelta retoma una petición que esperó a una tarea en segundo plano
         euros = PRES.entender_tope(pregunta)
         if euros is not None:                                   # solo TÚ cambias el tope de gasto: lo hace el código ante una frase tuya, nunca la IA
@@ -1386,6 +1391,7 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             if not que or que["tipo"] not in CONT.PLATAFORMAS:
                 log(f"Contenido: {('es ' + que['tipo']) if que else 'no lo he entendido'}; se lo dejo a la IA")
                 return None
+            self.contenido_pedido = que                           # A8: para decir después, por los hechos, si se llegó a lo que pediste
             lo = " - ".join(que["terminos"]) or T("eso")
             log(f"Contenido: {que['tipo']} «{lo}»{' (' + que['torneo'] + ')' if que['torneo'] else ''}, fecha={que['fecha_evento']}, plataformas={que['plataformas']}")
             self.nueva_tarea()
@@ -1435,13 +1441,106 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         if not comando.strip().startswith(("xdg-open ", "xdg-open\t")) or "://" not in comando or not pide_contenido(peticion):
             return None
         nueva = comando.split(None, 1)[1].strip().strip("'\"")
-        abiertas = [str(a[1].get("comando", "")).split(None, 1)[1].strip().strip("'\"") for a in self.acciones_turno
+        abiertas = [str(a[1].get("comando", "")).split(None, 1)[1].strip().strip("'\"") for a in sin_lo_no_abierto(self.acciones_turno)
                     if a[0] == "ejecutar_comando" and str(a[1].get("comando", "")).strip().startswith("xdg-open ") and "://" in str(a[1].get("comando", ""))]
         if nueva in abiertas:
             return "Esa página ya está abierta: no la abro otra vez. Si es la buena, díselo al usuario en una frase; si no, busca otra."
         if abiertas and not pagina_que_no_es(self.acciones_turno, peticion, lambda c: H.clasificar(c)[0] == "lectura"):
             return "Ya hay abierta una página que es la de lo que pidió: no abro otra. Díselo al usuario en una frase."
         return None
+
+    def _lo_visto_en_la_peticion(self):
+        """A8: (lo visto, tus palabras). Lo visto: lo que devolvió cada búsqueda, página leída (y su dirección) u orden de esta petición, y lo que dijiste;
+        no cuenta lo que devolvió abrir una web, ni lo que dijo la IA."""
+        tuyas = " ".join([str(getattr(self, "pregunta_pura", "") or "")] + [str(h.get("texto", "")) for h in (getattr(self, "historial", None) or [])
+                                                                            if isinstance(h, dict) and h.get("rol") == "user"][-3:])
+        vistos = [tuyas]
+        for nombre, args, resultado in getattr(self, "acciones_turno", None) or []:
+            if nombre == "ejecutar_comando" and direcciones_que_abre(str((args or {}).get("comando", ""))):
+                continue
+            vistos.append(str(resultado))
+            if nombre in ("leer_web", "usar_fuente") and str(resultado).startswith("CONTENIDO DE LA PÁGINA"):
+                vistos.append(str((args or {}).get("url", "")))
+        return vistos, tuyas
+
+    def _direccion_sin_origen(self, comando):
+        """A8: antes de abrir una web (con xdg-open o un navegador, pidas lo que pidas y con las palabras que sea), el código comprueba que la dirección
+        está bien formada y que sale de algo visto en esta petición (ver turnos.origen_de_direccion). Si no, no se abre y la IA recibe el hecho y las
+        salidas que valen. None si se puede abrir."""
+        try:
+            abiertas = direcciones_que_abre(comando)
+            if not abiertas:
+                return None
+            vistos, tuyas = self._lo_visto_en_la_peticion()
+            for url, problema in abiertas:
+                if problema:
+                    log(f"Dirección mal formada ({problema}): no la abro «{url[:150]}»")
+                    return nota_de_direccion_sin_origen(url, problema)
+                if not origen_de_direccion(url, vistos, tuyas):
+                    log(f"Dirección que no sale de ninguna búsqueda ni página leída: no la abro «{url[:150]}»")
+                    return nota_de_direccion_sin_origen(url)
+        except Exception as e:
+            log(f"Comprobar de dónde sale la dirección: fallo {e!r}; no la abro")
+            return "NO ABIERTO: no se ha podido comprobar de dónde sale esa dirección. Abre una que hayas visto en los resultados."
+        return None
+
+    def _aperturas_web(self):
+        """A8: [(dirección, resultado)] si en esta petición solo se ha buscado, leído y abierto webs (ver turnos.aperturas_web); None si no."""
+        try:
+            return aperturas_web(getattr(self, "acciones_turno", None) or [], lambda c: H.clasificar(c)[0] == "lectura")
+        except Exception as e:
+            log(f"Ver qué webs se han abierto: fallo {e!r}")
+            return None
+
+    def _presupuesto_web_agotado(self):
+        """A8: si la petición solo busca, lee y abre webs y ya ha gastado sus llamadas o su tiempo, por qué (para el registro y la IA); "" si no."""
+        if self._aperturas_web() is None:
+            return ""
+        llamadas, segundos = llamadas_de_la_peticion(), time.time() - getattr(self, "t_peticion", time.time())
+        if llamadas >= MAX_LLAMADAS_PETICION_WEB or segundos >= MAX_SEGUNDOS_PETICION_WEB:
+            return f"presupuesto de la petición agotado ({llamadas} llamadas, {segundos:.0f} s)"
+        return ""
+
+    def _frase_de_lo_abierto(self):
+        """A8: si en esta petición solo se han buscado y abierto webs, lo que se ha abierto de verdad y lo que te queda a ti, escrito por el código a partir
+        de los hechos (de dónde salió la dirección y, si la IA entendió que pedías un capítulo, si la página es la de ese capítulo). None si se ha abierto
+        justo lo encontrado (entonces vale la respuesta de la IA), si no se abrió nada o si se hizo otra cosa."""
+        abiertas = self._aperturas_web()
+        if not abiertas:
+            return None
+        url = abiertas[-1][0]
+        vistos, tuyas = self._lo_visto_en_la_peticion()
+        origen = origen_de_direccion(url, vistos, tuyas) or {"como": "vista", "titulo": "", "web": ""}
+        from urllib.parse import urlparse
+        web = origen.get("web") or urlparse(url).netloc.lower().removeprefix("www.")
+        web = CONT.NOMBRE_VISIBLE.get(web, web)                 # solo cómo se dice el nombre; nada se decide por él
+        if origen["como"] == "portada":
+            return T("He abierto {web}; ahí tienes que buscarlo tú.", web=web)
+        if origen["como"] == "busqueda":
+            return T("He abierto la búsqueda de «{busca}» en {web}; elige ahí el que quieres.", busca=origen["busca"][:80], web=web)
+        que = getattr(self, "contenido_pedido", None)
+        falta_capitulo = bool(isinstance(que, dict) and que.get("tipo") == "capitulo" and que.get("episodio")
+                              and not self._es_el_capitulo(url, origen.get("titulo", ""), que))
+        if origen["como"] == "parte":
+            return (T("He abierto en {web} una página más general que la que salió en la búsqueda; el capítulo hay que elegirlo ahí.", web=web) if falta_capitulo
+                    else T("He abierto en {web} una página más general que la que salió en la búsqueda; lo concreto hay que elegirlo ahí.", web=web))
+        titulo = str(origen.get("titulo") or "").strip()[:100]
+        if falta_capitulo:
+            return (T("He abierto «{titulo}» en {web}; el capítulo hay que elegirlo ahí.", titulo=titulo, web=web) if titulo
+                    else T("He abierto en {web} la página que salió en la búsqueda; el capítulo hay que elegirlo ahí.", web=web))
+        if getattr(self.ejecutor, "cambio_sin_comprobar", False) is True or getattr(self.ejecutor, "efecto_sin_comprobar", False) is True:
+            return (T("He abierto «{titulo}» en {web}.", titulo=titulo, web=web) if titulo
+                    else T("He abierto en {web} la página que salió en la búsqueda.", web=web))
+        return None
+
+    @staticmethod
+    def _es_el_capitulo(url, titulo, que):
+        """¿La página abierta es la del capítulo pedido? Por los hechos: la dirección dice ese capítulo (y no otro) o el título lo nombra."""
+        from urllib.parse import unquote, urlparse
+        ruta = unquote(urlparse(url).path).lower()
+        if CONT._EPISODIO_EN_RUTA.search(ruta) and CONT._es_ese_capitulo(ruta, que) and re.search(rf"(?<!\d)0*{que['episodio']}(?!\d)", ruta):
+            return True
+        return bool(re.search(rf"\b(?:capitulo|episodio|episode|ep|e)\s*0*{que['episodio']}\b", C.normalizar(titulo)))
 
     def _ejecutar_directa(self, ident, datos):
         """Hace la orden directa con las herramientas de siempre y devuelve lo que se dirá, o None si no se pudo comprobar que se hizo."""
@@ -1823,6 +1922,11 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             log(f"Tope de tiempo de la tarea ({tiempo} s)")
             return (f"TOPE ALCANZADO: esta petición ya ha durado más de {tiempo} s. No uses más herramientas: cuéntale al "
                     "usuario lo que ya has hecho y lo que falta, y que si quiere que siga te lo pida de nuevo.")
+        agotado = self._presupuesto_web_agotado()
+        if agotado:
+            log(f"Tope de la petición: {agotado}")
+            return (f"TOPE ALCANZADO: {agotado}. No uses más herramientas: dile al usuario en una frase qué has abierto, o que no has encontrado la "
+                    "página.")
         if _gasto_tarea["tokens"] > tokens:
             log(f"Tope de gasto de la tarea ({tokens} tokens)")
             return ("TOPE ALCANZADO: esta petición ya ha gastado mucho (demasiados tokens). No uses más herramientas: cuéntale al "
@@ -1946,6 +2050,9 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         return AVB.PARA_LA_IA_SIN_BUSQUEDA
 
     def _h_ejecutar_comando(self, nombre, args):
+        sin_origen = self._direccion_sin_origen(str(args.get("comando", "")))
+        if sin_origen:
+            return sin_origen
         otra = self._otra_pagina_de_mas(str(args.get("comando", "")))
         if otra:
             return otra
@@ -2555,6 +2662,10 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             log(f"La respuesta dice haber cambiado una fuente y no consta: se sustituye («{str(texto)[:80]}»)")
             return (T("No lo he guardado: las fuentes no las guardo así. Dime «para TEMA usa esta página…» con el atajo o con lina di, o usa lina fuentes añadir.") if afirma == "guardar"
                     else T("No lo he quitado: las fuentes no las quito así. Dime «quita la fuente de TEMA» con el atajo o con lina di, o usa lina fuentes quitar."))
+        abierto = self._frase_de_lo_abierto()
+        if abierto:                                                # A8: solo se buscaron y abrieron webs: qué se abrió de verdad y qué te queda, sin el aviso genérico
+            log(f"Lo que se ha abierto, por los hechos: «{abierto[:120]}» (en vez de «{str(texto)[:80]}»)")
+            return abierto
         frase = self._frase_sin_comprobar()
         if frase:                                                  # S9l: por los hechos, no por cómo lo diga la IA: no se da por hecho lo que no consta
             log(f"La respuesta no reconoce que el efecto no se ha podido comprobar: se sustituye por lo que consta («{str(texto)[:80]}»)")
@@ -2739,6 +2850,12 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             self.pedir_profundo, self.obstaculo = "", ""
             self._cerrar_receta_interfaz(False)
             return respuesta, modelo
+        agotado = self._presupuesto_web_agotado()
+        if agotado:                                       # A8: buscar y abrir webs no merece otra vuelta pasado su tope: se dice lo que se abrió
+            log(f"{agotado}: no insisto")
+            self.pedir_profundo, self.obstaculo = "", ""
+            self._cerrar_receta_interfaz(False)
+            return respuesta, modelo
         pide = self.pedir_profundo if not self.ejecutor.duda else ""     # si hay una duda de verdad, manda la duda
         rapido = False                                    # el código vio que no se hizo lo pedido (solo se informó, o se abrió otra página): basta el modelo rápido
         obst = self.obstaculo if not self.ejecutor.duda else ""
@@ -2809,6 +2926,8 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
             self.max_tiempo = TIEMPO_INSISTIR_SIN_AJUSTES
             timeout_insistir = TIMEOUT_INSISTIR_SIN_AJUSTES
             plazo = time.time() + TIEMPO_INSISTIR_SIN_AJUSTES
+            if self._aperturas_web() is not None:         # A8: solo se buscan y abren webs: la vuelta cabe en el tiempo de la petición
+                plazo = min(plazo, getattr(self, "t_peticion", time.time()) + MAX_SEGUNDOS_PETICION_WEB)
             log(f"Insisto con el modelo rápido ({pide[:120]})")
         elif pide:                                        # lo pidió la IA (o tú, con otras palabras): pensar con calma, no insistir a ciegas
             self.max_tiempo = TIEMPO_PENSAR_A_FONDO
@@ -2907,10 +3026,14 @@ class Asistente(TareaActual, MixinOrganizacion, MixinPantalla, MixinAjustes, Mix
         peticion = str(self.pregunta_pura or pregunta)
         if not pide_contenido(peticion):
             return respuesta
-        for _ in range(2):
+        for _ in range(1):                               # A8: una vuelta más como mucho (eran dos), y solo si queda presupuesto
             mal = pagina_que_no_es(self.acciones_turno, peticion, lambda c: H.clasificar(c)[0] == "lectura")
             if not mal:
                 return respuesta
+            agotado = self._presupuesto_web_agotado()
+            if agotado:
+                log(f"{agotado}: no doy otra vuelta")
+                break
             log(f"Tras insistir, {mal[1]}: otra vuelta con el modelo rápido")
             nota = "\n[SISTEMA: " + self._nota_pagina_de_contenido(mal[0], mal[1], pregunta) + ".]"
             nueva = None

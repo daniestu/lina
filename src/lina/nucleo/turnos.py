@@ -67,7 +67,7 @@ def pide_hacer(texto):
 
 
 # Lo que devuelve una herramienta cuando NO ha hecho lo que se le pedía
-_NO_HECHO = re.compile(r"^(?:BLOQUEADO|PREPARADO|TOPE ALCANZADO|No |Falta |Hay varios|Intenté |La herramienta ha fallado|Error|código de salida: [1-9])")
+_NO_HECHO = re.compile(r"^(?:BLOQUEADO|PREPARADO|NO ABIERTO|TOPE ALCANZADO|No |Falta |Hay varios|Intenté |La herramienta ha fallado|Error|código de salida: [1-9])")
 
 
 def sin_efecto(acciones, es_lectura):
@@ -259,6 +259,7 @@ def niega_internet(texto):
 
 def solo_se_informo(acciones, es_lectura):
     """True si en la petición solo se buscó, leyó o miró (ningún comando que cambie o abra algo). `es_lectura(comando)` dice si un comando solo lee."""
+    acciones = sin_lo_no_abierto(acciones)
     if not acciones:
         return True
     for nombre, args, _ in acciones:
@@ -288,6 +289,7 @@ def pide_contenido(texto):
 def solo_portadas(acciones, es_lectura):
     """La portada que se abrió (p. ej. «www.movistarplus.es») si, aparte de buscar y leer, lo único que se hizo fue abrir portadas de webs (sin ruta ni
     parámetros); None si se abrió una página concreta, se hizo otra cosa o no se abrió nada."""
+    acciones = sin_lo_no_abierto(acciones)
     from urllib.parse import urlparse
     portada = None
     for nombre, args, _ in acciones or []:
@@ -326,10 +328,205 @@ _PAGINA_DE_GUIA = re.compile(r"(?:^|[/_-])(?:programacion(?:-tv)?|parrilla|guia(
                              r"categor(?:y|ies|ia|ias))(?:[/_.-]|$)")
 
 
+def sin_lo_no_abierto(acciones):
+    """Las acciones sin las aperturas que el código no dejó hacer (A8, «NO ABIERTO…»): una dirección que no se abrió no cuenta como abierta."""
+    return [a for a in (acciones or []) if not str(a[2] if len(a) > 2 else "").startswith("NO ABIERTO")]
+
+
+# ---------------------------------------------------------------- A8: de dónde sale una dirección, ANTES de abrirla
+# Lo que se comprueba es un hecho (si la dirección salió de algo que se ha visto en esta petición), no qué quiere el usuario: vale para cualquier web y
+# cualquier forma de pedirlo, sin lista de plataformas.
+_HOST_VALIDO = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9](?::\d{1,5})?$|^localhost(?::\d{1,5})?$")
+_ESQUEMA = re.compile(r"^[a-z][\w+.-]*://", re.I)
+_SEGMENTO_DE_BUSQUEDA = re.compile(r"^[a-z_-]{1,30}$")
+_PARAMETROS_DE_RASTREO = re.compile(r"^(?:utm_\w+|fbclid|gclid|mc_\w+|ref|ref_src)$", re.I)
+_FINAL_DE_FRASE = ").,;:»”'\"]>"
+
+
+def direcciones_que_abre(comando):
+    """[(dirección, problema)] de cada web que abriría esta orden con xdg-open o un navegador; problema es None si está bien formada, o el motivo (en
+    palabras para la IA). [] si la orden no abre ninguna web."""
+    import shlex
+    from lina.nucleo import clasificador as CL
+    try:
+        lex = shlex.shlex(str(comando), posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        fichas = list(lex)
+    except ValueError:
+        return [(str(comando), "la orden tiene comillas sin cerrar")] if re.search(r"https?:", str(comando)) else []
+    abiertas = []
+    for seg in _segmentos(fichas):
+        if not seg or seg[0].rsplit("/", 1)[-1] not in CL._NAVEGADORES:
+            continue
+        args = [a for a in seg[1:] if not a.startswith("-")]
+        webs = [a for a in args if re.match(r"^\s*(?:https?:|www\.)", a, re.I)]       # un archivo («informe.pdf») o file:// no es una web
+        for a in webs:
+            abiertas.append((a, problema_de_direccion(a)))
+        if webs and seg[0].rsplit("/", 1)[-1] == "xdg-open" and len(args) > 1:
+            abiertas = [(u, p or "xdg-open abre una sola cosa y la orden lleva más de una (¿un espacio dentro de la dirección?)") for u, p in abiertas]
+    return abiertas
+
+
+def _segmentos(fichas):
+    """Las órdenes de una línea ya partida en fichas (separadas por ;, &&, |…), sin nohup, setsid, env ni exec delante."""
+    segmentos, actual = [], []
+    for f in fichas:
+        if f and all(c in "();<>|&" for c in f):
+            segmentos.append(actual)
+            actual = []
+        else:
+            actual.append(f)
+    segmentos.append(actual)
+    limpios = []
+    for seg in segmentos:
+        while seg and seg[0] in ("nohup", "setsid", "env", "exec"):
+            seg = seg[1:]
+        if seg:
+            limpios.append(seg)
+    return limpios
+
+
+def solo_abre_webs(comando):
+    """¿Esta orden no hace nada más que abrir webs con xdg-open o un navegador? (Un hecho de su texto, no de lo que se pidió.)"""
+    import shlex
+    from lina.nucleo import clasificador as CL
+    try:
+        lex = shlex.shlex(str(comando), posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        segmentos = _segmentos(list(lex))
+    except ValueError:
+        return bool(direcciones_que_abre(comando))
+    return bool(segmentos) and all(seg[0].rsplit("/", 1)[-1] in CL._NAVEGADORES for seg in segmentos) and bool(direcciones_que_abre(comando))
+
+
+def aperturas_web(acciones, es_lectura):
+    """Si en esta petición, aparte de buscar, leer y mirar, solo se han intentado abrir webs: [(dirección, resultado)] de las que se abrieron de verdad
+    (en orden; puede ser [] si ninguna se abrió). None si se hizo otra cosa o no se intentó abrir ninguna."""
+    intentada, abiertas = False, []
+    for nombre, args, resultado in acciones or []:
+        if nombre in HERRAMIENTAS_DE_INFORMAR or nombre in HERRAMIENTAS_META:
+            continue
+        comando = str((args or {}).get("comando", "")) if nombre == "ejecutar_comando" else ""
+        if nombre == "ejecutar_comando" and solo_abre_webs(comando):
+            intentada = True
+            r = str(resultado)
+            if not r.startswith("NO ABIERTO") and not _NO_HECHO.match(r):
+                abiertas += [(u, r) for u, problema in direcciones_que_abre(comando) if not problema]
+            continue
+        if nombre == "ejecutar_comando" and es_lectura(comando):
+            continue
+        return None
+    return abiertas if intentada else None
+
+
+def problema_de_direccion(url):
+    """None si es una dirección web bien formada (http o https, un dominio de verdad y sin espacios); si no, qué le pasa."""
+    from urllib.parse import urlparse
+    if re.search(r"\s", url) or any(ord(c) < 32 for c in url):
+        return "lleva espacios o saltos de línea dentro"
+    if not re.match(r"^https?://", url, re.I):
+        return "le falta «https://» delante" if not _ESQUEMA.match(url) else "no es una dirección http ni https"
+    try:
+        p = urlparse(url)
+        host = (p.netloc.rsplit("@", 1)[-1]).lower()
+    except ValueError:
+        return "no se puede leer como dirección"
+    if "@" in p.netloc or not _HOST_VALIDO.match(host):
+        return f"el dominio «{p.netloc}» no es válido"
+    return None
+
+
+def _clave_de_direccion(url):
+    """(dominio sin «www.», ruta sin «/» final, parámetros ordenados sin los de rastreo), para comparar dos direcciones."""
+    from urllib.parse import parse_qsl, unquote, urlparse
+    try:
+        p = urlparse(url.strip().rstrip(_FINAL_DE_FRASE))
+    except ValueError:
+        return None
+    parametros = tuple(sorted((k, v) for k, v in parse_qsl(p.query, keep_blank_values=True) if not _PARAMETROS_DE_RASTREO.match(k)))
+    return p.netloc.lower().removeprefix("www."), unquote(p.path).rstrip("/"), parametros
+
+
+def _vistas(vistos):
+    """{clave: (dirección, título, web)} de las direcciones que aparecen en lo visto (resultados, páginas leídas, tus palabras)."""
+    vistas = {}
+    for texto in vistos:
+        texto = str(texto or "")
+        for m in _URL.finditer(texto):
+            u = m.group(0).rstrip(_FINAL_DE_FRASE)
+            clave = _clave_de_direccion(u)
+            if not clave or clave in vistas:
+                continue
+            linea = texto[texto.rfind("\n", 0, m.start()) + 1:m.start()]
+            r = re.match(r"^\[\d+\]\s*(.*?)\s*\(([a-z0-9.-]+\.[a-z]{2,})\)\s*$", linea)          # «[1] Título (web) dirección», como salen los resultados
+            vistas[clave] = (u, r.group(1).strip() if r else "", r.group(2) if r else "")
+    return vistas
+
+
+def _palabras_de(texto):
+    from urllib.parse import unquote_plus
+    return C.normalizar(unquote_plus(str(texto))).split()
+
+
+def origen_de_direccion(url, vistos, palabras_tuyas=""):
+    """De dónde sale una dirección que se va a abrir, por los hechos de esta petición. Devuelve un dict con «como» y, si se sabe, «titulo», «web» o
+    «busca», o None si no sale de nada visto:
+      vista    la dirección exacta salió en una búsqueda, una página leída, la salida de una orden o lo que dijiste;
+      parte    es una parte de una dirección vista (la de la serie, quitando el capítulo): no trae nada que no se haya visto;
+      portada  la portada de una web (sin ruta ni parámetros);
+      busqueda la búsqueda de esa web con palabras tuyas (o de lo visto) y sin ningún identificador nuevo en la ruta."""
+    from urllib.parse import parse_qsl, urlparse
+    clave = _clave_de_direccion(url)
+    if not clave:
+        return None
+    host, ruta, parametros = clave
+    vistas = _vistas(vistos)
+    if clave in vistas:
+        _, titulo, web = vistas[clave]
+        return {"como": "vista", "titulo": titulo, "web": web or host}
+    if not parametros:
+        for (h, r, _), (_, titulo, web) in vistas.items():
+            if h == host and r == ruta:
+                return {"como": "vista", "titulo": titulo, "web": web or host}
+    if not ruta and not parametros and not urlparse(url).fragment:
+        return {"como": "portada", "web": host}
+    trozos = [t for t in ruta.split("/") if t]
+    if trozos and not parametros:
+        for (h, r, _), (_, _, web) in vistas.items():
+            if h == host and [t for t in r.split("/") if t][:len(trozos)] == trozos:
+                return {"como": "parte", "titulo": "", "web": web or host}
+    if parametros and len(trozos) <= 3 and all(_SEGMENTO_DE_BUSQUEDA.match(t.lower()) for t in trozos):
+        vocabulario = set(_palabras_de(palabras_tuyas)) | {w for t in vistos for w in _palabras_de(t)}
+        distintivas = palabras_distintivas(palabras_tuyas)
+        busca = None
+        for _, valor in parse_qsl(urlparse(url).query):
+            palabras = _palabras_de(valor)
+            if any(re.search(r"\d{3,}", w) and w not in vocabulario for w in palabras):
+                return None                                  # un identificador que no se ha visto: no es una búsqueda, es una ficha inventada
+            if (palabras and any(w in distintivas for w in palabras)
+                    and all(w in vocabulario for w in palabras if len(w) >= 3) and not busca):
+                busca = valor.strip()
+        if busca:
+            return {"como": "busqueda", "busca": busca, "web": host}
+    return None
+
+
+def nota_de_direccion_sin_origen(url, problema=None):
+    """Lo que se le dice a la IA cuando una dirección no se abre (A8): el hecho y las salidas que sí valen. No se nombra ninguna web."""
+    if problema:
+        return (f"NO ABIERTO: la dirección «{url[:200]}» está mal formada: {problema}. Escríbela entera, sin espacios, con https:// delante, "
+                "o abre una dirección que hayas visto en los resultados.")
+    return (f"NO ABIERTO: la dirección «{url[:200]}» no ha salido de ninguna búsqueda, página leída ni orden de esta petición, ni la ha dicho el usuario: "
+            "no se abren direcciones sacadas de memoria. Abre una dirección que hayas visto en los resultados (tal cual), la búsqueda de esa web con el "
+            "título (una dirección con el título en los parámetros, sin números que no hayas visto) o su portada. Si buscas la página, busca antes con "
+            "buscar_web y abre un resultado.")
+
+
 def enlace_sin_comprobar(acciones, plataformas, es_lectura, pregunta=""):
     """La última ficha de una plataforma de vídeo (Netflix, Movistar…) que se ha ABIERTO en esta petición sin que su identificador haya salido de ningún
     resultado (una búsqueda, una página leída, la salida de un comando) ni de lo que dijiste: un número que la IA ha sacado de su memoria (o inventado).
     Devuelve (dirección, dominio) o None."""
+    acciones = sin_lo_no_abierto(acciones)
     from urllib.parse import urlparse
     abierta, quien = None, None
     for i, (nombre, args, _) in enumerate(acciones or []):
@@ -361,6 +558,7 @@ def palabras_distintivas(texto):
 def pagina_que_no_es(acciones, pregunta, es_lectura):
     """Tras «pon…»: (dirección, motivo) si lo que se abrió NO es la página de lo pedido (una portada, una guía de programación o una página que no lo
     nombra); None si se abrió algo que sí lo es, si se hizo otra cosa o si no se abrió nada."""
+    acciones = sin_lo_no_abierto(acciones)
     from urllib.parse import urlparse
     abiertas = []
     for nombre, args, _ in acciones or []:

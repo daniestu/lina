@@ -76,6 +76,8 @@ MAX_BUSQUEDAS = 2                           # búsquedas máximas por pregunta
 CONFIRMAR_ACCIONES = True                   # True: lo que cambia el sistema espera tu "sí"; False: modo libre (solo se bloquea lo catastrófico)
 MAX_CONTINUACIONES = 3                      # veces seguidas que se retoma una petición tras una tarea en segundo plano (para que no dé vueltas sin fin)
 MAX_PASOS = 10                              # llamadas a herramientas máximas por pregunta
+MAX_LLAMADAS_PETICION_WEB = 20              # A8: una petición que solo busca, lee y abre webs («ponme…») no pasa de estas llamadas a la IA…
+MAX_SEGUNDOS_PETICION_WEB = 30              # …ni de este tiempo: se responde con lo que se haya abierto, sin otra vuelta
 ESPERA_TURNO_VOZ = 60                       # segundos que una frase espera su turno para hablar; después se salta (y, si importa, sale como notificación)
 
 ARCHIVO_PID = RUT.PID

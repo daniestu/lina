@@ -344,12 +344,18 @@ def test_lo_que_se_abre_al_insistir_tambien_se_comprueba(octubre_2026):
 
     def gemini(modo, modelo, texto, *x, **k):
         vueltas.append(modo)
-        url = _ANTIGUA if len(vueltas) == 1 else _ACTUAL                  # primero otra página que no vale, luego la buena
+        url = _ANTIGUA if len(vueltas) == 1 else _ACTUAL                  # la vuelta abre otra página que no vale
         a.acciones_turno.append(("ejecutar_comando", {"comando": f"xdg-open '{url}'"}, "Lanzado."))
         return "Abierto."
     a._gemini = gemini
+    assert "No he dado con la página" in a._asegurar_pagina_de_contenido("Te he abierto DAZN.", "p", None, [], "s")
+    assert vueltas == ["rapido"]                                            # A8: una sola vuelta más (eran dos)
+
+
+def test_si_la_vuelta_abre_la_buena_se_queda(octubre_2026):
+    A, a, _ = _asistente(_PARTIDO, _abre("https://www.dazn.com/es-ES/home"))
+    a._gemini = lambda *x, **k: (a.acciones_turno.append(("ejecutar_comando", {"comando": f"xdg-open '{_ACTUAL}'"}, "Lanzado.")), "Abierto.")[1]
     assert a._asegurar_pagina_de_contenido("Te he abierto DAZN.", "p", None, [], "s") == "Abierto."
-    assert vueltas == ["rapido", "rapido"]
 
 
 def test_si_tras_insistir_sigue_sin_estar_lo_dice(octubre_2026):

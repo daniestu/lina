@@ -89,10 +89,13 @@ def descripcion(n):
 # ----------------------------------------------------------------------------------------------------------------------
 # Adaptar las órdenes con sudo al nivel que hay
 # ----------------------------------------------------------------------------------------------------------------------
+_LLEVA_SUDO = re.compile(r"\b(?:sudo|doas)\b")
+
+
 def adaptar(comando, paquetes=None, n=None, existe=shutil.which):
     """`comando` ya viene con 'sudo -n'. Con nivel total no se toca. Con 'instalar', las instalaciones van por el ayudante. Sin regla, la orden sencilla
     pasa a pkexec (el sistema pide la contraseña en su propio diálogo)."""
-    if not COMPROBAR:
+    if not COMPROBAR or not _LLEVA_SUDO.search(comando):        # A8: sin sudo ni doas no hay nada que adaptar: no se pregunta el nivel (era un sudo -n true por acción)
         return comando
     n = n or nivel()
     if n == "total":

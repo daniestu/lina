@@ -508,6 +508,7 @@ def _registrar_uso(clave, modelo, r):
 _llamadas: list[tuple[float, str]] = []                       # (segundos, resultado) de cada llamada a la IA desde la última vez que se recogieron (para `lina tiempos`)
 _cerrojo_llamadas = threading.Lock()
 MAX_LLAMADAS_ANOTADAS = 30
+_cuenta_peticion = [0]                                       # A8: todas las llamadas a la IA de la petición en curso (para su tope), sin límite de anotación
 
 
 def _turno_medido(proveedor, clave, modelo, *args, **kwargs):
@@ -517,6 +518,7 @@ def _turno_medido(proveedor, clave, modelo, *args, **kwargs):
     segundos = time.monotonic() - t0
     resultado = "ok" if not isinstance(r, PROV.ErrorIA) else ("red" if r.tipo == "red" else str(r.estado or r.tipo))
     with _cerrojo_llamadas:
+        _cuenta_peticion[0] += 1
         if len(_llamadas) < MAX_LLAMADAS_ANOTADAS:
             _llamadas.append((round(segundos, 3), resultado))
     _apuntar_llamada(clave, modelo, args, kwargs, r, segundos, resultado)
@@ -607,6 +609,18 @@ def _apuntar_llamada(clave, modelo, args, kwargs, r, segundos, resultado):
                                                  conv=conv, huella=huella, repite=repite, pago=PRES.nombre_de(clave) == "pago", motivo=_motivo_fijo[0] or _motivo_actual.get()))
     except Exception as e:
         log(f"Llamadas a la IA: no he podido apuntarla ({e!r})")
+
+
+def empezar_cuenta_de_llamadas():
+    """A8: la cuenta de llamadas de una petición nueva empieza en cero."""
+    with _cerrojo_llamadas:
+        _cuenta_peticion[0] = 0
+
+
+def llamadas_de_la_peticion():
+    """A8: cuántas llamadas a la IA lleva la petición en curso (todas: las de responder, las cortas y las de insistir)."""
+    with _cerrojo_llamadas:
+        return _cuenta_peticion[0]
 
 
 def recoger_llamadas():
