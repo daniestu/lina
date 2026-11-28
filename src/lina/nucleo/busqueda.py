@@ -151,6 +151,53 @@ def resultados_de_google(datos, dominio=None):
     return salida
 
 
+# A8b: los enlaces de la búsqueda de Google son de paso (vertexaisearch…/grounding-api-redirect/…), largos y con una cadena aleatoria que la IA copia mal.
+# Se resuelven al llegar (a dónde llevan, sin seguirlos ni descargar la página) para que la IA vea y abra la dirección real, y el código la compruebe.
+ENLACES_DE_PASO: dict = {}                     # {enlace de Google: dirección real} de esta sesión: se abra el que se abra, cuenta como la misma
+MAX_ENLACES_DE_PASO = 500
+TIEMPO_RESOLVER = 2.0                          # segundos como mucho para resolverlos todos (en paralelo); lo que no llegue se queda como estaba
+
+
+def es_enlace_de_paso(url):
+    from lina.nucleo import turnos as TU
+    return TU.es_enlace_de_paso(url)
+
+
+def resolver_enlaces_de_paso(resultados, destino=None, plazo=TIEMPO_RESOLVER):
+    """Cambia en `resultados` cada enlace de paso de Google por la dirección a la que lleva (y su dominio por el real), y lo apunta en ENLACES_DE_PASO.
+    Con la descarga segura de web.py (nunca hacia la red interna). Si no se puede en `plazo` segundos, el resultado se queda con su enlace de Google."""
+    from lina.nucleo import turnos as TU
+    pendientes = [r for r in resultados if es_enlace_de_paso(r.get("url"))]
+    if not pendientes:
+        return resultados
+    if destino is None:
+        from lina.modulos import web as W
+
+        def destino(u):
+            return W.destino(u, timeout=plazo)
+    from concurrent.futures import ThreadPoolExecutor, wait
+    pool = ThreadPoolExecutor(max_workers=min(8, len(pendientes)))
+    futuros = {pool.submit(destino, r["url"]): r for r in pendientes}
+    hechos, _ = wait(futuros, timeout=plazo)
+    pool.shutdown(wait=False, cancel_futures=True)
+    resueltos = 0
+    for f in hechos:
+        r = futuros[f]
+        try:
+            final = f.result()
+        except Exception:
+            final = None
+        if not final or es_enlace_de_paso(final) or TU.problema_de_direccion(final):
+            continue
+        if len(ENLACES_DE_PASO) >= MAX_ENLACES_DE_PASO:
+            ENLACES_DE_PASO.clear()
+        ENLACES_DE_PASO[r["url"]] = final
+        r["url"], r["dominio"] = final, urlparse(final).netloc.lower().removeprefix("www.")
+        resueltos += 1
+    log(f"   enlaces de Google: {resueltos} de {len(pendientes)} con su dirección real")
+    return resultados
+
+
 def _claves_google():
     """[(clave, «pago»|«gratis»)] en el orden en que se prueban. La gratuita, siempre la de Gemini guardada: con otro proveedor, la clave «gratuita» del
     presupuesto es la de ese proveedor y no vale para Google."""
@@ -168,8 +215,9 @@ def pedido_google(consulta, dominio=None, ahora=None):
             "Responde con los datos que encuentres, en pocas frases.")
 
 
-def resultados_google(consulta, dominio=None, post=None, ahora=None):
-    """(resultados, motivo): la búsqueda de Google en una llamada aparte a Gemini. Cuenta en el gasto (tokens y búsquedas)."""
+def resultados_google(consulta, dominio=None, post=None, ahora=None, destino=None):
+    """(resultados, motivo): la búsqueda de Google en una llamada aparte a Gemini. Cuenta en el gasto (tokens y búsquedas). Los enlaces de paso se
+    resuelven (A8b) salvo con una conexión simulada (`post`) sin `destino`: entonces no se sale a la red."""
     claves = _claves_google()
     if not claves:
         return [], ""
@@ -217,6 +265,8 @@ def resultados_google(consulta, dominio=None, post=None, ahora=None):
         if consultas:
             PRES.registrar_busquedas_google(clave, len(consultas))
         resultados = resultados_de_google(datos, dominio)
+        if post is None or destino is not None:
+            resultados = resolver_enlaces_de_paso(resultados, destino)
         log(f"Búsqueda de Google ({tipo}) «{consulta}»{' en ' + dominio if dominio else ''}: {len(resultados)} fuentes ({time.time() - inicio:.1f} s)")
         return resultados, ("" if resultados else T(M_GOOGLE_FALLO))
     return [], motivo

@@ -150,12 +150,12 @@ def test_solo_portadas():
     assert TU.solo_portadas([("buscar_web", {}, "")], leer) is None
 
 
-def test_abrir_solo_la_portada_tras_ponme_hace_insistir(monkeypatch):
+def test_abrir_solo_la_portada_tras_ponme_ya_no_hace_insistir(monkeypatch):
     A, a, enviadas = _asistente("Ponme el partido del Barça en el navegador",
                                 [("buscar_web", {}, "…"), ("ejecutar_comando", {"comando": "xdg-open https://www.movistarplus.es"}, "código de salida: 0")])
     monkeypatch.setattr(A, "verificar_cumplimiento", MagicMock(side_effect=AssertionError("no hace falta el revisor")))
-    a._insistir_si_hace_falta("El partido lo emite Movistar Plus, te he abierto la plataforma.", "m", "rapido", "p", None, [], "s")
-    assert enviadas and "PUSIERAS" in enviadas[0] and "«movistarplus.es»" in enviadas[0]
+    r, _ = a._insistir_si_hace_falta("El partido lo emite Movistar Plus, te he abierto la plataforma.", "m", "rapido", "p", None, [], "s")
+    assert not enviadas and r.startswith("El partido lo emite")           # A8b: una alternativa abierta no se reintenta; si no era, lo dice el usuario
 
 
 def test_abrir_la_ficha_no_hace_insistir(monkeypatch):

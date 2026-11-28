@@ -88,7 +88,7 @@ class _AdaptadorFijado(requests.adapters.HTTPAdapter):
         return self.poolmanager.connection_from_host(**datos, pool_kwargs=ajustes)
 
 
-def _pedir(url, ip):
+def _pedir(url, ip, timeout=None):
     """Un GET sin seguir redirecciones, conectando a `ip` (la comprobada) con el nombre de `url` para el certificado."""
     p = urlparse(url)
     sesion = requests.Session()
@@ -97,7 +97,7 @@ def _pedir(url, ip):
     sesion.mount("https://", adaptador)
     cabeceras = dict(CABECERAS, Host=p.netloc)
     try:
-        r = sesion.get(url, headers=cabeceras, timeout=TIMEOUT, stream=True, allow_redirects=False)
+        r = sesion.get(url, headers=cabeceras, timeout=timeout or TIMEOUT, stream=True, allow_redirects=False)
     except BaseException:
         sesion.close()
         raise
@@ -145,6 +145,25 @@ def descargar(url):
         finally:
             r.close()
     raise ErrorWeb("Demasiadas redirecciones.")
+
+
+def destino(url, timeout=None):
+    """A8b: a dónde lleva una dirección de paso (una redirección, como los enlaces de la búsqueda de Google), sin seguirla ni descargar la página: una
+    sola petición, con la IP comprobada y nunca hacia la red interna. Devuelve la dirección de destino, o None si no redirige."""
+    url = normalizar_url(url)
+    ip = _comprobar_destino(url)
+    try:
+        r = _pedir(url, ip, timeout)
+    except requests.RequestException:
+        raise ErrorWeb("No he podido conectar con esa página.")
+    try:
+        if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("Location"):
+            final = normalizar_url(urljoin(url, r.headers["Location"]))
+            _comprobar_destino(final)                             # tampoco se acepta un destino de la red interna
+            return final
+        return None
+    finally:
+        r.close()
 
 
 def _decodificar(datos, codificacion):

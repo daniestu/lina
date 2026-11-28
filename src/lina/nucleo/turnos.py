@@ -419,6 +419,14 @@ def aperturas_web(acciones, es_lectura):
     return abiertas if intentada else None
 
 
+# A8b: los enlaces de paso de la búsqueda de Google de Lina (no son de ninguna web: los da el buscador que usa Lina)
+_DE_PASO = re.compile(r"^https://vertexaisearch\.cloud\.google\.com/grounding-api-redirect/", re.I)
+
+
+def es_enlace_de_paso(url):
+    return bool(_DE_PASO.match(str(url or "").strip().strip("'\"")))
+
+
 def problema_de_direccion(url):
     """None si es una dirección web bien formada (http o https, un dominio de verdad y sin espacios); si no, qué le pasa."""
     from urllib.parse import urlparse
@@ -581,6 +589,8 @@ def pagina_que_no_es(acciones, pregunta, es_lectura):
                 titulos[m.group(2).rstrip("/")] = m.group(1)
     for u in abiertas:
         p = urlparse(u)
+        if es_enlace_de_paso(u):
+            return None                                       # A8b: un enlace de paso sin resolver no dice qué página es: no se juzga por su ruta
         if p.path in ("", "/") and not p.query and not p.fragment:
             if distintivas and any(d in C.normalizar(p.netloc).replace(" ", "") for d in distintivas):
                 return None                                   # «ponme Movistar Plus»: su portada es justo lo pedido

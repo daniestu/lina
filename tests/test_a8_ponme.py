@@ -45,6 +45,7 @@ def _asistente(pregunta, acciones):
     a._avisar_voz = lambda t: None
     a._fuentes_antes = A.FUE.firma()
     a._gemini = MagicMock(side_effect=AssertionError("no debía llamar a la IA"))
+    a._claves = lambda modo: []                       # A8b: sin claves, la consulta de coherencia no se hace y queda la frase del código
     return A, a
 
 

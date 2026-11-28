@@ -28,7 +28,7 @@ from lina.nucleo import proveedor_openai as POA  # noqa: F401
 from lina.nucleo import proveedores as PROV
 from lina.nucleo import rutas as RUT
 from lina.nucleo import tiempos as TIE
-from lina.nucleo.constantes import (ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
+from lina.nucleo.constantes import (ESPERA_CUOTA_CON_OTRA_CLAVE, ESPERA_CUOTA_MAX, ESPERA_REINTENTO, INSTRUCCION_LOCAL, instrucciones, MAX_ESPERAS_CUOTA, MAX_PASOS,
                                     MODELO_LOCAL, OLLAMA, PAUSA_MODELO_SEG, PAUSA_RED_SEG, PAUSA_SERVIDOR_SEG, PAUSA_VISION_SEG, TIMEOUT_REVISOR, TIMEOUT_VISION, TIMEOUT_TEMA, INTENTOS_TEMA, REINTENTOS_SERVIDOR,
                                     TIMEOUT_CONFIRMACION, ESTIMACION_VRAM_LOCAL)
 from lina.nucleo.opcionales import PRES
@@ -991,7 +991,8 @@ class NecesitaReglasCompletas(BucleDeHerramienta):
 
 
 def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herramientas=None, ejecutar_herramienta=None,
-                 sistema=None, nivel=None, revisor=None, max_pasos=None, esperar_cuota=False, al_esperar=None, timeout=20, plazo=None):
+                 sistema=None, nivel=None, revisor=None, max_pasos=None, esperar_cuota=False, al_esperar=None, timeout=20, plazo=None,
+                 hay_otra_clave=False):
     """La pregunta con su bucle de herramientas, contra el proveedor dado: la IA pide herramientas, se ejecutan y se le devuelven los resultados
     hasta que responde con texto. Devuelve el texto o None si no hubo respuesta (la causa queda en el registro)."""
     if time.time() < _pausa_modelo.get(_id_pausa(modelo, clave), 0):
@@ -1034,6 +1035,12 @@ def preguntar_ia(proveedor, clave, modelo, pregunta, imagen, historial=(), herra
                 log(f"{modelo}: no acepta el nivel de razonamiento «{nivel}» -> reintento sin indicarlo")
                 nivel = None
                 continue
+            if (r.tipo == "cuota" and esperar_cuota and hay_otra_clave and PRES.nombre_de(clave) == "gratis" and not en_medida()
+                    and (r.espera is None or r.espera > ESPERA_CUOTA_CON_OTRA_CLAVE)):
+                log(f"{modelo}: {r.resumen} -> no espero: hay clave de pago con saldo y el mismo modelo, paso a ella enseguida")      # A8b
+                _pausar_por_fallo(modelo, clave, r)
+                _apuntar_fallo(modelo, clave, clase_de_fallo(r))
+                return None
             if r.tipo == "cuota" and esperar_cuota and esperas_cuota < MAX_ESPERAS_CUOTA:
                 if r.espera is not None and r.espera <= ESPERA_CUOTA_MAX:       # al insistir NO se salta a un modelo más flojo: se espera lo que pide el servicio
                     esperas_cuota += 1

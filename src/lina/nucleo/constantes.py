@@ -53,6 +53,7 @@ MAX_TIEMPO_TAREA_PROFUNDO = 900              # cuando el asistente INSISTE (segu
 MAX_TOKENS_TAREA_PROFUNDO = 400000
 MAX_BUSQUEDAS_PROFUNDO = 6
 MAX_PASOS_PROFUNDO = 25
+ESPERA_CUOTA_CON_OTRA_CLAVE = 3             # A8b: en una petición tuya, si la gratuita pide esperar más que esto y hay clave de pago con saldo, no se espera
 ESPERA_CUOTA_MAX = 90                        # si Google pide esperar el límite POR MINUTO, al insistir se espera hasta esto (segundos)
 MAX_ESPERAS_CUOTA = 4                        # y como mucho tantas veces por llamada
 MAX_MIRADAS = 4                              # veces que puede mirar la pantalla en una petición (8 cuando insiste)
@@ -78,6 +79,8 @@ MAX_CONTINUACIONES = 3                      # veces seguidas que se retoma una p
 MAX_PASOS = 10                              # llamadas a herramientas máximas por pregunta
 MAX_LLAMADAS_PETICION_WEB = 20              # A8: una petición que solo busca, lee y abre webs («ponme…») no pasa de estas llamadas a la IA…
 MAX_SEGUNDOS_PETICION_WEB = 30              # …ni de este tiempo: se responde con lo que se haya abierto, sin otra vuelta
+TIEMPO_COHERENCIA = 4.0                     # A8b: segundos que se espera a la IA para saber si su respuesta es coherente con lo abierto; si no, la frase del código
+TIEMPO_TITULO = 2.0                         # A8b: y a leer el título de la página abierta, cuando la búsqueda solo daba su dominio
 ESPERA_TURNO_VOZ = 60                       # segundos que una frase espera su turno para hablar; después se salta (y, si importa, sale como notificación)
 
 ARCHIVO_PID = RUT.PID
